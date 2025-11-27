@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Default to development unless specified
+ENV['RAILS_ENV'] ||= 'development'
+
+# Load the Rails environment
+require_relative '../config/environment'
+
+# Disable output buffering (important for logs)
+$stdout.sync = true
+
+puts "[SoulLink] Starting Discord bot in #{ENV['RAILS_ENV']} environment..."
+
+# Boot the bot
+SoulLink::DiscordBot.new.run
