@@ -57,8 +57,8 @@
     <orderEntry type="library" scope="PROVIDED" name="crass (v1.0.6, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="date (v3.5.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="debug (v1.11.0, RVM: ruby-3.4.5) [gem]" level="application" />
-    <orderEntry type="library" scope="PROVIDED" name="discordrb (v3.5.0, RVM: ruby-3.4.5) [gem]" level="application" />
-    <orderEntry type="library" scope="PROVIDED" name="discordrb-webhooks (v3.5.0, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="discordrb (v3.7.1, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="discordrb-webhooks (v3.7.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="domain_name (v0.6.20240107, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="dotenv (v3.1.8, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="drb (v2.2.3, RVM: ruby-3.4.5) [gem]" level="application" />
