@@ -65,4 +65,4 @@ group :test do
   gem "selenium-webdriver"
 end
 
-gem 'discordrb'
+gem 'discordrb', "~> 3.7"
