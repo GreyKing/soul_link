@@ -89,8 +89,6 @@ app/services/soul_link/
   events.rb        # handle catches/deaths
 bin/
   discord_bot      # start bot
-
-
 ```
 
 ## Troubleshooting
