@@ -1,0 +1,5 @@
+# config/soul_link/rally_points.yml
+current_boss:
+  name: "Brock"
+  recommended_level: 12
+  notes: "Geodude / Onix, watch the rock moves."
