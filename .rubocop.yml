@@ -13,4 +13,7 @@ AllCops:
   - 'bin/**/*'
 
 Style/StringLiterals:
-  EnforcedStyle: single_quotes      
+  Enabled: false
+
+Layout/TrailingEmptyLines:
+  Enabled: false    
