@@ -6,3 +6,14 @@ inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 # # Use `[a, [b, c]]` not `[ a, [ b, c ] ]`
 # Layout/SpaceInsideArrayLiteralBrackets:
 #   Enabled: false
+
+# Attempting to exclude the binary directory from linting 
+AllCops:
+  Exclude:
+  - 'bin/**/*'
+
+Style/StringLiterals:
+  Enabled: false
+
+Layout/TrailingEmptyLines:
+  Enabled: false    
