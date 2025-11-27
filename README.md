@@ -5,11 +5,13 @@ Features slash commands, buttons, and modals for logging catches and deaths.
 
 ⸻
 
-Setup
+## Setup
 
 ### 1. Install gem
+See: https://github.com/shardlab/discordrb
 
 ``gem 'discordrb', '~> 3.5'``
+
 
 ``bundle install``
 
