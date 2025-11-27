@@ -3,6 +3,8 @@
 A Rails-powered Discord bot for managing Soul Link runs.
 Features slash commands, buttons, and modals for logging catches and deaths.
 
+### current invite link within the credentials
+
 ⸻
 
 ## Setup
