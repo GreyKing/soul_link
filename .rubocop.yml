@@ -11,3 +11,6 @@ inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 AllCops:
   Exclude:
   - 'bin/**/*'
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes      
