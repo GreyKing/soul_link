@@ -33,4 +33,5 @@
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 
-.idea
+/.idea/*
+.DS_Store

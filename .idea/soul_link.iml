@@ -47,18 +47,17 @@
     <orderEntry type="library" scope="PROVIDED" name="bigdecimal (v3.3.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="bindex (v0.8.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="bootsnap (v1.19.0, RVM: ruby-3.4.5) [gem]" level="application" />
-    <orderEntry type="library" scope="TEST" name="brakeman (v7.1.1, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="brakeman (v7.1.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="builder (v3.3.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="bundler (v2.7.2, RVM: ruby-3.4.5) [gem]" level="application" />
-    <orderEntry type="library" scope="TEST" name="bundler-audit (v0.9.2, RVM: ruby-3.4.5) [gem]" level="application" />
-    <orderEntry type="library" scope="TEST" name="capybara (v3.40.0, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="bundler-audit (v0.9.2, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="capybara (v3.40.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="concurrent-ruby (v1.3.5, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="connection_pool (v2.5.4, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="crass (v1.0.6, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="date (v3.5.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="debug (v1.11.0, RVM: ruby-3.4.5) [gem]" level="application" />
-    <orderEntry type="library" scope="PROVIDED" name="discordrb (v3.7.1, RVM: ruby-3.4.5) [gem]" level="application" />
-    <orderEntry type="library" scope="PROVIDED" name="discordrb-webhooks (v3.7.1, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="discordrb (v3.7.2@0919e1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="domain_name (v0.6.20240107, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="dotenv (v3.1.8, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="drb (v2.2.3, RVM: ruby-3.4.5) [gem]" level="application" />
@@ -67,7 +66,7 @@
     <orderEntry type="library" scope="PROVIDED" name="erubi (v1.13.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="et-orbi (v1.4.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="event_emitter (v0.2.6, RVM: ruby-3.4.5) [gem]" level="application" />
-    <orderEntry type="library" scope="PROVIDED" name="ffi (v1.17.2, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="ffi (v1.17.3, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="fugit (v1.12.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="globalid (v1.3.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="http-accept (v1.7.0, RVM: ruby-3.4.5) [gem]" level="application" />
@@ -88,7 +87,7 @@
     <orderEntry type="library" scope="PROVIDED" name="marcel (v1.1.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="matrix (v0.4.3, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="mime-types (v3.7.0, RVM: ruby-3.4.5) [gem]" level="application" />
-    <orderEntry type="library" scope="PROVIDED" name="mime-types-data (v3.2025.0924, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="mime-types-data (v3.2026.0127, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="mini_magick (v5.3.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="mini_mime (v1.1.5, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="minitest (v5.26.1, RVM: ruby-3.4.5) [gem]" level="application" />
@@ -136,12 +135,12 @@
     <orderEntry type="library" scope="PROVIDED" name="rubocop-ast (v1.48.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="rubocop-performance (v1.26.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="rubocop-rails (v2.34.0, RVM: ruby-3.4.5) [gem]" level="application" />
-    <orderEntry type="library" scope="TEST" name="rubocop-rails-omakase (v1.1.0, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="rubocop-rails-omakase (v1.1.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="ruby-progressbar (v1.13.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="ruby-vips (v2.2.5, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="rubyzip (v3.2.2, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="securerandom (v0.4.1, RVM: ruby-3.4.5) [gem]" level="application" />
-    <orderEntry type="library" scope="TEST" name="selenium-webdriver (v4.38.0, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="selenium-webdriver (v4.38.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="solid_cable (v3.0.12, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="solid_cache (v1.0.10, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="solid_queue (v1.2.4, RVM: ruby-3.4.5) [gem]" level="application" />
