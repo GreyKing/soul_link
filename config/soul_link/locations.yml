@@ -1,0 +1,49 @@
+# config/soul_link/locations.yml
+route_201:
+  name: "Route 201"
+route_202:
+  name: "Route 202"
+route_203:
+  name: "Route 203"
+route_204:
+  name: "Route 204"
+route_205:
+  name: "Route 205"
+route_206:
+  name: "Route 206"
+route_207:
+  name: "Route 207"
+route_208:
+  name: "Route 208"
+route_209:
+  name: "Route 209"
+route_210:
+  name: "Route 210"
+jubilife_city:
+  name: "Jubilife City"
+oreburgh_city:
+  name: "Oreburgh City"
+floaroma_town:
+  name: "Floaroma Town"
+eterna_city:
+  name: "Eterna City"
+eterna_forest:
+  name: "Eterna Forest"
+oreburgh_mine:
+  name: "Oreburgh Mine"
+valley_windworks:
+  name: "Valley Windworks"
+ravaged_path:
+  name: "Ravaged Path"
+old_chateau:
+  name: "Old Chateau"
+starter:
+  name: "Starter Pokemon"
+gift:
+  name: "Gift Pokemon"
+egg:
+  name: "Egg Hatch"
+trade:
+  name: "Trade"
+other:
+  name: "Other"

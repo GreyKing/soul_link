@@ -1,0 +1,25 @@
+# config/soul_link/gym_info.yml
+first_gym:
+  name: "Oreburgh Gym"
+  max_level: 14
+second_gym:
+  name: "Eterna City Gym"
+  max_level: 22
+third_gym:
+  name: "Veilstone Gym"
+  max_level: 30
+fourth_gym:
+  name: "Pastoria Gym"
+  max_level: 33
+fifth_gym:
+  name: "Hearthome Gym"
+  max_level: 36
+sixth_gym:
+  name: "Canalave Gym"
+  max_level: 40
+seventh_gym:
+  name: "Snowpoint Gym"
+  max_level: 42
+eighth_gym:
+  name: "Sunyshore Gym"
+  max_level: 48
