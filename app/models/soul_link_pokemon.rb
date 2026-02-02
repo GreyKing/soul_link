@@ -1,4 +1,6 @@
 class SoulLinkPokemon < ApplicationRecord
+  self.table_name = 'soul_link_pokemon'  # Add this line
+
   belongs_to :soul_link_run
 
   validates :name, :location, :discord_user_id, presence: true

@@ -55,6 +55,63 @@ module SoulLink
         end
       end
 
+      # /end_current_run - Ends the current active run
+      bot.register_application_command(
+        :end_current_run,
+        'End the current Soul Link run',
+        server_id: guild_id
+      )
+
+      bot.application_command(:end_current_run) do |event|
+        event.defer(ephemeral: true)
+
+        run = SoulLinkRun.current
+        unless run
+          event.edit_response(content: "❌ No active run found!")
+          next
+        end
+
+        # Show confirmation with stats
+        stats = "**Run ##{run.run_number} Summary:**\n" \
+          "🎯 Caught: #{run.catches.count}\n" \
+          "💀 Dead: #{run.deaths.count}\n\n" \
+          "This will deactivate the run but keep all data. " \
+          "Use `/start_new_run` to begin Run ##{run.run_number + 1}."
+
+        run.deactivate!
+
+        event.edit_response(content: "✅ Ended Run ##{run.run_number}\n\n#{stats}")
+      end
+
+      # /run_status - Show current run statistics
+      bot.register_application_command(
+        :run_status,
+        'Show current run statistics',
+        server_id: guild_id
+      )
+
+      bot.application_command(:run_status) do |event|
+        run = SoulLinkRun.current
+        unless run
+          event.respond(content: "❌ No active run found!", ephemeral: true)
+          next
+        end
+
+        embed = Discordrb::Webhooks::Embed.new(
+          title: "📊 Run ##{run.run_number} Statistics",
+          color: 0x5865F2,
+          fields: [
+            { name: "🎯 Currently Caught", value: run.catches.count.to_s, inline: true },
+            { name: "💀 Deaths", value: run.deaths.count.to_s, inline: true },
+            { name: "📈 Total Caught", value: run.soul_link_pokemon.count.to_s, inline: true }
+          ],
+          footer: { text: "Use /end_current_run to end this run" },
+          timestamp: Time.now
+        )
+
+        event.respond(embed: embed, ephemeral: true)
+      end
+
       # Text command for !next_gym
       bot.message(content: '!next_gym') do |event|
         next unless event.channel.id == SoulLinkRun.current&.general_channel_id
@@ -68,29 +125,50 @@ module SoulLink
     # Button & Modal Handlers
     # ------------------------
     def register_interactions
-      # Button: Add catch
+      # Button: Add catch - show location selector
       bot.button(custom_id: /^soul_link:add_catch/) do |event|
-        open_catch_modal(event)
+        show_location_selector(event, 'catch')
       end
 
-      # Button: Mark caught pokemon as dead
+      # Select menu: Location selected for catch
+      bot.select_menu(custom_id: /^soul_link:location_select:catch:/) do |event|
+        location = event.values.first
+        open_catch_modal(event, location)
+      end
+
+      # Button: Mark caught pokemon as dead - show pokemon selector
       bot.button(custom_id: /^soul_link:move_to_deaths/) do |event|
-        open_move_to_deaths_modal(event)
+        show_caught_pokemon_selector(event)
       end
 
-      # Button: Add uncaught death
+      # Select menu: Pokemon selected to move to deaths
+      bot.select_menu(custom_id: /^soul_link:pokemon_select:move_deaths:/) do |event|
+        pokemon_id = event.values.first
+        show_death_location_selector(event, pokemon_id)
+      end
+
+      # Select menu: Death location selected
+      bot.select_menu(custom_id: /^soul_link:death_location_select:/) do |event|
+        # Extract pokemon_id from custom_id
+        pokemon_id = event.interaction.data['custom_id'].split(':').last
+        location = event.values.first
+        handle_move_to_deaths_final(event, pokemon_id, location)
+      end
+
+      # Button: Add uncaught death - show location selector
       bot.button(custom_id: /^soul_link:add_uncaught_death/) do |event|
-        open_uncaught_death_modal(event)
+        show_location_selector(event, 'uncaught_death')
+      end
+
+      # Select menu: Location selected for uncaught death
+      bot.select_menu(custom_id: /^soul_link:location_select:uncaught_death:/) do |event|
+        location = event.values.first
+        open_uncaught_death_modal(event, location)
       end
 
       # Modal: New catch submission
       bot.modal_submit(custom_id: 'soul_link:catch_modal') do |event|
         handle_catch_submission(event)
-      end
-
-      # Modal: Move to deaths submission
-      bot.modal_submit(custom_id: 'soul_link:move_deaths_modal') do |event|
-        handle_move_to_deaths_submission(event)
       end
 
       # Modal: Uncaught death submission
@@ -311,11 +389,104 @@ module SoulLink
     end
 
     # ------------------------
+    # Location Selector
+    # ------------------------
+    def show_location_selector(event, action_type)
+      locations = GameState.location_choices.first(25) # Discord limit
+
+      components = [
+        {
+          type: 1, # Action Row
+          components: [
+            {
+              type: 3, # Select Menu
+              custom_id: "soul_link:location_select:#{action_type}:",
+              placeholder: 'Choose a location',
+              options: locations
+            }
+          ]
+        }
+      ]
+
+      event.respond(
+        content: 'Select the location:',
+        components: components,
+        ephemeral: true
+      )
+    end
+
+    def show_caught_pokemon_selector(event)
+      run = SoulLinkRun.current
+      unless run
+        event.respond(content: "❌ No active run found!", ephemeral: true)
+        return
+      end
+
+      caught = run.catches
+      if caught.empty?
+        event.respond(content: "❌ No caught Pokemon to move to deaths!", ephemeral: true)
+        return
+      end
+
+      options = caught.first(25).map do |pokemon|
+        {
+          label: "#{pokemon.name} (#{GameState.location_name(pokemon.location)})",
+          value: pokemon.id.to_s,
+          description: "Caught at #{GameState.location_name(pokemon.location)}"
+        }
+      end
+
+      components = [
+        {
+          type: 1,
+          components: [
+            {
+              type: 3,
+              custom_id: 'soul_link:pokemon_select:move_deaths:',
+              placeholder: 'Choose a Pokemon to mark as dead',
+              options: options
+            }
+          ]
+        }
+      ]
+
+      event.respond(
+        content: 'Select which Pokemon died:',
+        components: components,
+        ephemeral: true
+      )
+    end
+
+    def show_death_location_selector(event, pokemon_id)
+      locations = GameState.location_choices.first(25)
+
+      components = [
+        {
+          type: 1,
+          components: [
+            {
+              type: 3,
+              custom_id: "soul_link:death_location_select:#{pokemon_id}",
+              placeholder: 'Where did it die? (or skip to use catch location)',
+              options: [
+                { label: 'Use original catch location', value: 'original', description: 'Keep the catch location' }
+              ] + locations
+            }
+          ]
+        }
+      ]
+
+      event.respond(
+        content: 'Select the death location:',
+        components: components,
+        ephemeral: true
+      )
+    end
+
+    # ------------------------
     # Modals
     # ------------------------
-    def open_catch_modal(event)
-      location_options = GameState.location_choices.first(25) # Discord limit
-
+    def open_catch_modal(event, location)
       components = [
         {
           type: 1,
@@ -338,66 +509,26 @@ module SoulLink
             {
               type: 4,
               custom_id: 'location',
-              label: 'Location (route key)',
+              label: 'Location',
               style: 1,
               required: true,
+              value: location, # Pre-fill with selected location
               min_length: 1,
-              max_length: 50,
-              placeholder: 'e.g., route_201'
+              max_length: 50
             }
           ]
         }
       ]
 
-      Discordrb::API::Interaction.create_interaction_modal_response(
-        event.token,
-        event.id,
-        'soul_link:catch_modal',
-        'Add New Catch',
-        components
+      event.show_modal(
+        title: 'Add New Catch',
+        custom_id: 'soul_link:catch_modal',
+        components: components
       )
     end
 
-    def open_move_to_deaths_modal(event)
-      components = [
-        {
-          type: 1,
-          components: [
-            {
-              type: 4,
-              custom_id: 'pokemon_name',
-              label: 'Pokemon Name (from catches)',
-              style: 1,
-              required: true,
-              placeholder: 'Exact name from catches list'
-            }
-          ]
-        },
-        {
-          type: 1,
-          components: [
-            {
-              type: 4,
-              custom_id: 'death_location',
-              label: 'Death Location (route key)',
-              style: 1,
-              required: false,
-              placeholder: 'Leave blank to use catch location'
-            }
-          ]
-        }
-      ]
 
-      Discordrb::API::Interaction.create_interaction_modal_response(
-        event.token,
-        event.id,
-        'soul_link:move_deaths_modal',
-        'Move Pokemon to Deaths',
-        components
-      )
-    end
-
-    def open_uncaught_death_modal(event)
+    def open_uncaught_death_modal(event, location)
       components = [
         {
           type: 1,
@@ -418,21 +549,21 @@ module SoulLink
             {
               type: 4,
               custom_id: 'location',
-              label: 'Location (route key)',
+              label: 'Location',
               style: 1,
               required: true,
-              placeholder: 'e.g., route_202'
+              value: location, # Pre-fill with selected location
+              min_length: 1,
+              max_length: 50
             }
           ]
         }
       ]
 
-      Discordrb::API::Interaction.create_interaction_modal_response(
-        event.token,
-        event.id,
-        'soul_link:uncaught_death_modal',
-        'Add Uncaught Death',
-        components
+      event.show_modal(
+        title: 'Add Uncaught Death',
+        custom_id: 'soul_link:uncaught_death_modal',
+        components: components
       )
     end
 
@@ -461,31 +592,29 @@ module SoulLink
       respond_ephemeral(event, "❌ Error: #{e.message}")
     end
 
-    def handle_move_to_deaths_submission(event)
+    def handle_move_to_deaths_final(event, pokemon_id, location)
       run = SoulLinkRun.current
       unless run
-        respond_ephemeral(event, "❌ No active run found!")
+        event.respond(content: "❌ No active run found!", ephemeral: true)
         return
       end
 
-      values = extract_modal_values(event)
-      pokemon_name = values['pokemon_name']
-      death_location = values['death_location'].presence
-
-      pokemon = run.catches.find_by("LOWER(name) = ?", pokemon_name.downcase)
+      pokemon = run.catches.find_by(id: pokemon_id)
       unless pokemon
-        respond_ephemeral(event, "❌ Could not find **#{pokemon_name}** in catches!")
+        event.respond(content: "❌ Could not find that Pokemon!", ephemeral: true)
         return
       end
 
+      # Use original location if 'original' was selected
+      death_location = location == 'original' ? nil : location
       pokemon.mark_as_dead!(location: death_location)
 
       update_catches_panel(run)
       update_deaths_panel(run)
 
-      respond_ephemeral(event, "💀 Moved **#{pokemon.name}** to deaths. RIP.")
+      event.respond(content: "💀 Moved **#{pokemon.name}** to deaths. RIP.", ephemeral: true)
     rescue => e
-      respond_ephemeral(event, "❌ Error: #{e.message}")
+      event.respond(content: "❌ Error: #{e.message}", ephemeral: true)
     end
 
     def handle_uncaught_death_submission(event)
@@ -516,23 +645,41 @@ module SoulLink
     # ------------------------
     def extract_modal_values(event)
       values = {}
-      event.data['components'].each do |row|
-        row['components'].each do |component|
-          values[component['custom_id']] = component['value']
+
+      # Try different ways discordrb might structure this
+      if event.respond_to?(:values)
+        # If there's a direct values method
+        return event.values
+      elsif event.respond_to?(:components) && event.components
+        # If components exist
+        event.components.each do |row|
+          next unless row.respond_to?(:components)
+          row.components.each do |component|
+            values[component.custom_id] = component.value
+          end
+        end
+      elsif event.respond_to?(:interaction) && event.interaction
+        # Try via interaction object
+        data = event.interaction.data
+        if data && data['components']
+          data['components'].each do |row|
+            row['components'].each do |component|
+              values[component['custom_id']] = component['value']
+            end
+          end
         end
       end
+
       values
+    rescue => e
+      Rails.logger.error "Failed to extract modal values: #{e.message}"
+      Rails.logger.error "Event class: #{event.class}"
+      Rails.logger.error "Event methods: #{event.methods.grep(/component|value|data/).join(', ')}"
+      {}
     end
 
     def respond_ephemeral(event, content)
-      Discordrb::API::Interaction.create_interaction_response(
-        event.token,
-        event.id,
-        4, # CHANNEL_MESSAGE_WITH_SOURCE
-        content,
-        nil, nil, nil,
-        1 << 6 # EPHEMERAL flag
-      )
+      event.respond(content: content, ephemeral: true)
     end
   end
 end

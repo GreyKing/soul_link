@@ -11,14 +11,14 @@
 # It's strongly recommended that you check this file into your version control system.
 
 ActiveRecord::Schema[8.1].define(version: 2026_02_02_164130) do
-  create_table "soul_link_pokemon", force: :cascade do |t|
+  create_table "soul_link_pokemon", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "caught_at"
     t.datetime "created_at", null: false
     t.datetime "died_at"
     t.bigint "discord_user_id", null: false
     t.string "location", null: false
     t.string "name", null: false
-    t.integer "soul_link_run_id", null: false
+    t.bigint "soul_link_run_id", null: false
     t.string "status", default: "caught", null: false
     t.datetime "updated_at", null: false
     t.index ["soul_link_run_id", "status"], name: "index_soul_link_pokemon_on_soul_link_run_id_and_status"
@@ -26,7 +26,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_02_164130) do
     t.index ["status"], name: "index_soul_link_pokemon_on_status"
   end
 
-  create_table "soul_link_runs", force: :cascade do |t|
+  create_table "soul_link_runs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.boolean "active", default: true, null: false
     t.bigint "catches_channel_id", null: false
     t.bigint "catches_panel_message_id"

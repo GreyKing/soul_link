@@ -199,6 +199,7 @@ GEM
     minitest (5.26.1)
     msgpack (1.8.0)
     mutex_m (0.3.0)
+    mysql2 (0.5.6)
     net-imap (0.5.12)
       date
       net-protocol
@@ -361,13 +362,6 @@ GEM
       fugit (~> 1.11)
       railties (>= 7.1)
       thor (>= 1.3.1)
-    sqlite3 (2.8.0-aarch64-linux-gnu)
-    sqlite3 (2.8.0-aarch64-linux-musl)
-    sqlite3 (2.8.0-arm-linux-gnu)
-    sqlite3 (2.8.0-arm-linux-musl)
-    sqlite3 (2.8.0-arm64-darwin)
-    sqlite3 (2.8.0-x86_64-linux-gnu)
-    sqlite3 (2.8.0-x86_64-linux-musl)
     sshkit (1.24.0)
       base64
       logger
@@ -437,6 +431,7 @@ DEPENDENCIES
   importmap-rails
   jbuilder
   kamal
+  mysql2
   propshaft
   puma (>= 5.0)
   rails (~> 8.1.1)
@@ -445,7 +440,6 @@ DEPENDENCIES
   solid_cable
   solid_cache
   solid_queue
-  sqlite3 (>= 2.1)
   stimulus-rails
   thruster
   turbo-rails

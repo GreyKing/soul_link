@@ -233,3 +233,150 @@ For issues or questions, check:
 - discordrb documentation: https://github.com/shardlab/discordrb
 - Discord API docs: https://discord.com/developers/docs
 - Rails logs for detailed error messages
+
+
+
+
+# Importing Existing Run Data
+
+If you're already mid-run and want to start using the bot, follow these steps:
+
+## Step 1: Find Your Discord IDs
+
+```bash
+rake soul_link:find_channel_ids
+```
+
+This will show you how to enable Developer Mode and find the IDs you need.
+
+## Step 2: Create Your Import File
+
+Copy `config/soul_link/import_data.yml` template and fill it in:
+
+```yaml
+run_number: 3  # Current run number
+
+# Channel IDs (right-click channel > Copy Channel ID)
+category_id: 1234567890123456789
+general_channel_id: 1234567890123456789
+catches_channel_id: 1234567890123456789
+deaths_channel_id: 1234567890123456789
+
+# Your Discord User ID
+discord_user_id: 123456789012345678
+
+# Currently caught Pokemon
+caught_pokemon:
+  - name: "Turtwig"
+    location: "starter"
+    caught_at: "2026-01-15 10:00:00"
+  
+  - name: "Starly"
+    location: "route_201"
+    caught_at: "2026-01-15 10:30:00"
+
+# Dead Pokemon
+dead_pokemon:
+  - name: "Bidoof"
+    location: "route_202"
+    caught_at: "2026-01-15 09:00:00"
+    died_at: "2026-01-15 12:00:00"
+```
+
+## Step 3: Run the Import
+
+```bash
+rake soul_link:import_data
+```
+
+This will:
+- Create the run in the database
+- Import all your Pokemon
+- Show you a summary
+
+## Step 4: Set Up Panels (Two Options)
+
+### Option A: Create Fresh Panels (Easiest)
+
+1. Start the bot: `./bin/discord_bot`
+2. In Discord, run `/start_new_run`
+3. This will create new panels with your imported data
+
+**Note:** This will create NEW channels. If you want to keep your existing channels, use Option B.
+
+### Option B: Use Existing Channels
+
+If you want to keep your existing #catches and #deaths channels:
+
+1. Start the bot: `./bin/discord_bot`
+2. In #catches channel, type `/panel` to post the panel
+3. Right-click the new panel message > Copy Message ID
+4. Run in Rails console:
+   ```ruby
+   run = SoulLinkRun.current
+   run.update!(catches_panel_message_id: PASTE_MESSAGE_ID_HERE)
+   ```
+5. Repeat for #deaths channel:
+   ```ruby
+   run.update!(deaths_panel_message_id: PASTE_MESSAGE_ID_HERE)
+   ```
+
+**Note:** You'll need to add a `/panel` command to the bot, or you can manually create a message and use that ID.
+
+## Step 5: Verify
+
+```bash
+rake soul_link:status
+```
+
+Should show your imported data!
+
+## Tips
+
+### Location Keys
+
+Make sure you use the exact keys from `locations.yml`:
+- ✅ `route_201`, `starter`, `eterna_forest`
+- ❌ `Route 201`, `Starter`, `Eterna Forest`
+
+### Dates
+
+Use ISO 8601 format: `YYYY-MM-DD HH:MM:SS`
+- Example: `2026-01-15 10:30:00`
+- Leave out `caught_at` for Pokemon that died before being caught
+
+### Multiple Runs
+
+To import multiple past runs:
+
+1. Set the first run as `active: false` in the database after import
+2. Run import again with next run's data
+3. Only the latest should be `active: true`
+
+```ruby
+# In Rails console
+SoulLinkRun.find_by(run_number: 1).update!(active: false)
+SoulLinkRun.find_by(run_number: 2).update!(active: false)
+# Run 3 stays active
+```
+
+## Troubleshooting
+
+**"No active run found" in bot:**
+- Make sure import succeeded
+- Check `rake soul_link:status`
+- Verify only one run has `active: true`
+
+**Panel not updating:**
+- Make sure `catches_panel_message_id` and `deaths_panel_message_id` are set
+- Check that message IDs are correct (18-19 digit numbers)
+- Try restarting the bot
+
+**Location not found:**
+- Check spelling matches `locations.yml` exactly
+- Keys are lowercase with underscores: `route_201` not `Route 201`
+
+**Import errors:**
+- YAML syntax is very picky about spacing
+- Use 2 spaces for indentation (not tabs)
+- Quotes around strings with special characters

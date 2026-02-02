@@ -1,0 +1,39 @@
+# config/soul_link/import_data.yml
+# Use this to initialize the bot with existing run data
+# Run with: rake soul_link:import_data
+
+run_number: 3  # What run number are you on?
+
+# Discord channel IDs (find these by enabling Developer Mode in Discord, right-click channel > Copy ID)
+category_id: 1234567890123456789
+general_channel_id: 1234567890123456789
+catches_channel_id: 1234567890123456789
+deaths_channel_id: 1234567890123456789
+
+# Your Discord user ID (for tracking who added each Pokemon)
+discord_user_id: 123456789012345678
+
+# List all currently caught Pokemon
+caught_pokemon:
+  - name: "Turtwig"
+    location: "starter"
+    caught_at: "2026-01-15 10:00:00"
+
+  - name: "Starly"
+    location: "route_201"
+    caught_at: "2026-01-15 10:30:00"
+
+  - name: "Shinx"
+    location: "route_202"
+    caught_at: "2026-01-15 11:00:00"
+
+# List all dead Pokemon (both caught and uncaught)
+dead_pokemon:
+  - name: "Bidoof"
+    location: "route_202"  # Where it died
+    caught_at: "2026-01-15 09:00:00"  # When it was caught (optional, leave out if never caught)
+    died_at: "2026-01-15 12:00:00"
+
+  - name: "Zubat"
+    location: "ravaged_path"
+    died_at: "2026-01-16 10:00:00"  # No caught_at = died before being caught
