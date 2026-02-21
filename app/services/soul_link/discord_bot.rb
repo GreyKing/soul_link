@@ -104,6 +104,42 @@ module SoulLink
         event.respond(embed: embed, ephemeral: true)
       end
 
+      # /post_panels - Post catches/deaths panels to existing channels
+      bot.register_application_command(
+        :post_panels,
+        'Post catches & deaths panels to the current run channels'
+      )
+
+      bot.application_command(:post_panels) do |event|
+        event.defer(ephemeral: true)
+
+        begin
+          run = current_run(event)
+          unless run
+            event.edit_response(content: "❌ No active run found! Use `/start_new_run` first or import data via rake.")
+            next
+          end
+
+          catches_channel = bot.channel(run.catches_channel_id)
+          deaths_channel = bot.channel(run.deaths_channel_id)
+
+          unless catches_channel && deaths_channel
+            event.edit_response(content: "❌ Could not find the catches/deaths channels. " \
+              "Make sure the channel IDs are correct in the database.")
+            next
+          end
+
+          post_catches_panel(catches_channel, run)
+          post_deaths_panel(deaths_channel, run)
+
+          event.edit_response(content: "✅ Posted panels to ##{catches_channel.name} and ##{deaths_channel.name}!\n" \
+            "Panels will auto-update as you add catches and deaths.")
+        rescue => e
+          Rails.logger.error "Failed to post panels: #{e.message}"
+          event.edit_response(content: "❌ Failed to post panels: #{e.message}")
+        end
+      end
+
       # Text command for !next_gym
       bot.message(content: '!next_gym') do |event|
         next unless event.channel.id == current_run(event)&.general_channel_id
@@ -185,7 +221,7 @@ module SoulLink
 
       # Create category
       category = server.create_channel(
-        "Run ##{next_number}",
+        GameState.category_name(next_number),
         4 # 4 = category type
       )
 
