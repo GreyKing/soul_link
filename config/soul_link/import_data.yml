@@ -5,13 +5,13 @@
 run_number: 16  # What run number are you on?
 
 # Discord channel IDs (find these by enabling Developer Mode in Discord, right-click channel > Copy ID)
-category_id: 1234567890123456789
-general_channel_id: 1234567890123456789
-catches_channel_id: 1234567890123456789
-deaths_channel_id: 1234567890123456789
+category_id: 1439824126725324894
+general_channel_id: 1017647781931913259
+catches_channel_id: 1439826123931258971
+deaths_channel_id: 1439826145951355000
 
 # Your Discord user ID (for tracking who added each Pokemon)
-discord_user_id: 123456789012345678
+discord_user_id: 153665622641737728
 
 # List all currently caught Pokemon
 caught_pokemon:
