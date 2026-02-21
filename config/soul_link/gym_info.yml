@@ -7,19 +7,19 @@ second_gym:
   max_level: 22
 third_gym:
   name: "Veilstone Gym"
-  max_level: 30
+  max_level: 26
 fourth_gym:
   name: "Pastoria Gym"
-  max_level: 33
+  max_level: 32
 fifth_gym:
   name: "Hearthome Gym"
-  max_level: 36
+  max_level: 37
 sixth_gym:
   name: "Canalave Gym"
-  max_level: 40
+  max_level: 41
 seventh_gym:
   name: "Snowpoint Gym"
-  max_level: 42
+  max_level: 44
 eighth_gym:
   name: "Sunyshore Gym"
-  max_level: 48
+  max_level: 50

@@ -2,7 +2,7 @@
 # Use this to initialize the bot with existing run data
 # Run with: rake soul_link:import_data
 
-run_number: 3  # What run number are you on?
+run_number: 16  # What run number are you on?
 
 # Discord channel IDs (find these by enabling Developer Mode in Discord, right-click channel > Copy ID)
 category_id: 1234567890123456789
@@ -15,25 +15,193 @@ discord_user_id: 123456789012345678
 
 # List all currently caught Pokemon
 caught_pokemon:
-  - name: "Turtwig"
+  - name: "ROSS"
     location: "starter"
-    caught_at: "2026-01-15 10:00:00"
+    caught_at: "2025-11-16 20:55:00"
 
-  - name: "Starly"
+  - name: "Phoebe"
     location: "route_201"
-    caught_at: "2026-01-15 10:30:00"
+    caught_at: "2025-11-16 20:57:00"
 
-  - name: "Shinx"
+  - name: "MIKE"
+    location: "lake_verity"
+    caught_at: "2025-11-16 20:58:00"
+
+  - name: "JOEY"
     location: "route_202"
-    caught_at: "2026-01-15 11:00:00"
+    caught_at: "2025-11-16 20:58:00"
 
-# List all dead Pokemon (both caught and uncaught)
-dead_pokemon:
-  - name: "Bidoof"
-    location: "route_202"  # Where it died
-    caught_at: "2026-01-15 09:00:00"  # When it was caught (optional, leave out if never caught)
-    died_at: "2026-01-15 12:00:00"
+  - name: "Chandler"
+    location: "route_218"
+    caught_at: "2025-11-16 21:04:00"
 
-  - name: "Zubat"
+  - name: "RACHEL"
+    location: "route_204"
+    caught_at: "2025-11-16 21:05:00"
+
+  - name: "Monica"
+    location: "route_219"
+    caught_at: "2025-11-16 21:06:00"
+
+  - name: "Gunther"
+    location: "twinleaf_town"
+    caught_at: "2025-11-16 21:06:00"
+
+  - name: "Mary Jane"
     location: "ravaged_path"
-    died_at: "2026-01-16 10:00:00"  # No caught_at = died before being caught
+    caught_at: "2025-11-16 21:12:00"
+
+  - name: "Tommy"
+    location: "route_203"
+    caught_at: "2025-11-16 21:12:00"
+
+  - name: "Janice"
+    location: "oreburgh_tunnel"
+    caught_at: "2025-12-07 09:18:00"
+
+  - name: "Ben"
+    location: "oreburgh_mine"
+    caught_at: "2025-12-07 09:18:00"
+
+  - name: "Susan"
+    location: "route_207"
+    caught_at: "2025-12-07 09:18:00"
+
+  - name: "RACHEL"
+    location: "route_204"
+    caught_at: "2025-12-17 16:54:00"
+
+  - name: "EMMA"
+    location: "valley_windworks"
+    caught_at: "2026-01-04 10:48:00"
+
+  - name: "Frank Jr"
+    location: "route_205"
+    caught_at: "2026-01-04 10:48:00"
+
+  - name: "Charles"
+    location: "eterna_city"
+    caught_at: "2026-01-10 17:53:00"
+
+  - name: "Gavin"
+    location: "route_211"
+    caught_at: "2026-01-10 17:53:00"
+
+  - name: "Richard"
+    location: "mt_coronet"
+    caught_at: "2026-01-10 17:53:00"
+
+  - name: "Mr. Heckle"
+    location: "old_chateau"
+    caught_at: "2026-01-18 09:30:00"
+
+  - name: "Janine"
+    location: "route_206"
+    caught_at: "2026-01-18 09:37:00"
+
+  - name: "Mr. Treeger"
+    location: "wayward_cave"
+    caught_at: "2026-01-18 09:37:00"
+
+  - name: "Jill"
+    location: "oreburgh_city"
+    caught_at: "2026-01-18 09:41:00"
+
+  - name: "Barry"
+    location: "jubilife_city"
+    caught_at: "2026-01-18 09:46:00"
+
+  - name: "Ursula"
+    location: "route_208"
+    caught_at: "2026-01-18 09:57:00"
+
+  - name: "ROY"
+    location: "route_215"
+    caught_at: "2026-01-18 10:39:00"
+
+  - name: "Phoebe Sr."
+    location: "veilstone_city"
+    caught_at: "2026-01-18 10:49:00"
+
+  - name: "Jack"
+    location: "ruin_maniac_cave"
+    caught_at: "2026-01-18 10:56:00"
+
+  - name: "Ryan"
+    location: "route_214"
+    caught_at: "2026-01-18 10:56:00"
+
+  - name: "EARL"
+    location: "valor_lakefront"
+    caught_at: "2026-01-24 13:46:00"
+
+  - name: "Franny"
+    location: "route_213"
+    caught_at: "2026-01-24 13:46:00"
+
+  - name: "Alan"
+    location: "safari_zone"
+    caught_at: "2026-01-25 09:59:00"
+
+  - name: "Charlie"
+    location: "route_212"
+    caught_at: "2026-01-25 10:03:00"
+
+  - name: "Mona"
+    location: "pastoria_city"
+    caught_at: "2026-01-25 10:03:00"
+
+  - name: "STUART"
+    location: "trophy_garden"
+    caught_at: "2026-01-30 20:51:00"
+
+  - name: "Marcel"
+    location: "solaceon_city"
+    caught_at: "2026-02-15 10:03:00"
+
+  - name: "UGONAKDGUY"
+    location: "route_211"
+    caught_at: "2026-02-15 10:03:00"
+
+# List all dead Pokemon
+dead_pokemon:
+  - name: "Chandler"
+    caught_at: "2025-11-16 21:04:00" # When it was caught (optional, leave out if never caught)
+                                     # No caught_at = died before being caught
+    died_at: "2025-12-17 16:52:00"
+
+  - name: "RACHEL"
+    caught_at: "2025-11-16 21:05:00"
+    died_at: "2026-01-04 10:57:00"
+
+  - name: "Ben"
+    caught_at: "2025-12-07 09:18:00"
+    died_at: "2026-01-18 09:26:00"
+
+  - name: "ROSS"
+    caught_at: "2025-11-16 20:55:00"
+    died_at: "2026-01-18 09:26:00"
+
+  - name: "Susan"
+    caught_at: "2025-12-07 09:18:00"
+    died_at: "2026-01-18 09:26:00"
+
+  - name: "Mary Jane"
+    caught_at: "2025-11-16 21:12:00"
+    died_at: "2026-01-04 10:06:00"
+
+  - name: "Mr. Heckle"
+    caught_at: "2026-01-18 09:30:00"
+    died_at: "2026-01-18 09:34:00"
+
+  - name: "STUART"
+    caught_at: "2026-01-30 20:51:00"
+    died_at: "2026-02-16 10:54:00"
+
+  - name: "EMMA"
+    caught_at: "2026-01-04 10:48:00"
+    died_at: "2026-02-16 11:10:00"
+
+  - name: "Charles"
+    caught_at: "2026-01-10 17:53:00"
+    died_at: "2026-02-16 11:10:00"
