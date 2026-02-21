@@ -43,15 +43,7 @@ discord:
   token: YOUR_BOT_TOKEN
 ```
 
-### 4. Update Channel ID
-
-In `discord_bot.rb`, update this constant with your initial general channel ID:
-
-```ruby
-INITIAL_GENERAL_CHANNEL_ID = 713775445635760206  # Your actual channel ID
-```
-
-### 5. Bot Permissions
+### 4. Bot Permissions
 
 Your Discord bot needs these permissions:
 - Manage Channels
@@ -65,24 +57,18 @@ Bot invite URL format:
 https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=268454928&scope=bot%20applications.commands
 ```
 
-### 6. Run the Bot
+The bot registers slash commands **globally**, so they'll automatically propagate to any server the bot joins (may take up to 1 hour for new servers).
 
-Create a rake task or initializer to run the bot:
+### 5. Run the Bot (Local Development)
 
-```ruby
-# lib/tasks/soul_link.rake
-namespace :soul_link do
-  desc "Run the Soul Link Discord bot"
-  task bot: :environment do
-    bot = SoulLink::DiscordBot.new
-    bot.run
-  end
-end
-```
-
-Then run:
 ```bash
 rake soul_link:bot
+```
+
+Or use the binary directly:
+
+```bash
+bin/discord_bot
 ```
 
 ## Usage
@@ -150,7 +136,8 @@ db/
 ## Database Schema
 
 ### soul_link_runs
-- `run_number` - Sequential run number
+- `guild_id` - Discord server (guild) ID this run belongs to
+- `run_number` - Sequential run number (unique per guild)
 - `category_id` - Discord category ID
 - `general_channel_id` - General channel ID
 - `catches_channel_id` - Catches channel ID
@@ -227,6 +214,147 @@ Potential features to add:
 - Export run data to CSV/JSON
 - Multi-run comparison statistics
 
+## Multi-Guild Support
+
+The bot supports running across multiple Discord servers simultaneously. Each server gets its own independent runs, catches, and deaths — scoped by `guild_id`.
+
+Slash commands are registered globally and work in any server the bot is invited to. No configuration is needed per server.
+
+### Rake Tasks with Guild ID
+
+Most rake tasks accept a `GUILD_ID` environment variable:
+
+```bash
+# Import data for a specific guild
+GUILD_ID=404132250385383433 rake soul_link:import_data
+
+# Show status for a specific guild
+GUILD_ID=404132250385383433 rake soul_link:status
+
+# Show status for ALL guilds
+rake soul_link:status
+
+# Create a test run (defaults to guild 0 if omitted)
+GUILD_ID=404132250385383433 rake soul_link:test_run
+
+# Add test data (defaults to guild 0 if omitted)
+GUILD_ID=404132250385383433 rake soul_link:test_data
+```
+
+### Inviting to a New Server
+
+1. Use the invite URL from the [Bot Permissions](#4-bot-permissions) section
+2. You must have **Manage Server** permission on the target server
+3. Slash commands will appear within ~1 hour of the bot joining
+4. Use `/start_new_run` to begin — no additional setup needed
+
+## Production Deployment (VPS)
+
+The bot is designed to run on a small VPS (1 CPU, 1GB RAM). Here's how to deploy it.
+
+### Server Setup
+
+1. **Install dependencies:**
+   ```bash
+   apt update && apt upgrade -y
+   apt install -y build-essential git curl libssl-dev libreadline-dev zlib1g-dev libffi-dev libyaml-dev mysql-server libmysqlclient-dev
+   ```
+
+2. **Add swap space** (recommended for 1GB servers):
+   ```bash
+   fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+   echo '/swapfile none swap sw 0 0' >> /etc/fstab
+   ```
+
+3. **Install Ruby via rbenv:**
+   ```bash
+   git clone https://github.com/rbenv/rbenv.git ~/.rbenv
+   git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build
+   echo 'eval "$(~/.rbenv/bin/rbenv init - bash)"' >> ~/.bashrc
+   source ~/.bashrc
+   rbenv install 3.4.5
+   rbenv global 3.4.5
+   ```
+
+4. **Set up MySQL:**
+   ```bash
+   DB_PASS=$(openssl rand -base64 24) && echo "Your DB password: $DB_PASS"
+   mysql -u root -e "CREATE DATABASE soul_link_production; CREATE USER 'soul_link'@'localhost' IDENTIFIED BY '$DB_PASS'; GRANT ALL PRIVILEGES ON soul_link_production.* TO 'soul_link'@'localhost'; FLUSH PRIVILEGES;"
+   ```
+   Save the generated password!
+
+5. **Clone and install:**
+   ```bash
+   git clone https://github.com/GreyKing/soul_link.git /opt/soul_link
+   cd /opt/soul_link
+   gem install bundler && bundle install
+   ```
+
+6. **Run migrations:**
+   ```bash
+   RAILS_ENV=production RAILS_MASTER_KEY=your_key DATABASE_USERNAME=soul_link DATABASE_PASSWORD=your_pass bin/rails db:migrate
+   ```
+
+### Systemd Service
+
+Create `/etc/systemd/system/soul-link-bot.service`:
+
+```ini
+[Unit]
+Description=Soul Link Discord Bot
+After=mysql.service
+
+[Service]
+WorkingDirectory=/opt/soul_link
+ExecStart=/root/.rbenv/shims/ruby bin/rails soul_link:bot
+Restart=always
+RestartSec=5
+Environment=RAILS_ENV=production
+Environment=RAILS_MASTER_KEY=your_master_key_here
+Environment=DATABASE_USERNAME=soul_link
+Environment=DATABASE_PASSWORD=your_db_password_here
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then enable and start:
+
+```bash
+systemctl daemon-reload
+systemctl enable soul-link-bot
+systemctl start soul-link-bot
+```
+
+### Server Management Commands
+
+| Command | Description |
+|---|---|
+| `systemctl status soul-link-bot` | Check if the bot is running |
+| `journalctl -u soul-link-bot -f` | Tail live logs |
+| `systemctl restart soul-link-bot` | Restart the bot |
+| `systemctl stop soul-link-bot` | Stop the bot |
+
+### Deploying Updates
+
+```bash
+cd /opt/soul_link && git pull && bundle install && \
+RAILS_ENV=production RAILS_MASTER_KEY=your_key DATABASE_USERNAME=soul_link DATABASE_PASSWORD=your_pass bin/rails db:migrate && \
+systemctl restart soul-link-bot
+```
+
+### Available Rake Tasks
+
+| Task | Description |
+|---|---|
+| `rake soul_link:bot` | Start the Discord bot |
+| `rake soul_link:status` | Show current run status (all guilds, or `GUILD_ID=X` for one) |
+| `rake soul_link:import_data` | Import run data from YAML (requires `GUILD_ID`) |
+| `rake soul_link:test_run` | Create a test run (optional `GUILD_ID`, defaults to 0) |
+| `rake soul_link:test_data` | Add sample Pokemon to test run (optional `GUILD_ID`) |
+| `rake soul_link:reload_config` | Reload gym and location YAML files |
+| `rake soul_link:find_channel_ids` | Show how to find Discord channel IDs |
+
 ## Support
 
 For issues or questions, check:
@@ -286,7 +414,7 @@ dead_pokemon:
 ## Step 3: Run the Import
 
 ```bash
-rake soul_link:import_data
+GUILD_ID=YOUR_GUILD_ID rake soul_link:import_data
 ```
 
 This will:
@@ -313,7 +441,7 @@ If you want to keep your existing #catches and #deaths channels:
 3. Right-click the new panel message > Copy Message ID
 4. Run in Rails console:
    ```ruby
-   run = SoulLinkRun.current
+   run = SoulLinkRun.current(YOUR_GUILD_ID)
    run.update!(catches_panel_message_id: PASTE_MESSAGE_ID_HERE)
    ```
 5. Repeat for #deaths channel:
