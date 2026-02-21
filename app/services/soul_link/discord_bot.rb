@@ -4,15 +4,10 @@ require 'yaml'
 
 module SoulLink
   class DiscordBot
-    DISCORD_GUILD_ID = 404132250385383433
-    INITIAL_GENERAL_CHANNEL_ID = 1467925828577923214
-
     def initialize
       creds = Rails.application.credentials.discord
       @client_id = creds[:client_id]
       @bot_token = creds[:token]
-      @guild_id = DISCORD_GUILD_ID
-      @channel_id = INITIAL_GENERAL_CHANNEL_ID
 
       @bot = Discordrb::Bot.new(
         token: @bot_token,
@@ -29,7 +24,7 @@ module SoulLink
 
     private
 
-    attr_reader :bot, :guild_id
+    attr_reader :bot
 
     # ------------------------
     # Commands Registration
@@ -38,8 +33,7 @@ module SoulLink
       # /start_new_run - Creates a new Soul Link run
       bot.register_application_command(
         :start_new_run,
-        'Start a new Soul Link run',
-        server_id: guild_id
+        'Start a new Soul Link run'
       )
 
       bot.application_command(:start_new_run) do |event|
@@ -58,14 +52,13 @@ module SoulLink
       # /end_current_run - Ends the current active run
       bot.register_application_command(
         :end_current_run,
-        'End the current Soul Link run',
-        server_id: guild_id
+        'End the current Soul Link run'
       )
 
       bot.application_command(:end_current_run) do |event|
         event.defer(ephemeral: true)
 
-        run = SoulLinkRun.current
+        run = current_run(event)
         unless run
           event.edit_response(content: "❌ No active run found!")
           next
@@ -86,12 +79,11 @@ module SoulLink
       # /run_status - Show current run statistics
       bot.register_application_command(
         :run_status,
-        'Show current run statistics',
-        server_id: guild_id
+        'Show current run statistics'
       )
 
       bot.application_command(:run_status) do |event|
-        run = SoulLinkRun.current
+        run = current_run(event)
         unless run
           event.respond(content: "❌ No active run found!", ephemeral: true)
           next
@@ -114,7 +106,7 @@ module SoulLink
 
       # Text command for !next_gym
       bot.message(content: '!next_gym') do |event|
-        next unless event.channel.id == SoulLinkRun.current&.general_channel_id
+        next unless event.channel.id == current_run(event)&.general_channel_id
 
         gym = GameState.next_gym_info
         event.respond embed: build_gym_embed(gym)
@@ -181,13 +173,14 @@ module SoulLink
     # Run Creation
     # ------------------------
     def create_new_run(event)
-      server = bot.servers[guild_id]
+      guild_id = event.server.id
+      server = event.server
 
       # Deactivate current run if exists
-      SoulLinkRun.current&.deactivate!
+      SoulLinkRun.current(guild_id)&.deactivate!
 
       # Determine next run number
-      last_run = SoulLinkRun.order(run_number: :desc).first
+      last_run = SoulLinkRun.for_guild(guild_id).order(run_number: :desc).first
       next_number = last_run ? last_run.run_number + 1 : 1
 
       # Create category
@@ -196,11 +189,13 @@ module SoulLink
         4 # 4 = category type
       )
 
-      # Move or find general channel
-      general_channel = if SoulLinkRun.current
-                          server.channels.find { |c| c.id == SoulLinkRun.current.general_channel_id }
+      # Look for an existing "general" channel inside the current run's category,
+      # or create a new one under the new category
+      existing_run = SoulLinkRun.current(guild_id)
+      general_channel = if existing_run
+                          server.channels.find { |c| c.id == existing_run.general_channel_id }
                         else
-                          server.channels.find { |c| c.id == INITIAL_GENERAL_CHANNEL_ID }
+                          server.channels.find { |c| c.name == 'general' && c.parent_id == category.id }
                         end
 
       if general_channel
@@ -229,6 +224,7 @@ module SoulLink
 
       # Create database record
       run = SoulLinkRun.create!(
+        guild_id: guild_id,
         run_number: next_number,
         category_id: category.id,
         general_channel_id: general_channel.id,
@@ -416,7 +412,7 @@ module SoulLink
     end
 
     def show_caught_pokemon_selector(event)
-      run = SoulLinkRun.current
+      run = current_run(event)
       unless run
         event.respond(content: "❌ No active run found!", ephemeral: true)
         return
@@ -571,7 +567,7 @@ module SoulLink
     # Modal Handlers
     # ------------------------
     def handle_catch_submission(event)
-      run = SoulLinkRun.current
+      run = current_run(event)
       unless run
         respond_ephemeral(event, "❌ No active run found!")
         return
@@ -593,7 +589,7 @@ module SoulLink
     end
 
     def handle_move_to_deaths_final(event, pokemon_id, location)
-      run = SoulLinkRun.current
+      run = current_run(event)
       unless run
         event.respond(content: "❌ No active run found!", ephemeral: true)
         return
@@ -618,7 +614,7 @@ module SoulLink
     end
 
     def handle_uncaught_death_submission(event)
-      run = SoulLinkRun.current
+      run = current_run(event)
       unless run
         respond_ephemeral(event, "❌ No active run found!")
         return
@@ -680,6 +676,18 @@ module SoulLink
 
     def respond_ephemeral(event, content)
       event.respond(content: content, ephemeral: true)
+    end
+
+    def current_run(event)
+      guild_id = if event.respond_to?(:server_id)
+                   event.server_id
+                 elsif event.respond_to?(:server) && event.server
+                   event.server.id
+                 elsif event.respond_to?(:interaction) && event.interaction
+                   event.interaction.server_id
+                 end
+
+      SoulLinkRun.current(guild_id)
     end
   end
 end
