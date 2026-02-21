@@ -1,41 +1,72 @@
-# Soul Link Discord Bot - Setup Guide
+# Soul Link Discord Bot
 
-This Discord bot manages Pokemon Pearl Soul Link runs with automatic channel management, catch/death tracking, and gym information.
+A Discord bot for managing Pokemon Platinum Soul Link Nuzlocke runs. Tracks catches, deaths, and gym progress with interactive panels that auto-update in real time.
 
 ## Features
 
-- **Automatic Run Management**: Creates categorized Discord channels for each run
-- **Catch Tracking**: Interactive panel to log caught Pokemon with location data
-- **Death Tracking**: Track fallen Pokemon (both caught and uncaught)
-- **Live Updates**: Panels auto-update with each new entry
-- **Gym Info**: Quick command to see next gym details
+- **Multi-Server Support**: Runs independently across multiple Discord servers, scoped by guild ID
+- **Automatic Run Management**: Creates categorized Discord channels for each run (e.g., "Platinum Run 17")
+- **Catch Tracking**: Interactive panel with dropdown location selector and modal input
+- **Death Tracking**: Move caught Pokemon to deaths or record uncaught deaths, with location tracking
+- **Live Panels**: Catches and deaths panels auto-update with each new entry
+- **Mid-Run Import**: Import existing run data from YAML and post panels to existing channels
+- **Gym Info**: Quick command to check next gym details
+- **Auto-Deploy**: GitHub Actions workflow deploys to VPS on push to main
 
-## Setup Instructions
+## Slash Commands
 
-### 1. Database Migration
+| Command | Description |
+|---|---|
+| `/start_new_run` | Create a new run with category, general, catches, and deaths channels |
+| `/end_current_run` | Deactivate the current run (keeps all data) |
+| `/run_status` | Show current run statistics (caught, dead, total) |
+| `/post_panels` | Post catches & deaths panels to existing channels (used after data import) |
 
-Run the migration to create the required tables:
+All commands are registered **globally** and work in any server the bot is invited to. New servers may take up to 1 hour for commands to appear.
+
+### Text Commands
+
+| Command | Channel | Description |
+|---|---|---|
+| `!next_gym` | #general | Display next gym info from YAML config |
+
+## Setup
+
+### 1. Database
 
 ```bash
 rails db:migrate
 ```
 
-### 2. YAML Configuration Files
+### 2. Configuration Files
 
-Place these files in your Rails app:
+Place these in `config/soul_link/`:
 
-- `config/soul_link/gym_info.yml` - Gym data
-- `config/soul_link/locations.yml` - Location data
+| File | Purpose |
+|---|---|
+| `gym_info.yml` | Gym names and recommended levels |
+| `locations.yml` | Catch/death location definitions (route keys and display names) |
+| `settings.yml` | Bot settings (category naming prefix, etc.) |
+| `import_data.yml` | Template for importing existing run data |
 
-### 3. Rails Credentials
+### 3. Settings
 
-Add your Discord bot credentials to `config/credentials.yml.enc`:
+Edit `config/soul_link/settings.yml` to customize:
+
+```yaml
+# Controls how Discord categories are named for each run.
+# The run number is appended automatically.
+# Examples: "Platinum Run" -> "Platinum Run 1", "Run #" -> "Run #1"
+category_prefix: "Platinum Run"
+```
+
+### 4. Rails Credentials
 
 ```bash
 rails credentials:edit
 ```
 
-Add:
+Add your Discord bot credentials:
 
 ```yaml
 discord:
@@ -43,7 +74,7 @@ discord:
   token: YOUR_BOT_TOKEN
 ```
 
-### 4. Bot Permissions
+### 5. Bot Permissions
 
 Your Discord bot needs these permissions:
 - Manage Channels
@@ -52,173 +83,128 @@ Your Discord bot needs these permissions:
 - Read Message History
 - Use Slash Commands
 
-Bot invite URL format:
+Invite URL format:
 ```
 https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=268454928&scope=bot%20applications.commands
 ```
 
-The bot registers slash commands **globally**, so they'll automatically propagate to any server the bot joins (may take up to 1 hour for new servers).
-
-### 5. Run the Bot (Local Development)
+### 6. Run the Bot (Local Development)
 
 ```bash
 rake soul_link:bot
-```
-
-Or use the binary directly:
-
-```bash
-bin/discord_bot
 ```
 
 ## Usage
 
 ### Starting a New Run
 
-1. In Discord, use the slash command: `/start_new_run`
-2. The bot will:
-    - Create a new category: "Run #X"
-    - Move the general channel to this category
-    - Create #catches and #deaths channels
-    - Post interactive panels in both channels
+1. Use `/start_new_run` in any channel
+2. The bot creates:
+   - A new category (e.g., "Platinum Run 17")
+   - A #general channel (or moves an existing one into the category)
+   - A #catches channel with an interactive panel
+   - A #deaths channel with an interactive panel
 
 ### Adding Catches
 
-1. In the #catches channel, click "➕ Add Catch"
-2. Fill in the modal:
-    - Pokemon Name (e.g., "Pikachu")
-    - Location (route key, e.g., "route_201")
-3. The panel updates automatically
+1. In the #catches panel, click **"Add Catch"**
+2. Select a location from the dropdown
+3. Enter the Pokemon name in the modal
+4. The panel updates automatically with the new catch
 
 ### Recording Deaths
 
-**Option 1: Move Caught Pokemon to Deaths**
-1. In #deaths, click "💀 Move Caught to Deaths"
-2. Enter the exact Pokemon name from catches
-3. Optionally specify a different death location
+**Move a caught Pokemon to deaths:**
+1. In the #deaths panel, click **"Move Caught to Deaths"**
+2. Select which Pokemon died from the dropdown
+3. Choose where it died (or keep original catch location)
+4. Both panels update automatically
 
-**Option 2: Add Uncaught Death**
-1. In #deaths, click "➕ Add Uncaught Death"
-2. Fill in Pokemon name and location
+**Record an uncaught death:**
+1. Click **"Add Uncaught Death"**
+2. Select the location and enter the Pokemon name
 3. Used for Pokemon that died before being caught
 
 ### Checking Next Gym
 
-In the #general channel, type:
-```
-!next_gym
-```
+In the #general channel, type `!next_gym` to see the next gym's name and recommended level.
 
-The bot will display the next gym's information from the YAML file.
+## Importing Existing Run Data
 
-## File Structure
+If you're mid-run and want to start using the bot with your existing data:
 
-```
-app/
-├── models/
-│   ├── soul_link_run.rb
-│   └── soul_link_pokemon.rb
-└── services/
-    └── soul_link/
-        ├── discord_bot.rb
-        └── game_state.rb
+### Step 1: Find Your Discord IDs
 
-config/
-└── soul_link/
-    ├── gym_info.yml
-    └── locations.yml
-
-db/
-└── migrate/
-    └── YYYYMMDDHHMMSS_create_soul_link_tables.rb
+```bash
+rake soul_link:find_channel_ids
 ```
 
-## Database Schema
+Enable Developer Mode in Discord (Settings > Advanced > Developer Mode), then right-click channels/categories to copy their IDs.
 
-### soul_link_runs
-- `guild_id` - Discord server (guild) ID this run belongs to
-- `run_number` - Sequential run number (unique per guild)
-- `category_id` - Discord category ID
-- `general_channel_id` - General channel ID
-- `catches_channel_id` - Catches channel ID
-- `deaths_channel_id` - Deaths channel ID
-- `catches_panel_message_id` - ID of the catches panel message
-- `deaths_panel_message_id` - ID of the deaths panel message
-- `active` - Whether this is the current run
+### Step 2: Fill In the Import File
 
-### soul_link_pokemon
-- `soul_link_run_id` - Which run this Pokemon belongs to
-- `name` - Pokemon nickname/species
-- `location` - Where caught/died (route key)
-- `status` - 'caught' or 'dead'
-- `discord_user_id` - Who recorded this entry
-- `caught_at` - Timestamp of catch
-- `died_at` - Timestamp of death
-
-## Customization
-
-### Adding More Gyms
-
-Edit `config/soul_link/gym_info.yml`:
+Edit `config/soul_link/import_data.yml`:
 
 ```yaml
-ninth_gym:
-  name: "Elite Four"
-  recommended_level: 55
+run_number: 16
+
+# Discord channel IDs (right-click channel > Copy ID)
+category_id: 1234567890123456789
+general_channel_id: 1234567890123456789
+catches_channel_id: 1234567890123456789
+deaths_channel_id: 1234567890123456789
+
+# Your Discord user ID
+discord_user_id: 123456789012345678
+
+# All currently caught Pokemon
+caught_pokemon:
+  - name: "Turtwig"
+    location: "starter"
+    caught_at: "2026-01-15 10:00:00"
+
+  - name: "Starly"
+    location: "route_201"
+    caught_at: "2026-01-15 10:30:00"
+
+# Dead Pokemon (location is derived automatically from caught_pokemon data)
+dead_pokemon:
+  - name: "Bidoof"
+    caught_at: "2026-01-15 09:00:00"
+    died_at: "2026-01-15 12:00:00"
 ```
 
-### Adding More Locations
+**Notes:**
+- Use location keys from `locations.yml` (e.g., `route_201`, not `Route 201`)
+- Dead Pokemon don't need a `location` field — it's derived from their matching `caught_pokemon` entry using `name` + `caught_at`
+- Dates use `YYYY-MM-DD HH:MM:SS` format
 
-Edit `config/soul_link/locations.yml`:
+### Step 3: Run the Import
 
-```yaml
-route_215:
-  name: "Route 215"
-victory_road:
-  name: "Victory Road"
+```bash
+GUILD_ID=YOUR_GUILD_ID rake soul_link:import_data
 ```
 
-### Enhancing Gym Tracking
+### Step 4: Post Panels
 
-To automatically track which gym is next, you could:
+Start (or restart) the bot, then use `/post_panels` in any channel in your Discord server. The bot will post interactive panels to the #catches and #deaths channels with all your imported data.
 
-1. Add a `gyms_defeated` field to `SoulLinkRun`
-2. Create a command to mark gyms as completed
-3. Update `GameState.next_gym_info` to use this field
+### Step 5: Verify
 
-## Troubleshooting
-
-**Bot not responding to commands:**
-- Ensure the bot is online in your server
-- Check that slash commands are synced (may take up to 1 hour)
-- Verify bot has proper permissions
-
-**Panels not updating:**
-- Check Rails logs for errors
-- Ensure message IDs are being saved correctly
-- Verify bot can edit its own messages
-
-**Location not found:**
-- Ensure you're using the route key (e.g., "route_201") not the display name
-- Check `locations.yml` for valid keys
-- Add custom locations as needed
-
-## Future Enhancements
-
-Potential features to add:
-- Dropdown select menus for locations instead of text input
-- Team composition view showing current party
-- Statistics dashboard (catch rate, survival rate, etc.)
-- Level tracking for each Pokemon
-- Auto-linking caught Pokemon when moved to deaths
-- Export run data to CSV/JSON
-- Multi-run comparison statistics
+```bash
+GUILD_ID=YOUR_GUILD_ID rake soul_link:status
+```
 
 ## Multi-Guild Support
 
-The bot supports running across multiple Discord servers simultaneously. Each server gets its own independent runs, catches, and deaths — scoped by `guild_id`.
+The bot supports multiple Discord servers simultaneously. Each server gets independent runs, catches, and deaths scoped by `guild_id`.
 
-Slash commands are registered globally and work in any server the bot is invited to. No configuration is needed per server.
+### Inviting to a New Server
+
+1. Use the invite URL from the [Bot Permissions](#5-bot-permissions) section
+2. You must have **Manage Server** permission on the target server
+3. Slash commands will appear within ~1 hour of the bot joining
+4. Use `/start_new_run` to begin — no additional setup needed
 
 ### Rake Tasks with Guild ID
 
@@ -241,16 +227,9 @@ GUILD_ID=404132250385383433 rake soul_link:test_run
 GUILD_ID=404132250385383433 rake soul_link:test_data
 ```
 
-### Inviting to a New Server
+## Production Deployment (Vultr VPS)
 
-1. Use the invite URL from the [Bot Permissions](#4-bot-permissions) section
-2. You must have **Manage Server** permission on the target server
-3. Slash commands will appear within ~1 hour of the bot joining
-4. Use `/start_new_run` to begin — no additional setup needed
-
-## Production Deployment (VPS)
-
-The bot is designed to run on a small VPS (1 CPU, 1GB RAM). Here's how to deploy it.
+The bot runs on a small VPS (1 CPU, 1GB RAM). Auto-deploys via GitHub Actions on push to main.
 
 ### Server Setup
 
@@ -326,7 +305,7 @@ systemctl enable soul-link-bot
 systemctl start soul-link-bot
 ```
 
-### Server Management Commands
+### Server Management
 
 | Command | Description |
 |---|---|
@@ -335,7 +314,21 @@ systemctl start soul-link-bot
 | `systemctl restart soul-link-bot` | Restart the bot |
 | `systemctl stop soul-link-bot` | Stop the bot |
 
-### Deploying Updates
+### Auto-Deploy (GitHub Actions)
+
+Pushes to `main` automatically deploy via `.github/workflows/deploy.yml`. The workflow SSHs into the VPS, pulls the latest code, installs dependencies, runs migrations, and restarts the bot.
+
+Required GitHub Secrets:
+
+| Secret | Description |
+|---|---|
+| `VPS_HOST` | Vultr server IP address |
+| `VPS_SSH_KEY` | SSH private key for root access |
+| `RAILS_MASTER_KEY` | Rails master key for encrypted credentials |
+| `DATABASE_USERNAME` | MySQL username (e.g., `soul_link`) |
+| `DATABASE_PASSWORD` | MySQL password |
+
+### Manual Deploy
 
 ```bash
 cd /opt/soul_link && git pull && bundle install && \
@@ -343,7 +336,7 @@ RAILS_ENV=production RAILS_MASTER_KEY=your_key DATABASE_USERNAME=soul_link DATAB
 systemctl restart soul-link-bot
 ```
 
-### Available Rake Tasks
+## Available Rake Tasks
 
 | Task | Description |
 |---|---|
@@ -352,159 +345,129 @@ systemctl restart soul-link-bot
 | `rake soul_link:import_data` | Import run data from YAML (requires `GUILD_ID`) |
 | `rake soul_link:test_run` | Create a test run (optional `GUILD_ID`, defaults to 0) |
 | `rake soul_link:test_data` | Add sample Pokemon to test run (optional `GUILD_ID`) |
-| `rake soul_link:reload_config` | Reload gym and location YAML files |
+| `rake soul_link:reload_config` | Reload gym, location, and settings YAML files |
 | `rake soul_link:find_channel_ids` | Show how to find Discord channel IDs |
 
-## Support
+## File Structure
 
-For issues or questions, check:
-- discordrb documentation: https://github.com/shardlab/discordrb
-- Discord API docs: https://discord.com/developers/docs
-- Rails logs for detailed error messages
+```
+app/
+├── models/
+│   ├── soul_link_run.rb          # Run model (guild-scoped, tracks channels/panels)
+│   └── soul_link_pokemon.rb      # Pokemon model (caught/dead status, location)
+└── services/
+    └── soul_link/
+        ├── discord_bot.rb         # Bot logic (commands, interactions, panels)
+        └── game_state.rb          # YAML config loader (gyms, locations, settings)
 
+config/
+└── soul_link/
+    ├── gym_info.yml               # Gym names and recommended levels
+    ├── locations.yml              # Location keys and display names
+    ├── settings.yml               # Bot settings (category prefix, etc.)
+    └── import_data.yml            # Template for importing existing run data
 
+db/
+└── migrate/
+    ├── 20260202164130_create_soul_link_tables.rb
+    └── 20260221200000_add_guild_id_to_soul_link_runs.rb
 
-
-# Importing Existing Run Data
-
-If you're already mid-run and want to start using the bot, follow these steps:
-
-## Step 1: Find Your Discord IDs
-
-```bash
-rake soul_link:find_channel_ids
+.github/
+└── workflows/
+    └── deploy.yml                 # Auto-deploy to Vultr on push to main
 ```
 
-This will show you how to enable Developer Mode and find the IDs you need.
+## Database Schema
 
-## Step 2: Create Your Import File
+### soul_link_runs
+| Column | Type | Description |
+|---|---|---|
+| `guild_id` | bigint | Discord server (guild) ID |
+| `run_number` | integer | Sequential run number (unique per guild) |
+| `category_id` | bigint | Discord category channel ID |
+| `general_channel_id` | bigint | General text channel ID |
+| `catches_channel_id` | bigint | Catches text channel ID |
+| `deaths_channel_id` | bigint | Deaths text channel ID |
+| `catches_panel_message_id` | bigint | Message ID of the catches panel |
+| `deaths_panel_message_id` | bigint | Message ID of the deaths panel |
+| `active` | boolean | Whether this is the current active run |
 
-Copy `config/soul_link/import_data.yml` template and fill it in:
+### soul_link_pokemon
+| Column | Type | Description |
+|---|---|---|
+| `soul_link_run_id` | bigint | Foreign key to the run |
+| `name` | string | Pokemon nickname |
+| `location` | string | Location key (from locations.yml) |
+| `status` | string | `caught` or `dead` |
+| `discord_user_id` | bigint | Who recorded this entry |
+| `caught_at` | datetime | When caught |
+| `died_at` | datetime | When died (null if still alive) |
+
+## Customization
+
+### Category Naming
+
+Edit `config/soul_link/settings.yml`:
 
 ```yaml
-run_number: 3  # Current run number
-
-# Channel IDs (right-click channel > Copy Channel ID)
-category_id: 1234567890123456789
-general_channel_id: 1234567890123456789
-catches_channel_id: 1234567890123456789
-deaths_channel_id: 1234567890123456789
-
-# Your Discord User ID
-discord_user_id: 123456789012345678
-
-# Currently caught Pokemon
-caught_pokemon:
-  - name: "Turtwig"
-    location: "starter"
-    caught_at: "2026-01-15 10:00:00"
-  
-  - name: "Starly"
-    location: "route_201"
-    caught_at: "2026-01-15 10:30:00"
-
-# Dead Pokemon
-dead_pokemon:
-  - name: "Bidoof"
-    location: "route_202"
-    caught_at: "2026-01-15 09:00:00"
-    died_at: "2026-01-15 12:00:00"
+category_prefix: "Platinum Run"   # -> "Platinum Run 1", "Platinum Run 2"
+# category_prefix: "Nuzlocke Run"  # -> "Nuzlocke Run 1", etc.
 ```
 
-## Step 3: Run the Import
+### Adding Locations
 
+Edit `config/soul_link/locations.yml`:
+
+```yaml
+victory_road:
+  name: "Victory Road"
+route_228:
+  name: "Route 228"
+```
+
+### Adding Gyms
+
+Edit `config/soul_link/gym_info.yml`:
+
+```yaml
+ninth_gym:
+  name: "Elite Four"
+  recommended_level: 55
+```
+
+After editing any YAML file, reload with:
 ```bash
-GUILD_ID=YOUR_GUILD_ID rake soul_link:import_data
-```
-
-This will:
-- Create the run in the database
-- Import all your Pokemon
-- Show you a summary
-
-## Step 4: Set Up Panels (Two Options)
-
-### Option A: Create Fresh Panels (Easiest)
-
-1. Start the bot: `./bin/discord_bot`
-2. In Discord, run `/start_new_run`
-3. This will create new panels with your imported data
-
-**Note:** This will create NEW channels. If you want to keep your existing channels, use Option B.
-
-### Option B: Use Existing Channels
-
-If you want to keep your existing #catches and #deaths channels:
-
-1. Start the bot: `./bin/discord_bot`
-2. In #catches channel, type `/panel` to post the panel
-3. Right-click the new panel message > Copy Message ID
-4. Run in Rails console:
-   ```ruby
-   run = SoulLinkRun.current(YOUR_GUILD_ID)
-   run.update!(catches_panel_message_id: PASTE_MESSAGE_ID_HERE)
-   ```
-5. Repeat for #deaths channel:
-   ```ruby
-   run.update!(deaths_panel_message_id: PASTE_MESSAGE_ID_HERE)
-   ```
-
-**Note:** You'll need to add a `/panel` command to the bot, or you can manually create a message and use that ID.
-
-## Step 5: Verify
-
-```bash
-rake soul_link:status
-```
-
-Should show your imported data!
-
-## Tips
-
-### Location Keys
-
-Make sure you use the exact keys from `locations.yml`:
-- ✅ `route_201`, `starter`, `eterna_forest`
-- ❌ `Route 201`, `Starter`, `Eterna Forest`
-
-### Dates
-
-Use ISO 8601 format: `YYYY-MM-DD HH:MM:SS`
-- Example: `2026-01-15 10:30:00`
-- Leave out `caught_at` for Pokemon that died before being caught
-
-### Multiple Runs
-
-To import multiple past runs:
-
-1. Set the first run as `active: false` in the database after import
-2. Run import again with next run's data
-3. Only the latest should be `active: true`
-
-```ruby
-# In Rails console
-SoulLinkRun.find_by(run_number: 1).update!(active: false)
-SoulLinkRun.find_by(run_number: 2).update!(active: false)
-# Run 3 stays active
+rake soul_link:reload_config
 ```
 
 ## Troubleshooting
 
-**"No active run found" in bot:**
-- Make sure import succeeded
-- Check `rake soul_link:status`
-- Verify only one run has `active: true`
+**Bot not responding to commands:**
+- Check the bot is running: `systemctl status soul-link-bot`
+- Check logs: `journalctl -u soul-link-bot -f`
+- Slash commands may take up to 1 hour to sync with new servers
+- Verify bot has proper permissions in the server
 
-**Panel not updating:**
-- Make sure `catches_panel_message_id` and `deaths_panel_message_id` are set
-- Check that message IDs are correct (18-19 digit numbers)
-- Try restarting the bot
+**Panels not updating:**
+- Ensure `catches_panel_message_id` and `deaths_panel_message_id` are set
+- Use `/post_panels` to post fresh panels
+- Check logs for errors
+
+**`/post_panels` says "No active run found":**
+- Verify the import succeeded: `GUILD_ID=X rake soul_link:status`
+- Ensure only one run has `active: true` per guild
 
 **Location not found:**
-- Check spelling matches `locations.yml` exactly
-- Keys are lowercase with underscores: `route_201` not `Route 201`
+- Use route keys from `locations.yml` (e.g., `route_201` not `Route 201`)
+- Keys are lowercase with underscores
 
 **Import errors:**
-- YAML syntax is very picky about spacing
-- Use 2 spaces for indentation (not tabs)
-- Quotes around strings with special characters
+- YAML requires 2-space indentation (not tabs)
+- Wrap strings with special characters in quotes
+- Dead Pokemon locations are derived from `caught_pokemon` by matching `name` + `caught_at`
+
+## Support
+
+- discordrb: https://github.com/shardlab/discordrb
+- Discord API: https://discord.com/developers/docs
+- Rails logs: `journalctl -u soul-link-bot -f` (production) or check `log/development.log` (local)
