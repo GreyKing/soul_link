@@ -1,14 +1,16 @@
 class SoulLinkRun < ApplicationRecord
   has_many :soul_link_pokemon, dependent: :destroy
 
-  validates :run_number, presence: true, uniqueness: true
+  validates :run_number, presence: true, uniqueness: { scope: :guild_id }
+  validates :guild_id, presence: true
   validates :category_id, :general_channel_id, :catches_channel_id, :deaths_channel_id, presence: true
 
   scope :active, -> { where(active: true) }
   scope :inactive, -> { where(active: false) }
+  scope :for_guild, ->(guild_id) { where(guild_id: guild_id) }
 
-  def self.current
-    active.order(run_number: :desc).first
+  def self.current(guild_id)
+    active.for_guild(guild_id).order(run_number: :desc).first
   end
 
   def catches

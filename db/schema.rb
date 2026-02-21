@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_02_164130) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_21_200000) do
   create_table "soul_link_pokemon", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "caught_at"
     t.datetime "created_at", null: false
@@ -35,10 +35,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_02_164130) do
     t.bigint "deaths_channel_id", null: false
     t.bigint "deaths_panel_message_id"
     t.bigint "general_channel_id", null: false
+    t.bigint "guild_id", null: false
     t.integer "run_number", null: false
     t.datetime "updated_at", null: false
     t.index ["active"], name: "index_soul_link_runs_on_active"
-    t.index ["run_number"], name: "index_soul_link_runs_on_run_number", unique: true
+    t.index ["guild_id", "active"], name: "index_soul_link_runs_on_guild_id_and_active"
+    t.index ["guild_id", "run_number"], name: "index_soul_link_runs_on_guild_id_and_run_number", unique: true
   end
 
   add_foreign_key "soul_link_pokemon", "soul_link_runs"

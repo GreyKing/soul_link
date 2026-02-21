@@ -1,6 +1,16 @@
 # lib/tasks/soul_link.rake
 namespace :soul_link do
-  desc "Import existing run data from YAML"
+  # Helper to extract guild_id from ENV, with optional default for convenience
+  def self.require_guild_id!(default: nil)
+    guild_id = ENV['GUILD_ID']&.to_i || default
+    unless guild_id
+      puts "❌ GUILD_ID is required. Usage: GUILD_ID=123456789 rake soul_link:#{ARGV.first&.split(':')&.last}"
+      exit 1
+    end
+    guild_id
+  end
+
+  desc "Import existing run data from YAML (requires GUILD_ID env var)"
   task import_data: :environment do
     require 'yaml'
 
@@ -13,19 +23,23 @@ namespace :soul_link do
 
     data = YAML.load_file(file_path)
 
+    guild_id = require_guild_id!
+
     puts "═══════════════════════════════════════"
     puts "  Importing Soul Link Run Data"
+    puts "  Guild: #{guild_id}"
     puts "═══════════════════════════════════════"
     puts ""
 
-    # Deactivate any current runs
-    if SoulLinkRun.current
+    # Deactivate any current runs for this guild
+    if SoulLinkRun.current(guild_id)
       puts "⚠️  Deactivating current active run..."
-      SoulLinkRun.current.deactivate!
+      SoulLinkRun.current(guild_id).deactivate!
     end
 
     # Create the run
     run = SoulLinkRun.create!(
+      guild_id: guild_id,
       run_number: data['run_number'],
       category_id: data['category_id'],
       general_channel_id: data['general_channel_id'],
@@ -107,17 +121,20 @@ namespace :soul_link do
     bot.run
   end
 
-  desc "Create a new Soul Link run manually (for testing)"
+  desc "Create a new Soul Link run manually (for testing). Accepts GUILD_ID env var (defaults to 0 for testing)"
   task test_run: :environment do
-    last_run = SoulLinkRun.order(run_number: :desc).first
+    guild_id = require_guild_id!(default: 0)
+
+    last_run = SoulLinkRun.for_guild(guild_id).order(run_number: :desc).first
     next_number = last_run ? last_run.run_number + 1 : 1
 
-    # Deactivate current run
-    SoulLinkRun.current&.deactivate!
+    # Deactivate current run for this guild
+    SoulLinkRun.current(guild_id)&.deactivate!
 
-    puts "Creating test run ##{next_number}..."
+    puts "Creating test run ##{next_number} for guild #{guild_id}..."
 
     run = SoulLinkRun.create!(
+      guild_id: guild_id,
       run_number: next_number,
       category_id: 999999999999999999, # Fake ID for testing
       general_channel_id: 999999999999999999,
@@ -128,12 +145,13 @@ namespace :soul_link do
     puts "✅ Created Run ##{run.run_number}"
   end
 
-  desc "Add test Pokemon data"
+  desc "Add test Pokemon data. Accepts GUILD_ID env var (defaults to 0 for testing)"
   task test_data: :environment do
-    run = SoulLinkRun.current
+    guild_id = require_guild_id!(default: 0)
+    run = SoulLinkRun.current(guild_id)
 
     unless run
-      puts "❌ No active run found. Create one first with: rake soul_link:test_run"
+      puts "❌ No active run found for guild #{guild_id}. Create one first with: GUILD_ID=#{guild_id} rake soul_link:test_run"
       exit
     end
 
@@ -170,46 +188,57 @@ namespace :soul_link do
     puts "   Deaths: #{run.deaths.count}"
   end
 
-  desc "Show current run status"
+  desc "Show current run status. Accepts optional GUILD_ID env var (shows all guilds if omitted)"
   task status: :environment do
-    run = SoulLinkRun.current
+    guild_id = ENV['GUILD_ID']&.to_i
 
-    unless run
-      puts "❌ No active run found"
+    runs = if guild_id
+             run = SoulLinkRun.current(guild_id)
+             run ? [run] : []
+           else
+             SoulLinkRun.active.order(:guild_id, run_number: :desc)
+           end
+
+    if runs.empty?
+      puts guild_id ? "❌ No active run found for guild #{guild_id}" : "❌ No active runs found"
       exit
     end
 
-    puts "═══════════════════════════════════════"
-    puts "  Soul Link Run ##{run.run_number}"
-    puts "═══════════════════════════════════════"
-    puts ""
-    puts "Channels:"
-    puts "  Category ID: #{run.category_id}"
-    puts "  General: #{run.general_channel_id}"
-    puts "  Catches: #{run.catches_channel_id}"
-    puts "  Deaths: #{run.deaths_channel_id}"
-    puts ""
-    puts "Pokemon:"
-    puts "  🎯 Caught: #{run.catches.count}"
-    puts "  💀 Dead: #{run.deaths.count}"
-    puts ""
+    runs.each do |run|
+      puts "═══════════════════════════════════════"
+      puts "  Soul Link Run ##{run.run_number}"
+      puts "  Guild: #{run.guild_id}"
+      puts "═══════════════════════════════════════"
+      puts ""
+      puts "Channels:"
+      puts "  Category ID: #{run.category_id}"
+      puts "  General: #{run.general_channel_id}"
+      puts "  Catches: #{run.catches_channel_id}"
+      puts "  Deaths: #{run.deaths_channel_id}"
+      puts ""
+      puts "Pokemon:"
+      puts "  🎯 Caught: #{run.catches.count}"
+      puts "  💀 Dead: #{run.deaths.count}"
+      puts ""
 
-    if run.catches.any?
-      puts "Recent Catches:"
-      run.catches.last(5).each do |p|
-        puts "  • #{p.name} (#{SoulLink::GameState.location_name(p.location)})"
+      if run.catches.any?
+        puts "Recent Catches:"
+        run.catches.last(5).each do |p|
+          puts "  • #{p.name} (#{SoulLink::GameState.location_name(p.location)})"
+        end
+        puts ""
       end
+
+      if run.deaths.any?
+        puts "Recent Deaths:"
+        run.deaths.last(5).each do |p|
+          puts "  • #{p.name} (#{SoulLink::GameState.location_name(p.location)})"
+        end
+      end
+
+      puts "═══════════════════════════════════════"
       puts ""
     end
-
-    if run.deaths.any?
-      puts "Recent Deaths:"
-      run.deaths.last(5).each do |p|
-        puts "  • #{p.name} (#{SoulLink::GameState.location_name(p.location)})"
-      end
-    end
-
-    puts "═══════════════════════════════════════"
   end
 
   desc "Reload YAML configuration files"
