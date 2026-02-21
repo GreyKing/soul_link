@@ -3,6 +3,7 @@ module SoulLink
   class GameState
     GYM_INFO_PATH = Rails.root.join('config', 'soul_link', 'gym_info.yml')
     LOCATIONS_PATH = Rails.root.join('config', 'soul_link', 'locations.yml')
+    SETTINGS_PATH = Rails.root.join('config', 'soul_link', 'settings.yml')
 
     class << self
       def gym_info
@@ -11,6 +12,15 @@ module SoulLink
 
       def locations
         @locations ||= YAML.load_file(LOCATIONS_PATH)
+      end
+
+      def settings
+        @settings ||= File.exist?(SETTINGS_PATH) ? YAML.load_file(SETTINGS_PATH) : {}
+      end
+
+      def category_name(run_number)
+        prefix = settings['category_prefix'] || 'Platinum Run'
+        "#{prefix} #{run_number}"
       end
 
       def next_gym_info
@@ -52,6 +62,7 @@ module SoulLink
       def reload!
         @gym_info = nil
         @locations = nil
+        @settings = nil
       end
     end
   end

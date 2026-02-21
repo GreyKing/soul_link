@@ -1,0 +1,7 @@
+# config/soul_link/settings.yml
+# General bot settings
+
+# Category naming: controls how Discord categories are named for each run.
+# The run number is appended automatically.
+# Examples: "Platinum Run" → "Platinum Run 1", "Run #" → "Run #1"
+category_prefix: "Platinum Run"

@@ -70,10 +70,26 @@ namespace :soul_link do
     # Import dead Pokemon
     if data['dead_pokemon']
       puts "Importing dead Pokemon..."
+
+      # Build a lookup from caught_pokemon to derive location for dead pokemon.
+      # Dead pokemon don't have their own location — they use the location where
+      # they were originally caught. Match on name + caught_at for precision
+      # (handles duplicates like RACHEL who was caught twice).
+      caught_lookup = {}
+      (data['caught_pokemon'] || []).each do |cp|
+        key = [cp['name'], cp['caught_at']]
+        caught_lookup[key] = cp['location']
+      end
+
       data['dead_pokemon'].each do |poke|
+        # Try to find location: explicit > matched from caught data > "unknown"
+        location = poke['location'] ||
+                   caught_lookup[[poke['name'], poke['caught_at']]] ||
+                   'unknown'
+
         pokemon = run.soul_link_pokemon.create!(
           name: poke['name'],
-          location: poke['location'],
+          location: location,
           status: 'dead',
           discord_user_id: data['discord_user_id'],
           caught_at: poke['caught_at'] ? Time.parse(poke['caught_at']) : nil,
@@ -244,7 +260,7 @@ namespace :soul_link do
   desc "Reload YAML configuration files"
   task reload_config: :environment do
     SoulLink::GameState.reload!
-    puts "✅ Reloaded gym_info.yml and locations.yml"
+    puts "✅ Reloaded gym_info.yml, locations.yml, and settings.yml"
 
     puts "\nGyms loaded:"
     SoulLink::GameState.gym_info.each do |key, data|
@@ -252,6 +268,9 @@ namespace :soul_link do
     end
 
     puts "\nLocations loaded: #{SoulLink::GameState.locations.count}"
+
+    puts "\nSettings:"
+    puts "  Category prefix: #{SoulLink::GameState.settings['category_prefix'] || 'Platinum Run'}"
   end
 
   desc "Helper: Find your Discord channel IDs"
