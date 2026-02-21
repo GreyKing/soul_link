@@ -25,9 +25,13 @@ namespace :soul_link do
 
     guild_id = require_guild_id!
 
+    # Detect format: new format has 'nickname' + 'species' hash, legacy has 'name' + root 'discord_user_id'
+    is_grouped_format = data['caught_pokemon']&.first&.key?('nickname') rescue false
+
     puts "═══════════════════════════════════════"
     puts "  Importing Soul Link Run Data"
     puts "  Guild: #{guild_id}"
+    puts "  Format: #{is_grouped_format ? 'grouped (with species)' : 'legacy (flat)'}"
     puts "═══════════════════════════════════════"
     puts ""
 
@@ -51,53 +55,10 @@ namespace :soul_link do
     puts "✅ Created Run ##{run.run_number}"
     puts ""
 
-    # Import caught Pokemon
-    if data['caught_pokemon']
-      puts "Importing caught Pokemon..."
-      data['caught_pokemon'].each do |poke|
-        pokemon = run.soul_link_pokemon.create!(
-          name: poke['name'],
-          location: poke['location'],
-          status: 'caught',
-          discord_user_id: data['discord_user_id'],
-          caught_at: poke['caught_at'] ? Time.parse(poke['caught_at']) : Time.current
-        )
-        puts "  ✅ #{pokemon.name} (#{pokemon.location})"
-      end
-      puts ""
-    end
-
-    # Import dead Pokemon
-    if data['dead_pokemon']
-      puts "Importing dead Pokemon..."
-
-      # Build a lookup from caught_pokemon to derive location for dead pokemon.
-      # Dead pokemon don't have their own location — they use the location where
-      # they were originally caught. Match on name + caught_at for precision
-      # (handles duplicates like RACHEL who was caught twice).
-      caught_lookup = {}
-      (data['caught_pokemon'] || []).each do |cp|
-        key = [cp['name'], cp['caught_at']]
-        caught_lookup[key] = cp['location']
-      end
-
-      data['dead_pokemon'].each do |poke|
-        # Try to find location: explicit > matched from caught data > "unknown"
-        location = poke['location'] ||
-                   caught_lookup[[poke['name'], poke['caught_at']]] ||
-                   'unknown'
-
-        pokemon = run.soul_link_pokemon.create!(
-          name: poke['name'],
-          location: location,
-          status: 'dead',
-          discord_user_id: data['discord_user_id'],
-          caught_at: poke['caught_at'] ? Time.parse(poke['caught_at']) : nil,
-          died_at: poke['died_at'] ? Time.parse(poke['died_at']) : Time.current
-        )
-        puts "  💀 #{pokemon.name} (#{pokemon.location})"
-      end
-      puts ""
+    if is_grouped_format
+      import_grouped_format(run, data)
+    else
+      import_legacy_format(run, data)
     end
 
     puts "═══════════════════════════════════════"
@@ -105,12 +66,156 @@ namespace :soul_link do
     puts "═══════════════════════════════════════"
     puts ""
     puts "Run ##{run.run_number} Summary:"
-    puts "  🎯 Caught: #{run.catches.count}"
-    puts "  💀 Dead: #{run.deaths.count}"
+    puts "  🎯 Caught Groups: #{run.caught_groups.count}"
+    puts "  💀 Dead Groups: #{run.dead_groups.count}"
+    puts "  📊 Total Species Entries: #{run.soul_link_pokemon.count}"
     puts ""
     puts "📋 Next step: Start (or restart) the bot, then use /post_panels"
     puts "   in any Discord channel to post interactive panels to your"
     puts "   #catches and #deaths channels."
+  end
+
+  # Import with grouped format (nickname + species hash per group)
+  def self.import_grouped_format(run, data)
+    # Import caught groups
+    if data['caught_pokemon']
+      puts "Importing caught groups..."
+      data['caught_pokemon'].each do |group_data|
+        group = run.soul_link_pokemon_groups.create!(
+          nickname: group_data['nickname'],
+          location: group_data['location'],
+          status: 'caught',
+          caught_at: group_data['caught_at'] ? Time.parse(group_data['caught_at']) : Time.current
+        )
+
+        species_count = 0
+        group_data['species']&.each do |discord_user_id, species_name|
+          group.soul_link_pokemon.create!(
+            soul_link_run: run,
+            species: species_name,
+            name: group_data['nickname'],
+            location: group_data['location'],
+            discord_user_id: discord_user_id.to_i,
+            status: 'caught',
+            caught_at: group_data['caught_at'] ? Time.parse(group_data['caught_at']) : Time.current
+          )
+          species_count += 1
+        end
+
+        puts "  ✅ #{group.nickname} (#{group.location}) — #{species_count} species"
+      end
+      puts ""
+    end
+
+    # Import dead groups
+    if data['dead_pokemon']
+      puts "Importing dead groups..."
+
+      # Build location lookup from caught groups
+      caught_lookup = {}
+      (data['caught_pokemon'] || []).each do |cp|
+        key = [cp['nickname'], cp['caught_at']]
+        caught_lookup[key] = cp['location']
+      end
+
+      data['dead_pokemon'].each do |group_data|
+        location = group_data['location'] ||
+                   caught_lookup[[group_data['nickname'], group_data['caught_at']]] ||
+                   'unknown'
+
+        group = run.soul_link_pokemon_groups.create!(
+          nickname: group_data['nickname'],
+          location: location,
+          status: 'dead',
+          caught_at: group_data['caught_at'] ? Time.parse(group_data['caught_at']) : nil,
+          died_at: group_data['died_at'] ? Time.parse(group_data['died_at']) : Time.current
+        )
+
+        species_count = 0
+        group_data['species']&.each do |discord_user_id, species_name|
+          group.soul_link_pokemon.create!(
+            soul_link_run: run,
+            species: species_name,
+            name: group_data['nickname'],
+            location: location,
+            discord_user_id: discord_user_id.to_i,
+            status: 'dead',
+            caught_at: group_data['caught_at'] ? Time.parse(group_data['caught_at']) : nil,
+            died_at: group_data['died_at'] ? Time.parse(group_data['died_at']) : Time.current
+          )
+          species_count += 1
+        end
+
+        puts "  💀 #{group.nickname} (#{location}) — #{species_count} species"
+      end
+      puts ""
+    end
+  end
+
+  # Import with legacy flat format (single discord_user_id, no species)
+  def self.import_legacy_format(run, data)
+    if data['caught_pokemon']
+      puts "Importing caught Pokemon (legacy format)..."
+      data['caught_pokemon'].each do |poke|
+        group = run.soul_link_pokemon_groups.create!(
+          nickname: poke['name'],
+          location: poke['location'],
+          status: 'caught',
+          caught_at: poke['caught_at'] ? Time.parse(poke['caught_at']) : Time.current
+        )
+
+        group.soul_link_pokemon.create!(
+          soul_link_run: run,
+          species: 'Unknown',
+          name: poke['name'],
+          location: poke['location'],
+          discord_user_id: data['discord_user_id'],
+          status: 'caught',
+          caught_at: poke['caught_at'] ? Time.parse(poke['caught_at']) : Time.current
+        )
+
+        puts "  ✅ #{group.nickname} (#{group.location})"
+      end
+      puts ""
+    end
+
+    if data['dead_pokemon']
+      puts "Importing dead Pokemon (legacy format)..."
+
+      caught_lookup = {}
+      (data['caught_pokemon'] || []).each do |cp|
+        key = [cp['name'], cp['caught_at']]
+        caught_lookup[key] = cp['location']
+      end
+
+      data['dead_pokemon'].each do |poke|
+        location = poke['location'] ||
+                   caught_lookup[[poke['name'], poke['caught_at']]] ||
+                   'unknown'
+
+        group = run.soul_link_pokemon_groups.create!(
+          nickname: poke['name'],
+          location: location,
+          status: 'dead',
+          caught_at: poke['caught_at'] ? Time.parse(poke['caught_at']) : nil,
+          died_at: poke['died_at'] ? Time.parse(poke['died_at']) : Time.current
+        )
+
+        group.soul_link_pokemon.create!(
+          soul_link_run: run,
+          species: 'Unknown',
+          name: poke['name'],
+          location: location,
+          discord_user_id: data['discord_user_id'],
+          status: 'dead',
+          caught_at: poke['caught_at'] ? Time.parse(poke['caught_at']) : nil,
+          died_at: poke['died_at'] ? Time.parse(poke['died_at']) : Time.current
+        )
+
+        puts "  💀 #{group.nickname} (#{location})"
+      end
+      puts ""
+    end
   end
 
   desc "Run the Soul Link Discord bot"
@@ -153,7 +258,7 @@ namespace :soul_link do
     puts "✅ Created Run ##{run.run_number}"
   end
 
-  desc "Add test Pokemon data. Accepts GUILD_ID env var (defaults to 0 for testing)"
+  desc "Add test Pokemon data with groups. Accepts GUILD_ID env var (defaults to 0 for testing)"
   task test_data: :environment do
     guild_id = require_guild_id!(default: 0)
     run = SoulLinkRun.current(guild_id)
@@ -163,37 +268,57 @@ namespace :soul_link do
       exit
     end
 
-    puts "Adding test Pokemon to Run ##{run.run_number}..."
+    puts "Adding test Pokemon groups to Run ##{run.run_number}..."
 
-    # Add some catches
+    # Add some catch groups
     [
-      { name: "Turtwig", location: "starter" },
-      { name: "Starly", location: "route_201" },
-      { name: "Bidoof", location: "route_202" },
-      { name: "Shinx", location: "route_202" }
+      { nickname: "ROSS", location: "starter", species: { 111 => "Turtwig", 222 => "Chimchar", 333 => "Piplup", 444 => "Starly" } },
+      { nickname: "RACHEL", location: "route_201", species: { 111 => "Shinx", 222 => "Bidoof", 333 => "Kricketot", 444 => "Starly" } }
     ].each do |attrs|
-      run.soul_link_pokemon.create!(
-        **attrs,
-        status: 'caught',
-        discord_user_id: 123456789,
-        caught_at: Time.current
+      group = run.soul_link_pokemon_groups.create!(
+        nickname: attrs[:nickname],
+        location: attrs[:location],
+        status: 'caught'
       )
-      puts "  ✅ Caught #{attrs[:name]}"
+
+      attrs[:species].each do |user_id, species|
+        group.soul_link_pokemon.create!(
+          soul_link_run: run,
+          species: species,
+          name: attrs[:nickname],
+          location: attrs[:location],
+          discord_user_id: user_id,
+          status: 'caught',
+          caught_at: Time.current
+        )
+      end
+
+      puts "  ✅ #{group.nickname} (#{group.location}) — #{attrs[:species].count} species"
     end
 
-    # Add a death
-    run.soul_link_pokemon.create!(
-      name: "Zubat",
-      location: "ravaged_path",
+    # Add a dead group
+    dead_group = run.soul_link_pokemon_groups.create!(
+      nickname: "Chandler",
+      location: "route_218",
       status: 'dead',
-      discord_user_id: 123456789,
       died_at: Time.current
     )
-    puts "  💀 Died: Zubat"
+    { 111 => "Machop", 222 => "Meditite", 333 => "Tentacool", 444 => "Shellos" }.each do |user_id, species|
+      dead_group.soul_link_pokemon.create!(
+        soul_link_run: run,
+        species: species,
+        name: "Chandler",
+        location: "route_218",
+        discord_user_id: user_id,
+        status: 'dead',
+        died_at: Time.current
+      )
+    end
+    puts "  💀 Chandler (route_218) — 4 species"
 
     puts "\n✅ Test data added!"
-    puts "   Catches: #{run.catches.count}"
-    puts "   Deaths: #{run.deaths.count}"
+    puts "   Caught Groups: #{run.caught_groups.count}"
+    puts "   Dead Groups: #{run.dead_groups.count}"
   end
 
   desc "Show current run status. Accepts optional GUILD_ID env var (shows all guilds if omitted)"
@@ -224,23 +349,29 @@ namespace :soul_link do
       puts "  Catches: #{run.catches_channel_id}"
       puts "  Deaths: #{run.deaths_channel_id}"
       puts ""
-      puts "Pokemon:"
-      puts "  🎯 Caught: #{run.catches.count}"
-      puts "  💀 Dead: #{run.deaths.count}"
+      puts "Groups:"
+      puts "  🎯 Caught: #{run.caught_groups.count}"
+      puts "  💀 Dead: #{run.dead_groups.count}"
       puts ""
 
-      if run.catches.any?
-        puts "Recent Catches:"
-        run.catches.last(5).each do |p|
-          puts "  • #{p.name} (#{SoulLink::GameState.location_name(p.location)})"
+      if run.caught_groups.any?
+        puts "Caught Groups:"
+        run.caught_groups.includes(:soul_link_pokemon).last(5).each do |group|
+          species_list = group.soul_link_pokemon.map { |p|
+            "#{SoulLink::GameState.player_name(p.discord_user_id)}: #{p.species}"
+          }.join(', ')
+          puts "  • #{group.nickname} (#{SoulLink::GameState.location_name(group.location)}) — #{species_list}"
         end
         puts ""
       end
 
-      if run.deaths.any?
-        puts "Recent Deaths:"
-        run.deaths.last(5).each do |p|
-          puts "  • #{p.name} (#{SoulLink::GameState.location_name(p.location)})"
+      if run.dead_groups.any?
+        puts "Dead Groups:"
+        run.dead_groups.includes(:soul_link_pokemon).last(5).each do |group|
+          species_list = group.soul_link_pokemon.map { |p|
+            "#{SoulLink::GameState.player_name(p.discord_user_id)}: #{p.species}"
+          }.join(', ')
+          puts "  • #{group.nickname} (#{SoulLink::GameState.location_name(group.location)}) — #{species_list}"
         end
       end
 
@@ -263,6 +394,15 @@ namespace :soul_link do
 
     puts "\nSettings:"
     puts "  Category prefix: #{SoulLink::GameState.settings['category_prefix'] || 'Platinum Run'}"
+
+    puts "\nPlayers:"
+    if SoulLink::GameState.players.any?
+      SoulLink::GameState.players.each do |player|
+        puts "  • #{player['display_name']} (#{player['discord_user_id']})"
+      end
+    else
+      puts "  ⚠️  No players configured. Add them to config/soul_link/settings.yml"
+    end
   end
 
   desc "Helper: Find your Discord channel IDs"
@@ -282,7 +422,7 @@ namespace :soul_link do
     puts "   • Paste into import_data.yml"
     puts ""
     puts "3. Find Category ID:"
-    puts "   • Right-click the category name (e.g., 'Run #3')"
+    puts "   • Right-click the category name (e.g., 'Platinum Run 16')"
     puts "   • Click 'Copy Channel ID' (yes, categories are channels too!)"
     puts ""
     puts "4. Find Your User ID:"

@@ -64,10 +64,9 @@ module SoulLink
           next
         end
 
-        # Show confirmation with stats
         stats = "**Run ##{run.run_number} Summary:**\n" \
-          "🎯 Caught: #{run.catches.count}\n" \
-          "💀 Dead: #{run.deaths.count}\n\n" \
+          "🎯 Caught Groups: #{run.caught_groups.count}\n" \
+          "💀 Dead Groups: #{run.dead_groups.count}\n\n" \
           "This will deactivate the run but keep all data. " \
           "Use `/start_new_run` to begin Run ##{run.run_number + 1}."
 
@@ -93,9 +92,9 @@ module SoulLink
           title: "📊 Run ##{run.run_number} Statistics",
           color: 0x5865F2,
           fields: [
-            { name: "🎯 Currently Caught", value: run.catches.count.to_s, inline: true },
-            { name: "💀 Deaths", value: run.deaths.count.to_s, inline: true },
-            { name: "📈 Total Caught", value: run.soul_link_pokemon.count.to_s, inline: true }
+            { name: "🎯 Caught Groups", value: run.caught_groups.count.to_s, inline: true },
+            { name: "💀 Dead Groups", value: run.dead_groups.count.to_s, inline: true },
+            { name: "📈 Total Species", value: run.soul_link_pokemon.count.to_s, inline: true }
           ],
           footer: { text: "Use /end_current_run to end this run" },
           timestamp: Time.now
@@ -164,23 +163,38 @@ module SoulLink
         open_catch_modal(event, location)
       end
 
-      # Button: Mark caught pokemon as dead - show pokemon selector
-      bot.button(custom_id: /^soul_link:move_to_deaths/) do |event|
-        show_caught_pokemon_selector(event)
+      # Button: Add species to existing group
+      bot.button(custom_id: /^soul_link:add_species/) do |event|
+        show_group_selector_for_species(event)
       end
 
-      # Select menu: Pokemon selected to move to deaths
-      bot.select_menu(custom_id: /^soul_link:pokemon_select:move_deaths:/) do |event|
-        pokemon_id = event.values.first
-        show_death_location_selector(event, pokemon_id)
+      # Select menu: Group selected for adding species
+      bot.select_menu(custom_id: /^soul_link:group_select:add_species:/) do |event|
+        group_id = event.values.first
+        open_species_modal(event, group_id)
+      end
+
+      # Modal: Species submission for existing group
+      bot.modal_submit(custom_id: /^soul_link:species_modal:/) do |event|
+        handle_species_submission(event)
+      end
+
+      # Button: Mark caught group as dead - show group selector
+      bot.button(custom_id: /^soul_link:move_to_deaths/) do |event|
+        show_caught_group_selector(event)
+      end
+
+      # Select menu: Group selected to move to deaths
+      bot.select_menu(custom_id: /^soul_link:group_select:move_deaths:/) do |event|
+        group_id = event.values.first
+        show_death_location_selector(event, group_id)
       end
 
       # Select menu: Death location selected
       bot.select_menu(custom_id: /^soul_link:death_location_select:/) do |event|
-        # Extract pokemon_id from custom_id
-        pokemon_id = event.interaction.data['custom_id'].split(':').last
+        group_id = event.interaction.data['custom_id'].split(':').last
         location = event.values.first
-        handle_move_to_deaths_final(event, pokemon_id, location)
+        handle_move_to_deaths_final(event, group_id, location)
       end
 
       # Button: Add uncaught death - show location selector
@@ -325,44 +339,60 @@ module SoulLink
     end
 
     # ------------------------
-    # Embeds
+    # Embeds (Group-Based)
     # ------------------------
     def build_catches_embed(run)
-      catches = run.catches
+      groups = run.caught_groups.includes(:soul_link_pokemon)
 
-      description = if catches.empty?
-                      "*No Pokemon caught yet. Click the + button to add your first catch!*"
+      description = if groups.empty?
+                      "*No Pokemon caught yet. Click 'Add Catch' to start a new group!*"
                     else
-                      catches.map.with_index(1) do |pokemon, idx|
-                        "**#{idx}.** #{pokemon.name} *(#{GameState.location_name(pokemon.location)})*"
-                      end.join("\n")
+                      groups.map.with_index(1) do |group, idx|
+                        lines = ["**#{idx}.** #{group.nickname} *(#{GameState.location_name(group.location)})*"]
+
+                        group.soul_link_pokemon.each do |pokemon|
+                          lines << "   #{GameState.player_name(pokemon.discord_user_id)}: #{pokemon.species}"
+                        end
+
+                        group.missing_players.each do |user_id|
+                          lines << "   #{GameState.player_name(user_id)}: *pending*"
+                        end
+
+                        lines.join("\n")
+                      end.join("\n\n")
                     end
 
       Discordrb::Webhooks::Embed.new(
         title: "🎯 Caught Pokemon",
         description: description,
         color: 0x00ff00,
-        footer: { text: "Run ##{run.run_number} | Total: #{catches.count}" },
+        footer: { text: "Run ##{run.run_number} | Groups: #{groups.count}" },
         timestamp: Time.now
       )
     end
 
     def build_deaths_embed(run)
-      deaths = run.deaths
+      groups = run.dead_groups.includes(:soul_link_pokemon)
 
-      description = if deaths.empty?
+      description = if groups.empty?
                       "*No deaths yet. Stay safe out there!*"
                     else
-                      deaths.map.with_index(1) do |pokemon, idx|
-                        "**#{idx}.** #{pokemon.name} *(#{GameState.location_name(pokemon.location)})*"
-                      end.join("\n")
+                      groups.map.with_index(1) do |group, idx|
+                        lines = ["**#{idx}.** #{group.nickname} *(#{GameState.location_name(group.location)})*"]
+
+                        group.soul_link_pokemon.each do |pokemon|
+                          lines << "   #{GameState.player_name(pokemon.discord_user_id)}: #{pokemon.species}"
+                        end
+
+                        lines.join("\n")
+                      end.join("\n\n")
                     end
 
       Discordrb::Webhooks::Embed.new(
         title: "💀 Fallen Pokemon",
         description: description,
         color: 0xff0000,
-        footer: { text: "Run ##{run.run_number} | Total: #{deaths.count}" },
+        footer: { text: "Run ##{run.run_number} | Groups: #{groups.count}" },
         timestamp: Time.now
       )
     end
@@ -392,6 +422,12 @@ module SoulLink
               style: 3, # Success (green)
               label: '➕ Add Catch',
               custom_id: 'soul_link:add_catch'
+            },
+            {
+              type: 2, # Button
+              style: 1, # Primary (blue)
+              label: '🔗 Add My Species',
+              custom_id: 'soul_link:add_species'
             }
           ]
         }
@@ -447,24 +483,37 @@ module SoulLink
       )
     end
 
-    def show_caught_pokemon_selector(event)
+    # ------------------------
+    # Group Selectors
+    # ------------------------
+    def show_group_selector_for_species(event)
       run = current_run(event)
       unless run
         event.respond(content: "❌ No active run found!", ephemeral: true)
         return
       end
 
-      caught = run.catches
-      if caught.empty?
-        event.respond(content: "❌ No caught Pokemon to move to deaths!", ephemeral: true)
+      user_id = event.user.id
+
+      # Find groups where this player hasn't added their species yet
+      incomplete_groups = run.caught_groups.includes(:soul_link_pokemon).select do |group|
+        group.species_for(user_id).nil?
+      end
+
+      if incomplete_groups.empty?
+        event.respond(content: "✅ You've already added your species to all caught groups!", ephemeral: true)
         return
       end
 
-      options = caught.first(25).map do |pokemon|
+      options = incomplete_groups.first(25).map do |group|
+        existing = group.soul_link_pokemon.map { |p|
+          "#{GameState.player_name(p.discord_user_id)}: #{p.species}"
+        }.join(', ')
+
         {
-          label: "#{pokemon.name} (#{GameState.location_name(pokemon.location)})",
-          value: pokemon.id.to_s,
-          description: "Caught at #{GameState.location_name(pokemon.location)}"
+          label: "#{group.nickname} (#{GameState.location_name(group.location)})",
+          value: group.id.to_s,
+          description: existing.truncate(100)
         }
       end
 
@@ -474,8 +523,8 @@ module SoulLink
           components: [
             {
               type: 3,
-              custom_id: 'soul_link:pokemon_select:move_deaths:',
-              placeholder: 'Choose a Pokemon to mark as dead',
+              custom_id: 'soul_link:group_select:add_species:',
+              placeholder: 'Choose a group to add your species to',
               options: options
             }
           ]
@@ -483,13 +532,59 @@ module SoulLink
       ]
 
       event.respond(
-        content: 'Select which Pokemon died:',
+        content: 'Select the group to add your species to:',
         components: components,
         ephemeral: true
       )
     end
 
-    def show_death_location_selector(event, pokemon_id)
+    def show_caught_group_selector(event)
+      run = current_run(event)
+      unless run
+        event.respond(content: "❌ No active run found!", ephemeral: true)
+        return
+      end
+
+      groups = run.caught_groups.includes(:soul_link_pokemon)
+      if groups.empty?
+        event.respond(content: "❌ No caught groups to move to deaths!", ephemeral: true)
+        return
+      end
+
+      options = groups.first(25).map do |group|
+        species_list = group.soul_link_pokemon.map { |p|
+          "#{GameState.player_name(p.discord_user_id)}: #{p.species}"
+        }.join(', ')
+
+        {
+          label: "#{group.nickname} (#{GameState.location_name(group.location)})",
+          value: group.id.to_s,
+          description: species_list.truncate(100)
+        }
+      end
+
+      components = [
+        {
+          type: 1,
+          components: [
+            {
+              type: 3,
+              custom_id: 'soul_link:group_select:move_deaths:',
+              placeholder: 'Choose a group to mark as dead',
+              options: options
+            }
+          ]
+        }
+      ]
+
+      event.respond(
+        content: 'Select which group died (ALL species will be marked dead):',
+        components: components,
+        ephemeral: true
+      )
+    end
+
+    def show_death_location_selector(event, group_id)
       locations = GameState.location_choices.first(25)
 
       components = [
@@ -498,8 +593,8 @@ module SoulLink
           components: [
             {
               type: 3,
-              custom_id: "soul_link:death_location_select:#{pokemon_id}",
-              placeholder: 'Where did it die? (or skip to use catch location)',
+              custom_id: "soul_link:death_location_select:#{group_id}",
+              placeholder: 'Where did it die? (or keep catch location)',
               options: [
                 { label: 'Use original catch location', value: 'original', description: 'Keep the catch location' }
               ] + locations
@@ -525,13 +620,28 @@ module SoulLink
           components: [
             {
               type: 4, # text input
-              custom_id: 'pokemon_name',
-              label: 'Pokemon Name',
+              custom_id: 'nickname',
+              label: 'Group Nickname',
               style: 1, # short
               required: true,
               min_length: 1,
               max_length: 50,
-              placeholder: 'e.g., Pikachu'
+              placeholder: 'e.g., ROSS'
+            }
+          ]
+        },
+        {
+          type: 1,
+          components: [
+            {
+              type: 4,
+              custom_id: 'species',
+              label: 'Your Species',
+              style: 1,
+              required: true,
+              min_length: 1,
+              max_length: 50,
+              placeholder: 'e.g., Turtwig'
             }
           ]
         },
@@ -544,7 +654,7 @@ module SoulLink
               label: 'Location',
               style: 1,
               required: true,
-              value: location, # Pre-fill with selected location
+              value: location,
               min_length: 1,
               max_length: 50
             }
@@ -553,12 +663,37 @@ module SoulLink
       ]
 
       event.show_modal(
-        title: 'Add New Catch',
+        title: 'Add New Catch Group',
         custom_id: 'soul_link:catch_modal',
         components: components
       )
     end
 
+    def open_species_modal(event, group_id)
+      components = [
+        {
+          type: 1,
+          components: [
+            {
+              type: 4,
+              custom_id: 'species',
+              label: 'Your Species',
+              style: 1,
+              required: true,
+              min_length: 1,
+              max_length: 50,
+              placeholder: 'e.g., Chimchar'
+            }
+          ]
+        }
+      ]
+
+      event.show_modal(
+        title: 'Add Your Species',
+        custom_id: "soul_link:species_modal:#{group_id}",
+        components: components
+      )
+    end
 
     def open_uncaught_death_modal(event, location)
       components = [
@@ -567,11 +702,11 @@ module SoulLink
           components: [
             {
               type: 4,
-              custom_id: 'pokemon_name',
-              label: 'Pokemon Name',
+              custom_id: 'nickname',
+              label: 'Group Nickname',
               style: 1,
               required: true,
-              placeholder: 'e.g., Starly'
+              placeholder: 'e.g., Chandler'
             }
           ]
         },
@@ -584,7 +719,7 @@ module SoulLink
               label: 'Location',
               style: 1,
               required: true,
-              value: location, # Pre-fill with selected location
+              value: location,
               min_length: 1,
               max_length: 50
             }
@@ -611,40 +746,88 @@ module SoulLink
 
       values = extract_modal_values(event)
 
-      pokemon = run.soul_link_pokemon.create!(
-        name: values['pokemon_name'],
+      group = run.soul_link_pokemon_groups.create!(
+        nickname: values['nickname'],
         location: values['location'],
-        status: 'caught',
-        discord_user_id: event.user.id
+        status: 'caught'
+      )
+
+      group.soul_link_pokemon.create!(
+        soul_link_run: run,
+        species: values['species'],
+        name: values['nickname'],
+        location: values['location'],
+        discord_user_id: event.user.id,
+        status: 'caught'
       )
 
       update_catches_panel(run)
-      respond_ephemeral(event, "✅ Added **#{pokemon.name}** to catches!")
+      respond_ephemeral(event, "✅ Added group **#{group.nickname}** with your species **#{values['species']}**!\n" \
+        "Other players: use **Add My Species** to add yours.")
     rescue => e
       respond_ephemeral(event, "❌ Error: #{e.message}")
     end
 
-    def handle_move_to_deaths_final(event, pokemon_id, location)
+    def handle_species_submission(event)
+      run = current_run(event)
+      unless run
+        respond_ephemeral(event, "❌ No active run found!")
+        return
+      end
+
+      group_id = event.interaction.data['custom_id'].split(':').last
+      group = run.soul_link_pokemon_groups.find_by(id: group_id)
+      unless group
+        respond_ephemeral(event, "❌ Could not find that group!")
+        return
+      end
+
+      if group.species_for(event.user.id)
+        respond_ephemeral(event, "❌ You've already added your species to **#{group.nickname}**!")
+        return
+      end
+
+      values = extract_modal_values(event)
+
+      group.soul_link_pokemon.create!(
+        soul_link_run: run,
+        species: values['species'],
+        name: group.nickname,
+        location: group.location,
+        discord_user_id: event.user.id,
+        status: 'caught'
+      )
+
+      update_catches_panel(run)
+      respond_ephemeral(event, "✅ Added **#{values['species']}** to group **#{group.nickname}**!")
+    rescue => e
+      respond_ephemeral(event, "❌ Error: #{e.message}")
+    end
+
+    def handle_move_to_deaths_final(event, group_id, location)
       run = current_run(event)
       unless run
         event.respond(content: "❌ No active run found!", ephemeral: true)
         return
       end
 
-      pokemon = run.catches.find_by(id: pokemon_id)
-      unless pokemon
-        event.respond(content: "❌ Could not find that Pokemon!", ephemeral: true)
+      group = run.caught_groups.find_by(id: group_id)
+      unless group
+        event.respond(content: "❌ Could not find that group!", ephemeral: true)
         return
       end
 
-      # Use original location if 'original' was selected
       death_location = location == 'original' ? nil : location
-      pokemon.mark_as_dead!(location: death_location)
+      group.mark_as_dead!(death_location: death_location)
 
       update_catches_panel(run)
       update_deaths_panel(run)
 
-      event.respond(content: "💀 Moved **#{pokemon.name}** to deaths. RIP.", ephemeral: true)
+      species_count = group.soul_link_pokemon.count
+      event.respond(
+        content: "💀 Moved **#{group.nickname}** (#{species_count} species) to deaths. RIP.",
+        ephemeral: true
+      )
     rescue => e
       event.respond(content: "❌ Error: #{e.message}", ephemeral: true)
     end
@@ -658,16 +841,15 @@ module SoulLink
 
       values = extract_modal_values(event)
 
-      pokemon = run.soul_link_pokemon.create!(
-        name: values['pokemon_name'],
+      group = run.soul_link_pokemon_groups.create!(
+        nickname: values['nickname'],
         location: values['location'],
         status: 'dead',
-        discord_user_id: event.user.id,
         died_at: Time.current
       )
 
       update_deaths_panel(run)
-      respond_ephemeral(event, "💀 Added **#{pokemon.name}** to deaths!")
+      respond_ephemeral(event, "💀 Added **#{group.nickname}** to deaths!")
     rescue => e
       respond_ephemeral(event, "❌ Error: #{e.message}")
     end
@@ -680,10 +862,8 @@ module SoulLink
 
       # Try different ways discordrb might structure this
       if event.respond_to?(:values)
-        # If there's a direct values method
         return event.values
       elsif event.respond_to?(:components) && event.components
-        # If components exist
         event.components.each do |row|
           next unless row.respond_to?(:components)
           row.components.each do |component|
@@ -691,7 +871,6 @@ module SoulLink
           end
         end
       elsif event.respond_to?(:interaction) && event.interaction
-        # Try via interaction object
         data = event.interaction.data
         if data && data['components']
           data['components'].each do |row|
