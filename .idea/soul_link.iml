@@ -67,9 +67,12 @@
     <orderEntry type="library" scope="PROVIDED" name="erubi (v1.13.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="et-orbi (v1.4.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="event_emitter (v0.2.6, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="faraday (v2.14.1, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="faraday-net_http (v3.4.2, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="ffi (v1.17.3, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="fugit (v1.12.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="globalid (v1.3.0, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="hashie (v5.1.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="http-accept (v1.7.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="http-cookie (v1.1.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="i18n (v1.14.7, RVM: ruby-3.4.5) [gem]" level="application" />
@@ -79,6 +82,7 @@
     <orderEntry type="library" scope="PROVIDED" name="irb (v1.15.3, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="jbuilder (v2.14.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="json (v2.16.0, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="jwt (v3.1.2, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="kamal (v2.8.2, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="language_server-protocol (v3.17.0.5, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="lint_roller (v1.1.0, RVM: ruby-3.4.5) [gem]" level="application" />
@@ -93,8 +97,10 @@
     <orderEntry type="library" scope="PROVIDED" name="mini_mime (v1.1.5, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="minitest (v5.26.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="msgpack (v1.8.0, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="multi_xml (v0.8.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="mutex_m (v0.3.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="mysql2 (v0.5.6, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="net-http (v0.9.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="net-imap (v0.5.12, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="net-pop (v0.1.2, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="net-protocol (v0.2.2, RVM: ruby-3.4.5) [gem]" level="application" />
@@ -105,6 +111,11 @@
     <orderEntry type="library" scope="PROVIDED" name="netrc (v0.11.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="nio4r (v2.7.5, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="nokogiri (v1.18.10, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="oauth2 (v2.0.18, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="omniauth (v2.1.4, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="omniauth-discord (v1.2.0, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="omniauth-oauth2 (v1.9.0, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="omniauth-rails_csrf_protection (v1.0.2, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="opus-ruby (v1.0.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="ostruct (v0.6.3, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="parallel (v1.27.0, RVM: ruby-3.4.5) [gem]" level="application" />
@@ -119,6 +130,7 @@
     <orderEntry type="library" scope="PROVIDED" name="raabro (v1.4.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="racc (v1.8.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="rack (v3.2.4, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="rack-protection (v4.2.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="rack-session (v2.1.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="rack-test (v2.2.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="rackup (v2.2.1, RVM: ruby-3.4.5) [gem]" level="application" />
@@ -143,12 +155,15 @@
     <orderEntry type="library" scope="PROVIDED" name="rubyzip (v3.2.2, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="securerandom (v0.4.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="selenium-webdriver (v4.38.0, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="snaky_hash (v2.0.3, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="solid_cable (v3.0.12, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="solid_cache (v1.0.10, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="solid_queue (v1.2.4, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="sshkit (v1.24.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="stimulus-rails (v1.3.4, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="stringio (v3.1.8, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="tailwindcss-rails (v4.4.0, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="tailwindcss-ruby (v4.2.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="thor (v1.4.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="thruster (v0.1.16, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="timeout (v0.4.4, RVM: ruby-3.4.5) [gem]" level="application" />
@@ -159,6 +174,7 @@
     <orderEntry type="library" scope="PROVIDED" name="unicode-emoji (v4.1.0, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="uri (v1.1.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="useragent (v0.16.11, RVM: ruby-3.4.5) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="version_gem (v1.1.9, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="web-console (v4.2.1, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="websocket (v1.2.11, RVM: ruby-3.4.5) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="websocket-client-simple (v0.9.0, RVM: ruby-3.4.5) [gem]" level="application" />
@@ -181,6 +197,9 @@
         <option value="benchmark" />
         <option value="channel" />
         <option value="controller" />
+        <option value="erb:controller" />
+        <option value="erb:mailer" />
+        <option value="erb:scaffold" />
         <option value="generator" />
         <option value="helper" />
         <option value="integration_test" />
@@ -217,6 +236,9 @@
         <option value="benchmark" />
         <option value="channel" />
         <option value="controller" />
+        <option value="erb:controller" />
+        <option value="erb:mailer" />
+        <option value="erb:scaffold" />
         <option value="generator" />
         <option value="helper" />
         <option value="integration_test" />
@@ -547,6 +569,17 @@
               <RakeTaskImpl description="start solid_queue supervisor to dispatch and process jobs" fullCommand="solid_queue:start" id="start" />
             </subtasks>
           </RakeTaskImpl>
+          <RakeTaskImpl id="soul_link">
+            <subtasks>
+              <RakeTaskImpl description="Run the Soul Link Discord bot" fullCommand="soul_link:bot" id="bot" />
+              <RakeTaskImpl description="Helper: Find your Discord channel IDs" fullCommand="soul_link:find_channel_ids" id="find_channel_ids" />
+              <RakeTaskImpl description="Import existing run data from YAML (requires GUILD_ID env var)" fullCommand="soul_link:import_data" id="import_data" />
+              <RakeTaskImpl description="Reload YAML configuration files" fullCommand="soul_link:reload_config" id="reload_config" />
+              <RakeTaskImpl description="Show current run status" fullCommand="soul_link:status" id="status" />
+              <RakeTaskImpl description="Add test Pokemon data with groups" fullCommand="soul_link:test_data" id="test_data" />
+              <RakeTaskImpl description="Create a new Soul Link run manually (for testing). Accepts GUILD_ID env var (defaults to 0 for testing)" fullCommand="soul_link:test_run" id="test_run" />
+            </subtasks>
+          </RakeTaskImpl>
           <RakeTaskImpl id="stimulus">
             <subtasks>
               <RakeTaskImpl description="Install Stimulus into the app" fullCommand="stimulus:install" id="install" />
@@ -563,6 +596,16 @@
                   <RakeTaskImpl description="Update the Stimulus manifest (will overwrite controllers/index.js)" fullCommand="stimulus:manifest:update" id="update" />
                 </subtasks>
               </RakeTaskImpl>
+            </subtasks>
+          </RakeTaskImpl>
+          <RakeTaskImpl id="tailwindcss">
+            <subtasks>
+              <RakeTaskImpl description="Build your Tailwind CSS" fullCommand="tailwindcss:build" id="build" />
+              <RakeTaskImpl description="Remove CSS builds" fullCommand="tailwindcss:clobber" id="clobber" />
+              <RakeTaskImpl description="Create Tailwind CSS entry point files for Rails Engines" fullCommand="tailwindcss:engines" id="engines" />
+              <RakeTaskImpl description="Install Tailwind CSS into the app" fullCommand="tailwindcss:install" id="install" />
+              <RakeTaskImpl description="Upgrade app from Tailwind CSS v3 to v4" fullCommand="tailwindcss:upgrade" id="upgrade" />
+              <RakeTaskImpl description="Watch and build your Tailwind CSS on file changes" fullCommand="tailwindcss:watch" id="watch" />
             </subtasks>
           </RakeTaskImpl>
           <RakeTaskImpl description="Run all tests in test folder except system ones" fullCommand="test" id="test" />
