@@ -25,14 +25,16 @@ class TeamsController < ApplicationController
     group_ids = params[:group_ids] || []
 
     # Validate: all group_ids must be caught groups in this run
-    valid_group_ids = run.caught_groups.where(id: group_ids).pluck(:id)
+    # Use a Set for fast lookup while preserving the JS-sent order
+    allowed_ids = run.caught_groups.where(id: group_ids).pluck(:id).to_set
+    ordered_valid_ids = group_ids.select { |id| allowed_ids.include?(id.to_i) }
 
-    if group_ids.length > SoulLinkTeam::MAX_SLOTS
+    if ordered_valid_ids.length > SoulLinkTeam::MAX_SLOTS
       render json: { error: "Maximum #{SoulLinkTeam::MAX_SLOTS} Pokemon per team" }, status: :unprocessable_entity
       return
     end
 
-    team.replace_slots!(valid_group_ids)
+    team.replace_slots!(ordered_valid_ids)
     render json: { status: "saved", slots: team.soul_link_team_slots.count }
   end
 
