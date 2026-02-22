@@ -9,25 +9,36 @@
  * Consider organizing styles into separate files for maintainability.
  */
 
-/* ── Sinnoh Map ── */
+/* ── Sinnoh Map: Pin Markers ── */
 
-.location-node {
-  transition: opacity 0.15s ease, filter 0.15s ease;
+.map-pin {
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
-.location-node:hover {
-  opacity: 0.85;
-  filter: brightness(1.3);
+.map-pin:hover {
+  transform: scale(1.25);
 }
 
-/* Pulse animation for uncaught locations to hint they're clickable */
-.location-node[data-status="uncaught"]:hover rect,
-.location-node[data-status="uncaught"]:hover circle,
-.location-node[data-status="uncaught"]:hover ellipse {
-  animation: map-pulse 1.5s ease-in-out infinite;
+.map-pin:hover .map-pin__body {
+  stroke-width: 2.5;
 }
 
-@keyframes map-pulse {
+/* Uncaught pins: subtle pulse on hover to hint clickability */
+.map-pin--uncaught:hover .map-pin__body {
+  animation: pin-pulse 1.2s ease-in-out infinite;
+}
+
+/* Caught pins: gentle breathing glow */
+.map-pin--caught .map-pin__body {
+  animation: pin-glow 3s ease-in-out infinite;
+}
+
+@keyframes pin-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.9; }
+}
+
+@keyframes pin-glow {
   0%, 100% { stroke-opacity: 1; }
-  50% { stroke-opacity: 0.4; }
+  50% { stroke-opacity: 0.6; }
 }
