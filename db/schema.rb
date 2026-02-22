@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_21_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_22_100000) do
   create_table "soul_link_pokemon", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "caught_at"
     t.datetime "created_at", null: false
@@ -18,12 +18,31 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_21_200000) do
     t.bigint "discord_user_id", null: false
     t.string "location", null: false
     t.string "name", null: false
+    t.bigint "soul_link_pokemon_group_id", null: false
     t.bigint "soul_link_run_id", null: false
+    t.string "species", null: false
     t.string "status", default: "caught", null: false
     t.datetime "updated_at", null: false
+    t.index ["soul_link_pokemon_group_id", "discord_user_id"], name: "index_pokemon_on_group_and_user", unique: true
+    t.index ["soul_link_pokemon_group_id"], name: "index_soul_link_pokemon_on_soul_link_pokemon_group_id"
     t.index ["soul_link_run_id", "status"], name: "index_soul_link_pokemon_on_soul_link_run_id_and_status"
     t.index ["soul_link_run_id"], name: "index_soul_link_pokemon_on_soul_link_run_id"
     t.index ["status"], name: "index_soul_link_pokemon_on_status"
+  end
+
+  create_table "soul_link_pokemon_groups", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.datetime "caught_at"
+    t.datetime "created_at", null: false
+    t.datetime "died_at"
+    t.text "eulogy"
+    t.string "location", null: false
+    t.string "nickname", null: false
+    t.bigint "soul_link_run_id", null: false
+    t.string "status", default: "caught", null: false
+    t.datetime "updated_at", null: false
+    t.index ["soul_link_run_id", "nickname"], name: "idx_on_soul_link_run_id_nickname_4d742b8831"
+    t.index ["soul_link_run_id", "status"], name: "index_soul_link_pokemon_groups_on_soul_link_run_id_and_status"
+    t.index ["soul_link_run_id"], name: "index_soul_link_pokemon_groups_on_soul_link_run_id"
   end
 
   create_table "soul_link_runs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -43,5 +62,32 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_21_200000) do
     t.index ["guild_id", "run_number"], name: "index_soul_link_runs_on_guild_id_and_run_number", unique: true
   end
 
+  create_table "soul_link_team_slots", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "position", null: false
+    t.bigint "soul_link_pokemon_group_id", null: false
+    t.bigint "soul_link_team_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["soul_link_pokemon_group_id"], name: "index_soul_link_team_slots_on_soul_link_pokemon_group_id"
+    t.index ["soul_link_team_id", "position"], name: "index_team_slots_on_team_and_position", unique: true
+    t.index ["soul_link_team_id", "soul_link_pokemon_group_id"], name: "index_team_slots_on_team_and_group", unique: true
+    t.index ["soul_link_team_id"], name: "index_soul_link_team_slots_on_soul_link_team_id"
+  end
+
+  create_table "soul_link_teams", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "discord_user_id", null: false
+    t.string "label"
+    t.bigint "soul_link_run_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["soul_link_run_id", "discord_user_id"], name: "index_teams_on_run_and_user", unique: true
+    t.index ["soul_link_run_id"], name: "index_soul_link_teams_on_soul_link_run_id"
+  end
+
+  add_foreign_key "soul_link_pokemon", "soul_link_pokemon_groups"
   add_foreign_key "soul_link_pokemon", "soul_link_runs"
+  add_foreign_key "soul_link_pokemon_groups", "soul_link_runs"
+  add_foreign_key "soul_link_team_slots", "soul_link_pokemon_groups"
+  add_foreign_key "soul_link_team_slots", "soul_link_teams"
+  add_foreign_key "soul_link_teams", "soul_link_runs"
 end
