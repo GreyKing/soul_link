@@ -23,8 +23,14 @@ export default class extends Controller {
       animation: 150,
       ghostClass: "opacity-30",
       dragClass: "shadow-lg",
-      onAdd: () => this.updateEmptyStates()
+      onAdd: () => {
+        this.updateEmptyStates()
+        this.updatePositions()
+      }
     })
+
+    // Show initial positions
+    this.updatePositions()
   }
 
   onTeamChanged() {
@@ -37,6 +43,7 @@ export default class extends Controller {
     }
 
     this.updateEmptyStates()
+    this.updatePositions()
     this.save()
   }
 
@@ -84,6 +91,27 @@ export default class extends Controller {
     } catch (error) {
       this.showStatus("Network error", "text-red-400")
     }
+  }
+
+  updatePositions() {
+    // Show position numbers on team cards, hide on pool cards
+    const teamCards = this.teamListTarget.querySelectorAll(".pokemon-card")
+    teamCards.forEach((card, idx) => {
+      const badge = card.querySelector(".position-badge")
+      if (badge) {
+        badge.textContent = `#${idx + 1}`
+        badge.classList.remove("hidden")
+      }
+    })
+
+    const poolCards = this.poolListTarget.querySelectorAll(".pokemon-card")
+    poolCards.forEach(card => {
+      const badge = card.querySelector(".position-badge")
+      if (badge) {
+        badge.textContent = ""
+        badge.classList.add("hidden")
+      }
+    })
   }
 
   showStatus(text, className) {

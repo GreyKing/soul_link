@@ -2,9 +2,10 @@
 <div class="pokemon-card bg-gray-800 rounded-lg border border-gray-700 p-3 cursor-grab active:cursor-grabbing hover:border-gray-500 transition select-none"
      data-group-id="<%= group.id %>">
   <div class="flex items-center justify-between">
-    <div>
+    <div class="flex items-center gap-2">
+      <span class="position-badge text-xs text-gray-500 font-mono w-5 text-center hidden"></span>
       <span class="font-semibold text-white text-sm"><%= group.nickname %></span>
-      <span class="text-xs text-gray-500 ml-2"><%= group.location %></span>
+      <span class="text-xs text-gray-500"><%= group.location %></span>
     </div>
     <div class="text-xs text-gray-500">
       <svg class="w-4 h-4 inline-block opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
