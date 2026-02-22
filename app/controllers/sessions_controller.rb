@@ -18,7 +18,7 @@ class SessionsController < ApplicationController
     avatar_url = auth.info.image
 
     # Check guild membership — user must be in a guild that has any Soul Link run
-    guild_ids = auth.extra.raw_info.guilds&.map { |g| g["id"] } || []
+    guild_ids = auth.extra.raw_info.guilds&.map { |g| g["id"].to_i } || []
     run = SoulLinkRun.where(guild_id: guild_ids).order(created_at: :desc).first
 
     unless run
