@@ -5,6 +5,7 @@ module SoulLink
     LOCATIONS_PATH = Rails.root.join('config', 'soul_link', 'locations.yml')
     SETTINGS_PATH = Rails.root.join('config', 'soul_link', 'settings.yml')
     POKEDEX_PATH = Rails.root.join('config', 'soul_link', 'pokedex.yml')
+    MAP_COORDINATES_PATH = Rails.root.join('config', 'soul_link', 'map_coordinates.yml')
 
     class << self
       def gym_info
@@ -24,23 +25,16 @@ module SoulLink
         "#{prefix} #{run_number}"
       end
 
-      def next_gym_info
-        run = SoulLinkRun.current
-        return first_gym_info unless run
+      def map_coordinates
+        @map_coordinates ||= File.exist?(MAP_COORDINATES_PATH) ? YAML.load_file(MAP_COORDINATES_PATH) : {}
+      end
 
-        # Determine which gym is next based on number of gyms defeated
-        # For now, simple logic - you can enhance this
-        gyms_defeated = 0 # You might track this separately
+      GYM_KEYS = %w[first_gym second_gym third_gym fourth_gym fifth_gym sixth_gym seventh_gym eighth_gym].freeze
 
-        gym_key = case gyms_defeated
-                  when 0 then :first_gym
-                  when 1 then :second_gym
-                  # Add more as needed
-                  else
-                    :first_gym
-                  end
-
-        gym_info[gym_key.to_s] || first_gym_info
+      def next_gym_info(gyms_defeated = 0)
+        return nil if gyms_defeated >= 8
+        key = GYM_KEYS[gyms_defeated]
+        gym_info[key]
       end
 
       def first_gym_info
@@ -93,6 +87,7 @@ module SoulLink
         @locations = nil
         @settings = nil
         @pokedex = nil
+        @map_coordinates = nil
       end
     end
   end

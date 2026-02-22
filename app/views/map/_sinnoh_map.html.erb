@@ -1,0 +1,181 @@
+<%# Inline SVG map of the Sinnoh region. Rendered from map_coordinates.yml data.
+    Each location node is clickable via Stimulus actions. %>
+<svg viewBox="<%= map_data['viewbox'] %>"
+     class="w-full h-auto"
+     style="max-height: 70vh;"
+     preserveAspectRatio="xMidYMid meet"
+     data-sinnoh-map-target="svg"
+     xmlns="http://www.w3.org/2000/svg">
+
+  <%# ── Definitions ── %>
+  <defs>
+    <linearGradient id="map-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <%# ── Layer 0: Background ── %>
+  <rect width="1000" height="800" fill="url(#map-bg)" rx="8"/>
+
+  <%# ── Layer 1: Mt. Coronet mountain range (decorative) ── %>
+  <path d="M360,200 L380,160 L400,210 L420,170 L440,220 L370,340 L350,400 L360,450 L380,500 L370,540"
+        fill="none" stroke="#334155" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" opacity="0.3"/>
+
+  <%# ── Layer 2: Connection lines ── %>
+  <g class="connections">
+    <% (map_data['connections'] || []).each do |pair| %>
+      <% from_key, to_key = pair[0], pair[1] %>
+      <% from = map_data.dig('locations', from_key) %>
+      <% to = map_data.dig('locations', to_key) %>
+      <% next unless from && to %>
+      <% is_water = (map_data['water_routes'] || []).include?(from_key) || (map_data['water_routes'] || []).include?(to_key) %>
+      <line x1="<%= from['x'] %>" y1="<%= from['y'] %>"
+            x2="<%= to['x'] %>" y2="<%= to['y'] %>"
+            stroke="<%= is_water ? '#1e3a5f' : '#374151' %>"
+            stroke-width="2"
+            stroke-linecap="round"
+            <%= 'stroke-dasharray="6,4"' if is_water %>
+            opacity="0.6"/>
+    <% end %>
+  </g>
+
+  <%# ── Layer 3: Location nodes ── %>
+  <g class="locations">
+    <% locations.each do |key, loc_data| %>
+      <% next if loc_data['type'] == 'special' %>
+      <% coords = map_data.dig('locations', key) %>
+      <% next unless coords %>
+      <% groups = groups_by_location[key] %>
+      <% status = location_status(groups) %>
+      <% loc_type = loc_data['type'] || 'route' %>
+      <% gym_num = loc_data['gym_number'] %>
+      <% fill = location_fill(status, type: loc_type) %>
+      <% stroke = location_stroke(status, type: loc_type) %>
+      <% cx = coords['x'] %>
+      <% cy = coords['y'] %>
+
+      <%# Build JSON data for popover rendering %>
+      <% group_json = if groups.present?
+           groups.map do |g|
+             {
+               nickname: g.nickname,
+               status: g.status,
+               caught_at: g.caught_at&.strftime('%b %d'),
+               eulogy: g.eulogy,
+               pokemon: g.soul_link_pokemon.map { |p|
+                 {
+                   species: p.species,
+                   player: SoulLink::GameState.player_name(p.discord_user_id),
+                   sprite: SoulLink::GameState.sprite_filename(p.species)
+                 }
+               }
+             }
+           end
+         end %>
+
+      <g class="location-node"
+         style="cursor: pointer;"
+         data-sinnoh-map-target="location"
+         data-location-key="<%= key %>"
+         data-location-name="<%= loc_data['name'] %>"
+         data-status="<%= status %>"
+         <% if group_json %>data-groups="<%= group_json.to_json %>"<% end %>
+         data-action="click->sinnoh-map#onLocationClick">
+
+        <%# Invisible larger hit area for easier clicking %>
+        <circle cx="<%= cx %>" cy="<%= cy %>" r="18" fill="transparent" stroke="none"/>
+
+        <%# Render shape based on location type %>
+        <% case loc_type %>
+        <% when 'city' %>
+          <rect x="<%= cx - 26 %>" y="<%= cy - 16 %>"
+                width="52" height="32" rx="5"
+                fill="<%= fill %>" stroke="<%= stroke %>" stroke-width="2"/>
+          <% if gym_num %>
+            <%# Gym badge indicator %>
+            <% beaten = gyms_defeated >= gym_num %>
+            <circle cx="<%= cx + 22 %>" cy="<%= cy - 12 %>" r="8"
+                    fill="<%= beaten ? '#eab308' : '#1f2937' %>"
+                    stroke="<%= beaten ? '#facc15' : '#6b7280' %>"
+                    stroke-width="1.5"
+                    data-gym-badge="<%= gym_num %>"/>
+            <text x="<%= cx + 22 %>" y="<%= cy - 8 %>"
+                  text-anchor="middle" font-size="8" font-weight="bold"
+                  fill="<%= beaten ? '#1f2937' : '#9ca3af' %>"
+                  style="pointer-events: none;"><%= gym_num %></text>
+          <% end %>
+
+        <% when 'town' %>
+          <rect x="<%= cx - 22 %>" y="<%= cy - 14 %>"
+                width="44" height="28" rx="4"
+                fill="<%= fill %>" stroke="<%= stroke %>" stroke-width="1.5"/>
+
+        <% when 'route' %>
+          <circle cx="<%= cx %>" cy="<%= cy %>" r="10"
+                  fill="<%= fill %>" stroke="<%= stroke %>" stroke-width="1.5"/>
+
+        <% when 'dungeon' %>
+          <rect x="<%= cx - 11 %>" y="<%= cy - 11 %>"
+                width="22" height="22" rx="3"
+                fill="<%= fill %>" stroke="<%= stroke %>" stroke-width="1.5"
+                transform="rotate(45 <%= cx %> <%= cy %>)"/>
+
+        <% when 'lake' %>
+          <ellipse cx="<%= cx %>" cy="<%= cy %>"
+                   rx="20" ry="14"
+                   fill="<%= fill %>" stroke="<%= stroke %>" stroke-width="1.5"/>
+        <% end %>
+
+        <%# Location label %>
+        <% label_y = case loc_type
+             when 'city' then cy + 28
+             when 'town' then cy + 26
+             when 'lake' then cy + 24
+             else cy + 22
+           end %>
+        <text x="<%= cx %>" y="<%= label_y %>"
+              text-anchor="middle" font-size="7" fill="#9ca3af"
+              style="pointer-events: none;">
+          <%= loc_data['name'] %>
+        </text>
+
+        <%# Status indicators %>
+        <% if status == 'caught' && groups.present? %>
+          <%# Small green dot for caught %>
+          <circle cx="<%= cx + (loc_type == 'city' ? 26 : 12) %>" cy="<%= cy - (loc_type == 'city' ? 16 : 10) %>"
+                  r="3" fill="#22c55e" stroke="#15803d" stroke-width="1"/>
+        <% elsif status == 'dead' && groups.present? %>
+          <%# Red X for dead %>
+          <text x="<%= cx + (loc_type == 'city' ? 26 : 12) %>" y="<%= cy - (loc_type == 'city' ? 12 : 6) %>"
+                font-size="10" fill="#ef4444" style="pointer-events: none;">&#x2620;</text>
+        <% end %>
+
+        <%# Show group nickname on caught/dead locations %>
+        <% if groups.present? %>
+          <% group = primary_group(groups) %>
+          <text x="<%= cx %>" y="<%= cy - (loc_type == 'city' ? 22 : loc_type == 'town' ? 20 : 16) %>"
+                text-anchor="middle" font-size="7" font-weight="bold"
+                fill="<%= status == 'dead' ? '#fca5a5' : '#93c5fd' %>"
+                style="pointer-events: none;">
+            <%= group.nickname.truncate(12) %>
+          </text>
+        <% end %>
+      </g>
+    <% end %>
+  </g>
+
+  <%# ── Layer 4: Region labels (decorative) ── %>
+  <text x="370" y="340" text-anchor="middle" font-size="11" fill="#475569" font-weight="bold" opacity="0.4"
+        style="pointer-events: none;">MT. CORONET</text>
+</svg>

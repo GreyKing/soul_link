@@ -1,49 +1,246 @@
 # config/soul_link/locations.yml
-route_201:
-  name: "Route 201"
-route_202:
-  name: "Route 202"
-route_203:
-  name: "Route 203"
-route_204:
-  name: "Route 204"
-route_205:
-  name: "Route 205"
-route_206:
-  name: "Route 206"
-route_207:
-  name: "Route 207"
-route_208:
-  name: "Route 208"
-route_209:
-  name: "Route 209"
-route_210:
-  name: "Route 210"
+# All catchable/notable locations in the Sinnoh region (Pokemon Platinum)
+# type: city | town | route | dungeon | lake | special
+# gym_number: only on cities with a gym (1-8)
+
+# ── TOWNS & CITIES ──
+twinleaf_town:
+  name: "Twinleaf Town"
+  type: town
+
+sandgem_town:
+  name: "Sandgem Town"
+  type: town
+
 jubilife_city:
   name: "Jubilife City"
+  type: city
+
 oreburgh_city:
   name: "Oreburgh City"
+  type: city
+  gym_number: 1
+
 floaroma_town:
   name: "Floaroma Town"
+  type: town
+
 eterna_city:
   name: "Eterna City"
-eterna_forest:
-  name: "Eterna Forest"
+  type: city
+  gym_number: 2
+
+hearthome_city:
+  name: "Hearthome City"
+  type: city
+  gym_number: 5
+
+solaceon_town:
+  name: "Solaceon Town"
+  type: town
+
+veilstone_city:
+  name: "Veilstone City"
+  type: city
+  gym_number: 3
+
+pastoria_city:
+  name: "Pastoria City"
+  type: city
+  gym_number: 4
+
+celestic_town:
+  name: "Celestic Town"
+  type: town
+
+canalave_city:
+  name: "Canalave City"
+  type: city
+  gym_number: 6
+
+snowpoint_city:
+  name: "Snowpoint City"
+  type: city
+  gym_number: 7
+
+sunyshore_city:
+  name: "Sunyshore City"
+  type: city
+  gym_number: 8
+
+# ── ROUTES ──
+route_201:
+  name: "Route 201"
+  type: route
+
+route_202:
+  name: "Route 202"
+  type: route
+
+route_203:
+  name: "Route 203"
+  type: route
+
+route_204:
+  name: "Route 204"
+  type: route
+
+route_205:
+  name: "Route 205"
+  type: route
+
+route_206:
+  name: "Route 206"
+  type: route
+
+route_207:
+  name: "Route 207"
+  type: route
+
+route_208:
+  name: "Route 208"
+  type: route
+
+route_209:
+  name: "Route 209"
+  type: route
+
+route_210:
+  name: "Route 210"
+  type: route
+
+route_211:
+  name: "Route 211"
+  type: route
+
+route_212:
+  name: "Route 212"
+  type: route
+
+route_213:
+  name: "Route 213"
+  type: route
+
+route_214:
+  name: "Route 214"
+  type: route
+
+route_215:
+  name: "Route 215"
+  type: route
+
+route_216:
+  name: "Route 216"
+  type: route
+
+route_217:
+  name: "Route 217"
+  type: route
+
+route_218:
+  name: "Route 218"
+  type: route
+
+route_219:
+  name: "Route 219"
+  type: route
+
+route_222:
+  name: "Route 222"
+  type: route
+
+# ── DUNGEONS & CAVES ──
 oreburgh_mine:
   name: "Oreburgh Mine"
-valley_windworks:
-  name: "Valley Windworks"
+  type: dungeon
+
+oreburgh_gate:
+  name: "Oreburgh Gate"
+  type: dungeon
+
 ravaged_path:
   name: "Ravaged Path"
+  type: dungeon
+
+eterna_forest:
+  name: "Eterna Forest"
+  type: dungeon
+
 old_chateau:
   name: "Old Chateau"
+  type: dungeon
+
+valley_windworks:
+  name: "Valley Windworks"
+  type: dungeon
+
+wayward_cave:
+  name: "Wayward Cave"
+  type: dungeon
+
+mt_coronet:
+  name: "Mt. Coronet"
+  type: dungeon
+
+solaceon_ruins:
+  name: "Solaceon Ruins"
+  type: dungeon
+
+ruin_maniac_cave:
+  name: "Ruin Maniac Cave"
+  type: dungeon
+
+iron_island:
+  name: "Iron Island"
+  type: dungeon
+
+fuego_ironworks:
+  name: "Fuego Ironworks"
+  type: dungeon
+
+# ── LAKES ──
+lake_verity:
+  name: "Lake Verity"
+  type: lake
+
+lake_valor:
+  name: "Lake Valor"
+  type: lake
+
+lake_acuity:
+  name: "Lake Acuity"
+  type: lake
+
+# ── OTHER AREAS ──
+valor_lakefront:
+  name: "Valor Lakefront"
+  type: route
+
+trophy_garden:
+  name: "Trophy Garden"
+  type: dungeon
+
+safari_zone:
+  name: "Safari Zone"
+  type: dungeon
+
+# ── SPECIAL (not on map) ──
 starter:
   name: "Starter Pokemon"
+  type: special
+
 gift:
   name: "Gift Pokemon"
+  type: special
+
 egg:
   name: "Egg Hatch"
+  type: special
+
 trade:
   name: "Trade"
+  type: special
+
 other:
   name: "Other"
+  type: special
