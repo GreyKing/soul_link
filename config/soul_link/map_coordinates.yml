@@ -7,76 +7,76 @@ viewbox: "0 0 1268 734"
 
 locations:
   # ── NORTHERN SINNOH (Snowpoint area) ──
-  snowpoint_city:     { x: 605, y: 82 }
-  lake_acuity:        { x: 710, y: 58 }
-  route_217:          { x: 560, y: 135 }
-  route_216:          { x: 530, y: 190 }
+  snowpoint_city:     { x: 548, y: 62 }
+  lake_acuity:        { x: 462, y: 58 }
+  route_217:          { x: 540, y: 148 }
+  route_216:          { x: 575, y: 225 }
 
   # ── NORTHWEST / ETERNA AREA ──
-  eterna_city:        { x: 380, y: 205 }
-  eterna_forest:      { x: 305, y: 235 }
-  old_chateau:        { x: 270, y: 210 }
-  route_205:          { x: 275, y: 280 }
+  eterna_city:        { x: 490, y: 348 }
+  eterna_forest:      { x: 440, y: 310 }
+  old_chateau:        { x: 420, y: 285 }
+  route_205:          { x: 415, y: 332 }
 
   # ── CENTRAL-NORTH (Celestic / Mt. Coronet) ──
-  celestic_town:      { x: 620, y: 225 }
-  route_211:          { x: 550, y: 228 }
-  route_210:          { x: 670, y: 280 }
-  route_206:          { x: 420, y: 275 }
-  wayward_cave:       { x: 445, y: 300 }
-  mt_coronet:         { x: 500, y: 290 }
+  celestic_town:      { x: 668, y: 270 }
+  route_211:          { x: 635, y: 272 }
+  route_210:          { x: 700, y: 305 }
+  route_206:          { x: 492, y: 388 }
+  wayward_cave:       { x: 508, y: 398 }
+  mt_coronet:         { x: 598, y: 360 }
 
   # ── WEST (Floaroma area) ──
-  floaroma_town:      { x: 280, y: 330 }
-  valley_windworks:   { x: 370, y: 340 }
-  fuego_ironworks:    { x: 218, y: 295 }
-  route_204:          { x: 310, y: 385 }
+  floaroma_town:      { x: 423, y: 370 }
+  valley_windworks:   { x: 465, y: 378 }
+  fuego_ironworks:    { x: 375, y: 340 }
+  route_204:          { x: 400, y: 442 }
 
   # ── CENTRAL (Hearthome area) ──
-  route_207:          { x: 485, y: 345 }
-  route_208:          { x: 565, y: 370 }
-  hearthome_city:     { x: 625, y: 398 }
-  route_209:          { x: 685, y: 370 }
-  solaceon_town:      { x: 725, y: 338 }
-  solaceon_ruins:     { x: 765, y: 355 }
-  route_215:          { x: 775, y: 298 }
+  route_207:          { x: 540, y: 400 }
+  route_208:          { x: 610, y: 425 }
+  hearthome_city:     { x: 620, y: 458 }
+  route_209:          { x: 680, y: 400 }
+  solaceon_town:      { x: 730, y: 340 }
+  solaceon_ruins:     { x: 760, y: 348 }
+  route_215:          { x: 750, y: 362 }
 
   # ── EAST (Veilstone / Valor area) ──
-  veilstone_city:     { x: 830, y: 255 }
-  route_214:          { x: 840, y: 350 }
-  valor_lakefront:    { x: 860, y: 415 }
-  lake_valor:         { x: 915, y: 395 }
-  route_213:          { x: 810, y: 460 }
-  pastoria_city:      { x: 730, y: 478 }
-  route_212:          { x: 660, y: 452 }
-  trophy_garden:      { x: 690, y: 498 }
-  safari_zone:        { x: 760, y: 510 }
+  veilstone_city:     { x: 767, y: 388 }
+  route_214:          { x: 800, y: 418 }
+  valor_lakefront:    { x: 830, y: 445 }
+  lake_valor:         { x: 880, y: 400 }
+  route_213:          { x: 775, y: 488 }
+  pastoria_city:      { x: 720, y: 530 }
+  route_212:          { x: 670, y: 495 }
+  trophy_garden:      { x: 680, y: 530 }
+  safari_zone:        { x: 745, y: 548 }
 
   # ── FAR EAST (Sunyshore) ──
-  route_222:          { x: 935, y: 445 }
-  sunyshore_city:     { x: 1000, y: 418 }
+  route_222:          { x: 912, y: 468 }
+  sunyshore_city:     { x: 930, y: 505 }
 
   # ── OREBURGH AREA ──
-  route_203:          { x: 430, y: 468 }
-  oreburgh_gate:      { x: 470, y: 450 }
-  ravaged_path:       { x: 455, y: 432 }
-  oreburgh_city:      { x: 508, y: 485 }
-  oreburgh_mine:      { x: 528, y: 525 }
-  ruin_maniac_cave:   { x: 555, y: 510 }
+  route_203:          { x: 440, y: 495 }
+  oreburgh_gate:      { x: 458, y: 500 }
+  ravaged_path:       { x: 445, y: 478 }
+  oreburgh_city:      { x: 480, y: 521 }
+  oreburgh_mine:      { x: 500, y: 558 }
+  ruin_maniac_cave:   { x: 520, y: 545 }
 
   # ── SOUTHWEST (Jubilife / Canalave) ──
-  jubilife_city:      { x: 335, y: 448 }
-  route_218:          { x: 220, y: 432 }
-  canalave_city:      { x: 135, y: 415 }
-  iron_island:        { x: 100, y: 340 }
+  jubilife_city:      { x: 397, y: 534 }
+  route_218:          { x: 330, y: 528 }
+  canalave_city:      { x: 265, y: 525 }
+  iron_island:        { x: 340, y: 310 }
 
   # ── SOUTHERN SINNOH (Starting area) ──
-  route_202:          { x: 385, y: 505 }
-  sandgem_town:       { x: 415, y: 555 }
-  route_219:          { x: 448, y: 608 }
-  route_201:          { x: 355, y: 575 }
-  twinleaf_town:      { x: 310, y: 595 }
-  lake_verity:        { x: 230, y: 572 }
+  route_202:          { x: 392, y: 560 }
+  sandgem_town:       { x: 380, y: 585 }
+  route_219:          { x: 380, y: 640 }
+  route_201:          { x: 345, y: 600 }
+  twinleaf_town:      { x: 315, y: 618 }
+  lake_verity:        { x: 273, y: 588 }
 
 # Connections kept for potential future use (path highlighting, etc.)
 connections:
