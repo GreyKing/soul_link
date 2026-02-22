@@ -24,10 +24,9 @@ gem "jbuilder"
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 
-# Use the database-backed adapters for Rails.cache, Active Job, and Action Cable
-gem "solid_cache"
-gem "solid_queue"
-gem "solid_cable"
+# Rails 8.1 defaults to solid_cache/solid_queue/solid_cable which each require
+# separate database configs. We don't need background jobs, durable cache, or
+# Action Cable, so these are removed.
 
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
