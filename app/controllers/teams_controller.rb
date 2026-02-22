@@ -9,8 +9,9 @@ class TeamsController < ApplicationController
     end
 
     @team = run.soul_link_teams.find_or_create_by!(discord_user_id: current_user_id)
-    @team_groups = @team.soul_link_pokemon_groups.includes(:soul_link_pokemon)
-    team_group_ids = @team_groups.pluck(:id)
+    @team_slots = @team.soul_link_team_slots.includes(soul_link_pokemon_group: :soul_link_pokemon).order(:position)
+    @team_groups = @team_slots.map(&:soul_link_pokemon_group)
+    team_group_ids = @team_groups.map(&:id)
 
     @pool_groups = run.caught_groups.includes(:soul_link_pokemon).where.not(id: team_group_ids)
     @player_name = SoulLink::GameState.player_name(current_user_id)
