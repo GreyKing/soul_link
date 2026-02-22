@@ -17,12 +17,12 @@ class SessionsController < ApplicationController
     username = auth.info.name
     avatar_url = auth.info.image
 
-    # Check guild membership — user must be in a guild with an active run
+    # Check guild membership — user must be in a guild that has any Soul Link run
     guild_ids = auth.extra.raw_info.guilds&.map { |g| g["id"] } || []
-    active_run = SoulLinkRun.active.where(guild_id: guild_ids).first
+    run = SoulLinkRun.where(guild_id: guild_ids).order(created_at: :desc).first
 
-    unless active_run
-      redirect_to login_path, alert: "You must be a member of a Discord server with an active Soul Link run."
+    unless run
+      redirect_to login_path, alert: "You must be a member of a Discord server with Soul Link."
       return
     end
 
@@ -30,7 +30,7 @@ class SessionsController < ApplicationController
     session[:discord_user_id] = discord_user_id
     session[:discord_username] = username
     session[:discord_avatar_url] = avatar_url
-    session[:guild_id] = active_run.guild_id
+    session[:guild_id] = run.guild_id
 
     redirect_to team_path, notice: "Welcome, #{username}!"
   end
