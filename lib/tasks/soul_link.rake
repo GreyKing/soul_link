@@ -176,9 +176,22 @@ namespace :soul_link do
       puts ""
     end
 
+    # Build set of dead pokemon keys to skip from caught list
+    # (caught list often includes pokemon that later died)
+    dead_keys = Set.new
+    (data['dead_pokemon'] || []).each do |dp|
+      dead_keys << [dp['name'], dp['caught_at']]
+    end
+
     if data['caught_pokemon']
       puts "Importing caught Pokemon (legacy format)..."
       data['caught_pokemon'].each do |poke|
+        # Skip if this pokemon appears in the dead list (it'll be imported as dead)
+        if dead_keys.include?([poke['name'], poke['caught_at']])
+          puts "  ⏩ #{poke['name']} (#{poke['location']}) — skipped (in dead list)"
+          next
+        end
+
         group = run.soul_link_pokemon_groups.create!(
           nickname: poke['name'],
           location: poke['location'],
