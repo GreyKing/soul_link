@@ -15,5 +15,10 @@ Rails.application.routes.draw do
   end
   get "/teams", to: "teams#index", as: :teams
 
+  # Species assignment (drag-and-drop)
+  resource :species, only: [ :show ], controller: "species_assignments" do
+    patch :assign, on: :member
+  end
+
   root "teams#show"
 end

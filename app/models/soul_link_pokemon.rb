@@ -13,7 +13,23 @@ class SoulLinkPokemon < ApplicationRecord
   validates :name, presence: true
   validates :location, presence: true
 
+  scope :unassigned, -> { where(soul_link_pokemon_group_id: nil) }
+  scope :for_player, ->(uid) { where(discord_user_id: uid) }
+
   before_create :set_caught_at, if: -> { status == 'caught' }
+
+  def assign_to_group!(group)
+    raise "Already assigned to a group" if soul_link_pokemon_group_id.present?
+    update!(
+      soul_link_pokemon_group_id: group.id,
+      name: group.nickname,
+      location: group.location
+    )
+  end
+
+  def assigned?
+    soul_link_pokemon_group_id.present?
+  end
 
   def mark_as_dead!(location: nil)
     update!(

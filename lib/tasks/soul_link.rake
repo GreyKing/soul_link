@@ -61,6 +61,11 @@ namespace :soul_link do
       import_legacy_format(run, data)
     end
 
+    # Import species pool (unassigned species per player for web drag-and-drop)
+    if data['species_pool']
+      import_species_pool(run, data['species_pool'])
+    end
+
     puts "═══════════════════════════════════════"
     puts "  Import Complete!"
     puts "═══════════════════════════════════════"
@@ -69,10 +74,16 @@ namespace :soul_link do
     puts "  🎯 Caught Groups: #{run.caught_groups.count}"
     puts "  💀 Dead Groups: #{run.dead_groups.count}"
     puts "  📊 Total Species Entries: #{run.soul_link_pokemon.count}"
+    unassigned = run.soul_link_pokemon.unassigned.count
+    puts "  🎴 Unassigned Species: #{unassigned}" if unassigned > 0
     puts ""
     puts "📋 Next step: Start (or restart) the bot, then use /post_panels"
     puts "   in any Discord channel to post interactive panels to your"
     puts "   #catches and #deaths channels."
+    if unassigned > 0
+      puts ""
+      puts "🌐 Visit the Species page on the web UI to assign species to groups."
+    end
   end
 
   # Import with grouped format (nickname + species hash per group)
@@ -216,6 +227,34 @@ namespace :soul_link do
       end
       puts ""
     end
+  end
+
+  # Import species pool — unassigned species per player for web-based assignment
+  def self.import_species_pool(run, species_pool)
+    puts "Importing species pool..."
+    total = 0
+
+    species_pool.each do |discord_user_id, species_list|
+      player_name = SoulLink::GameState.player_name(discord_user_id.to_i)
+      count = 0
+
+      species_list.each do |species_name|
+        run.soul_link_pokemon.create!(
+          species: species_name,
+          name: species_name,
+          location: 'pool',
+          discord_user_id: discord_user_id.to_i,
+          status: 'caught'
+        )
+        count += 1
+      end
+
+      puts "  🎴 #{player_name}: #{count} species"
+      total += count
+    end
+
+    puts "  Total: #{total} unassigned species"
+    puts ""
   end
 
   desc "Run the Soul Link Discord bot"

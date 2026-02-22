@@ -1,0 +1,53 @@
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-white">Species Assignment</h1>
+  <p class="text-gray-400 text-sm mt-1">Drag your species from the pool onto the correct group.</p>
+</div>
+
+<div data-controller="species-assignment"
+     data-species-assignment-assign-url-value="<%= assign_species_path %>"
+     data-species-assignment-csrf-value="<%= form_authenticity_token %>"
+     data-species-assignment-user-id-value="<%= current_user_id %>"
+     class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+  <%# ── CAUGHT GROUPS (left 2 columns) ── %>
+  <div class="lg:col-span-2">
+    <h2 class="text-lg font-semibold text-white mb-4">
+      Caught Groups
+      <span class="text-sm font-normal text-gray-400">(<%= @groups.size %> groups)</span>
+    </h2>
+
+    <div class="space-y-3">
+      <% @groups.each do |group| %>
+        <%= render "group_card", group: group, current_user_id: current_user_id, players: @players %>
+      <% end %>
+
+      <% if @groups.empty? %>
+        <p class="text-gray-500 text-sm text-center py-8">No caught groups yet.</p>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ── YOUR SPECIES POOL (right column) ── %>
+  <div>
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-white">
+        Your Species
+        <span class="text-sm font-normal text-gray-400"
+              data-species-assignment-target="poolCount">(<%= @pool.size %> remaining)</span>
+      </h2>
+      <span data-species-assignment-target="saveStatus" class="text-xs text-gray-500"></span>
+    </div>
+
+    <div data-species-assignment-target="poolList"
+         class="space-y-2 min-h-[200px] p-4 bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-600 sticky top-4">
+      <% @pool.each do |pokemon| %>
+        <%= render "species_card", pokemon: pokemon %>
+      <% end %>
+
+      <p class="text-gray-500 text-sm text-center py-4 <%= @pool.any? ? 'hidden' : '' %>"
+         data-species-assignment-target="poolEmpty">
+        All species assigned!
+      </p>
+    </div>
+  </div>
+</div>
