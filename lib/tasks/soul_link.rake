@@ -139,7 +139,8 @@ namespace :soul_link do
           location: location,
           status: 'dead',
           caught_at: group_data['caught_at'] ? Time.parse(group_data['caught_at']) : nil,
-          died_at: group_data['died_at'] ? Time.parse(group_data['died_at']) : Time.current
+          died_at: group_data['died_at'] ? Time.parse(group_data['died_at']) : Time.current,
+          eulogy: group_data['eulogy']
         )
 
         species_count = 0
@@ -157,7 +158,8 @@ namespace :soul_link do
           species_count += 1
         end
 
-        puts "  💀 #{group.nickname} (#{location}) — #{species_count} species"
+        eulogy_note = group_data['eulogy'] ? " — 📝" : ""
+        puts "  💀 #{group.nickname} (#{location}) — #{species_count} species#{eulogy_note}"
       end
       puts ""
     end
@@ -209,7 +211,8 @@ namespace :soul_link do
           location: location,
           status: 'dead',
           caught_at: poke['caught_at'] ? Time.parse(poke['caught_at']) : nil,
-          died_at: poke['died_at'] ? Time.parse(poke['died_at']) : Time.current
+          died_at: poke['died_at'] ? Time.parse(poke['died_at']) : Time.current,
+          eulogy: poke['eulogy']
         )
 
         group.soul_link_pokemon.create!(
@@ -223,7 +226,8 @@ namespace :soul_link do
           died_at: poke['died_at'] ? Time.parse(poke['died_at']) : Time.current
         )
 
-        puts "  💀 #{group.nickname} (#{location})"
+        eulogy_note = poke['eulogy'] ? " — 📝" : ""
+        puts "  💀 #{group.nickname} (#{location})#{eulogy_note}"
       end
       puts ""
     end
