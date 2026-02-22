@@ -18,12 +18,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_22_130000) do
     t.bigint "discord_user_id", null: false
     t.string "location", null: false
     t.string "name", null: false
-    t.bigint "soul_link_pokemon_group_id", null: false
+    t.bigint "soul_link_pokemon_group_id"
     t.bigint "soul_link_run_id", null: false
     t.string "species", null: false
     t.string "status", default: "caught", null: false
     t.datetime "updated_at", null: false
-    t.index ["soul_link_pokemon_group_id", "discord_user_id"], name: "index_pokemon_on_group_and_user", unique: true
+    t.index ["soul_link_pokemon_group_id", "discord_user_id"], name: "index_pokemon_on_group_and_user"
     t.index ["soul_link_pokemon_group_id"], name: "index_soul_link_pokemon_on_soul_link_pokemon_group_id"
     t.index ["soul_link_run_id", "status"], name: "index_soul_link_pokemon_on_soul_link_run_id_and_status"
     t.index ["soul_link_run_id"], name: "index_soul_link_pokemon_on_soul_link_run_id"
