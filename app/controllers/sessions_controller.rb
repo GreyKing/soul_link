@@ -18,10 +18,13 @@ class SessionsController < ApplicationController
     avatar_url = auth.info.image
 
     # Check guild membership — user must be in a guild that has any Soul Link run
-    guild_ids = auth.extra.raw_info.guilds&.map { |g| g["id"].to_i } || []
+    guilds_data = auth.extra.raw_info.guilds
+    guild_ids = guilds_data&.map { |g| g["id"].to_i } || []
+    Rails.logger.info "[SoulLink Auth] User: #{username} (#{discord_user_id}), guilds raw: #{guilds_data&.map { |g| g['id'] }}, guild_ids: #{guild_ids}"
     run = SoulLinkRun.where(guild_id: guild_ids).order(created_at: :desc).first
 
     unless run
+      Rails.logger.info "[SoulLink Auth] No matching run found. DB runs: #{SoulLinkRun.pluck(:guild_id).inspect}"
       redirect_to login_path, alert: "You must be a member of a Discord server with Soul Link."
       return
     end
