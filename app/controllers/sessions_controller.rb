@@ -17,10 +17,15 @@ class SessionsController < ApplicationController
     username = auth.info.name
     avatar_url = auth.info.image
 
+    # Fetch user's guilds via Discord API (raw_info only has user data, not guilds)
+    access_token = auth.credentials.token
+    guilds_response = Faraday.get("https://discord.com/api/users/@me/guilds") do |req|
+      req.headers["Authorization"] = "Bearer #{access_token}"
+    end
+    guild_ids = JSON.parse(guilds_response.body).map { |g| g["id"].to_i } rescue []
+    Rails.logger.info "[SoulLink Auth] User: #{username} (#{discord_user_id}), guild_ids: #{guild_ids}"
+
     # Check guild membership — user must be in a guild that has any Soul Link run
-    guilds_data = auth.extra.raw_info.guilds
-    guild_ids = guilds_data&.map { |g| g["id"].to_i } || []
-    Rails.logger.info "[SoulLink Auth] User: #{username} (#{discord_user_id}), guilds raw: #{guilds_data&.map { |g| g['id'] }}, guild_ids: #{guild_ids}"
     run = SoulLinkRun.where(guild_id: guild_ids).order(created_at: :desc).first
 
     unless run
