@@ -4,6 +4,7 @@ module SoulLink
     GYM_INFO_PATH = Rails.root.join('config', 'soul_link', 'gym_info.yml')
     LOCATIONS_PATH = Rails.root.join('config', 'soul_link', 'locations.yml')
     SETTINGS_PATH = Rails.root.join('config', 'soul_link', 'settings.yml')
+    POKEDEX_PATH = Rails.root.join('config', 'soul_link', 'pokedex.yml')
 
     class << self
       def gym_info
@@ -77,10 +78,21 @@ module SoulLink
         player_ids.include?(discord_user_id)
       end
 
+      # Pokedex: species name → sprite filename mapping
+      def pokedex
+        @pokedex ||= File.exist?(POKEDEX_PATH) ? YAML.load_file(POKEDEX_PATH) : {}
+      end
+
+      # Returns the sprite filename (without extension) for a species, or nil
+      def sprite_filename(species_name)
+        pokedex[species_name]
+      end
+
       def reload!
         @gym_info = nil
         @locations = nil
         @settings = nil
+        @pokedex = nil
       end
     end
   end
