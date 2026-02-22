@@ -9,10 +9,10 @@
      data-species-assignment-user-id-value="<%= current_user_id %>"
      class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-  <%# ── CAUGHT GROUPS (left 2 columns) ── %>
+  <%# ── ALL GROUPS (left 2 columns) ── %>
   <div class="lg:col-span-2">
     <h2 class="text-lg font-semibold text-white mb-4">
-      Caught Groups
+      All Groups
       <span class="text-sm font-normal text-gray-400">(<%= @groups.size %> groups)</span>
     </h2>
 
@@ -22,7 +22,7 @@
       <% end %>
 
       <% if @groups.empty? %>
-        <p class="text-gray-500 text-sm text-center py-8">No caught groups yet.</p>
+        <p class="text-gray-500 text-sm text-center py-8">No groups yet.</p>
       <% end %>
     </div>
   </div>

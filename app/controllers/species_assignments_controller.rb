@@ -8,7 +8,7 @@ class SpeciesAssignmentsController < ApplicationController
       return
     end
 
-    @groups = run.caught_groups.includes(:soul_link_pokemon)
+    @groups = run.soul_link_pokemon_groups.includes(:soul_link_pokemon).order(caught_at: :asc)
     @pool = run.soul_link_pokemon.unassigned.for_player(current_user_id).order(:species)
     @player_name = SoulLink::GameState.player_name(current_user_id)
     @players = SoulLink::GameState.players
@@ -19,7 +19,7 @@ class SpeciesAssignmentsController < ApplicationController
     head :not_found and return unless run
 
     pokemon = run.soul_link_pokemon.unassigned.for_player(current_user_id).find_by(id: params[:pokemon_id])
-    group = run.caught_groups.find_by(id: params[:group_id])
+    group = run.soul_link_pokemon_groups.find_by(id: params[:group_id])
 
     unless pokemon
       render json: { error: "Species not found or already assigned" }, status: :unprocessable_entity
