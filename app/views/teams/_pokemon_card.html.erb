@@ -18,6 +18,7 @@
       <% is_mine = pokemon.discord_user_id == current_user_id %>
       <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full
                    <%= is_mine ? 'bg-indigo-900/60 text-indigo-300 border border-indigo-700' : 'bg-gray-700/50 text-gray-400' %>">
+        <%= pokemon_sprite_tag(pokemon.species, size: 20) %>
         <span class="font-medium"><%= SoulLink::GameState.player_name(pokemon.discord_user_id) %></span>
         <span class="<%= is_mine ? 'text-indigo-200' : 'text-gray-500' %>"><%= pokemon.species %></span>
       </span>
