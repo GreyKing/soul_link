@@ -1,0 +1,26 @@
+<%# Each card is draggable. data-group-id is read by Sortable to persist order. %>
+<div class="pokemon-card bg-gray-800 rounded-lg border border-gray-700 p-3 cursor-grab active:cursor-grabbing hover:border-gray-500 transition select-none"
+     data-group-id="<%= group.id %>">
+  <div class="flex items-center justify-between">
+    <div>
+      <span class="font-semibold text-white text-sm"><%= group.nickname %></span>
+      <span class="text-xs text-gray-500 ml-2"><%= group.location %></span>
+    </div>
+    <div class="text-xs text-gray-500">
+      <svg class="w-4 h-4 inline-block opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="mt-2 flex flex-wrap gap-2">
+    <% group.soul_link_pokemon.each do |pokemon| %>
+      <% is_mine = pokemon.discord_user_id == current_user_id %>
+      <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full
+                   <%= is_mine ? 'bg-indigo-900/60 text-indigo-300 border border-indigo-700' : 'bg-gray-700/50 text-gray-400' %>">
+        <span class="font-medium"><%= SoulLink::GameState.player_name(pokemon.discord_user_id) %></span>
+        <span class="<%= is_mine ? 'text-indigo-200' : 'text-gray-500' %>"><%= pokemon.species %></span>
+      </span>
+    <% end %>
+  </div>
+</div>

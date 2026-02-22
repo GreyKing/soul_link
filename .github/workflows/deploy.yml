@@ -27,4 +27,6 @@ jobs:
             git pull origin main
             ~/.rbenv/shims/bundle install --without development test
             ~/.rbenv/shims/ruby bin/rails db:migrate
+            ~/.rbenv/shims/ruby bin/rails assets:precompile
             systemctl restart soul-link-bot
+            systemctl restart soul-link-web || true

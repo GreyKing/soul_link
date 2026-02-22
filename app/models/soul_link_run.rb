@@ -1,6 +1,7 @@
 class SoulLinkRun < ApplicationRecord
   has_many :soul_link_pokemon_groups, dependent: :destroy
   has_many :soul_link_pokemon, dependent: :destroy
+  has_many :soul_link_teams, dependent: :destroy
 
   validates :run_number, presence: true, uniqueness: { scope: :guild_id }
   validates :guild_id, presence: true

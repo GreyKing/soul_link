@@ -1,0 +1,55 @@
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-white"><%= @player_name %>'s Team</h1>
+  <p class="text-gray-400 text-sm mt-1">Drag Pokemon between your team and the pool. Max 6 per team.</p>
+</div>
+
+<div data-controller="team-builder"
+     data-team-builder-update-url-value="<%= update_slots_team_path %>"
+     data-team-builder-csrf-value="<%= form_authenticity_token %>"
+     data-team-builder-user-id-value="<%= current_user_id %>"
+     class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+  <%# ── YOUR TEAM (left column) ── %>
+  <div>
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-white">
+        Your Team
+        <span class="text-sm font-normal text-gray-400"
+              data-team-builder-target="teamCount">(<%= @team_groups.size %>/<%= SoulLinkTeam::MAX_SLOTS %>)</span>
+      </h2>
+      <span data-team-builder-target="saveStatus" class="text-xs text-gray-500"></span>
+    </div>
+
+    <div data-team-builder-target="teamList"
+         class="space-y-3 min-h-[200px] p-4 bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-700">
+      <% if @team_groups.empty? %>
+        <p class="text-gray-500 text-sm text-center py-8" data-team-builder-target="teamEmpty">
+          Drag Pokemon here to build your team
+        </p>
+      <% end %>
+      <% @team_groups.each do |group| %>
+        <%= render "pokemon_card", group: group, current_user_id: current_user_id %>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ── AVAILABLE POOL (right column) ── %>
+  <div>
+    <h2 class="text-lg font-semibold text-white mb-4">
+      Available Pool
+      <span class="text-sm font-normal text-gray-400">(<%= @pool_groups.size %> caught)</span>
+    </h2>
+
+    <div data-team-builder-target="poolList"
+         class="space-y-3 min-h-[200px] p-4 bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-600">
+      <% if @pool_groups.empty? %>
+        <p class="text-gray-500 text-sm text-center py-8" data-team-builder-target="poolEmpty">
+          All caught Pokemon are on your team!
+        </p>
+      <% end %>
+      <% @pool_groups.each do |group| %>
+        <%= render "pokemon_card", group: group, current_user_id: current_user_id %>
+      <% end %>
+    </div>
+  </div>
+</div>

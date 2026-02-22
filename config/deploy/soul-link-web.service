@@ -1,0 +1,29 @@
+# /etc/systemd/system/soul-link-web.service
+# Puma web server for Soul Link Team Builder
+#
+# Install:
+#   sudo cp config/deploy/soul-link-web.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable soul-link-web
+#   sudo systemctl start soul-link-web
+
+[Unit]
+Description=Soul Link Web (Puma)
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/soul_link
+ExecStart=/root/.rbenv/shims/bundle exec puma -C config/puma.rb
+Restart=always
+RestartSec=3
+
+Environment=RAILS_ENV=production
+Environment=RAILS_MASTER_KEY=REPLACE_ME
+Environment=DATABASE_USERNAME=soul_link
+Environment=DATABASE_PASSWORD=REPLACE_ME
+Environment=SOUL_LINK_HOST=4luckyclovers.com
+
+[Install]
+WantedBy=multi-user.target

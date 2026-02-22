@@ -3,6 +3,7 @@ class SoulLinkPokemonGroup < ApplicationRecord
 
   belongs_to :soul_link_run
   has_many :soul_link_pokemon, dependent: :destroy
+  has_many :soul_link_team_slots, dependent: :destroy
 
   validates :nickname, :location, presence: true
   validates :status, inclusion: { in: %w[caught dead] }
@@ -11,6 +12,7 @@ class SoulLinkPokemonGroup < ApplicationRecord
   scope :dead, -> { where(status: 'dead') }
 
   before_create :set_caught_at, if: -> { status == 'caught' }
+  after_update :remove_team_slots_on_death, if: -> { saved_change_to_status? && dead? }
 
   def mark_as_dead!(death_location: nil)
     transaction do
@@ -55,5 +57,9 @@ class SoulLinkPokemonGroup < ApplicationRecord
 
   def set_caught_at
     self.caught_at = Time.current
+  end
+
+  def remove_team_slots_on_death
+    soul_link_team_slots.destroy_all
   end
 end
