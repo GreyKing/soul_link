@@ -55,10 +55,12 @@ namespace :soul_link do
     puts "✅ Created Run ##{run.run_number}"
     puts ""
 
+    has_species_pool = data['species_pool'].present?
+
     if is_grouped_format
       import_grouped_format(run, data)
     else
-      import_legacy_format(run, data)
+      import_legacy_format(run, data, skip_pokemon: has_species_pool)
     end
 
     # Import species pool (unassigned species per player for web drag-and-drop)
@@ -166,7 +168,14 @@ namespace :soul_link do
   end
 
   # Import with legacy flat format (single discord_user_id, no species)
-  def self.import_legacy_format(run, data)
+  # When skip_pokemon is true (species_pool present), only create groups —
+  # players will assign species via the web UI drag-and-drop.
+  def self.import_legacy_format(run, data, skip_pokemon: false)
+    if skip_pokemon
+      puts "(Species pool provided — creating groups only, species assigned via web UI)"
+      puts ""
+    end
+
     if data['caught_pokemon']
       puts "Importing caught Pokemon (legacy format)..."
       data['caught_pokemon'].each do |poke|
@@ -177,15 +186,17 @@ namespace :soul_link do
           caught_at: poke['caught_at'] ? Time.parse(poke['caught_at']) : Time.current
         )
 
-        group.soul_link_pokemon.create!(
-          soul_link_run: run,
-          species: 'Unknown',
-          name: poke['name'],
-          location: poke['location'],
-          discord_user_id: data['discord_user_id'],
-          status: 'caught',
-          caught_at: poke['caught_at'] ? Time.parse(poke['caught_at']) : Time.current
-        )
+        unless skip_pokemon
+          group.soul_link_pokemon.create!(
+            soul_link_run: run,
+            species: 'Unknown',
+            name: poke['name'],
+            location: poke['location'],
+            discord_user_id: data['discord_user_id'],
+            status: 'caught',
+            caught_at: poke['caught_at'] ? Time.parse(poke['caught_at']) : Time.current
+          )
+        end
 
         puts "  ✅ #{group.nickname} (#{group.location})"
       end
@@ -215,16 +226,18 @@ namespace :soul_link do
           eulogy: poke['eulogy']
         )
 
-        group.soul_link_pokemon.create!(
-          soul_link_run: run,
-          species: 'Unknown',
-          name: poke['name'],
-          location: location,
-          discord_user_id: data['discord_user_id'],
-          status: 'dead',
-          caught_at: poke['caught_at'] ? Time.parse(poke['caught_at']) : nil,
-          died_at: poke['died_at'] ? Time.parse(poke['died_at']) : Time.current
-        )
+        unless skip_pokemon
+          group.soul_link_pokemon.create!(
+            soul_link_run: run,
+            species: 'Unknown',
+            name: poke['name'],
+            location: location,
+            discord_user_id: data['discord_user_id'],
+            status: 'dead',
+            caught_at: poke['caught_at'] ? Time.parse(poke['caught_at']) : nil,
+            died_at: poke['died_at'] ? Time.parse(poke['died_at']) : Time.current
+          )
+        end
 
         eulogy_note = poke['eulogy'] ? " — 📝" : ""
         puts "  💀 #{group.nickname} (#{location})#{eulogy_note}"
