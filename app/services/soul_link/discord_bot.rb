@@ -190,11 +190,16 @@ module SoulLink
         show_death_location_selector(event, group_id)
       end
 
-      # Select menu: Death location selected
+      # Select menu: Death location selected - show eulogy modal
       bot.select_menu(custom_id: /^soul_link:death_location_select:/) do |event|
         group_id = event.interaction.data['custom_id'].split(':').last
         location = event.values.first
-        handle_move_to_deaths_final(event, group_id, location)
+        open_eulogy_modal(event, group_id, location)
+      end
+
+      # Modal: Eulogy submission for caught death
+      bot.modal_submit(custom_id: /^soul_link:eulogy_modal:/) do |event|
+        handle_eulogy_submission(event)
       end
 
       # Button: Add uncaught death - show location selector
@@ -382,6 +387,10 @@ module SoulLink
 
                         group.soul_link_pokemon.each do |pokemon|
                           lines << "   #{GameState.player_name(pokemon.discord_user_id)}: #{pokemon.species}"
+                        end
+
+                        if group.eulogy.present?
+                          lines << "   📝 *#{group.eulogy}*"
                         end
 
                         lines.join("\n")
@@ -724,12 +733,51 @@ module SoulLink
               max_length: 50
             }
           ]
+        },
+        {
+          type: 1,
+          components: [
+            {
+              type: 4,
+              custom_id: 'eulogy',
+              label: 'Eulogy (optional)',
+              style: 2, # paragraph
+              required: false,
+              max_length: 500,
+              placeholder: 'How did they die? Write a short eulogy...'
+            }
+          ]
         }
       ]
 
       event.show_modal(
         title: 'Add Uncaught Death',
         custom_id: 'soul_link:uncaught_death_modal',
+        components: components
+      )
+    end
+
+    def open_eulogy_modal(event, group_id, location)
+      components = [
+        {
+          type: 1,
+          components: [
+            {
+              type: 4, # text input
+              custom_id: 'eulogy',
+              label: 'Eulogy (optional)',
+              style: 2, # paragraph (multi-line)
+              required: false,
+              max_length: 500,
+              placeholder: 'How did they die? Write a short eulogy...'
+            }
+          ]
+        }
+      ]
+
+      event.show_modal(
+        title: 'Write a Eulogy',
+        custom_id: "soul_link:eulogy_modal:#{group_id}:#{location}",
         components: components
       )
     end
@@ -804,32 +852,43 @@ module SoulLink
       respond_ephemeral(event, "❌ Error: #{e.message}")
     end
 
-    def handle_move_to_deaths_final(event, group_id, location)
+    def handle_eulogy_submission(event)
+      # custom_id format: soul_link:eulogy_modal:GROUP_ID:LOCATION
+      parts = event.interaction.data['custom_id'].split(':')
+      group_id = parts[2]
+      location = parts[3..].join(':') # rejoin in case location has colons
+
+      values = extract_modal_values(event)
+      eulogy = values['eulogy']
+
+      handle_move_to_deaths_final(event, group_id, location, eulogy: eulogy)
+    end
+
+    def handle_move_to_deaths_final(event, group_id, location, eulogy: nil)
       run = current_run(event)
       unless run
-        event.respond(content: "❌ No active run found!", ephemeral: true)
+        respond_ephemeral(event, "❌ No active run found!")
         return
       end
 
       group = run.caught_groups.find_by(id: group_id)
       unless group
-        event.respond(content: "❌ Could not find that group!", ephemeral: true)
+        respond_ephemeral(event, "❌ Could not find that group!")
         return
       end
 
       death_location = location == 'original' ? nil : location
-      group.mark_as_dead!(death_location: death_location)
+      group.mark_as_dead!(death_location: death_location, eulogy: eulogy)
 
       update_catches_panel(run)
       update_deaths_panel(run)
 
       species_count = group.soul_link_pokemon.count
-      event.respond(
-        content: "💀 Moved **#{group.nickname}** (#{species_count} species) to deaths. RIP.",
-        ephemeral: true
-      )
+      response = "💀 Moved **#{group.nickname}** (#{species_count} species) to deaths. RIP."
+      response += "\n📝 *#{eulogy}*" if eulogy.present?
+      respond_ephemeral(event, response)
     rescue => e
-      event.respond(content: "❌ Error: #{e.message}", ephemeral: true)
+      respond_ephemeral(event, "❌ Error: #{e.message}")
     end
 
     def handle_uncaught_death_submission(event)
@@ -845,11 +904,14 @@ module SoulLink
         nickname: values['nickname'],
         location: values['location'],
         status: 'dead',
-        died_at: Time.current
+        died_at: Time.current,
+        eulogy: values['eulogy'].presence
       )
 
       update_deaths_panel(run)
-      respond_ephemeral(event, "💀 Added **#{group.nickname}** to deaths!")
+      response = "💀 Added **#{group.nickname}** to deaths!"
+      response += "\n📝 *#{values['eulogy']}*" if values['eulogy'].present?
+      respond_ephemeral(event, response)
     rescue => e
       respond_ephemeral(event, "❌ Error: #{e.message}")
     end

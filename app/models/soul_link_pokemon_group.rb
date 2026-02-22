@@ -14,12 +14,13 @@ class SoulLinkPokemonGroup < ApplicationRecord
   before_create :set_caught_at, if: -> { status == 'caught' }
   after_update :remove_team_slots_on_death, if: -> { saved_change_to_status? && dead? }
 
-  def mark_as_dead!(death_location: nil)
+  def mark_as_dead!(death_location: nil, eulogy: nil)
     transaction do
       update!(
         status: 'dead',
         died_at: Time.current,
-        location: death_location || location
+        location: death_location || location,
+        eulogy: eulogy.presence
       )
 
       soul_link_pokemon.each do |pokemon|
