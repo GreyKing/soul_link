@@ -1,25 +1,12 @@
 module MapHelper
-  # Returns SVG fill color based on location catch status
-  def location_fill(status, type: "route")
-    case status
-    when "caught"
-      type == "lake" ? "#1e40af" : "#1e3a5f"
-    when "dead"
-      "#7f1d1d"
-    else
-      type == "lake" ? "#1e293b" : "#374151"
-    end
-  end
-
-  # Returns SVG stroke color based on location catch status
-  def location_stroke(status, type: "route")
-    case status
-    when "caught"
-      "#3b82f6"
-    when "dead"
-      "#ef4444"
-    else
-      type == "lake" ? "#1e3a5f" : "#4b5563"
+  # Pin radius based on location type — cities get bigger pins
+  def pin_radius(loc_type)
+    case loc_type
+    when "city" then 9
+    when "town" then 8
+    when "lake" then 7
+    when "dungeon" then 6
+    else 6  # route
     end
   end
 
