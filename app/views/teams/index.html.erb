@@ -27,7 +27,7 @@
                 <% group.soul_link_pokemon.each do |pokemon| %>
                   <% is_this_player = pokemon.discord_user_id == player['discord_user_id'] %>
                   <span class="inline-flex items-center gap-0.5 text-xs <%= is_this_player ? 'text-indigo-300 font-medium' : 'text-gray-500' %>">
-                    <%= pokemon_sprite_tag(pokemon.species, size: 18) %>
+                    <%= pokemon_sprite_tag(pokemon.species, size: 32) %>
                     <%= pokemon.species %>
                   </span>
                 <% end %>
