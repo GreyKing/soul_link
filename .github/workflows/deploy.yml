@@ -22,6 +22,7 @@ jobs:
             export RAILS_MASTER_KEY=${{ secrets.RAILS_MASTER_KEY }}
             export DATABASE_USERNAME=${{ secrets.DATABASE_USERNAME }}
             export DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
+            export SOUL_LINK_HOST=4luckyclovers.com
 
             cd /opt/soul_link
             git pull origin main
@@ -29,4 +30,4 @@ jobs:
             ~/.rbenv/shims/ruby bin/rails db:migrate
             ~/.rbenv/shims/ruby bin/rails assets:precompile
             systemctl restart soul-link-bot
-            systemctl restart soul-link-web || true
+            systemctl restart soul-link-web
