@@ -1,10 +1,14 @@
-<div class="bg-gray-800 rounded-lg border border-gray-700 p-4" data-group-id="<%= group.id %>">
+<div class="<%= group.dead? ? 'bg-gray-800/50 border-red-900/50' : 'bg-gray-800 border-gray-700' %> rounded-lg border p-4" data-group-id="<%= group.id %>">
   <div class="flex items-center justify-between mb-3">
     <div>
-      <span class="font-semibold text-white"><%= group.nickname %></span>
+      <span class="font-semibold <%= group.dead? ? 'text-red-300' : 'text-white' %>">
+        <%= group.dead? ? '💀 ' : '' %><%= group.nickname %>
+      </span>
       <span class="text-xs text-gray-500 ml-2"><%= group.location %></span>
     </div>
-    <% if group.complete? %>
+    <% if group.dead? %>
+      <span class="text-xs text-red-400">Dead</span>
+    <% elsif group.complete? %>
       <span class="text-xs text-green-400">Complete</span>
     <% else %>
       <span class="text-xs text-yellow-400"><%= group.missing_players.size %> missing</span>
