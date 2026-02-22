@@ -1,0 +1,181 @@
+<div data-controller="sinnoh-map"
+     data-sinnoh-map-gyms-defeated-value="<%= @gyms_defeated %>"
+     data-sinnoh-map-csrf-value="<%= form_authenticity_token %>"
+     data-sinnoh-map-gym-progress-url-value="<%= gym_progress_path %>"
+     data-sinnoh-map-create-group-url-value="<%= pokemon_groups_path %>"
+     data-sinnoh-map-pokedex-species-value="<%= @pokedex_species.to_json %>"
+     data-sinnoh-map-sprite-map-value="<%= SoulLink::GameState.pokedex.to_json %>"
+     class="relative">
+
+  <%# ── HEADER: Title + Gym Badges ── %>
+  <div class="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Sinnoh Region</h1>
+      <p class="text-gray-400 text-sm mt-1">Click a location to view catches or add new ones.</p>
+    </div>
+
+    <%# Gym badges progress bar %>
+    <div class="flex items-center gap-1.5">
+      <span class="text-xs text-gray-400 mr-1">Badges:</span>
+      <% SoulLink::GameState.gym_info.each do |key, gym| %>
+        <% num = gym['number'] %>
+        <% beaten = @gyms_defeated >= num %>
+        <button class="w-7 h-7 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition
+                       <%= beaten ? 'bg-yellow-500 border-yellow-400 text-gray-900' : 'bg-gray-700 border-gray-600 text-gray-400 hover:border-gray-500' %>"
+                data-action="click->sinnoh-map#toggleGym"
+                data-gym-number="<%= num %>"
+                title="<%= gym['name'] %> — <%= gym['leader'] %> (<%= gym['type'] %>) — Lv. <%= gym['max_level'] %>">
+          <%= num %>
+        </button>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ── LEVEL CAP INFO ── %>
+  <% next_gym = SoulLink::GameState.next_gym_info(@gyms_defeated) %>
+  <% if next_gym %>
+    <div class="mb-4 px-4 py-2 bg-indigo-900/30 border border-indigo-800 rounded-lg inline-flex items-center gap-2 text-sm">
+      <span class="text-indigo-300">Next Gym:</span>
+      <span class="text-white font-medium"><%= next_gym['name'] %></span>
+      <span class="text-gray-400">(<%= next_gym['leader'] %> — <%= next_gym['type'] %>)</span>
+      <span class="text-yellow-400 font-medium ml-2">Level Cap: <%= next_gym['max_level'] %></span>
+    </div>
+  <% else %>
+    <div class="mb-4 px-4 py-2 bg-yellow-900/30 border border-yellow-800 rounded-lg inline-flex items-center gap-2 text-sm">
+      <span class="text-yellow-300 font-medium">All 8 badges earned! Prepare for the Elite Four.</span>
+    </div>
+  <% end %>
+
+  <%# ── SVG MAP ── %>
+  <div class="bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
+    <%= render "sinnoh_map",
+      groups_by_location: @groups_by_location,
+      locations: @locations,
+      map_data: @map_data,
+      gym_info: @gym_info,
+      gyms_defeated: @gyms_defeated %>
+  </div>
+
+  <%# ── SPECIAL ENCOUNTERS (below map) ── %>
+  <div class="mt-6">
+    <h2 class="text-lg font-semibold text-white mb-3">Special Encounters</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+      <% %w[starter gift egg trade other].each do |key| %>
+        <% groups = @groups_by_location[key] %>
+        <% status = location_status(groups) %>
+        <% loc = @locations[key] %>
+        <% special_json = if groups.present?
+             groups.map do |g|
+               {
+                 nickname: g.nickname, status: g.status,
+                 caught_at: g.caught_at&.strftime('%b %d'), eulogy: g.eulogy,
+                 pokemon: g.soul_link_pokemon.map { |p|
+                   { species: p.species, player: SoulLink::GameState.player_name(p.discord_user_id),
+                     sprite: SoulLink::GameState.sprite_filename(p.species) }
+                 }
+               }
+             end.to_json
+           end %>
+        <button class="rounded-lg border p-3 text-left transition cursor-pointer
+                       <%= status == 'caught' ? 'bg-blue-900/30 border-blue-700 hover:border-blue-500' :
+                           status == 'dead' ? 'bg-red-900/30 border-red-700 hover:border-red-500' :
+                           'bg-gray-800 border-gray-700 hover:border-gray-500' %>"
+                data-action="click->sinnoh-map#onSpecialClick"
+                data-location-key="<%= key %>"
+                data-location-name="<%= loc&.dig('name') || key.titleize %>"
+                data-status="<%= status %>"
+                <% if special_json %>data-groups="<%= special_json %>"<% end %>>
+          <div class="text-sm font-medium <%= status == 'caught' ? 'text-blue-300' : status == 'dead' ? 'text-red-300' : 'text-gray-300' %>">
+            <%= loc&.dig('name') || key.titleize %>
+          </div>
+          <% if groups.present? %>
+            <% group = primary_group(groups) %>
+            <div class="text-xs text-gray-400 mt-1">
+              <%= group.dead? ? '💀 ' : '' %><%= group.nickname %>
+            </div>
+            <div class="flex flex-wrap gap-1 mt-1">
+              <% group.soul_link_pokemon.each do |pokemon| %>
+                <span class="inline-flex items-center"><%= pokemon_sprite_tag(pokemon.species, size: 16) %></span>
+              <% end %>
+            </div>
+          <% else %>
+            <div class="text-xs text-gray-500 mt-1">No catch yet</div>
+          <% end %>
+        </button>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ── LOCATION POPOVER (hidden, positioned by JS) ── %>
+  <div data-sinnoh-map-target="popover"
+       class="hidden absolute z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-2xl p-4 min-w-[260px] max-w-[340px]">
+  </div>
+
+  <%# ── CATCH MODAL (hidden overlay) ── %>
+  <div data-sinnoh-map-target="modal"
+       class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+       data-action="click->sinnoh-map#onModalBackdropClick">
+    <div class="bg-gray-800 rounded-xl border border-gray-600 shadow-2xl p-6 w-full max-w-lg mx-4"
+         data-action="click->sinnoh-map#stopPropagation">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-lg font-bold text-white">
+          New Catch at <span data-sinnoh-map-target="modalLocationName" class="text-blue-400"></span>
+        </h2>
+        <button data-action="click->sinnoh-map#closeModal"
+                class="text-gray-400 hover:text-white transition text-xl leading-none">&times;</button>
+      </div>
+
+      <form data-action="submit->sinnoh-map#submitCatch">
+        <input type="hidden" name="location" data-sinnoh-map-target="modalLocationKey">
+
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-300 mb-1.5">Group Nickname</label>
+          <input type="text" name="nickname" required autocomplete="off"
+                 data-sinnoh-map-target="nicknameInput"
+                 class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
+                        focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                 placeholder="e.g. Chandler, RACHEL...">
+        </div>
+
+        <div class="space-y-3">
+          <% @players.each do |player| %>
+            <div class="relative" data-sinnoh-map-target="speciesSearchWrapper">
+              <label class="block text-sm font-medium text-gray-300 mb-1.5">
+                <%= player['display_name'] %>'s Species
+              </label>
+              <div class="flex items-center gap-2">
+                <span data-sinnoh-map-target="speciesPreview" class="w-8 h-8 flex-shrink-0"></span>
+                <input type="text"
+                       placeholder="Search species..."
+                       autocomplete="off"
+                       data-action="input->sinnoh-map#filterSpecies focus->sinnoh-map#filterSpecies"
+                       data-player-id="<%= player['discord_user_id'] %>"
+                       class="flex-1 bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
+                              focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none">
+              </div>
+              <input type="hidden"
+                     name="species[<%= player['discord_user_id'] %>]"
+                     data-sinnoh-map-target="speciesHidden">
+              <div class="hidden absolute z-10 left-10 right-0 mt-1 max-h-48 overflow-y-auto
+                          bg-gray-900 border border-gray-600 rounded-lg shadow-lg"
+                   data-sinnoh-map-target="speciesDropdown">
+              </div>
+            </div>
+          <% end %>
+        </div>
+
+        <div class="flex items-center justify-between mt-6">
+          <span data-sinnoh-map-target="modalStatus" class="text-xs text-gray-500"></span>
+          <div class="flex gap-3">
+            <button type="button" data-action="click->sinnoh-map#closeModal"
+                    class="px-4 py-2 text-sm text-gray-400 hover:text-white transition">Cancel</button>
+            <button type="submit"
+                    class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition font-medium">
+              Add Catch
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

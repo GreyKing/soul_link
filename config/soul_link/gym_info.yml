@@ -2,24 +2,63 @@
 first_gym:
   name: "Oreburgh Gym"
   max_level: 14
+  location: oreburgh_city
+  number: 1
+  leader: "Roark"
+  type: "Rock"
+
 second_gym:
   name: "Eterna City Gym"
   max_level: 22
+  location: eterna_city
+  number: 2
+  leader: "Gardenia"
+  type: "Grass"
+
 third_gym:
   name: "Veilstone Gym"
   max_level: 26
+  location: veilstone_city
+  number: 3
+  leader: "Maylene"
+  type: "Fighting"
+
 fourth_gym:
   name: "Pastoria Gym"
   max_level: 32
+  location: pastoria_city
+  number: 4
+  leader: "Crasher Wake"
+  type: "Water"
+
 fifth_gym:
   name: "Hearthome Gym"
   max_level: 37
+  location: hearthome_city
+  number: 5
+  leader: "Fantina"
+  type: "Ghost"
+
 sixth_gym:
   name: "Canalave Gym"
   max_level: 41
+  location: canalave_city
+  number: 6
+  leader: "Byron"
+  type: "Steel"
+
 seventh_gym:
   name: "Snowpoint Gym"
   max_level: 44
+  location: snowpoint_city
+  number: 7
+  leader: "Candice"
+  type: "Ice"
+
 eighth_gym:
   name: "Sunyshore Gym"
   max_level: 50
+  location: sunyshore_city
+  number: 8
+  leader: "Volkner"
+  type: "Electric"
