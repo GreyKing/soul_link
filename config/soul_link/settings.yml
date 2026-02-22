@@ -12,9 +12,9 @@ category_prefix: "Platinum Run"
 players:
   - discord_user_id: 153665622641737728
     display_name: "Grey"
-  # - discord_user_id: 234567890123456789
-  #   display_name: "Player2"
-  # - discord_user_id: 345678901234567890
-  #   display_name: "Player3"
-  # - discord_user_id: 456789012345678901
-  #   display_name: "Player4"
+  - discord_user_id: 600802903967531093
+    display_name: "ARatypuss"
+  - discord_user_id: 189518174125817856
+    display_name: "Scythe461"
+  - discord_user_id: 182742127061630976
+    display_name: "ZealousZarathuuuustra"
