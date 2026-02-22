@@ -1,0 +1,48 @@
+<div class="bg-gray-800 rounded-lg border border-gray-700 p-4" data-group-id="<%= group.id %>">
+  <div class="flex items-center justify-between mb-3">
+    <div>
+      <span class="font-semibold text-white"><%= group.nickname %></span>
+      <span class="text-xs text-gray-500 ml-2"><%= group.location %></span>
+    </div>
+    <% if group.complete? %>
+      <span class="text-xs text-green-400">Complete</span>
+    <% else %>
+      <span class="text-xs text-yellow-400"><%= group.missing_players.size %> missing</span>
+    <% end %>
+  </div>
+
+  <div class="space-y-2">
+    <% players.each do |player| %>
+      <% player_id = player['discord_user_id'] %>
+      <% species_entry = group.species_for(player_id) %>
+      <% is_me = player_id == current_user_id %>
+
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-medium w-24 truncate <%= is_me ? 'text-indigo-300' : 'text-gray-400' %>">
+          <%= player['display_name'] %>
+        </span>
+
+        <% if species_entry %>
+          <%# Assigned — show locked species badge %>
+          <span class="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg
+                       <%= is_me ? 'bg-indigo-900/60 text-indigo-200 border border-indigo-700' : 'bg-gray-700/50 text-gray-300 border border-gray-600' %>">
+            <%= species_entry.species %>
+            <svg class="w-3 h-3 opacity-50" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+            </svg>
+          </span>
+        <% elsif is_me %>
+          <%# My empty slot — drop target %>
+          <div data-species-assignment-target="dropZone"
+               data-group-id="<%= group.id %>"
+               class="drop-zone flex-1 min-h-[36px] px-3 py-1.5 rounded-lg border-2 border-dashed border-indigo-500/50 bg-indigo-950/20 text-xs text-indigo-400 flex items-center justify-center transition hover:border-indigo-400 hover:bg-indigo-950/40">
+            Drop your species here
+          </div>
+        <% else %>
+          <%# Other player's empty slot — not interactive %>
+          <span class="text-xs text-gray-600 italic px-3 py-1.5">waiting...</span>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>

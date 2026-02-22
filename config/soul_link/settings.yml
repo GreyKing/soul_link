@@ -5,3 +5,16 @@
 # The run number is appended automatically.
 # Examples: "Platinum Run" → "Platinum Run 1", "Run #" → "Run #1"
 category_prefix: "Platinum Run"
+
+# Players: the 4 Soul Link participants. Used for species tracking per group.
+# discord_user_id: right-click your username in Discord > Copy User ID
+# display_name: shown in panel embeds next to each player's species
+players:
+  - discord_user_id: 153665622641737728
+    display_name: "Grey"
+  - discord_user_id: 600802903967531093
+    display_name: "ARatypuss"
+  - discord_user_id: 189518174125817856
+    display_name: "Scythe461"
+  - discord_user_id: 182742127061630976
+    display_name: "ZealousZarathuuuustra"

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html class="h-full">
   <head>
     <title><%= content_for(:title) || "Soul Link" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -11,19 +11,50 @@
 
     <%= yield :head %>
 
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
-
     <link rel="icon" href="/icon.png" type="image/png">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
 
-    <%# Includes all stylesheet files in app/assets/stylesheets %>
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
-    <%= yield %>
+  <body class="h-full bg-gray-900 text-gray-100">
+    <% if logged_in? %>
+      <nav class="bg-gray-800 border-b border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="flex items-center justify-between h-14">
+            <div class="flex items-center gap-6">
+              <span class="text-lg font-bold text-white">⚔️ Soul Link</span>
+              <%= link_to "Species", species_path, class: "text-sm text-gray-300 hover:text-white transition" %>
+              <%= link_to "My Team", team_path, class: "text-sm text-gray-300 hover:text-white transition" %>
+              <%= link_to "All Teams", teams_path, class: "text-sm text-gray-300 hover:text-white transition" %>
+            </div>
+            <div class="flex items-center gap-3">
+              <% if current_avatar_url %>
+                <img src="<%= current_avatar_url %>" class="w-7 h-7 rounded-full" alt="avatar">
+              <% end %>
+              <span class="text-sm text-gray-300"><%= current_username %></span>
+              <%= button_to "Logout", logout_path, method: :delete, class: "text-xs text-gray-400 hover:text-white transition" %>
+            </div>
+          </div>
+        </div>
+      </nav>
+    <% end %>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <% if flash[:alert] %>
+        <div class="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-200 text-sm">
+          <%= flash[:alert] %>
+        </div>
+      <% end %>
+      <% if flash[:notice] %>
+        <div class="mb-4 p-3 bg-green-900/50 border border-green-700 rounded-lg text-green-200 text-sm">
+          <%= flash[:notice] %>
+        </div>
+      <% end %>
+      <%= yield %>
+    </main>
   </body>
 </html>

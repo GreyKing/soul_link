@@ -67,3 +67,10 @@ group :test do
 end
 
 gem 'discordrb', github: 'shardlab/discordrb', branch: 'main'
+
+# Discord OAuth for web authentication
+gem 'omniauth-discord', '~> 1.2'
+gem 'omniauth-rails_csrf_protection', '~> 1.0'
+
+# Tailwind CSS for styling
+gem 'tailwindcss-rails', '~> 4.0'

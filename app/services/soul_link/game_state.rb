@@ -59,6 +59,24 @@ module SoulLink
         locations.dig(key.to_s, 'name') || key.to_s.titleize
       end
 
+      # Player management for multi-player species tracking
+      def players
+        settings['players'] || []
+      end
+
+      def player_ids
+        players.map { |p| p['discord_user_id'] }
+      end
+
+      def player_name(discord_user_id)
+        player = players.find { |p| p['discord_user_id'] == discord_user_id }
+        player&.fetch('display_name', nil) || "Player #{discord_user_id}"
+      end
+
+      def registered_player?(discord_user_id)
+        player_ids.include?(discord_user_id)
+      end
+
       def reload!
         @gym_info = nil
         @locations = nil
