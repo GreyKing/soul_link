@@ -2,8 +2,17 @@ import { Controller } from "@hotwired/stimulus"
 import Sortable from "sortablejs"
 
 export default class extends Controller {
-  static targets = ["poolList", "dropZone", "saveStatus", "poolCount", "poolEmpty"]
-  static values = { assignUrl: String, csrf: String, userId: Number }
+  static targets = [
+    "poolList", "dropZone", "saveStatus", "poolCount", "poolEmpty",
+    "tabButton", "tabPanel",
+    "pokedexList", "pokedexSearch"
+  ]
+  static values = {
+    assignUrl: String,
+    assignFromPokedexUrl: String,
+    csrf: String,
+    userId: Number
+  }
 
   connect() {
     // Make the species pool sortable (draggable source)
@@ -19,6 +28,20 @@ export default class extends Controller {
       filter: "[data-species-assignment-target='poolEmpty']"
     })
 
+    // Make the pokédex list sortable (draggable source)
+    if (this.hasPokedexListTarget) {
+      this.pokedexSortable = new Sortable(this.pokedexListTarget, {
+        group: {
+          name: "species",
+          pull: "clone",
+          put: false
+        },
+        sort: false,
+        animation: 150,
+        ghostClass: "opacity-30"
+      })
+    }
+
     // Make each drop zone accept species cards
     this.dropZoneTargets.forEach(zone => {
       new Sortable(zone, {
@@ -33,12 +56,50 @@ export default class extends Controller {
     })
   }
 
+  // ── Tab Switching ──
+
+  switchTab(event) {
+    const selectedTab = event.currentTarget.dataset.tab
+
+    this.tabButtonTargets.forEach(btn => {
+      const isActive = btn.dataset.tab === selectedTab
+      btn.classList.toggle("text-indigo-300", isActive)
+      btn.classList.toggle("border-indigo-500", isActive)
+      btn.classList.toggle("text-gray-400", !isActive)
+      btn.classList.toggle("border-transparent", !isActive)
+      btn.setAttribute("aria-selected", isActive)
+    })
+
+    this.tabPanelTargets.forEach(panel => {
+      panel.classList.toggle("hidden", panel.dataset.tab !== selectedTab)
+    })
+  }
+
+  // ── Pokédex Search ──
+
+  filterPokedex() {
+    const query = this.pokedexSearchTarget.value.toLowerCase().trim()
+    const cards = this.pokedexListTarget.querySelectorAll(".pokedex-card")
+
+    cards.forEach(card => {
+      if (query === "") {
+        card.classList.remove("hidden")
+      } else {
+        const name = card.dataset.speciesName.toLowerCase()
+        card.classList.toggle("hidden", !name.includes(query))
+      }
+    })
+  }
+
+  // ── Drag-and-Drop Assignment ──
+
   async onSpeciesDropped(evt, zone) {
     const card = evt.item
     const pokemonId = card.dataset.pokemonId
+    const speciesName = card.dataset.speciesName
     const groupId = zone.dataset.groupId
 
-    if (!pokemonId || !groupId) {
+    if ((!pokemonId && !speciesName) || !groupId) {
       this.bounceBack(card)
       return
     }
@@ -46,24 +107,39 @@ export default class extends Controller {
     this.showStatus("Saving...", "text-yellow-400")
 
     try {
-      const response = await fetch(this.assignUrlValue, {
+      let url, body
+
+      if (pokemonId) {
+        // Existing flow: assign existing unassigned pool record
+        url = this.assignUrlValue
+        body = JSON.stringify({ pokemon_id: pokemonId, group_id: groupId })
+      } else {
+        // New flow: create + assign from pokédex
+        url = this.assignFromPokedexUrlValue
+        body = JSON.stringify({ species_name: speciesName, group_id: groupId })
+      }
+
+      const response = await fetch(url, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           "X-CSRF-Token": this.csrfValue
         },
-        body: JSON.stringify({ pokemon_id: pokemonId, group_id: groupId })
+        body: body
       })
 
       if (response.ok) {
         // Success — lock the species in place
         this.lockSpecies(card, zone)
 
-        // Remove the original from the pool (since we used clone)
-        const original = this.poolListTarget.querySelector(`[data-pokemon-id="${pokemonId}"]`)
-        if (original) original.remove()
+        // Remove from pool only if it was a pool card
+        if (pokemonId) {
+          const original = this.poolListTarget.querySelector(`[data-pokemon-id="${pokemonId}"]`)
+          if (original) original.remove()
+          this.updatePoolCount()
+        }
+        // Pokédex cards stay in the list (clone behavior)
 
-        this.updatePoolCount()
         this.showStatus("Assigned!", "text-green-400")
         setTimeout(() => this.showStatus("", ""), 2000)
       } else {
