@@ -3,6 +3,7 @@
   <span class="inline-flex items-center gap-1.5 text-sm font-medium text-gray-200">
     <%= pokemon_sprite_tag(species_name, size: 24) %>
     <%= species_name %>
+    <%= pokemon_type_badges(species_name, size: :xs) %>
   </span>
   <svg class="w-4 h-4 text-gray-500 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>

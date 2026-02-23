@@ -21,6 +21,9 @@ Rails.application.routes.draw do
     patch :assign_from_pokedex, on: :member
   end
 
+  # Gym readiness analysis
+  resource :gym_ready, only: [ :show ], controller: "gym_ready"
+
   # Interactive region map
   resource :map, only: [ :show ], controller: "map"
   resources :pokemon_groups, only: [ :create ]

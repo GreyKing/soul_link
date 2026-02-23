@@ -7,6 +7,7 @@ module SoulLink
     POKEDEX_PATH = Rails.root.join('config', 'soul_link', 'pokedex.yml')
     MAP_COORDINATES_PATH = Rails.root.join('config', 'soul_link', 'map_coordinates.yml')
     PROGRESSION_PATH = Rails.root.join('config', 'soul_link', 'progression.yml')
+    TYPES_PATH = Rails.root.join('config', 'soul_link', 'types.yml')
 
     class << self
       def gym_info
@@ -87,6 +88,16 @@ module SoulLink
         pokedex[species_name]
       end
 
+      # Pokemon types: species name → array of 1-2 types
+      def pokemon_types
+        @pokemon_types ||= File.exist?(TYPES_PATH) ? YAML.load_file(TYPES_PATH) : {}
+      end
+
+      # Returns type array for a species, e.g. ["Grass", "Poison"], or []
+      def types_for(species_name)
+        pokemon_types[species_name] || []
+      end
+
       def reload!
         @gym_info = nil
         @locations = nil
@@ -94,6 +105,7 @@ module SoulLink
         @pokedex = nil
         @map_coordinates = nil
         @progression = nil
+        @pokemon_types = nil
       end
     end
   end

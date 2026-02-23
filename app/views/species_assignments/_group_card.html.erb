@@ -32,6 +32,7 @@
                        <%= is_me ? 'bg-indigo-900/60 text-indigo-200 border border-indigo-700' : 'bg-gray-700/50 text-gray-300 border border-gray-600' %>">
             <%= pokemon_sprite_tag(species_entry.species, size: 20) %>
             <%= species_entry.species %>
+            <%= pokemon_type_badges(species_entry.species, size: :xs) %>
           </span>
         <% elsif is_me %>
           <%# My empty slot — drop target %>

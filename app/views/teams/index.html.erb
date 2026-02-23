@@ -29,6 +29,7 @@
                   <span class="inline-flex items-center gap-0.5 text-xs <%= is_this_player ? 'text-indigo-300 font-medium' : 'text-gray-500' %>">
                     <%= pokemon_sprite_tag(pokemon.species, size: 32) %>
                     <%= pokemon.species %>
+                    <%= pokemon_type_badges(pokemon.species, size: :xs) %>
                   </span>
                 <% end %>
               </div>

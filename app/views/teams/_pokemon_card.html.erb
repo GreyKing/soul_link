@@ -22,6 +22,7 @@
         <%= pokemon_sprite_tag(pokemon.species, size: 20) %>
         <span class="font-medium"><%= SoulLink::GameState.player_name(pokemon.discord_user_id) %></span>
         <span class="<%= is_mine ? 'text-indigo-200' : 'text-gray-500' %>"><%= pokemon.species %></span>
+        <%= pokemon_type_badges(pokemon.species, size: :xs) %>
       </span>
     <% end %>
   </div>
