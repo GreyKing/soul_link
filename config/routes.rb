@@ -18,6 +18,7 @@ Rails.application.routes.draw do
   # Species assignment (drag-and-drop)
   resource :species, only: [ :show ], controller: "species_assignments" do
     patch :assign, on: :member
+    patch :assign_from_pokedex, on: :member
   end
 
   # Interactive region map
