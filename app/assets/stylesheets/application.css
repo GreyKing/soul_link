@@ -9,36 +9,33 @@
  * Consider organizing styles into separate files for maintainability.
  */
 
-/* ── Sinnoh Map: Pin Markers ── */
+/* ── Timeline: Custom Scrollbar ── */
 
-.map-pin {
-  transition: transform 0.15s ease, opacity 0.15s ease;
+.timeline-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #1f2937;
 }
 
-.map-pin:hover {
-  transform: scale(1.25);
+.timeline-scroll::-webkit-scrollbar {
+  height: 6px;
 }
 
-.map-pin:hover .map-pin__body {
-  stroke-width: 2.5;
+.timeline-scroll::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 3px;
 }
 
-/* Uncaught pins: subtle pulse on hover to hint clickability */
-.map-pin--uncaught:hover .map-pin__body {
-  animation: pin-pulse 1.2s ease-in-out infinite;
+.timeline-scroll::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
 }
 
-/* Caught pins: gentle breathing glow */
-.map-pin--caught .map-pin__body {
-  animation: pin-glow 3s ease-in-out infinite;
+.timeline-scroll::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
-@keyframes pin-pulse {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 0.9; }
-}
+/* ── Timeline: Node Interaction ── */
 
-@keyframes pin-glow {
-  0%, 100% { stroke-opacity: 1; }
-  50% { stroke-opacity: 0.6; }
+.timeline-node {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
