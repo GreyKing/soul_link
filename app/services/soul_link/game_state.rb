@@ -6,6 +6,7 @@ module SoulLink
     SETTINGS_PATH = Rails.root.join('config', 'soul_link', 'settings.yml')
     POKEDEX_PATH = Rails.root.join('config', 'soul_link', 'pokedex.yml')
     MAP_COORDINATES_PATH = Rails.root.join('config', 'soul_link', 'map_coordinates.yml')
+    PROGRESSION_PATH = Rails.root.join('config', 'soul_link', 'progression.yml')
 
     class << self
       def gym_info
@@ -27,6 +28,10 @@ module SoulLink
 
       def map_coordinates
         @map_coordinates ||= File.exist?(MAP_COORDINATES_PATH) ? YAML.load_file(MAP_COORDINATES_PATH) : {}
+      end
+
+      def progression
+        @progression ||= File.exist?(PROGRESSION_PATH) ? YAML.load_file(PROGRESSION_PATH) : {}
       end
 
       GYM_KEYS = %w[first_gym second_gym third_gym fourth_gym fifth_gym sixth_gym seventh_gym eighth_gym].freeze
@@ -88,6 +93,7 @@ module SoulLink
         @settings = nil
         @pokedex = nil
         @map_coordinates = nil
+        @progression = nil
       end
     end
   end

@@ -16,7 +16,7 @@ class MapController < ApplicationController
     @groups_by_location = all_groups.group_by(&:location)
 
     @locations = SoulLink::GameState.locations
-    @map_data = SoulLink::GameState.map_coordinates
+    @progression = SoulLink::GameState.progression
     @gym_info = SoulLink::GameState.gym_info
     @players = SoulLink::GameState.players
     @pokedex_species = SoulLink::GameState.pokedex.keys.sort

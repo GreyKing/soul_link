@@ -224,6 +224,10 @@ safari_zone:
   name: "Safari Zone"
   type: dungeon
 
+victory_road:
+  name: "Victory Road"
+  type: dungeon
+
 # ── SPECIAL (not on map) ──
 starter:
   name: "Starter Pokemon"

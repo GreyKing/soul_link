@@ -1,0 +1,83 @@
+# config/soul_link/progression.yml
+# Defines the linear game progression order for the timeline view.
+# Each segment is a group of encounter locations followed by a gym milestone.
+# Location keys reference config/soul_link/locations.yml.
+# Gym keys reference config/soul_link/gym_info.yml.
+
+segments:
+  - locations:
+      - starter
+      - lake_verity
+      - route_201
+      - route_202
+      - route_203
+      - oreburgh_gate
+      - oreburgh_city
+      - oreburgh_mine
+    gym: first_gym
+
+  - locations:
+      - ravaged_path
+      - route_204
+      - valley_windworks
+      - route_205
+      - eterna_forest
+      - old_chateau
+      - eterna_city
+    gym: second_gym
+
+  - locations:
+      - route_206
+      - wayward_cave
+      - route_207
+      - mt_coronet
+      - route_208
+      - hearthome_city
+    gym: fifth_gym
+
+  - locations:
+      - route_209
+      - solaceon_ruins
+      - route_210
+      - route_215
+      - veilstone_city
+    gym: third_gym
+
+  - locations:
+      - route_214
+      - valor_lakefront
+      - lake_valor
+      - route_213
+      - pastoria_city
+    gym: fourth_gym
+
+  - locations:
+      - safari_zone
+      - route_212
+      - trophy_garden
+      - route_218
+      - canalave_city
+    gym: sixth_gym
+
+  - locations:
+      - iron_island
+      - fuego_ironworks
+      - route_211
+      - celestic_town
+      - route_216
+      - route_217
+      - snowpoint_city
+      - lake_acuity
+    gym: seventh_gym
+
+  - locations:
+      - route_222
+      - sunyshore_city
+    gym: eighth_gym
+
+  - locations:
+      - route_219
+      - victory_road
+    gym: null
+
+endpoint: "Elite Four / Champion"
