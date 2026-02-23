@@ -23,16 +23,16 @@
                 <span class="font-medium text-white text-sm"><%= group.nickname %></span>
                 <span class="text-xs text-gray-500">#<%= slot.position %></span>
               </div>
-              <div class="mt-1 flex flex-wrap gap-1">
-                <% group.soul_link_pokemon.each do |pokemon| %>
-                  <% is_this_player = pokemon.discord_user_id == player['discord_user_id'] %>
-                  <span class="inline-flex items-center gap-0.5 text-xs <%= is_this_player ? 'text-indigo-300 font-medium' : 'text-gray-500' %>">
-                    <%= pokemon_sprite_tag(pokemon.species, size: 32) %>
-                    <%= pokemon.species %>
-                    <%= pokemon_type_badges(pokemon.species, size: :xs) %>
-                  </span>
-                <% end %>
-              </div>
+              <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == player['discord_user_id'] } %>
+              <% if my_pokemon %>
+                <div class="mt-1 flex items-center gap-1.5">
+                  <%= pokemon_sprite_tag(my_pokemon.species, size: 32) %>
+                  <span class="text-xs text-indigo-300 font-medium"><%= my_pokemon.species %></span>
+                  <%= pokemon_type_badges(my_pokemon.species, size: :xs) %>
+                </div>
+              <% else %>
+                <div class="mt-1 text-xs text-gray-600 italic">No species assigned</div>
+              <% end %>
             </div>
           <% end %>
         </div>
