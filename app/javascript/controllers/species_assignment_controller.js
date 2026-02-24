@@ -13,6 +13,7 @@ export default class extends Controller {
   static values = {
     assignUrl: String,
     assignFromPokedexUrl: String,
+    unassignUrl: String,
     groupsUrl: String,
     csrf: String,
     userId: Number
@@ -220,6 +221,48 @@ export default class extends Controller {
       }
     } catch (error) {
       alert("Network error — could not delete group")
+    }
+  }
+
+  // ── Unassign Species ──
+
+  async unassignSpecies(event) {
+    const pokemonId = event.currentTarget.dataset.pokemonId
+    if (!pokemonId) return
+
+    try {
+      const response = await fetch(this.unassignUrlValue, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": this.csrfValue
+        },
+        body: JSON.stringify({ pokemon_id: pokemonId })
+      })
+
+      if (response.ok) {
+        window.location.reload()
+      } else {
+        const data = await response.json()
+        this.showStatus(data.error || "Unassign failed", "text-red-400")
+      }
+    } catch (error) {
+      this.showStatus("Network error", "text-red-400")
+    }
+  }
+
+  // ── Group Name Sidebar ──
+
+  scrollToGroup(event) {
+    const groupId = event.currentTarget.dataset.scrollToGroup
+    if (!groupId) return
+
+    const card = this.element.querySelector(`[data-group-id="${groupId}"]`)
+    if (card) {
+      card.scrollIntoView({ behavior: "smooth", block: "center" })
+      // Brief highlight
+      card.classList.add("ring-2", "ring-indigo-500")
+      setTimeout(() => card.classList.remove("ring-2", "ring-indigo-500"), 1500)
     }
   }
 
