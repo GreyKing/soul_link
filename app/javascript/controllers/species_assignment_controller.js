@@ -5,16 +5,23 @@ export default class extends Controller {
   static targets = [
     "poolList", "dropZone", "saveStatus", "poolCount", "poolEmpty",
     "tabButton", "tabPanel",
-    "pokedexList", "pokedexSearch"
+    "pokedexList", "pokedexSearch",
+    "modal", "modalTitle", "modalStatus",
+    "groupIdInput", "groupNicknameInput", "groupLocationSelect",
+    "groupStatusSelect", "groupEulogyInput", "eulogyWrapper"
   ]
   static values = {
     assignUrl: String,
     assignFromPokedexUrl: String,
+    groupsUrl: String,
     csrf: String,
     userId: Number
   }
 
   connect() {
+    // Track whether modal is in create or edit mode
+    this.editingGroupId = null
+
     // Make the species pool sortable (draggable source)
     this.poolSortable = new Sortable(this.poolListTarget, {
       group: {
@@ -89,6 +96,131 @@ export default class extends Controller {
         card.classList.toggle("hidden", !name.includes(query))
       }
     })
+  }
+
+  // ── Group Modal ──
+
+  openNewGroupModal() {
+    this.editingGroupId = null
+    this.modalTitleTarget.textContent = "New Group"
+    this.groupIdInputTarget.value = ""
+    this.groupNicknameInputTarget.value = ""
+    this.groupLocationSelectTarget.value = ""
+    this.groupStatusSelectTarget.value = "caught"
+    this.groupEulogyInputTarget.value = ""
+    this.eulogyWrapperTarget.classList.add("hidden")
+    this.modalStatusTarget.textContent = ""
+    this.modalTarget.classList.remove("hidden")
+    this.groupNicknameInputTarget.focus()
+  }
+
+  openEditGroupModal(event) {
+    const card = event.currentTarget.closest("[data-group-id]")
+    if (!card) return
+
+    this.editingGroupId = card.dataset.groupId
+    this.modalTitleTarget.textContent = "Edit Group"
+    this.groupIdInputTarget.value = card.dataset.groupId
+    this.groupNicknameInputTarget.value = card.dataset.groupNickname || ""
+    this.groupLocationSelectTarget.value = card.dataset.groupLocation || ""
+    this.groupStatusSelectTarget.value = card.dataset.groupStatus || "caught"
+    this.groupEulogyInputTarget.value = card.dataset.groupEulogy || ""
+    this.toggleEulogy()
+    this.modalStatusTarget.textContent = ""
+    this.modalTarget.classList.remove("hidden")
+    this.groupNicknameInputTarget.focus()
+  }
+
+  closeModal() {
+    this.modalTarget.classList.add("hidden")
+    this.editingGroupId = null
+  }
+
+  toggleEulogy() {
+    const isDead = this.groupStatusSelectTarget.value === "dead"
+    this.eulogyWrapperTarget.classList.toggle("hidden", !isDead)
+  }
+
+  async submitGroup(event) {
+    event.preventDefault()
+
+    const nickname = this.groupNicknameInputTarget.value.trim()
+    const location = this.groupLocationSelectTarget.value
+    const status = this.groupStatusSelectTarget.value
+    const eulogy = this.groupEulogyInputTarget.value.trim()
+
+    if (!nickname || !location) {
+      this.modalStatusTarget.textContent = "Nickname and location are required"
+      this.modalStatusTarget.className = "text-xs text-red-400"
+      return
+    }
+
+    this.modalStatusTarget.textContent = "Saving..."
+    this.modalStatusTarget.className = "text-xs text-yellow-400"
+
+    try {
+      let url, method
+      const body = { nickname, location, status, eulogy }
+
+      if (this.editingGroupId) {
+        url = `${this.groupsUrlValue}/${this.editingGroupId}`
+        method = "PATCH"
+      } else {
+        url = this.groupsUrlValue
+        method = "POST"
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": this.csrfValue
+        },
+        body: JSON.stringify(body)
+      })
+
+      if (response.ok) {
+        // Reload page to get fresh DOM (Sortable instances need fresh elements)
+        window.location.reload()
+      } else {
+        const data = await response.json()
+        this.modalStatusTarget.textContent = data.error || "Save failed"
+        this.modalStatusTarget.className = "text-xs text-red-400"
+      }
+    } catch (error) {
+      this.modalStatusTarget.textContent = "Network error"
+      this.modalStatusTarget.className = "text-xs text-red-400"
+    }
+  }
+
+  async deleteGroup(event) {
+    const card = event.currentTarget.closest("[data-group-id]")
+    if (!card) return
+
+    const groupId = card.dataset.groupId
+    const nickname = card.dataset.groupNickname || "this group"
+
+    if (!confirm(`Delete "${nickname}" and all its pokemon? This cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`${this.groupsUrlValue}/${groupId}`, {
+        method: "DELETE",
+        headers: {
+          "X-CSRF-Token": this.csrfValue
+        }
+      })
+
+      if (response.ok) {
+        window.location.reload()
+      } else {
+        const data = await response.json()
+        alert(data.error || "Delete failed")
+      }
+    } catch (error) {
+      alert("Network error — could not delete group")
+    }
   }
 
   // ── Drag-and-Drop Assignment ──

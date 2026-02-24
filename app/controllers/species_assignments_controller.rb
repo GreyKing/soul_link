@@ -13,6 +13,7 @@ class SpeciesAssignmentsController < ApplicationController
     @player_name = SoulLink::GameState.player_name(current_user_id)
     @players = SoulLink::GameState.players
     @pokedex_species = SoulLink::GameState.pokedex.keys.sort
+    @locations = SoulLink::GameState.locations
   end
 
   def assign
