@@ -10,7 +10,20 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_22_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_23_110000) do
+  create_table "gym_drafts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "current_player_index", default: 0, null: false
+    t.integer "current_round", default: 0, null: false
+    t.json "pick_order"
+    t.bigint "soul_link_run_id", null: false
+    t.json "state_data"
+    t.string "status", default: "lobby", null: false
+    t.datetime "updated_at", null: false
+    t.index ["soul_link_run_id", "status"], name: "index_gym_drafts_on_soul_link_run_id_and_status"
+    t.index ["soul_link_run_id"], name: "index_gym_drafts_on_soul_link_run_id"
+  end
+
   create_table "soul_link_pokemon", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "caught_at"
     t.datetime "created_at", null: false
@@ -37,6 +50,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_22_130000) do
     t.text "eulogy"
     t.string "location", null: false
     t.string "nickname", null: false
+    t.integer "position", null: false
     t.bigint "soul_link_run_id", null: false
     t.string "status", default: "caught", null: false
     t.datetime "updated_at", null: false
@@ -85,6 +99,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_22_130000) do
     t.index ["soul_link_run_id"], name: "index_soul_link_teams_on_soul_link_run_id"
   end
 
+  add_foreign_key "gym_drafts", "soul_link_runs"
   add_foreign_key "soul_link_pokemon", "soul_link_pokemon_groups"
   add_foreign_key "soul_link_pokemon", "soul_link_runs"
   add_foreign_key "soul_link_pokemon_groups", "soul_link_runs"
