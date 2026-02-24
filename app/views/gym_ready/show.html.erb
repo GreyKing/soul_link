@@ -1,7 +1,11 @@
 <%# ── HEADER ── %>
-<div class="mb-6">
-  <h1 class="text-2xl font-bold text-white">Gym Ready Check</h1>
-  <p class="text-gray-400 text-sm mt-1"><%= @player_name %>'s team readiness analysis.</p>
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold text-white">Gym Ready Check</h1>
+    <p class="text-gray-400 text-sm mt-1"><%= @player_name %>'s team readiness analysis.</p>
+  </div>
+  <%= button_to "Start Gym Draft", gym_drafts_path, method: :post,
+        class: "px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition font-medium" %>
 </div>
 
 <%# ── NEXT GYM INFO ── %>

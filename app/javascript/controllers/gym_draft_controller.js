@@ -1,0 +1,301 @@
+import { Controller } from "@hotwired/stimulus"
+import { createConsumer } from "@rails/actioncable"
+
+export default class extends Controller {
+  static targets = [
+    "phaseLabel", "phaseInfo",
+    "lobbyPanel", "readyGrid", "readyButton",
+    "votingPanel", "voteGrid", "voteStatus",
+    "draftingPanel", "teamSlots", "turnIndicator", "myPokemonGrid",
+    "nominatingPanel", "nomTeamSlots", "nomStatus", "nomVoteArea", "nomVotePrompt", "nomPokemonGrid",
+    "completePanel", "finalTeamSlots"
+  ]
+  static values = {
+    draftId: Number,
+    userId: Number,
+    players: Array,
+    playerGroups: Object
+  }
+
+  connect() {
+    this.subscription = createConsumer().subscriptions.create(
+      { channel: "GymDraftChannel", draft_id: this.draftIdValue },
+      {
+        received: (data) => this.handleMessage(data),
+        ready: () => this.subscription.perform("ready"),
+        vote: (votedFor) => this.subscription.perform("vote", { voted_for: votedFor }),
+        pick: (groupId) => this.subscription.perform("pick", { group_id: groupId }),
+        nominate: (groupId) => this.subscription.perform("nominate", { group_id: groupId }),
+        voteNomination: (approve) => this.subscription.perform("vote_nomination", { approve })
+      }
+    )
+    this.state = null
+  }
+
+  disconnect() {
+    if (this.subscription) {
+      this.subscription.unsubscribe()
+    }
+  }
+
+  handleMessage(data) {
+    if (data.error) {
+      console.error("Draft error:", data.error)
+      return
+    }
+    if (data.type === "state_update") {
+      this.state = data.state
+      this.render()
+    }
+  }
+
+  // ── User Actions ──
+
+  ready() {
+    this.subscription.perform("ready")
+    this.readyButtonTarget.disabled = true
+    this.readyButtonTarget.textContent = "Waiting..."
+    this.readyButtonTarget.classList.replace("bg-green-600", "bg-gray-600")
+  }
+
+  vote(event) {
+    const votedFor = parseInt(event.currentTarget.dataset.voteFor)
+    this.subscription.perform("vote", { voted_for: votedFor })
+    // Disable all vote buttons
+    this.voteGridTarget.querySelectorAll("button").forEach(btn => {
+      btn.disabled = true
+      btn.classList.add("opacity-50")
+    })
+    event.currentTarget.classList.add("border-indigo-500", "bg-indigo-950/30")
+  }
+
+  pickPokemon(event) {
+    const groupId = parseInt(event.currentTarget.dataset.groupId)
+    this.subscription.perform("pick", { group_id: groupId })
+  }
+
+  nominatePokemon(event) {
+    const groupId = parseInt(event.currentTarget.dataset.groupId)
+    this.subscription.perform("nominate", { group_id: groupId })
+  }
+
+  approveNomination() {
+    this.subscription.perform("vote_nomination", { approve: true })
+    this.nomVoteAreaTarget.classList.add("opacity-50")
+  }
+
+  rejectNomination() {
+    this.subscription.perform("vote_nomination", { approve: false })
+    this.nomVoteAreaTarget.classList.add("opacity-50")
+  }
+
+  // ── Rendering ──
+
+  render() {
+    if (!this.state) return
+
+    const { status } = this.state
+    this.phaseLabelTarget.textContent = this.phaseDisplayName(status)
+
+    // Show/hide panels
+    this.lobbyPanelTarget.classList.toggle("hidden", status !== "lobby")
+    this.votingPanelTarget.classList.toggle("hidden", status !== "voting")
+    this.draftingPanelTarget.classList.toggle("hidden", status !== "drafting")
+    this.nominatingPanelTarget.classList.toggle("hidden", status !== "nominating")
+    this.completePanelTarget.classList.toggle("hidden", status !== "complete")
+
+    switch (status) {
+      case "lobby": this.renderLobby(); break
+      case "voting": this.renderVoting(); break
+      case "drafting": this.renderDrafting(); break
+      case "nominating": this.renderNominating(); break
+      case "complete": this.renderComplete(); break
+    }
+  }
+
+  renderLobby() {
+    const readyPlayers = this.state.ready_players || []
+    const cards = this.readyGridTarget.querySelectorAll("[data-player-id]")
+    cards.forEach(card => {
+      const pid = parseInt(card.dataset.playerId)
+      const isReady = readyPlayers.includes(pid)
+      const statusEl = card.querySelector(".ready-status")
+      if (statusEl) {
+        statusEl.textContent = isReady ? "Ready!" : "Not ready"
+        statusEl.className = `text-xs mt-1 ready-status ${isReady ? "text-green-400" : "text-gray-500"}`
+      }
+      card.classList.toggle("border-green-600", isReady)
+      card.classList.toggle("border-gray-700", !isReady)
+    })
+
+    const myReady = readyPlayers.includes(this.userIdValue)
+    if (myReady) {
+      this.readyButtonTarget.disabled = true
+      this.readyButtonTarget.textContent = "Waiting..."
+      this.readyButtonTarget.classList.replace("bg-green-600", "bg-gray-600")
+    }
+
+    this.phaseInfoTarget.textContent = `${readyPlayers.length}/${this.state.player_ids.length} ready`
+  }
+
+  renderVoting() {
+    const votes = this.state.first_pick_votes || {}
+    const voteCount = Object.keys(votes).length
+    const total = this.state.player_ids.length
+    this.voteStatusTarget.textContent = `${voteCount}/${total} votes cast`
+
+    const myVoted = votes[this.userIdValue.toString()]
+    if (myVoted) {
+      this.voteGridTarget.querySelectorAll("button").forEach(btn => {
+        btn.disabled = true
+        btn.classList.add("opacity-50")
+        if (parseInt(btn.dataset.voteFor) === myVoted) {
+          btn.classList.remove("opacity-50")
+          btn.classList.add("border-indigo-500", "bg-indigo-950/30")
+        }
+      })
+    }
+
+    this.phaseInfoTarget.textContent = `${voteCount}/${total} votes`
+  }
+
+  renderDrafting() {
+    this.fillTeamSlots(this.teamSlotsTarget, this.state.picks)
+
+    const currentId = this.state.current_drafter_id
+    const currentPlayer = this.findPlayer(currentId)
+    const isMyTurn = currentId === this.userIdValue
+
+    this.turnIndicatorTarget.textContent = isMyTurn
+      ? "It's your turn! Pick a pokemon."
+      : `Waiting for ${currentPlayer?.display_name || "..."} to pick...`
+
+    this.phaseInfoTarget.textContent = `Round ${this.state.picks.length + 1}/6`
+
+    // Render my pokemon as pickable cards
+    this.renderPokemonGrid(this.myPokemonGridTarget, isMyTurn, "pick")
+  }
+
+  renderNominating() {
+    this.fillTeamSlots(this.nomTeamSlotsTarget, this.state.picks)
+
+    const nomination = this.state.current_nomination
+    const slotsRemaining = 6 - this.state.picks.length
+
+    this.phaseInfoTarget.textContent = `${slotsRemaining} slot${slotsRemaining > 1 ? "s" : ""} remaining`
+
+    if (nomination) {
+      const nominator = this.findPlayer(nomination.nominator_id)
+      const group = this.findGroupById(nomination.group_id)
+      const groupName = group ? group.nickname : `Group #${nomination.group_id}`
+
+      this.nomStatusTarget.textContent = `${nominator?.display_name} nominated "${groupName}"`
+
+      // Show vote buttons for non-nominators
+      const isNominator = nomination.nominator_id === this.userIdValue
+      const hasVoted = nomination.votes && nomination.votes[this.userIdValue.toString()] !== undefined
+
+      if (!isNominator && !hasVoted) {
+        this.nomVoteAreaTarget.classList.remove("hidden")
+        this.nomVoteAreaTarget.classList.remove("opacity-50")
+        this.nomVotePromptTarget.textContent = `Do you agree with "${groupName}"?`
+      } else {
+        this.nomVoteAreaTarget.classList.add("hidden")
+      }
+    } else {
+      this.nomStatusTarget.textContent = "Nominate a pokemon for the team!"
+      this.nomVoteAreaTarget.classList.add("hidden")
+    }
+
+    // Render pokemon grid for nomination
+    const canNominate = !nomination
+    this.renderPokemonGrid(this.nomPokemonGridTarget, canNominate, "nominate")
+  }
+
+  renderComplete() {
+    this.fillTeamSlots(this.finalTeamSlotsTarget, this.state.picks)
+    this.phaseInfoTarget.textContent = "Team drafted!"
+  }
+
+  // ── Helpers ──
+
+  fillTeamSlots(container, picks) {
+    const slots = container.querySelectorAll("[data-slot-index]")
+    slots.forEach((slot, idx) => {
+      const pick = picks[idx]
+      if (pick) {
+        const group = this.findGroupById(pick.group_id)
+        const picker = this.findPlayer(pick.picked_by)
+        if (group) {
+          slot.innerHTML = `
+            <div class="text-xs font-medium text-white">${group.nickname}</div>
+            <div class="text-[10px] text-gray-500">${picker?.display_name || ""}</div>
+          `
+          slot.classList.remove("border-dashed", "border-gray-600")
+          slot.classList.add("border-solid", "border-indigo-600", "bg-indigo-950/30")
+        }
+      } else {
+        slot.innerHTML = `<span class="text-xs text-gray-600">#${idx + 1}</span>`
+        slot.classList.add("border-dashed", "border-gray-600")
+        slot.classList.remove("border-solid", "border-indigo-600", "bg-indigo-950/30")
+      }
+    })
+  }
+
+  renderPokemonGrid(container, interactive, actionType) {
+    const myUid = this.userIdValue.toString()
+    const allGroups = this.playerGroupsValue[myUid] || []
+    const pickedGroupIds = (this.state.picks || []).map(p => p.group_id)
+
+    container.innerHTML = allGroups.map(group => {
+      const isPicked = pickedGroupIds.includes(group.id)
+      const myPokemon = group.pokemon.find(p => p.discord_user_id === this.userIdValue)
+      const species = myPokemon ? myPokemon.species : "?"
+      const action = actionType === "pick" ? "click->gym-draft#pickPokemon" : "click->gym-draft#nominatePokemon"
+
+      if (isPicked) {
+        return `
+          <div class="bg-gray-900/30 rounded-lg border border-gray-700/30 p-3 text-center opacity-30">
+            <div class="text-sm text-gray-500">${group.nickname}</div>
+            <div class="text-xs text-gray-600">${species}</div>
+            <div class="text-[10px] text-gray-600">Picked</div>
+          </div>
+        `
+      }
+
+      const interactiveClass = interactive
+        ? "cursor-pointer hover:border-indigo-500 hover:bg-indigo-950/30"
+        : "opacity-50"
+
+      return `
+        <div class="bg-gray-900/50 rounded-lg border border-gray-700 p-3 text-center transition ${interactiveClass}"
+             data-group-id="${group.id}"
+             ${interactive ? `data-action="${action}"` : ""}>
+          <div class="text-sm font-medium text-white">${group.nickname}</div>
+          <div class="text-xs text-indigo-300">${species}</div>
+          <div class="text-[10px] text-gray-500">${group.location}</div>
+        </div>
+      `
+    }).join("")
+  }
+
+  findPlayer(id) {
+    return this.playersValue.find(p => p.discord_user_id === parseInt(id))
+  }
+
+  findGroupById(groupId) {
+    const allGroups = Object.values(this.playerGroupsValue).flat()
+    return allGroups.find(g => g.id === groupId)
+  }
+
+  phaseDisplayName(status) {
+    const names = {
+      lobby: "Lobby",
+      voting: "Voting",
+      drafting: "Drafting",
+      nominating: "Nominations",
+      complete: "Complete"
+    }
+    return names[status] || status
+  }
+}

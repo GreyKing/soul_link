@@ -25,8 +25,9 @@ Rails.application.routes.draw do
   # Player dashboard
   resource :dashboard, only: [ :show ]
 
-  # Gym readiness analysis
+  # Gym readiness analysis + gym draft
   resource :gym_ready, only: [ :show ], controller: "gym_ready"
+  resources :gym_drafts, only: [ :create, :show ]
 
   # Interactive region map
   resource :map, only: [ :show ], controller: "map"
