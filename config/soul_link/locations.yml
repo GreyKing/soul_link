@@ -2,6 +2,7 @@
 # All catchable/notable locations in the Sinnoh region (Pokemon Platinum)
 # type: city | town | route | dungeon | lake | special
 # gym_number: only on cities with a gym (1-8)
+# tall_grass: true if the location has tall grass random encounters
 
 # ── TOWNS & CITIES ──
 twinleaf_town:
@@ -72,74 +73,92 @@ sunyshore_city:
 route_201:
   name: "Route 201"
   type: route
+  tall_grass: true
 
 route_202:
   name: "Route 202"
   type: route
+  tall_grass: true
 
 route_203:
   name: "Route 203"
   type: route
+  tall_grass: true
 
 route_204:
   name: "Route 204"
   type: route
+  tall_grass: true
 
 route_205:
   name: "Route 205"
   type: route
+  tall_grass: true
 
 route_206:
   name: "Route 206"
   type: route
+  tall_grass: true
 
 route_207:
   name: "Route 207"
   type: route
+  tall_grass: true
 
 route_208:
   name: "Route 208"
   type: route
+  tall_grass: true
 
 route_209:
   name: "Route 209"
   type: route
+  tall_grass: true
 
 route_210:
   name: "Route 210"
   type: route
+  tall_grass: true
 
 route_211:
   name: "Route 211"
   type: route
+  tall_grass: true
 
 route_212:
   name: "Route 212"
   type: route
+  tall_grass: true
 
 route_213:
   name: "Route 213"
   type: route
+  tall_grass: true
 
 route_214:
   name: "Route 214"
   type: route
+  tall_grass: true
 
 route_215:
   name: "Route 215"
   type: route
+  tall_grass: true
 
 route_216:
   name: "Route 216"
   type: route
+  tall_grass: true
 
 route_217:
   name: "Route 217"
   type: route
+  tall_grass: true
 
 route_218:
   name: "Route 218"
   type: route
+  tall_grass: true
 
 route_219:
   name: "Route 219"
@@ -148,6 +167,7 @@ route_219:
 route_222:
   name: "Route 222"
   type: route
+  tall_grass: true
 
 # ── DUNGEONS & CAVES ──
 oreburgh_mine:
@@ -165,6 +185,7 @@ ravaged_path:
 eterna_forest:
   name: "Eterna Forest"
   type: dungeon
+  tall_grass: true
 
 old_chateau:
   name: "Old Chateau"
@@ -202,23 +223,28 @@ fuego_ironworks:
 lake_verity:
   name: "Lake Verity"
   type: lake
+  tall_grass: true
 
 lake_valor:
   name: "Lake Valor"
   type: lake
+  tall_grass: true
 
 lake_acuity:
   name: "Lake Acuity"
   type: lake
+  tall_grass: true
 
 # ── OTHER AREAS ──
 valor_lakefront:
   name: "Valor Lakefront"
   type: route
+  tall_grass: true
 
 trophy_garden:
   name: "Trophy Garden"
   type: dungeon
+  tall_grass: true
 
 safari_zone:
   name: "Safari Zone"
