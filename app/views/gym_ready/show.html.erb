@@ -36,14 +36,22 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       <% @team_groups.each_with_index do |group, idx| %>
         <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
-        <div class="bg-gray-800 rounded-lg border border-gray-700 p-3">
+        <% is_dead = group.dead? %>
+        <div class="rounded-lg border p-3
+                    <%= is_dead ? 'bg-red-950/20 border-red-900/50' : 'bg-gray-800 border-gray-700' %>">
           <div class="flex items-center gap-2">
             <span class="text-xs text-gray-500 font-mono w-5">#<%= idx + 1 %></span>
             <% if my_pokemon %>
-              <%= pokemon_sprite_tag(my_pokemon.species, size: 32) %>
+              <div class="<%= is_dead ? 'opacity-40' : '' %>">
+                <%= pokemon_sprite_tag(my_pokemon.species, size: 32) %>
+              </div>
               <div>
-                <div class="text-sm font-medium text-white"><%= my_pokemon.species %></div>
-                <div class="mt-0.5"><%= pokemon_type_badges(my_pokemon.species) %></div>
+                <div class="text-sm font-medium <%= is_dead ? 'text-red-300 line-through' : 'text-white' %>"><%= my_pokemon.species %></div>
+                <% if is_dead %>
+                  <div class="text-xs text-red-400/70 mt-0.5">💀 Dead</div>
+                <% else %>
+                  <div class="mt-0.5"><%= pokemon_type_badges(my_pokemon.species) %></div>
+                <% end %>
               </div>
             <% else %>
               <span class="text-sm text-gray-500">No species assigned</span>
@@ -163,21 +171,31 @@
               <% loc_data = @locations[loc_key] %>
               <% next unless loc_data %>
               <% groups = @groups_by_location[loc_key] %>
-              <% has_catch = groups&.any?(&:caught?) %>
+              <% group = groups&.first %>
+              <% is_dead = group&.dead? %>
+              <% is_caught = group&.caught? %>
+              <% has_encounter = group.present? %>
 
               <div class="rounded-lg border px-3 py-2 text-sm
-                          <%= has_catch ? 'bg-blue-900/20 border-blue-800' : 'bg-gray-900/50 border-gray-700' %>">
-                <div class="font-medium <%= has_catch ? 'text-blue-300' : 'text-gray-500' %>">
+                          <%= if is_dead
+                                'bg-red-950/20 border-red-900/50'
+                              elsif is_caught
+                                'bg-blue-900/20 border-blue-800'
+                              else
+                                'bg-gray-900/50 border-gray-700'
+                              end %>">
+                <div class="font-medium <%= if is_dead then 'text-red-300' elsif is_caught then 'text-blue-300' else 'text-gray-500' end %>">
                   <%= loc_data['name'] %>
                 </div>
-                <% if has_catch %>
-                  <% group = groups.find(&:caught?) || groups.first %>
-                  <div class="text-xs text-gray-400 mt-0.5"><%= group.nickname %></div>
+                <% if has_encounter %>
+                  <div class="text-xs mt-0.5 <%= is_dead ? 'text-red-400/70' : 'text-gray-400' %>">
+                    <%= "\u{1F480} " if is_dead %><%= group.nickname %>
+                  </div>
                   <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
                   <% if my_pokemon %>
-                    <div class="mt-1 flex items-center gap-1">
+                    <div class="mt-1 flex items-center gap-1 <%= is_dead ? 'opacity-50' : '' %>">
                       <%= pokemon_sprite_tag(my_pokemon.species, size: 16) %>
-                      <span class="text-[10px] text-gray-400"><%= my_pokemon.species %></span>
+                      <span class="text-[10px] <%= is_dead ? 'text-red-400/70 line-through' : 'text-gray-400' %>"><%= my_pokemon.species %></span>
                     </div>
                   <% end %>
                 <% else %>
