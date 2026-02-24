@@ -23,7 +23,7 @@ Rails.application.routes.draw do
   end
 
   # Player dashboard
-  resource :dashboard, only: [ :show ]
+  resource :dashboard, only: [ :show ], controller: "dashboard"
 
   # Gym readiness analysis + gym draft
   resource :gym_ready, only: [ :show ], controller: "gym_ready"
