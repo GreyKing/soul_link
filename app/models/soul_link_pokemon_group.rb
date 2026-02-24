@@ -12,6 +12,7 @@ class SoulLinkPokemonGroup < ApplicationRecord
   scope :dead, -> { where(status: 'dead') }
 
   before_create :set_caught_at, if: -> { status == 'caught' }
+  before_create :set_position
   after_update :remove_team_slots_on_death, if: -> { saved_change_to_status? && dead? }
 
   def mark_as_dead!(death_location: nil, eulogy: nil)
@@ -58,6 +59,11 @@ class SoulLinkPokemonGroup < ApplicationRecord
 
   def set_caught_at
     self.caught_at = Time.current
+  end
+
+  def set_position
+    max = soul_link_run.soul_link_pokemon_groups.maximum(:position) || 0
+    self.position = max + 1
   end
 
   def remove_team_slots_on_death

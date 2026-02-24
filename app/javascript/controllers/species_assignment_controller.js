@@ -8,13 +8,15 @@ export default class extends Controller {
     "pokedexList", "pokedexSearch",
     "modal", "modalTitle", "modalStatus",
     "groupIdInput", "groupNicknameInput", "groupLocationSelect",
-    "groupStatusSelect", "groupEulogyInput", "eulogyWrapper"
+    "groupStatusSelect", "groupEulogyInput", "eulogyWrapper",
+    "quickNavBar"
   ]
   static values = {
     assignUrl: String,
     assignFromPokedexUrl: String,
     unassignUrl: String,
     groupsUrl: String,
+    reorderUrl: String,
     csrf: String,
     userId: Number
   }
@@ -47,6 +49,15 @@ export default class extends Controller {
         sort: false,
         animation: 150,
         ghostClass: "opacity-30"
+      })
+    }
+
+    // Make the quick-nav pill bar reorderable
+    if (this.hasQuickNavBarTarget) {
+      this.navSortable = new Sortable(this.quickNavBarTarget, {
+        animation: 200,
+        ghostClass: "opacity-30",
+        onEnd: () => this.reorderGroups()
       })
     }
 
@@ -263,6 +274,37 @@ export default class extends Controller {
       // Brief highlight
       card.classList.add("ring-2", "ring-indigo-500")
       setTimeout(() => card.classList.remove("ring-2", "ring-indigo-500"), 1500)
+    }
+  }
+
+  async reorderGroups() {
+    if (!this.hasQuickNavBarTarget) return
+
+    const pills = this.quickNavBarTarget.querySelectorAll("[data-scroll-to-group]")
+    const groupIds = Array.from(pills).map(p => parseInt(p.dataset.scrollToGroup))
+
+    try {
+      const response = await fetch(this.reorderUrlValue, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": this.csrfValue
+        },
+        body: JSON.stringify({ group_ids: groupIds })
+      })
+
+      if (response.ok) {
+        // Reorder the group cards in the DOM to match pill order
+        const container = this.element.querySelector(".space-y-3")
+        if (container) {
+          groupIds.forEach(id => {
+            const card = container.querySelector(`[data-group-id="${id}"]`)
+            if (card) container.appendChild(card)
+          })
+        }
+      }
+    } catch (error) {
+      // Silently fail — reload will fix ordering
     }
   }
 

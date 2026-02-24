@@ -8,6 +8,7 @@
      data-species-assignment-assign-from-pokedex-url-value="<%= assign_from_pokedex_species_path %>"
      data-species-assignment-unassign-url-value="<%= unassign_species_path %>"
      data-species-assignment-groups-url-value="<%= pokemon_groups_path %>"
+     data-species-assignment-reorder-url-value="<%= reorder_pokemon_groups_path %>"
      data-species-assignment-csrf-value="<%= form_authenticity_token %>"
      data-species-assignment-user-id-value="<%= current_user_id %>"
      data-species-assignment-locations-value="<%= @locations.map { |k, v| { key: k, name: v['name'] } }.to_json %>"
@@ -29,7 +30,8 @@
 
     <%# ── Group Name Quick-Nav ── %>
     <% if @groups.any? %>
-      <div class="flex flex-wrap gap-1.5 mb-3">
+      <div data-species-assignment-target="quickNavBar"
+           class="flex flex-wrap gap-1.5 mb-3">
         <% @groups.each do |group| %>
           <button type="button"
                   data-action="click->species-assignment#scrollToGroup"

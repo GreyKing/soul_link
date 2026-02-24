@@ -91,6 +91,27 @@ class PokemonGroupsController < ApplicationController
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
+  def reorder
+    run = current_run
+    head :not_found and return unless run
+
+    group_ids = params[:group_ids]
+    unless group_ids.is_a?(Array) && group_ids.any?
+      render json: { error: "group_ids array required" }, status: :unprocessable_entity
+      return
+    end
+
+    ActiveRecord::Base.transaction do
+      group_ids.each_with_index do |id, index|
+        run.soul_link_pokemon_groups.where(id: id).update_all(position: index + 1)
+      end
+    end
+
+    render json: { status: "reordered" }
+  rescue => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   def destroy
     run = current_run
     head :not_found and return unless run

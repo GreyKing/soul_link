@@ -22,12 +22,18 @@ Rails.application.routes.draw do
     patch :unassign, on: :member
   end
 
-  # Gym readiness analysis
+  # Player dashboard
+  resource :dashboard, only: [ :show ]
+
+  # Gym readiness analysis + gym draft
   resource :gym_ready, only: [ :show ], controller: "gym_ready"
+  resources :gym_drafts, only: [ :create, :show ]
 
   # Interactive region map
   resource :map, only: [ :show ], controller: "map"
-  resources :pokemon_groups, only: [ :create, :update, :destroy ]
+  resources :pokemon_groups, only: [ :create, :update, :destroy ] do
+    patch :reorder, on: :collection
+  end
   resource :gym_progress, only: [ :update ], controller: "gym_progress"
 
   root "teams#show"
