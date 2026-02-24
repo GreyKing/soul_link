@@ -12,7 +12,7 @@ class MapController < ApplicationController
     @gyms_defeated = run.gyms_defeated
 
     # All groups indexed by location (multiple groups possible per location)
-    all_groups = run.soul_link_pokemon_groups.includes(:soul_link_pokemon).order(caught_at: :asc)
+    all_groups = run.soul_link_pokemon_groups.includes(:soul_link_pokemon).order(position: :asc)
     @groups_by_location = all_groups.group_by(&:location)
 
     @locations = SoulLink::GameState.locations

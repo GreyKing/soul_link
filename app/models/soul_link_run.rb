@@ -17,11 +17,11 @@ class SoulLinkRun < ApplicationRecord
 
   # Group-based queries (primary — used by panels)
   def caught_groups
-    soul_link_pokemon_groups.caught.order(created_at: :asc)
+    soul_link_pokemon_groups.caught.order(position: :asc)
   end
 
   def dead_groups
-    soul_link_pokemon_groups.dead.order(died_at: :asc)
+    soul_link_pokemon_groups.dead.order(position: :asc)
   end
 
   # Legacy individual queries (kept for backward compatibility)

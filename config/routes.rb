@@ -27,7 +27,9 @@ Rails.application.routes.draw do
 
   # Interactive region map
   resource :map, only: [ :show ], controller: "map"
-  resources :pokemon_groups, only: [ :create, :update, :destroy ]
+  resources :pokemon_groups, only: [ :create, :update, :destroy ] do
+    patch :reorder, on: :collection
+  end
   resource :gym_progress, only: [ :update ], controller: "gym_progress"
 
   root "teams#show"
