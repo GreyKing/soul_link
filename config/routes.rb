@@ -22,6 +22,9 @@ Rails.application.routes.draw do
     patch :unassign, on: :member
   end
 
+  # Player dashboard
+  resource :dashboard, only: [ :show ]
+
   # Gym readiness analysis
   resource :gym_ready, only: [ :show ], controller: "gym_ready"
 
