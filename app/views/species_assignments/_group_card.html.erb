@@ -60,6 +60,15 @@
             <%= pokemon_sprite_tag(species_entry.species, size: 20) %>
             <%= species_entry.species %>
             <%= pokemon_type_badges(species_entry.species, size: :xs) %>
+            <% if is_me %>
+              <button type="button"
+                      data-action="click->species-assignment#unassignSpecies"
+                      data-pokemon-id="<%= species_entry.id %>"
+                      class="ml-1 text-indigo-400/50 hover:text-red-400 transition leading-none"
+                      title="Remove from group">
+                &times;
+              </button>
+            <% end %>
           </span>
         <% elsif is_me %>
           <%# My empty slot — drop target %>

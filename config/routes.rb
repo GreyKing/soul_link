@@ -19,6 +19,7 @@ Rails.application.routes.draw do
   resource :species, only: [ :show ], controller: "species_assignments" do
     patch :assign, on: :member
     patch :assign_from_pokedex, on: :member
+    patch :unassign, on: :member
   end
 
   # Gym readiness analysis

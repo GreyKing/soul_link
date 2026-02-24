@@ -6,6 +6,7 @@
 <div data-controller="species-assignment"
      data-species-assignment-assign-url-value="<%= assign_species_path %>"
      data-species-assignment-assign-from-pokedex-url-value="<%= assign_from_pokedex_species_path %>"
+     data-species-assignment-unassign-url-value="<%= unassign_species_path %>"
      data-species-assignment-groups-url-value="<%= pokemon_groups_path %>"
      data-species-assignment-csrf-value="<%= form_authenticity_token %>"
      data-species-assignment-user-id-value="<%= current_user_id %>"
@@ -25,6 +26,21 @@
         + New Group
       </button>
     </div>
+
+    <%# ── Group Name Quick-Nav ── %>
+    <% if @groups.any? %>
+      <div class="flex flex-wrap gap-1.5 mb-3">
+        <% @groups.each do |group| %>
+          <button type="button"
+                  data-action="click->species-assignment#scrollToGroup"
+                  data-scroll-to-group="<%= group.id %>"
+                  class="px-2 py-0.5 text-xs rounded-full border transition cursor-pointer
+                         <%= group.dead? ? 'bg-red-950/40 border-red-900/50 text-red-400 hover:bg-red-950/60' : 'bg-gray-700/50 border-gray-600 text-gray-300 hover:bg-gray-700' %>">
+            <%= group.nickname %>
+          </button>
+        <% end %>
+      </div>
+    <% end %>
 
     <div class="space-y-3 max-h-[75vh] overflow-y-auto pr-2">
       <% @groups.each do |group| %>

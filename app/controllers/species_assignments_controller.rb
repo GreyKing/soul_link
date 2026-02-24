@@ -81,6 +81,28 @@ class SpeciesAssignmentsController < ApplicationController
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
+  def unassign
+    run = current_run
+    head :not_found and return unless run
+
+    pokemon = run.soul_link_pokemon.for_player(current_user_id).find_by(id: params[:pokemon_id])
+
+    unless pokemon
+      render json: { error: "Pokemon not found" }, status: :unprocessable_entity
+      return
+    end
+
+    unless pokemon.assigned?
+      render json: { error: "Pokemon is not assigned to a group" }, status: :unprocessable_entity
+      return
+    end
+
+    pokemon.update!(soul_link_pokemon_group_id: nil)
+    render json: { status: "unassigned", pokemon_id: pokemon.id }
+  rescue => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   private
 
   def current_run
