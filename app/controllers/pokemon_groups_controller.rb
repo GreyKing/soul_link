@@ -44,6 +44,69 @@ class PokemonGroupsController < ApplicationController
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
+  def update
+    run = current_run
+    head :not_found and return unless run
+
+    group = run.soul_link_pokemon_groups.find_by(id: params[:id])
+    unless group
+      render json: { error: "Group not found" }, status: :not_found
+      return
+    end
+
+    new_status = params[:status]&.strip
+    was_alive = group.caught?
+
+    if new_status == "dead" && was_alive
+      # Use mark_as_dead! to cascade status to all pokemon + remove team slots
+      group.mark_as_dead!(eulogy: params[:eulogy])
+      # Also update nickname/location if changed
+      group.update!(
+        nickname: params[:nickname]&.strip || group.nickname,
+        location: params[:location]&.strip || group.location
+      )
+    elsif new_status == "caught" && group.dead?
+      # Revive: set group + all pokemon back to caught
+      ActiveRecord::Base.transaction do
+        group.update!(
+          nickname: params[:nickname]&.strip || group.nickname,
+          location: params[:location]&.strip || group.location,
+          status: "caught",
+          died_at: nil,
+          eulogy: nil
+        )
+        group.soul_link_pokemon.each { |p| p.update!(status: "caught", died_at: nil) }
+      end
+    else
+      # Simple metadata update (no status change)
+      group.update!(
+        nickname: params[:nickname]&.strip || group.nickname,
+        location: params[:location]&.strip || group.location,
+        eulogy: group.dead? ? (params[:eulogy] || group.eulogy) : group.eulogy
+      )
+    end
+
+    render json: { status: "updated", group_id: group.id, nickname: group.nickname }
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  def destroy
+    run = current_run
+    head :not_found and return unless run
+
+    group = run.soul_link_pokemon_groups.find_by(id: params[:id])
+    unless group
+      render json: { error: "Group not found" }, status: :not_found
+      return
+    end
+
+    group.destroy!
+    render json: { status: "deleted" }
+  rescue => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   private
 
   def current_run
