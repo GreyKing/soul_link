@@ -8,7 +8,7 @@ class SpeciesAssignmentsController < ApplicationController
       return
     end
 
-    @groups = run.soul_link_pokemon_groups.includes(:soul_link_pokemon).order(position: :asc)
+    @groups = run.soul_link_pokemon_groups.includes(:soul_link_pokemon).order(created_at: :desc)
     @pool = run.soul_link_pokemon.unassigned.for_player(current_user_id).order(:species)
     @player_name = SoulLink::GameState.player_name(current_user_id)
     @players = SoulLink::GameState.players
