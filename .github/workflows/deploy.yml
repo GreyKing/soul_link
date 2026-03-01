@@ -65,12 +65,8 @@ jobs:
             ~/.rbenv/shims/ruby bin/rails db:migrate
             ~/.rbenv/shims/ruby bin/rails assets:precompile
 
-            # Sync nginx config and reload if changed
-            if ! diff -q config/deploy/nginx-soul-link.conf /etc/nginx/sites-available/soul-link > /dev/null 2>&1; then
-              echo "Nginx config changed — updating..."
-              cp config/deploy/nginx-soul-link.conf /etc/nginx/sites-available/soul-link
-              nginx -t && systemctl reload nginx
-            fi
+            # Reload nginx if location includes changed (safe — certbot manages the main config)
+            nginx -t && systemctl reload nginx
 
             systemctl restart soul-link-bot
             systemctl restart soul-link-web
