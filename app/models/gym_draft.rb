@@ -92,6 +92,7 @@ class GymDraft < ApplicationRecord
   def make_pick!(picker_uid, group_id)
     raise "Not in drafting phase" unless drafting?
     raise "Not your turn" unless current_drafter_id == picker_uid.to_i
+    raise "That pokemon has already been picked" if picks.any? { |p| p["group_id"] == group_id.to_i }
 
     new_picks = picks + [{ "round" => picks.size + 1, "group_id" => group_id.to_i, "picked_by" => picker_uid.to_i }]
     next_index = current_player_index + 1
@@ -116,6 +117,7 @@ class GymDraft < ApplicationRecord
   def submit_nomination!(nominator_uid, group_id)
     raise "Not in nominating phase" unless nominating?
     raise "Already have a pending nomination" if current_nomination.present?
+    raise "That pokemon has already been picked" if picks.any? { |p| p["group_id"] == group_id.to_i }
 
     nomination = {
       "nominator_id" => nominator_uid.to_i,
@@ -129,7 +131,7 @@ class GymDraft < ApplicationRecord
     raise "Not in nominating phase" unless nominating?
     raise "No pending nomination" unless current_nomination.present?
 
-    nom = current_nomination.dup
+    nom = current_nomination.deep_dup
     nom["votes"][voter_uid.to_s] = approve
     update_data!("current_nomination" => nom)
 
@@ -150,14 +152,16 @@ class GymDraft < ApplicationRecord
       status: status,
       current_round: current_round,
       current_player_index: current_player_index,
-      pick_order: pick_order,
-      ready_players: ready_players,
-      first_pick_votes: first_pick_votes,
-      picks: picks,
-      current_nomination: current_nomination,
-      current_drafter_id: current_drafter_id,
-      players: players,
-      player_ids: player_ids,
+      pick_order: pick_order&.map(&:to_s),
+      ready_players: ready_players.map(&:to_s),
+      first_pick_votes: first_pick_votes.transform_values { |v| v.to_s },
+      picks: picks.map { |p| p.merge("picked_by" => p["picked_by"].to_s) },
+      current_nomination: current_nomination&.then { |n|
+        n.merge("nominator_id" => n["nominator_id"].to_s)
+      },
+      current_drafter_id: current_drafter_id&.to_s,
+      players: players.map { |p| p.merge("discord_user_id" => p["discord_user_id"].to_s) },
+      player_ids: player_ids.map(&:to_s),
       final_team_group_ids: final_team_group_ids
     }
   end

@@ -6,15 +6,14 @@
 <div data-controller="gym-draft"
      data-gym-draft-draft-id-value="<%= @draft.id %>"
      data-gym-draft-user-id-value="<%= current_user_id %>"
-     data-gym-draft-players-value="<%= @players.to_json %>"
-     data-gym-draft-player-groups-value="<%= @player_groups.transform_values { |groups|
+     data-gym-draft-players-value="<%= @players.map { |p| p.merge('discord_user_id' => p['discord_user_id'].to_s) }.to_json %>"
+     data-gym-draft-player-groups-value="<%= @player_groups.transform_keys(&:to_s).transform_values { |groups|
        groups.map { |g|
-         pokemon = g.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id }
          {
            id: g.id,
            nickname: g.nickname,
            location: g.location,
-           pokemon: g.soul_link_pokemon.map { |p| { species: p.species, discord_user_id: p.discord_user_id } }
+           pokemon: g.soul_link_pokemon.map { |p| { species: p.species, discord_user_id: p.discord_user_id.to_s } }
          }
        }
      }.to_json %>">
@@ -35,7 +34,7 @@
       <div class="grid grid-cols-2 gap-3 mb-6" data-gym-draft-target="readyGrid">
         <% @players.each do |player| %>
           <div class="bg-gray-900/50 rounded-lg border border-gray-700 p-3 text-center"
-               data-player-id="<%= player['discord_user_id'] %>">
+               data-player-id="<%= player['discord_user_id'].to_s %>">
             <div class="text-sm font-medium text-white"><%= player['display_name'] %></div>
             <div class="text-xs text-gray-500 mt-1 ready-status">Not ready</div>
           </div>
@@ -59,7 +58,7 @@
         <% @players.each do |player| %>
           <button type="button"
                   data-action="click->gym-draft#vote"
-                  data-vote-for="<%= player['discord_user_id'] %>"
+                  data-vote-for="<%= player['discord_user_id'].to_s %>"
                   class="bg-gray-900/50 rounded-lg border border-gray-700 p-4 text-center hover:border-indigo-500 hover:bg-indigo-950/30 transition cursor-pointer">
             <div class="text-sm font-medium text-white"><%= player['display_name'] %></div>
           </button>
