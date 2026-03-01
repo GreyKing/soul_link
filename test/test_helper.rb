@@ -2,6 +2,9 @@ ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
 
+# OmniAuth test mode — prevents real OAuth calls
+OmniAuth.config.test_mode = true
+
 module ActiveSupport
   class TestCase
     # Run tests in parallel with specified workers
@@ -12,4 +15,28 @@ module ActiveSupport
 
     # Add more helper methods to be used by all tests here...
   end
+end
+
+# Helper for integration tests that need a logged-in session
+module LoginHelper
+  GUILD_ID = 999999999999999999
+
+  def login_as(discord_user_id, guild_id: GUILD_ID)
+    OmniAuth.config.mock_auth[:discord] = OmniAuth::AuthHash.new(
+      provider: "discord",
+      uid: discord_user_id.to_s,
+      info: { name: "TestUser", image: nil },
+      credentials: { token: "fake_token" }
+    )
+
+    # Stub the Faraday guild API call made by SessionsController#create
+    fake_response = Struct.new(:body).new([{ "id" => guild_id.to_s }].to_json)
+    Faraday.stub(:get, fake_response) do
+      get "/auth/discord/callback"
+    end
+  end
+end
+
+class ActionDispatch::IntegrationTest
+  include LoginHelper
 end

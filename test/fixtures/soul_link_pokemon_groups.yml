@@ -1,0 +1,47 @@
+group_route201:
+  soul_link_run: active_run
+  nickname: "ROY"
+  location: "route_201"
+  status: "caught"
+  position: 1
+  caught_at: <%= 6.days.ago.to_fs(:db) %>
+
+group_route202:
+  soul_link_run: active_run
+  nickname: "TOMMY"
+  location: "route_202"
+  status: "caught"
+  position: 2
+  caught_at: <%= 5.days.ago.to_fs(:db) %>
+
+group_route203:
+  soul_link_run: active_run
+  nickname: "RACHEL"
+  location: "route_203"
+  status: "caught"
+  position: 3
+  caught_at: <%= 4.days.ago.to_fs(:db) %>
+
+group_route204:
+  soul_link_run: active_run
+  nickname: "SPIKE"
+  location: "route_204"
+  status: "caught"
+  position: 4
+  caught_at: <%= 3.days.ago.to_fs(:db) %>
+
+group_route205:
+  soul_link_run: active_run
+  nickname: "LUNA"
+  location: "route_205"
+  status: "caught"
+  position: 5
+  caught_at: <%= 2.days.ago.to_fs(:db) %>
+
+group_route206:
+  soul_link_run: active_run
+  nickname: "BLAZE"
+  location: "route_206"
+  status: "caught"
+  position: 6
+  caught_at: <%= 1.day.ago.to_fs(:db) %>

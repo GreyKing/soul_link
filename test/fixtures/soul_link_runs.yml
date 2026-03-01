@@ -1,0 +1,9 @@
+active_run:
+  guild_id: 999999999999999999
+  run_number: 1
+  active: true
+  category_id: 100000000000000001
+  catches_channel_id: 100000000000000002
+  deaths_channel_id: 100000000000000003
+  general_channel_id: 100000000000000004
+  gyms_defeated: 2
