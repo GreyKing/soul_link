@@ -1,17 +1,52 @@
-name: Deploy
+name: Test & Deploy
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  deploy:
+  test:
     runs-on: ubuntu-latest
-    # Only deploy if CI passes (optional — remove `needs` if you don't want to wait)
-    needs: []
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: soul_link_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
-      - name: Deploy to Vultr VPS
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4.5'
+          bundler-cache: true
+
+      - name: Set up database
+        env:
+          RAILS_ENV: test
+        run: bin/rails db:schema:load
+
+      - name: Run tests
+        env:
+          RAILS_ENV: test
+        run: bin/rails test
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [ test ]
+
+    steps:
+      - name: Deploy to VPS
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -29,5 +64,13 @@ jobs:
             ~/.rbenv/shims/bundle install --without development test
             ~/.rbenv/shims/ruby bin/rails db:migrate
             ~/.rbenv/shims/ruby bin/rails assets:precompile
+
+            # Sync nginx config and reload if changed
+            if ! diff -q config/deploy/nginx-soul-link.conf /etc/nginx/sites-available/soul-link > /dev/null 2>&1; then
+              echo "Nginx config changed — updating..."
+              cp config/deploy/nginx-soul-link.conf /etc/nginx/sites-available/soul-link
+              nginx -t && systemctl reload nginx
+            fi
+
             systemctl restart soul-link-bot
             systemctl restart soul-link-web
