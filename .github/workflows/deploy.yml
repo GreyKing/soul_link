@@ -34,11 +34,13 @@ jobs:
       - name: Set up database
         env:
           RAILS_ENV: test
+          DATABASE_HOST: 127.0.0.1
         run: bin/rails db:schema:load
 
       - name: Run tests
         env:
           RAILS_ENV: test
+          DATABASE_HOST: 127.0.0.1
         run: bin/rails test
 
   deploy:
