@@ -12,7 +12,7 @@ export default class extends Controller {
   ]
   static values = {
     draftId: Number,
-    userId: Number,
+    userId: String,
     players: Array,
     playerGroups: Object
   }
@@ -21,12 +21,7 @@ export default class extends Controller {
     this.subscription = createConsumer().subscriptions.create(
       { channel: "GymDraftChannel", draft_id: this.draftIdValue },
       {
-        received: (data) => this.handleMessage(data),
-        ready: () => this.subscription.perform("ready"),
-        vote: (votedFor) => this.subscription.perform("vote", { voted_for: votedFor }),
-        pick: (groupId) => this.subscription.perform("pick", { group_id: groupId }),
-        nominate: (groupId) => this.subscription.perform("nominate", { group_id: groupId }),
-        voteNomination: (approve) => this.subscription.perform("vote_nomination", { approve })
+        received: (data) => this.handleMessage(data)
       }
     )
     this.state = null
@@ -59,7 +54,7 @@ export default class extends Controller {
   }
 
   vote(event) {
-    const votedFor = parseInt(event.currentTarget.dataset.voteFor)
+    const votedFor = event.currentTarget.dataset.voteFor
     this.subscription.perform("vote", { voted_for: votedFor })
     // Disable all vote buttons
     this.voteGridTarget.querySelectorAll("button").forEach(btn => {
@@ -114,10 +109,10 @@ export default class extends Controller {
   }
 
   renderLobby() {
-    const readyPlayers = this.state.ready_players || []
+    const readyPlayers = (this.state.ready_players || []).map(String)
     const cards = this.readyGridTarget.querySelectorAll("[data-player-id]")
     cards.forEach(card => {
-      const pid = parseInt(card.dataset.playerId)
+      const pid = card.dataset.playerId
       const isReady = readyPlayers.includes(pid)
       const statusEl = card.querySelector(".ready-status")
       if (statusEl) {
@@ -135,21 +130,21 @@ export default class extends Controller {
       this.readyButtonTarget.classList.replace("bg-green-600", "bg-gray-600")
     }
 
-    this.phaseInfoTarget.textContent = `${readyPlayers.length}/${this.state.player_ids.length} ready`
+    this.phaseInfoTarget.textContent = `${readyPlayers.length}/${(this.state.player_ids || []).length} ready`
   }
 
   renderVoting() {
     const votes = this.state.first_pick_votes || {}
     const voteCount = Object.keys(votes).length
-    const total = this.state.player_ids.length
+    const total = (this.state.player_ids || []).length
     this.voteStatusTarget.textContent = `${voteCount}/${total} votes cast`
 
-    const myVoted = votes[this.userIdValue.toString()]
+    const myVoted = votes[this.userIdValue]
     if (myVoted) {
       this.voteGridTarget.querySelectorAll("button").forEach(btn => {
         btn.disabled = true
         btn.classList.add("opacity-50")
-        if (parseInt(btn.dataset.voteFor) === myVoted) {
+        if (btn.dataset.voteFor === String(myVoted)) {
           btn.classList.remove("opacity-50")
           btn.classList.add("border-indigo-500", "bg-indigo-950/30")
         }
@@ -162,7 +157,7 @@ export default class extends Controller {
   renderDrafting() {
     this.fillTeamSlots(this.teamSlotsTarget, this.state.picks)
 
-    const currentId = this.state.current_drafter_id
+    const currentId = String(this.state.current_drafter_id)
     const currentPlayer = this.findPlayer(currentId)
     const isMyTurn = currentId === this.userIdValue
 
@@ -192,8 +187,8 @@ export default class extends Controller {
       this.nomStatusTarget.textContent = `${nominator?.display_name} nominated "${groupName}"`
 
       // Show vote buttons for non-nominators
-      const isNominator = nomination.nominator_id === this.userIdValue
-      const hasVoted = nomination.votes && nomination.votes[this.userIdValue.toString()] !== undefined
+      const isNominator = String(nomination.nominator_id) === this.userIdValue
+      const hasVoted = nomination.votes && nomination.votes[this.userIdValue] !== undefined
 
       if (!isNominator && !hasVoted) {
         this.nomVoteAreaTarget.classList.remove("hidden")
@@ -243,13 +238,13 @@ export default class extends Controller {
   }
 
   renderPokemonGrid(container, interactive, actionType) {
-    const myUid = this.userIdValue.toString()
+    const myUid = this.userIdValue
     const allGroups = this.playerGroupsValue[myUid] || []
     const pickedGroupIds = (this.state.picks || []).map(p => p.group_id)
 
     container.innerHTML = allGroups.map(group => {
       const isPicked = pickedGroupIds.includes(group.id)
-      const myPokemon = group.pokemon.find(p => p.discord_user_id === this.userIdValue)
+      const myPokemon = group.pokemon.find(p => String(p.discord_user_id) === myUid)
       const species = myPokemon ? myPokemon.species : "?"
       const action = actionType === "pick" ? "click->gym-draft#pickPokemon" : "click->gym-draft#nominatePokemon"
 
@@ -280,7 +275,7 @@ export default class extends Controller {
   }
 
   findPlayer(id) {
-    return this.playersValue.find(p => p.discord_user_id === parseInt(id))
+    return this.playersValue.find(p => String(p.discord_user_id) === String(id))
   }
 
   findGroupById(groupId) {
