@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import Sortable from "sortablejs"
 
 export default class extends Controller {
-  static targets = ["teamList", "poolList", "saveStatus", "teamCount", "teamEmpty", "poolEmpty"]
+  static targets = ["teamList", "poolList", "saveStatus", "teamCount", "teamEmpty", "poolEmpty", "poolSearch"]
   static values = { updateUrl: String, csrf: String, userId: Number }
 
   connect() {
@@ -111,6 +111,20 @@ export default class extends Controller {
         badge.textContent = ""
         badge.classList.add("hidden")
       }
+    })
+  }
+
+  filterPool() {
+    const query = this.poolSearchTarget.value.toLowerCase().trim()
+    const cards = this.poolListTarget.querySelectorAll(".pokemon-card")
+
+    cards.forEach(card => {
+      if (!query) {
+        card.style.display = ""
+        return
+      }
+      const text = card.textContent.toLowerCase()
+      card.style.display = text.includes(query) ? "" : "none"
     })
   }
 
