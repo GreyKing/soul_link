@@ -87,4 +87,10 @@ Rails.application.configure do
 
   # Skip DNS rebinding protection for the default health check endpoint.
   config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+
+  # ActionCable: allow WebSocket connections from the app's domain
+  config.action_cable.allowed_request_origins = [
+    "https://#{ENV['SOUL_LINK_HOST'] || 'localhost'}",
+    "http://#{ENV['SOUL_LINK_HOST'] || 'localhost'}"
+  ]
 end

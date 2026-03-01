@@ -1,0 +1,28 @@
+<% species_map = {
+  "route_201" => %w[Starly Bidoof Shinx Kricketot],
+  "route_202" => %w[Budew Zubat Geodude Machop],
+  "route_203" => %w[Abra Ponyta Gastly Roselia],
+  "route_204" => %w[Buizel Shellos Pachirisu Aipom],
+  "route_205" => %w[Eevee Murkrow Misdreavus Gligar],
+  "route_206" => %w[Bronzor Chingling Meditite Stunky]
+} %>
+<% players = [
+  { id: 153665622641737728, name: "Grey" },
+  { id: 600802903967531093, name: "ARatypuss" },
+  { id: 189518174125817856, name: "Scythe461" },
+  { id: 182742127061630976, name: "Zealous" }
+] %>
+<% %w[route_201 route_202 route_203 route_204 route_205 route_206].each do |loc|
+  players.each_with_index do |player, idx|
+    species = species_map[loc][idx]
+%>
+pkmn_<%= loc %>_<%= player[:name].downcase %>:
+  soul_link_run: active_run
+  soul_link_pokemon_group: group_<%= loc %>
+  discord_user_id: <%= player[:id] %>
+  species: "<%= species %>"
+  name: "<%= species %>"
+  location: "<%= loc %>"
+  status: "caught"
+<% end
+end %>

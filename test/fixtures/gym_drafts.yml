@@ -1,0 +1,7 @@
+lobby_draft:
+  soul_link_run: active_run
+  status: "lobby"
+  current_round: 0
+  current_player_index: 0
+  pick_order: <%= [].to_json %>
+  state_data: <%= { "ready_players" => [], "first_pick_votes" => {}, "picks" => [] }.to_json %>
