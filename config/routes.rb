@@ -28,6 +28,7 @@ Rails.application.routes.draw do
   # Gym readiness analysis + gym draft
   resource :gym_ready, only: [ :show ], controller: "gym_ready"
   resources :gym_drafts, only: [ :create, :show ]
+  resources :gym_schedules, only: [ :index, :create, :show ]
 
   # Interactive region map
   resource :map, only: [ :show ], controller: "map"

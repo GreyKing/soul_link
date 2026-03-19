@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_23_110000) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_08_100000) do
   create_table "gym_drafts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "current_player_index", default: 0, null: false
@@ -22,6 +22,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_23_110000) do
     t.datetime "updated_at", null: false
     t.index ["soul_link_run_id", "status"], name: "index_gym_drafts_on_soul_link_run_id_and_status"
     t.index ["soul_link_run_id"], name: "index_gym_drafts_on_soul_link_run_id"
+  end
+
+  create_table "gym_schedules", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "discord_channel_id"
+    t.bigint "discord_message_id"
+    t.bigint "gym_draft_id"
+    t.bigint "proposed_by", null: false
+    t.datetime "scheduled_at", null: false
+    t.bigint "soul_link_run_id", null: false
+    t.json "state_data"
+    t.string "status", default: "proposed", null: false
+    t.datetime "updated_at", null: false
+    t.index ["gym_draft_id"], name: "index_gym_schedules_on_gym_draft_id"
+    t.index ["soul_link_run_id", "status"], name: "index_gym_schedules_on_soul_link_run_id_and_status"
+    t.index ["soul_link_run_id"], name: "index_gym_schedules_on_soul_link_run_id"
   end
 
   create_table "soul_link_pokemon", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -100,6 +116,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_23_110000) do
   end
 
   add_foreign_key "gym_drafts", "soul_link_runs"
+  add_foreign_key "gym_schedules", "gym_drafts"
+  add_foreign_key "gym_schedules", "soul_link_runs"
   add_foreign_key "soul_link_pokemon", "soul_link_pokemon_groups"
   add_foreign_key "soul_link_pokemon", "soul_link_runs"
   add_foreign_key "soul_link_pokemon_groups", "soul_link_runs"
