@@ -1,0 +1,83 @@
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-white">Gym Schedules</h1>
+  <p class="text-gray-400 text-sm mt-1">Propose a time for the next gym battle and RSVP.</p>
+</div>
+
+<%# ── Create New Schedule ── %>
+<% unless @schedules.any? %>
+  <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-6 mb-6 max-w-lg">
+    <h2 class="text-lg font-semibold text-white mb-4">Propose a Gym Day</h2>
+    <%= form_with url: gym_schedules_path, method: :post, class: "flex flex-col sm:flex-row items-start sm:items-end gap-3" do |f| %>
+      <div class="flex-1 w-full">
+        <label for="scheduled_at" class="block text-sm text-gray-400 mb-1">When?</label>
+        <input type="datetime-local" name="scheduled_at" id="scheduled_at" required
+               class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500">
+      </div>
+      <button type="submit"
+              class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition font-medium text-sm whitespace-nowrap">
+        Propose Schedule
+      </button>
+    <% end %>
+  </div>
+<% end %>
+
+<%# ── Upcoming / Active Schedules ── %>
+<% if @schedules.any? %>
+  <div class="mb-8">
+    <h2 class="text-lg font-semibold text-white mb-3">Upcoming</h2>
+    <div class="space-y-3">
+      <% @schedules.each do |schedule| %>
+        <%= link_to gym_schedule_path(schedule), class: "block bg-gray-800/50 rounded-xl border border-gray-700 p-4 hover:border-indigo-600 transition" do %>
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-white font-medium">
+                <%= schedule.scheduled_at.strftime("%A, %B %-d at %-I:%M %p") %>
+              </div>
+              <div class="text-sm text-gray-400 mt-1">
+                Proposed by <%= schedule.proposer_name %>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="text-sm">
+                <span class="text-green-400"><%= schedule.yes_count %> yes</span>
+                <% if schedule.maybe_count > 0 %>
+                  <span class="text-yellow-400 ml-2"><%= schedule.maybe_count %> maybe</span>
+                <% end %>
+                <% if schedule.no_count > 0 %>
+                  <span class="text-red-400 ml-2"><%= schedule.no_count %> no</span>
+                <% end %>
+              </div>
+              <span class="px-2 py-1 rounded-full text-xs font-medium
+                           <%= schedule.confirmed? ? 'bg-green-900/50 text-green-300 border border-green-700' : 'bg-yellow-900/50 text-yellow-300 border border-yellow-700' %>">
+                <%= schedule.status.capitalize %>
+              </span>
+            </div>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# ── Past Schedules ── %>
+<% if @past_schedules.any? %>
+  <div>
+    <h2 class="text-lg font-semibold text-gray-400 mb-3">Past</h2>
+    <div class="space-y-2">
+      <% @past_schedules.each do |schedule| %>
+        <div class="bg-gray-800/30 rounded-lg border border-gray-700/50 p-3 opacity-60">
+          <div class="flex items-center justify-between">
+            <div class="text-sm text-gray-400">
+              <%= schedule.scheduled_at.strftime("%B %-d at %-I:%M %p") %>
+              <span class="text-gray-500 ml-2">— <%= schedule.proposer_name %></span>
+            </div>
+            <span class="px-2 py-1 rounded-full text-xs font-medium
+                         <%= schedule.completed? ? 'bg-green-900/30 text-green-400' : 'bg-gray-700 text-gray-400' %>">
+              <%= schedule.status.capitalize %>
+            </span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

@@ -1,0 +1,73 @@
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold text-white">Gym Schedule</h1>
+    <p class="text-gray-400 text-sm mt-1">
+      <%= @schedule.scheduled_at.strftime("%A, %B %-d at %-I:%M %p") %>
+    </p>
+  </div>
+  <%= link_to "All Schedules", gym_schedules_path,
+        class: "text-sm text-indigo-400 hover:text-indigo-300 transition" %>
+</div>
+
+<div data-controller="gym-schedule"
+     data-gym-schedule-schedule-id-value="<%= @schedule.id %>"
+     data-gym-schedule-user-id-value="<%= current_user_id %>"
+     data-gym-schedule-players-value="<%= @players.map { |p| p.merge('discord_user_id' => p['discord_user_id'].to_s) }.to_json %>">
+
+  <%# ── Status Bar ── %>
+  <div class="mb-6 flex items-center gap-3">
+    <div data-gym-schedule-target="statusBadge"
+         class="px-3 py-1 rounded-full text-sm font-medium bg-yellow-900/50 text-yellow-300 border border-yellow-700">
+      <%= @schedule.status.capitalize %>
+    </div>
+    <div data-gym-schedule-target="statusInfo" class="text-sm text-gray-400">
+      Proposed by <%= @schedule.proposer_name %>
+    </div>
+  </div>
+
+  <%# ── RSVP Grid ── %>
+  <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-6 mb-6">
+    <h2 class="text-lg font-semibold text-white mb-4">RSVPs</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" data-gym-schedule-target="rsvpGrid">
+      <% @players.each do |player| %>
+        <div class="bg-gray-900/50 rounded-lg border border-gray-700 p-4 text-center"
+             data-player-id="<%= player['discord_user_id'].to_s %>">
+          <div class="text-sm font-medium text-white"><%= player['display_name'] %></div>
+          <div class="text-xs mt-2 rsvp-status text-gray-500">Pending</div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ── RSVP Buttons (for current user) ── %>
+  <div data-gym-schedule-target="rsvpActions"
+       class="bg-gray-800/50 rounded-xl border border-gray-700 p-6 mb-6 text-center">
+    <p class="text-sm text-gray-400 mb-4">Are you available?</p>
+    <div class="flex justify-center gap-3">
+      <button type="button"
+              data-action="click->gym-schedule#rsvpYes"
+              class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition font-medium">
+        Yes
+      </button>
+      <button type="button"
+              data-action="click->gym-schedule#rsvpMaybe"
+              class="px-5 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-500 transition font-medium">
+        Maybe
+      </button>
+      <button type="button"
+              data-action="click->gym-schedule#rsvpNo"
+              class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition font-medium">
+        No
+      </button>
+    </div>
+  </div>
+
+  <%# ── Cancel Button ── %>
+  <div data-gym-schedule-target="cancelAction" class="text-center">
+    <button type="button"
+            data-action="click->gym-schedule#cancel"
+            class="px-4 py-2 text-sm text-gray-400 hover:text-red-400 transition">
+      Cancel this schedule
+    </button>
+  </div>
+</div>
