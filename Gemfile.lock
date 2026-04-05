@@ -201,6 +201,7 @@ GEM
     mini_magick (5.3.1)
       logger
     mini_mime (1.1.5)
+    mini_portile2 (2.8.9)
     minitest (5.26.1)
     msgpack (1.8.0)
     multi_xml (0.8.1)
@@ -225,6 +226,9 @@ GEM
     net-ssh (7.3.0)
     netrc (0.11.0)
     nio4r (2.7.5)
+    nokogiri (1.18.10)
+      mini_portile2 (~> 2.8.2)
+      racc (~> 1.4)
     nokogiri (1.18.10-aarch64-linux-gnu)
       racc (~> 1.4)
     nokogiri (1.18.10-aarch64-linux-musl)
@@ -415,7 +419,7 @@ GEM
       concurrent-ruby (~> 1.0)
     unicode-display_width (3.2.0)
       unicode-emoji (~> 4.1)
-    unicode-emoji (4.1.0)
+    unicode-emoji (4.2.0)
     uri (1.1.1)
     useragent (0.16.11)
     version_gem (1.1.9)
@@ -444,6 +448,7 @@ PLATFORMS
   aarch64-linux-musl
   arm-linux-gnu
   arm-linux-musl
+  arm64-darwin-23
   arm64-darwin-24
   arm64-darwin-25
   x86_64-linux
