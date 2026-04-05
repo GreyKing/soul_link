@@ -1,0 +1,30 @@
+# /etc/systemd/system/soul-link-bot.service
+# Discord bot for Soul Link Team Builder
+#
+# Install:
+#   sudo cp config/deploy/soul-link-bot.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable soul-link-bot
+#   sudo systemctl start soul-link-bot
+
+[Unit]
+Description=Soul Link Discord Bot
+After=network.target mysql.service
+OnFailure=systemd-failure-notify@%n.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/soul_link
+ExecStart=/root/.rbenv/shims/bundle exec rake soul_link:bot
+Restart=always
+RestartSec=5
+
+Environment=RAILS_ENV=production
+Environment=RAILS_MASTER_KEY=REPLACE_ME
+Environment=DATABASE_USERNAME=soul_link
+Environment=DATABASE_PASSWORD=REPLACE_ME
+Environment=SOUL_LINK_HOST=4luckyclovers.com
+
+[Install]
+WantedBy=multi-user.target

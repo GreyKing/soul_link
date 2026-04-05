@@ -1,0 +1,16 @@
+# /etc/systemd/system/systemd-failure-notify@.service
+# Template unit that sends an email when a service fails.
+# Triggered via OnFailure=systemd-failure-notify@%n.service
+#
+# Install:
+#   sudo cp config/deploy/systemd-failure-notify@.service /etc/systemd/system/
+#   sudo cp config/deploy/notify-failure.sh /usr/local/bin/notify-failure
+#   sudo chmod +x /usr/local/bin/notify-failure
+#   sudo systemctl daemon-reload
+
+[Unit]
+Description=Send failure notification for %i
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/notify-failure %i
