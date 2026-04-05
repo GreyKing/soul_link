@@ -26,42 +26,26 @@ CI uses `DATABASE_HOST=127.0.0.1` (TCP) — not Unix socket. Test database: `sou
 
 ## Architecture
 
-### Domain Model
+For detailed documentation, see `.claude/documents/`:
 
-```
-SoulLinkRun (one active per guild)
-├── SoulLinkPokemonGroup (shared nickname, location, caught/dead status)
-│   └── SoulLinkPokemon (one per player per group — species assignment)
-├── SoulLinkTeam (one per player, max 6 slots)
-│   └── SoulLinkTeamSlot → belongs_to PokemonGroup
-├── GymDraft (multi-phase: lobby → voting → drafting → nominating → complete)
-└── GymSchedule (RSVP-based scheduling: proposed → confirmed → completed/cancelled)
-```
+| Document | Description |
+|----------|-------------|
+| [domain-models.md](.claude/documents/domain-models.md) | Models, relationships, validations, JSON state patterns, cascading behaviors |
+| [discord-bot.md](.claude/documents/discord-bot.md) | Bot setup, slash commands, button/modal interactions, panel management, rake tasks |
+| [discord-auth.md](.claude/documents/discord-auth.md) | OAuth flow, session keys, guild validation, DiscordAuthentication concern |
+| [gym-draft.md](.claude/documents/gym-draft.md) | 5-phase draft state machine, ActionCable channel, Stimulus controller |
+| [gym-schedule.md](.claude/documents/gym-schedule.md) | RSVP scheduling, auto-confirm, Discord message sync |
+| [frontend.md](.claude/documents/frontend.md) | Stimulus controllers, SortableJS drag-and-drop, Importmap, Tailwind theme |
+| [services.md](.claude/documents/services.md) | GameState config loader, TypeChart analysis, YAML file reference |
+| [controllers-routes.md](.claude/documents/controllers-routes.md) | Full route map, controller actions, common patterns |
+| [deployment.md](.claude/documents/deployment.md) | CI/CD pipeline, systemd services, nginx, Puma, database config |
 
-### Authentication
+### Quick Reference
 
-Discord OAuth via `omniauth-discord`. Session-based with no User model. Session keys: `discord_user_id`, `discord_username`, `discord_avatar_url`, `guild_id`. The `DiscordAuthentication` concern (`app/controllers/concerns/discord_authentication.rb`) provides `current_user_id`, `logged_in?`, `require_login`.
-
-### Real-Time (ActionCable)
-
-Channels: `GymDraftChannel`, `GymScheduleChannel`. Pattern: `stream_for @record`, broadcast full state via `Model#broadcast_state`, client receives `{ type: "state_update", state: {...} }`.
-
-**Dev gotcha:** The async cable adapter (`config/cable.yml`) only works within the same process. `rails console` broadcasts won't reach the browser — use the web console (add `console` to an ERB template or controller action) instead.
-
-Connection auth (`app/channels/application_cable/connection.rb`) uses `request.session[:discord_user_id]`.
-
-### Game Configuration
-
-YAML files in `config/soul_link/`: `settings.yml` (player roster, category prefix), `gym_info.yml` (8 gyms), `locations.yml`, `pokedex.yml`, `types.yml`, `progression.yml`, `map_coordinates.yml`. Loaded via `SoulLink::GameState` service which memoizes file reads.
-
-### Discord Bot
-
-Separate process (`rake soul_link:bot`) using `discordrb`. Handles slash commands, button interactions, and panel updates. Custom ID format: `soul_link:action:resource_id:variant`. Service code in `app/services/soul_link/`.
-
-### Frontend
-
-Stimulus controllers in `app/javascript/controllers/` with Importmap (no build step). Sortable.js for drag-and-drop team building. Dark Discord-inspired theme via Tailwind CSS. Propshaft asset pipeline.
-
-### Deployment
-
-GitHub Actions (`.github/workflows/deploy.yml`): test → SSH deploy to Vultr VPS. Production runs nginx (reverse proxy with WebSocket support at `/cable`) + Puma + systemd services (`soul-link-web`, `soul-link-bot`). Nginx config in `config/deploy/`.
+- **Domain model:** `SoulLinkRun` → `PokemonGroup` → `Pokemon` (one per player per group). Teams have max 6 slots referencing groups.
+- **Auth:** Discord OAuth, session-based, no User model. Guild ID scopes all data.
+- **Real-time:** ActionCable channels for GymDraft and GymSchedule. Pattern: `stream_for @record`, broadcast full state, client re-renders.
+- **Dev gotcha:** Async cable adapter only works within same process — `rails console` broadcasts won't reach browser.
+- **Config:** YAML files in `config/soul_link/`, loaded via `SoulLink::GameState`.
+- **Bot:** Separate process (`rake soul_link:bot`), shares Rails models. Custom ID format: `soul_link:action:context:value`.
+- **Frontend:** Stimulus + Importmap + SortableJS + Tailwind (dark theme). No Node/npm.

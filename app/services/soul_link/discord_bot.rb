@@ -41,6 +41,7 @@ module SoulLink
 
         begin
           run = create_new_run(event)
+          broadcast_run_state(run.guild_id)
           event.edit_response(content: "✅ Started **Run ##{run.run_number}**!\n" \
             "Created category and channels. Good luck!")
         rescue => e
@@ -71,6 +72,7 @@ module SoulLink
           "Use `/start_new_run` to begin Run ##{run.run_number + 1}."
 
         run.deactivate!
+        broadcast_run_state(run.guild_id)
 
         event.edit_response(content: "✅ Ended Run ##{run.run_number}\n\n#{stats}")
       end
@@ -953,6 +955,12 @@ module SoulLink
 
     def respond_ephemeral(event, content)
       event.respond(content: content, ephemeral: true)
+    end
+
+    def broadcast_run_state(guild_id)
+      RunChannel.broadcast_run_state(guild_id)
+    rescue => e
+      Rails.logger.error "Failed to broadcast run state: #{e.message}"
     end
 
     def current_run(event)

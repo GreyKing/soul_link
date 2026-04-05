@@ -30,6 +30,9 @@ Rails.application.routes.draw do
   resources :gym_drafts, only: [ :create, :show ]
   resources :gym_schedules, only: [ :index, :create, :show ]
 
+  # Run management
+  resources :runs, only: [ :index ]
+
   # Interactive region map
   resource :map, only: [ :show ], controller: "map"
   resources :pokemon_groups, only: [ :create, :update, :destroy ] do

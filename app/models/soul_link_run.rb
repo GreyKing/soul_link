@@ -7,11 +7,10 @@ class SoulLinkRun < ApplicationRecord
 
   validates :run_number, presence: true, uniqueness: { scope: :guild_id }
   validates :guild_id, presence: true
-  validates :category_id, :general_channel_id, :catches_channel_id, :deaths_channel_id, presence: true
-
   scope :active, -> { where(active: true) }
   scope :inactive, -> { where(active: false) }
   scope :for_guild, ->(guild_id) { where(guild_id: guild_id) }
+  scope :history, ->(guild_id) { for_guild(guild_id).inactive.order(run_number: :desc) }
 
   def self.current(guild_id)
     active.for_guild(guild_id).order(run_number: :desc).first
@@ -37,5 +36,24 @@ class SoulLinkRun < ApplicationRecord
 
   def deactivate!
     update!(active: false)
+  end
+
+  def discord_channels_configured?
+    category_id.present? && general_channel_id.present? &&
+      catches_channel_id.present? && deaths_channel_id.present?
+  end
+
+  def broadcast_state
+    {
+      id: id,
+      run_number: run_number,
+      active: active,
+      gyms_defeated: gyms_defeated,
+      caught_count: caught_groups.count,
+      dead_count: dead_groups.count,
+      started_at: created_at&.iso8601,
+      ended_at: active? ? nil : updated_at&.iso8601,
+      has_discord_channels: discord_channels_configured?
+    }
   end
 end

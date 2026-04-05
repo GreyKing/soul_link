@@ -1,0 +1,93 @@
+<div data-controller="run-management"
+     data-run-management-guild-id-value="<%= @guild_id %>"
+     data-run-management-user-id-value="<%= current_user_id %>">
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-white">Run Management</h1>
+    <p class="text-gray-400 text-sm mt-1">Start new runs, view history, and manage Discord channels.</p>
+  </div>
+
+  <%# ── Current Run Panel ── %>
+  <div data-run-management-target="currentRunPanel" class="<%= 'hidden' unless @current_run %>">
+    <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-white">
+          Current Run: <span data-run-management-target="runNumber">#<%= @current_run&.run_number %></span>
+        </h2>
+        <span class="px-2 py-1 rounded-full text-xs font-medium bg-green-900/50 text-green-300 border border-green-700">
+          Active
+        </span>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div class="bg-gray-900/50 rounded-lg p-3 text-center">
+          <div class="text-2xl font-bold text-white" data-run-management-target="gymsDefeated"><%= @current_run&.gyms_defeated || 0 %>/8</div>
+          <div class="text-xs text-gray-400 mt-1">Gyms Defeated</div>
+        </div>
+        <div class="bg-gray-900/50 rounded-lg p-3 text-center">
+          <div class="text-2xl font-bold text-green-400" data-run-management-target="caughtCount"><%= @current_run&.caught_groups&.count || 0 %></div>
+          <div class="text-xs text-gray-400 mt-1">Caught Groups</div>
+        </div>
+        <div class="bg-gray-900/50 rounded-lg p-3 text-center">
+          <div class="text-2xl font-bold text-red-400" data-run-management-target="deadCount"><%= @current_run&.dead_groups&.count || 0 %></div>
+          <div class="text-xs text-gray-400 mt-1">Dead Groups</div>
+        </div>
+        <div class="bg-gray-900/50 rounded-lg p-3 text-center">
+          <div class="text-sm font-medium text-gray-300" data-run-management-target="startedAt"><%= @current_run&.created_at&.strftime("%b %-d, %Y") %></div>
+          <div class="text-xs text-gray-400 mt-1">Started</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button data-action="click->run-management#endRun"
+                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition font-medium text-sm">
+          End Current Run
+        </button>
+        <button data-action="click->run-management#setupDiscord"
+                data-run-management-target="setupDiscordButton"
+                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition font-medium text-sm <%= 'hidden' if @current_run&.discord_channels_configured? %>">
+          Setup Discord Channels
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <%# ── No Active Run Panel ── %>
+  <div data-run-management-target="noRunPanel" class="<%= 'hidden' if @current_run %>">
+    <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-6 mb-6 text-center">
+      <p class="text-gray-400 mb-4">No active run. Start a new one to begin tracking.</p>
+      <button data-action="click->run-management#startRun"
+              class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition font-medium text-sm">
+        Start New Run
+      </button>
+    </div>
+  </div>
+
+  <%# ── Run History ── %>
+  <div>
+    <h2 class="text-lg font-semibold text-gray-400 mb-3">Run History</h2>
+    <div data-run-management-target="historyList" class="space-y-2">
+      <% if @past_runs.any? %>
+        <% @past_runs.each do |run| %>
+          <div class="bg-gray-800/30 rounded-lg border border-gray-700/50 p-4 opacity-60">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-white font-medium">Run #<%= run.run_number %></span>
+                <span class="text-gray-500 text-sm ml-3">
+                  <%= run.created_at.strftime("%b %-d") %> &mdash; <%= run.updated_at.strftime("%b %-d, %Y") %>
+                </span>
+              </div>
+              <div class="flex items-center gap-4 text-sm">
+                <span class="text-gray-400"><%= run.gyms_defeated %>/8 gyms</span>
+                <span class="text-green-400"><%= run.caught_groups.count %> caught</span>
+                <span class="text-red-400"><%= run.dead_groups.count %> dead</span>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      <% else %>
+        <p class="text-gray-500 text-sm">No previous runs.</p>
+      <% end %>
+    </div>
+  </div>
+</div>

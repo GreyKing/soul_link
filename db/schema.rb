@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_08_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_05_202919) do
   create_table "gym_drafts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "current_player_index", default: 0, null: false
@@ -77,13 +77,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_08_100000) do
 
   create_table "soul_link_runs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.boolean "active", default: true, null: false
-    t.bigint "catches_channel_id", null: false
+    t.bigint "catches_channel_id"
     t.bigint "catches_panel_message_id"
-    t.bigint "category_id", null: false
+    t.bigint "category_id"
     t.datetime "created_at", null: false
-    t.bigint "deaths_channel_id", null: false
+    t.bigint "deaths_channel_id"
     t.bigint "deaths_panel_message_id"
-    t.bigint "general_channel_id", null: false
+    t.bigint "general_channel_id"
     t.bigint "guild_id", null: false
     t.integer "gyms_defeated", default: 0, null: false
     t.integer "run_number", null: false
