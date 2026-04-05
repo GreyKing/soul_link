@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelDex // Soul Link</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --d1: #0f380f;
+    --d2: #306230;
+    --l1: #8bac0f;
+    --l2: #9bbc0f;
+    --white: #c6de8a;
+    --border: 2px solid var(--d1);
+    --border-double: 4px double var(--d1);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: #2a3a0a;
+    color: var(--d1);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    line-height: 2;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 12px;
+    image-rendering: pixelated;
+  }
+
+  /* ── Game Boy Housing ── */
+  .gameboy-frame {
+    width: 100%;
+    max-width: 520px;
+    background: #6b7b3a;
+    border: 4px solid #4a5a2a;
+    border-radius: 12px 12px 4px 4px;
+    padding: 16px 12px 12px;
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.1),
+      0 4px 12px rgba(0,0,0,0.5);
+    position: relative;
+  }
+
+  .gameboy-frame::before {
+    content: 'SOUL LINK';
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 6px;
+    color: #4a5a2a;
+    letter-spacing: 0.3em;
+  }
+
+  /* ── Screen ── */
+  .screen {
+    background: var(--l2);
+    border: 4px solid var(--d2);
+    border-radius: 4px;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      inset 0 0 20px rgba(15, 56, 15, 0.15);
+  }
+
+  .screen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 2px,
+      rgba(15, 56, 15, 0.03) 2px,
+      rgba(15, 56, 15, 0.03) 4px
+    );
+    pointer-events: none;
+  }
+
+  /* ── Screen content area ── */
+  .screen-inner {
+    height: 600px;
+    overflow-y: auto;
+    padding: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--d2) var(--l1);
+  }
+
+  .screen-inner::-webkit-scrollbar { width: 8px; }
+  .screen-inner::-webkit-scrollbar-track { background: var(--l1); }
+  .screen-inner::-webkit-scrollbar-thumb { background: var(--d2); border: 1px solid var(--d1); }
+
+  /* ── Menu sections ── */
+  .menu-section {
+    margin-bottom: 12px;
+  }
+
+  .menu-header {
+    background: var(--d1);
+    color: var(--l2);
+    padding: 4px 8px;
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    margin-bottom: 2px;
+  }
+
+  .menu-body {
+    background: var(--l1);
+    border: var(--border);
+    padding: 8px;
+  }
+
+  /* ── Pixel borders ── */
+  .pixel-box {
+    border: var(--border);
+    background: var(--l1);
+    padding: 6px;
+  }
+
+  .pixel-box-inner {
+    border: 1px solid var(--d2);
+    background: var(--l2);
+    padding: 6px;
+  }
+
+  /* ── Selection cursor ── */
+  .cursor-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 2px 0;
+    cursor: pointer;
+    transition: background 0.05s;
+  }
+
+  .cursor-item:hover {
+    background: var(--d2);
+    color: var(--l2);
+  }
+
+  .cursor-item:hover .cursor-arrow { visibility: visible; }
+
+  .cursor-arrow {
+    visibility: hidden;
+    flex-shrink: 0;
+    font-size: 8px;
+    line-height: 2;
+  }
+
+  /* ── Trainer Card ── */
+  .trainer-card {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .trainer-avatar {
+    width: 40px;
+    height: 40px;
+    border: var(--border);
+    background: var(--d2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: var(--l2);
+    flex-shrink: 0;
+  }
+
+  .trainer-info {
+    flex: 1;
+  }
+
+  .trainer-name {
+    font-size: 12px;
+    margin-bottom: 2px;
+  }
+
+  .trainer-detail {
+    font-size: 7px;
+    color: var(--d2);
+    line-height: 1.8;
+  }
+
+  /* ── Pokemon list item ── */
+  .poke-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--d2);
+  }
+
+  .poke-item:last-child { border-bottom: none; }
+
+  .poke-sprite-box {
+    width: 24px;
+    height: 24px;
+    background: var(--l2);
+    border: 1px solid var(--d2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .poke-item-name {
+    font-size: 8px;
+    flex: 1;
+  }
+
+  .hp-bar {
+    width: 48px;
+    height: 6px;
+    border: 1px solid var(--d1);
+    background: var(--l2);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .hp-fill {
+    height: 100%;
+    background: var(--d1);
+  }
+
+  .hp-fill.dead {
+    background: transparent;
+  }
+
+  .poke-item.dead {
+    opacity: 0.5;
+  }
+
+  .poke-item.dead .poke-item-name {
+    text-decoration: line-through;
+  }
+
+  /* ── Badge case ── */
+  .badge-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+
+  .badge-cell {
+    aspect-ratio: 1;
+    border: var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+
+  .badge-earned {
+    background: var(--d2);
+    color: var(--l2);
+  }
+
+  .badge-empty {
+    background: var(--l2);
+    color: var(--d2);
+    font-size: 8px;
+  }
+
+  /* ── Stats ── */
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    font-size: 8px;
+    border-bottom: 1px dotted var(--d2);
+  }
+
+  .stat-row:last-child { border-bottom: none; }
+
+  .stat-val { color: var(--d1); font-size: 10px; }
+
+  /* ── Dialog box ── */
+  .dialog {
+    border: var(--border-double);
+    background: var(--l2);
+    padding: 8px 10px;
+    margin-top: 8px;
+    position: relative;
+  }
+
+  .dialog::after {
+    content: '\25BC';
+    position: absolute;
+    bottom: 4px;
+    right: 8px;
+    font-size: 6px;
+    animation: dialogBlink 1s step-end infinite;
+  }
+
+  @keyframes dialogBlink {
+    50% { opacity: 0; }
+  }
+
+  /* ── Type text ── */
+  .type-text {
+    font-size: 6px;
+    display: inline-block;
+    padding: 0 3px;
+    border: 1px solid var(--d2);
+    margin: 0 1px;
+    line-height: 1.8;
+  }
+
+  /* ── Bottom controls (decorative) ── */
+  .controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 14px;
+    padding: 0 8px;
+  }
+
+  .dpad {
+    width: 56px;
+    height: 56px;
+    position: relative;
+  }
+
+  .dpad-h, .dpad-v {
+    position: absolute;
+    background: #3a4a1a;
+    border-radius: 2px;
+  }
+
+  .dpad-h {
+    width: 56px;
+    height: 18px;
+    top: 19px;
+    left: 0;
+  }
+
+  .dpad-v {
+    width: 18px;
+    height: 56px;
+    top: 0;
+    left: 19px;
+  }
+
+  .dpad-center {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    top: 19px;
+    left: 19px;
+    background: #2a3a0a;
+    z-index: 1;
+  }
+
+  .ab-buttons {
+    display: flex;
+    gap: 10px;
+    transform: rotate(-20deg);
+  }
+
+  .btn-ab {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #5a1a3a;
+    border: 2px solid #3a0a2a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    color: #8a4a6a;
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,0.2);
+  }
+
+  .start-select {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    justify-content: center;
+  }
+
+  .btn-ss {
+    width: 24px;
+    height: 8px;
+    background: #4a5a2a;
+    border-radius: 4px;
+    transform: rotate(-25deg);
+  }
+
+  /* ── Bottom tab bar ── */
+  .tab-bar {
+    display: flex;
+    border-top: var(--border);
+    background: var(--d2);
+  }
+
+  .tab-item {
+    flex: 1;
+    padding: 6px 4px;
+    text-align: center;
+    font-size: 6px;
+    color: var(--l1);
+    cursor: pointer;
+    border-right: 1px solid var(--d1);
+    transition: background 0.05s;
+    font-family: 'Press Start 2P', monospace;
+    background: none;
+    border-top: none;
+    border-bottom: none;
+    border-left: none;
+  }
+
+  .tab-item:last-child { border-right: none; }
+  .tab-item:hover { background: var(--d1); color: var(--l2); }
+  .tab-item.active { background: var(--d1); color: var(--l2); }
+
+  .tab-icon {
+    display: block;
+    font-size: 12px;
+    margin-bottom: 2px;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 540px) {
+    body { padding: 4px; }
+    .gameboy-frame { padding: 8px 6px 8px; border-radius: 8px 8px 4px 4px; }
+    .screen-inner { height: 500px; }
+    .controls { display: none; }
+  }
+
+  /* ── Entrance ── */
+  @keyframes screenFlash {
+    0% { background: var(--d1); }
+    20% { background: var(--l2); }
+    100% { background: var(--l2); }
+  }
+
+  .screen {
+    animation: screenFlash 0.4s ease-out;
+  }
+</style>
+</head>
+<body>
+
+<div class="gameboy-frame">
+  <div class="screen">
+    <!-- Tab bar at top of screen -->
+    <div class="tab-bar">
+      <button class="tab-item active" onclick="showSection('sec-team', this)"><span class="tab-icon">&#9876;</span>TEAM</button>
+      <button class="tab-item" onclick="showSection('sec-box', this)"><span class="tab-icon">&#9635;</span>BOX</button>
+      <button class="tab-item" onclick="showSection('sec-badge', this)"><span class="tab-icon">&#9733;</span>BADGE</button>
+      <button class="tab-item" onclick="showSection('sec-stats', this)"><span class="tab-icon">&#9670;</span>STATS</button>
+    </div>
+
+    <div class="screen-inner">
+
+      <!-- ═══ TEAM Section ═══ -->
+      <div id="sec-team" class="section-page">
+
+        <!-- Trainer Card -->
+        <div class="menu-section">
+          <div class="menu-header">TRAINER CARD</div>
+          <div class="menu-body">
+            <div class="trainer-card">
+              <div class="trainer-avatar">G</div>
+              <div class="trainer-info">
+                <div class="trainer-name">GREY</div>
+                <div class="trainer-detail">PLATINUM SOUL LINK</div>
+                <div class="trainer-detail">RUN #1 . 4 DAYS</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Team Pokemon -->
+        <div class="menu-section">
+          <div class="menu-header">PARTY POKEMON</div>
+          <div class="menu-body">
+            <div class="cursor-item">
+              <span class="cursor-arrow">&#9654;</span>
+              <div class="poke-sprite-box">&#128293;</div>
+              <div style="flex: 1;">
+                <div class="poke-item-name">INFERNAPE</div>
+                <div style="font-size: 6px; color: var(--d2);">"Blaze"</div>
+              </div>
+              <div>
+                <span class="type-text">FIR</span><span class="type-text">FGT</span>
+                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+            <div class="cursor-item">
+              <span class="cursor-arrow">&#9654;</span>
+              <div class="poke-sprite-box">&#129413;</div>
+              <div style="flex: 1;">
+                <div class="poke-item-name">STARAPTOR</div>
+                <div style="font-size: 6px; color: var(--d2);">"Wingman"</div>
+              </div>
+              <div>
+                <span class="type-text">NRM</span><span class="type-text">FLY</span>
+                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+            <div class="cursor-item">
+              <span class="cursor-arrow">&#9654;</span>
+              <div class="poke-sprite-box">&#9889;</div>
+              <div style="flex: 1;">
+                <div class="poke-item-name">LUXRAY</div>
+                <div style="font-size: 6px; color: var(--d2);">"Sparks"</div>
+              </div>
+              <div>
+                <span class="type-text">ELC</span>
+                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+            <div class="cursor-item">
+              <span class="cursor-arrow">&#9654;</span>
+              <div class="poke-sprite-box">&#127754;</div>
+              <div style="flex: 1;">
+                <div class="poke-item-name">GASTRODON</div>
+                <div style="font-size: 6px; color: var(--d2);">"Sluggo"</div>
+              </div>
+              <div>
+                <span class="type-text">WTR</span><span class="type-text">GND</span>
+                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+            <div class="cursor-item">
+              <span class="cursor-arrow">&#9654;</span>
+              <div class="poke-sprite-box">&#127801;</div>
+              <div style="flex: 1;">
+                <div class="poke-item-name">ROSERADE</div>
+                <div style="font-size: 6px; color: var(--d2);">"Thorn"</div>
+              </div>
+              <div>
+                <span class="type-text">GRS</span><span class="type-text">PSN</span>
+                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+            <div class="cursor-item">
+              <span class="cursor-arrow">&#9654;</span>
+              <div class="poke-sprite-box">&#129354;</div>
+              <div style="flex: 1;">
+                <div class="poke-item-name">LUCARIO</div>
+                <div style="font-size: 6px; color: var(--d2);">"Aura"</div>
+              </div>
+              <div>
+                <span class="type-text">FGT</span><span class="type-text">STL</span>
+                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dialog">
+          GREY's team is ready!
+          Next gym: BYRON (Steel)
+          at Canalave City.
+        </div>
+      </div>
+
+      <!-- ═══ BOX Section ═══ -->
+      <div id="sec-box" class="section-page" style="display: none;">
+
+        <div class="menu-section">
+          <div class="menu-header">PC BOX - STORAGE</div>
+          <div class="menu-body">
+            <div class="cursor-item">
+              <span class="cursor-arrow">&#9654;</span>
+              <div class="poke-sprite-box">&#129451;</div>
+              <div style="flex: 1;">
+                <div class="poke-item-name">BIBAREL</div>
+                <div style="font-size: 6px; color: var(--d2);">"Chomps" . Route 208</div>
+              </div>
+              <div>
+                <span class="type-text">NRM</span><span class="type-text">WTR</span>
+                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+            <div class="cursor-item">
+              <span class="cursor-arrow">&#9654;</span>
+              <div class="poke-sprite-box">&#128276;</div>
+              <div style="flex: 1;">
+                <div class="poke-item-name">BRONZONG</div>
+                <div style="font-size: 6px; color: var(--d2);">"Gong" . Mt. Coronet</div>
+              </div>
+              <div>
+                <span class="type-text">STL</span><span class="type-text">PSY</span>
+                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="menu-section">
+          <div class="menu-header">FALLEN POKEMON</div>
+          <div class="menu-body">
+            <div class="poke-item dead">
+              <div class="poke-sprite-box" style="opacity: 0.4;">&#9760;</div>
+              <div class="poke-item-name">GEODUDE "Rocky"</div>
+              <div class="hp-bar"><div class="hp-fill dead"></div></div>
+            </div>
+            <div class="poke-item dead">
+              <div class="poke-sprite-box" style="opacity: 0.4;">&#9760;</div>
+              <div class="poke-item-name">ZUBAT "Screech"</div>
+              <div class="hp-bar"><div class="hp-fill dead"></div></div>
+            </div>
+            <div class="poke-item dead">
+              <div class="poke-sprite-box" style="opacity: 0.4;">&#9760;</div>
+              <div class="poke-item-name">BUIZEL "Splash"</div>
+              <div class="hp-bar"><div class="hp-fill dead"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dialog">
+          3 Pokemon have fallen
+          in this run. Rest in
+          peace, brave ones.
+        </div>
+      </div>
+
+      <!-- ═══ BADGE Section ═══ -->
+      <div id="sec-badge" class="section-page" style="display: none;">
+
+        <div class="menu-section">
+          <div class="menu-header">BADGE CASE</div>
+          <div class="menu-body">
+            <div class="badge-grid">
+              <div class="badge-cell badge-earned">&#9733;</div>
+              <div class="badge-cell badge-earned">&#9733;</div>
+              <div class="badge-cell badge-earned">&#9733;</div>
+              <div class="badge-cell badge-earned">&#9733;</div>
+              <div class="badge-cell badge-earned">&#9733;</div>
+              <div class="badge-cell badge-empty">...</div>
+              <div class="badge-cell badge-empty">...</div>
+              <div class="badge-cell badge-empty">...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="menu-section">
+          <div class="menu-header">GYM LEADERS</div>
+          <div class="menu-body" style="font-size: 7px; line-height: 2.2;">
+            <div>&#9733; GYM 1: ROARK <span class="type-text">RCK</span></div>
+            <div>&#9733; GYM 2: GARDENIA <span class="type-text">GRS</span></div>
+            <div>&#9733; GYM 3: MAYLENE <span class="type-text">FGT</span></div>
+            <div>&#9733; GYM 4: C.WAKE <span class="type-text">WTR</span></div>
+            <div>&#9733; GYM 5: FANTINA <span class="type-text">GHO</span></div>
+            <div style="background: var(--d2); color: var(--l2); padding: 2px 4px; margin: 2px -4px;">
+              &#9654; GYM 6: BYRON <span class="type-text">STL</span> &lt;NEXT
+            </div>
+            <div style="opacity: 0.4;">. GYM 7: CANDICE <span class="type-text">ICE</span></div>
+            <div style="opacity: 0.4;">. GYM 8: VOLKNER <span class="type-text">ELC</span></div>
+          </div>
+        </div>
+
+        <div class="dialog">
+          5 of 8 badges earned.
+          BYRON awaits in
+          Canalave City!
+        </div>
+      </div>
+
+      <!-- ═══ STATS Section ═══ -->
+      <div id="sec-stats" class="section-page" style="display: none;">
+
+        <div class="menu-section">
+          <div class="menu-header">RUN STATISTICS</div>
+          <div class="menu-body">
+            <div class="stat-row"><span>CAUGHT</span><span class="stat-val">11</span></div>
+            <div class="stat-row"><span>ALIVE</span><span class="stat-val">8</span></div>
+            <div class="stat-row"><span>DEAD</span><span class="stat-val">3</span></div>
+            <div class="stat-row"><span>ON TEAM</span><span class="stat-val">6</span></div>
+            <div class="stat-row"><span>IN BOX</span><span class="stat-val">2</span></div>
+            <div class="stat-row"><span>BADGES</span><span class="stat-val">5/8</span></div>
+            <div class="stat-row"><span>SURVIVAL</span><span class="stat-val">72.7%</span></div>
+          </div>
+        </div>
+
+        <div class="menu-section">
+          <div class="menu-header">TYPE ANALYSIS</div>
+          <div class="menu-body" style="font-size: 7px; line-height: 2.2;">
+            <div style="margin-bottom: 4px;">SUPER EFFECTIVE:</div>
+            <div>
+              <span class="type-text">FIR</span>
+              <span class="type-text">WTR</span>
+              <span class="type-text">GRS</span>
+              <span class="type-text">ELC</span>
+              <span class="type-text">NRM</span>
+              <span class="type-text">FGT</span>
+              <span class="type-text">FLY</span>
+              <span class="type-text">PSN</span>
+              <span class="type-text">GND</span>
+              <span class="type-text">RCK</span>
+              <span class="type-text">PSY</span>
+              <span class="type-text">GHO</span>
+              <span class="type-text">STL</span>
+              <span class="type-text">DRK</span>
+              <span class="type-text">BUG</span>
+            </div>
+            <div style="margin-top: 8px; margin-bottom: 4px;">NO COVERAGE:</div>
+            <div style="background: var(--d2); color: var(--l2); display: inline-block; padding: 2px 4px;">
+              <span class="type-text" style="border-color: var(--l1);">ICE</span>
+              <span class="type-text" style="border-color: var(--l1);">DRG</span>
+              !! DANGER
+            </div>
+            <div style="margin-top: 8px; margin-bottom: 4px;">WEAKNESS:</div>
+            <div>GROUND x3 (Infernape,</div>
+            <div>Luxray, Lucario)</div>
+          </div>
+        </div>
+
+        <div class="dialog">
+          Team coverage is good
+          but watch out for
+          Ground-type moves!
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Decorative controls -->
+  <div class="controls">
+    <div class="dpad">
+      <div class="dpad-h"></div>
+      <div class="dpad-v"></div>
+      <div class="dpad-center"></div>
+    </div>
+    <div class="ab-buttons">
+      <div class="btn-ab">B</div>
+      <div class="btn-ab">A</div>
+    </div>
+  </div>
+  <div class="start-select">
+    <div class="btn-ss"></div>
+    <div class="btn-ss"></div>
+  </div>
+</div>
+
+<script>
+  function showSection(id, btn) {
+    document.querySelectorAll('.section-page').forEach(s => s.style.display = 'none');
+    document.getElementById(id).style.display = 'block';
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    // Scroll to top of screen
+    document.querySelector('.screen-inner').scrollTop = 0;
+  }
+</script>
+
+</body>
+</html>

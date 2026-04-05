@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>PokePocket // Soul Link</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #121212;
+    --surface: #1e1e1e;
+    --surface-hi: #2c2c2c;
+    --purple: #bb86fc;
+    --purple-dark: #3700b3;
+    --teal: #03dac6;
+    --error: #cf6679;
+    --on-bg: #e1e1e1;
+    --on-bg-sec: #a0a0a0;
+    --on-bg-muted: #666666;
+    --tab-bar: #1e1e1e;
+    --divider: rgba(255, 255, 255, 0.06);
+    --radius: 12px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--on-bg);
+    font-family: 'Roboto', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  /* On desktop, show phone frame */
+  @media (min-width: 500px) {
+    body {
+      border-left: 1px solid #333;
+      border-right: 1px solid #333;
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  /* ── Scroll snap pages ─�� */
+  .pages {
+    flex: 1;
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pages::-webkit-scrollbar { display: none; }
+
+  .page {
+    min-width: 100%;
+    scroll-snap-align: start;
+    overflow-y: auto;
+    padding: 16px 16px 20px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface-hi) transparent;
+  }
+
+  /* ── Bottom Tab Bar ── */
+  .tab-bar {
+    background: var(--tab-bar);
+    border-top: 1px solid var(--divider);
+    display: flex;
+    padding: 4px 0 8px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+
+  .tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 0;
+    background: none;
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tab-icon {
+    font-size: 20px;
+    line-height: 1;
+    color: var(--on-bg-muted);
+    transition: color 0.2s;
+  }
+
+  .tab-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: transparent;
+    transition: color 0.2s;
+    letter-spacing: 0.02em;
+  }
+
+  .tab.active .tab-icon { color: var(--purple); }
+  .tab.active .tab-label { color: var(--purple); }
+
+  /* ── Page Header ── */
+  .page-header {
+    font-size: 20px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Metric Cards (2x2) ── */
+  .metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .metric-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 14px;
+    transition: background 0.2s;
+  }
+
+  .metric-card:active { background: var(--surface-hi); }
+
+  .metric-icon {
+    font-size: 18px;
+    margin-bottom: 6px;
+  }
+
+  .metric-num {
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 1;
+    margin-bottom: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .metric-label {
+    font-size: 11px;
+    color: var(--on-bg-sec);
+    font-weight: 400;
+  }
+
+  /* ── Horizontal Team Scroll ── */
+  .team-scroll-section {
+    margin-bottom: 20px;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--on-bg-sec);
+    margin-bottom: 10px;
+  }
+
+  .team-scroll {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .team-scroll::-webkit-scrollbar { display: none; }
+
+  .team-scroll-item {
+    scroll-snap-align: start;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    width: 64px;
+    cursor: default;
+  }
+
+  .team-sprite-circle {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    border: 2px solid var(--surface-hi);
+    transition: border-color 0.2s;
+  }
+
+  .team-scroll-item:active .team-sprite-circle {
+    border-color: var(--purple);
+  }
+
+  .team-sprite-name {
+    font-size: 10px;
+    color: var(--on-bg-sec);
+    text-align: center;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 64px;
+  }
+
+  /* ── Activity Feed ── */
+  .activity-feed {
+    margin-bottom: 16px;
+  }
+
+  .feed-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+
+  .feed-item:last-child { border-bottom: none; }
+
+  .feed-sprite {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .feed-text { flex: 1; min-width: 0; }
+
+  .feed-primary {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .feed-secondary {
+    font-size: 12px;
+    color: var(--on-bg-sec);
+  }
+
+  .feed-accessory {
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 6px;
+  }
+
+  .fa-team { background: rgba(187, 134, 252, 0.12); color: var(--purple); }
+  .fa-stored { background: rgba(255, 255, 255, 0.06); color: var(--on-bg-muted); }
+  .fa-dead { background: rgba(207, 102, 121, 0.12); color: var(--error); }
+
+  /* ── Team Page (full cards) ── */
+  .team-full-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: background 0.2s;
+  }
+
+  .team-full-card:active { background: var(--surface-hi); }
+
+  .team-full-sprite {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--surface-hi);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    flex-shrink: 0;
+  }
+
+  .team-full-info { flex: 1; min-width: 0; }
+
+  .team-full-name {
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  .team-full-nick {
+    font-size: 12px;
+    color: var(--on-bg-sec);
+  }
+
+  .team-full-types {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .type-chip {
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .tc-fire { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+  .tc-fighting { background: rgba(194, 65, 12, 0.15); color: #fdba74; }
+  .tc-normal { background: rgba(168, 162, 158, 0.15); color: #d6d3d1; }
+  .tc-flying { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; }
+  .tc-electric { background: rgba(234, 179, 8, 0.15); color: #fde68a; }
+  .tc-water { background: rgba(59, 130, 246, 0.15); color: #93c5fd; }
+  .tc-ground { background: rgba(180, 140, 80, 0.15); color: #e0c68e; }
+  .tc-grass { background: rgba(34, 197, 94, 0.15); color: #86efac; }
+  .tc-poison { background: rgba(168, 85, 247, 0.15); color: #d8b4fe; }
+  .tc-steel { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+  .tc-psychic { background: rgba(236, 72, 153, 0.15); color: #f9a8d4; }
+  .tc-rock { background: rgba(161, 130, 50, 0.15); color: #d4b85e; }
+  .tc-ghost { background: rgba(107, 33, 168, 0.15); color: #c084fc; }
+
+  .team-full-pos {
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--on-bg-muted);
+    flex-shrink: 0;
+    width: 28px;
+    text-align: center;
+  }
+
+  /* ── Gym progress circles ── */
+  .gym-circles {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .gym-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    transition: all 0.2s;
+  }
+
+  .gym-done {
+    background: var(--purple);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(187, 134, 252, 0.3);
+  }
+
+  .gym-next {
+    background: rgba(3, 218, 198, 0.15);
+    color: var(--teal);
+    border: 2px solid var(--teal);
+    animation: gymPulse 2s ease infinite;
+  }
+
+  @keyframes gymPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(3, 218, 198, 0.3); }
+    50% { box-shadow: 0 0 0 6px rgba(3, 218, 198, 0); }
+  }
+
+  .gym-pending {
+    background: var(--surface);
+    color: var(--on-bg-muted);
+  }
+
+  .gym-leader-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .gym-leader-num {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--on-bg-muted);
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .gym-leader-done { color: var(--purple); }
+  .gym-leader-next-num { color: var(--teal); }
+
+  .gym-leader-name { font-weight: 500; font-size: 14px; }
+  .gym-leader-meta { font-size: 12px; color: var(--on-bg-sec); }
+
+  .gym-next-badge {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--teal);
+    background: rgba(3, 218, 198, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Profile page ── */
+  .profile-section {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+
+  .profile-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .profile-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--purple), var(--purple-dark));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .profile-name { font-size: 20px; font-weight: 500; }
+  .profile-sub { font-size: 12px; color: var(--on-bg-sec); }
+
+  .profile-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    text-align: center;
+  }
+
+  .ps-num { font-size: 18px; font-weight: 500; }
+  .ps-label { font-size: 10px; color: var(--on-bg-sec); }
+
+  .coverage-section-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--on-bg-sec);
+    margin-bottom: 8px;
+  }
+
+  .coverage-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .cp-pill {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  .cp-good { background: rgba(3, 218, 198, 0.1); color: var(--teal); }
+  .cp-bad { background: rgba(207, 102, 121, 0.12); color: var(--error); border: 1px dashed rgba(207, 102, 121, 0.3); }
+
+  /* ── FAB ── */
+  .fab {
+    position: fixed;
+    bottom: 72px;
+    right: calc(50% - 240px + 16px);
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    background: var(--purple);
+    color: #fff;
+    border: none;
+    font-size: 28px;
+    font-weight: 300;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(187, 134, 252, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    transition: all 0.2s;
+  }
+
+  .fab:active {
+    transform: scale(0.92);
+  }
+
+  @media (max-width: 500px) {
+    .fab { right: 16px; }
+  }
+
+  /* ── Search Bar ── */
+  .search-bar {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+
+  .search-icon { color: var(--on-bg-muted); font-size: 16px; }
+
+  .search-input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--on-bg);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+  }
+
+  .search-input::placeholder { color: var(--on-bg-muted); }
+
+  /* ── Page dots ── */
+  .page-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 0;
+    background: var(--bg);
+  }
+
+  .page-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--on-bg-muted);
+    transition: all 0.2s;
+  }
+
+  .page-dot.active {
+    background: var(--purple);
+    width: 18px;
+    border-radius: 3px;
+  }
+
+  /* Dead in list */
+  .feed-item.is-dead { opacity: 0.5; }
+  .feed-item.is-dead .feed-sprite { filter: grayscale(1); }
+</style>
+</head>
+<body>
+
+<!-- Pages Container -->
+<div class="pages" id="pages">
+
+  <!-- ═══ HOME PAGE ═══ -->
+  <div class="page" id="page-home">
+    <div class="page-header">Home</div>
+
+    <!-- Team scroll -->
+    <div class="team-scroll-section">
+      <div class="section-label">Your Team</div>
+      <div class="team-scroll">
+        <div class="team-scroll-item"><div class="team-sprite-circle">&#128293;</div><div class="team-sprite-name">Infernape</div></div>
+        <div class="team-scroll-item"><div class="team-sprite-circle">&#129413;</div><div class="team-sprite-name">Staraptor</div></div>
+        <div class="team-scroll-item"><div class="team-sprite-circle">&#9889;</div><div class="team-sprite-name">Luxray</div></div>
+        <div class="team-scroll-item"><div class="team-sprite-circle">&#127754;</div><div class="team-sprite-name">Gastrodon</div></div>
+        <div class="team-scroll-item"><div class="team-sprite-circle">&#127801;</div><div class="team-sprite-name">Roserade</div></div>
+        <div class="team-scroll-item"><div class="team-sprite-circle">&#129354;</div><div class="team-sprite-name">Lucario</div></div>
+      </div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="metric-grid">
+      <div class="metric-card">
+        <div class="metric-icon">&#128200;</div>
+        <div class="metric-num" style="color: var(--purple);">11</div>
+        <div class="metric-label">Total Caught</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon">&#9760;</div>
+        <div class="metric-num" style="color: var(--error);">3</div>
+        <div class="metric-label">Deaths</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon">&#9889;</div>
+        <div class="metric-num" style="color: var(--teal);">72.7%</div>
+        <div class="metric-label">Survival Rate</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon">&#127942;</div>
+        <div class="metric-num" style="color: #fbbf24;">5/8</div>
+        <div class="metric-label">Badges</div>
+      </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="section-label">Recent Activity</div>
+    <div class="activity-feed">
+      <div class="feed-item"><div class="feed-sprite">&#128276;</div><div class="feed-text"><div class="feed-primary">Bronzong caught</div><div class="feed-secondary">Mt. Coronet &middot; "Gong"</div></div><span class="feed-accessory fa-stored">Stored</span></div>
+      <div class="feed-item"><div class="feed-sprite">&#129354;</div><div class="feed-text"><div class="feed-primary">Lucario added to team</div><div class="feed-secondary">Route 207 &middot; "Aura"</div></div><span class="feed-accessory fa-team">Team</span></div>
+      <div class="feed-item"><div class="feed-sprite">&#129451;</div><div class="feed-text"><div class="feed-primary">Bibarel caught</div><div class="feed-secondary">Route 208 &middot; "Chomps"</div></div><span class="feed-accessory fa-stored">Stored</span></div>
+      <div class="feed-item is-dead"><div class="feed-sprite">&#9760;</div><div class="feed-text"><div class="feed-primary">Buizel fell in battle</div><div class="feed-secondary">Route 205 &middot; "Splash"</div></div><span class="feed-accessory fa-dead">Dead</span></div>
+    </div>
+  </div>
+
+  <!-- ═══ TEAM PAGE ═══ -->
+  <div class="page" id="page-team">
+    <div class="page-header">Team</div>
+
+    <div class="team-full-card">
+      <div class="team-full-pos">1</div>
+      <div class="team-full-sprite">&#128293;</div>
+      <div class="team-full-info">
+        <div class="team-full-name">Infernape</div>
+        <div class="team-full-nick">"Blaze" &middot; Oreburgh Gate</div>
+        <div class="team-full-types"><span class="type-chip tc-fire">Fire</span><span class="type-chip tc-fighting">Fighting</span></div>
+      </div>
+    </div>
+    <div class="team-full-card">
+      <div class="team-full-pos">2</div>
+      <div class="team-full-sprite">&#129413;</div>
+      <div class="team-full-info">
+        <div class="team-full-name">Staraptor</div>
+        <div class="team-full-nick">"Wingman" &middot; Route 201</div>
+        <div class="team-full-types"><span class="type-chip tc-normal">Normal</span><span class="type-chip tc-flying">Flying</span></div>
+      </div>
+    </div>
+    <div class="team-full-card">
+      <div class="team-full-pos">3</div>
+      <div class="team-full-sprite">&#9889;</div>
+      <div class="team-full-info">
+        <div class="team-full-name">Luxray</div>
+        <div class="team-full-nick">"Sparks" &middot; Route 202</div>
+        <div class="team-full-types"><span class="type-chip tc-electric">Electric</span></div>
+      </div>
+    </div>
+    <div class="team-full-card">
+      <div class="team-full-pos">4</div>
+      <div class="team-full-sprite">&#127754;</div>
+      <div class="team-full-info">
+        <div class="team-full-name">Gastrodon</div>
+        <div class="team-full-nick">"Sluggo" &middot; Route 205</div>
+        <div class="team-full-types"><span class="type-chip tc-water">Water</span><span class="type-chip tc-ground">Ground</span></div>
+      </div>
+    </div>
+    <div class="team-full-card">
+      <div class="team-full-pos">5</div>
+      <div class="team-full-sprite">&#127801;</div>
+      <div class="team-full-info">
+        <div class="team-full-name">Roserade</div>
+        <div class="team-full-nick">"Thorn" &middot; Route 204</div>
+        <div class="team-full-types"><span class="type-chip tc-grass">Grass</span><span class="type-chip tc-poison">Poison</span></div>
+      </div>
+    </div>
+    <div class="team-full-card">
+      <div class="team-full-pos">6</div>
+      <div class="team-full-sprite">&#129354;</div>
+      <div class="team-full-info">
+        <div class="team-full-name">Lucario</div>
+        <div class="team-full-nick">"Aura" &middot; Route 207</div>
+        <div class="team-full-types"><span class="type-chip tc-fighting">Fighting</span><span class="type-chip tc-steel">Steel</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ DEX PAGE ═══ -->
+  <div class="page" id="page-dex">
+    <div class="page-header">All Catches</div>
+    <div class="search-bar">
+      <span class="search-icon">&#128269;</span>
+      <input class="search-input" type="text" placeholder="Search Pokemon..." id="searchInput" oninput="filterDex()">
+    </div>
+    <div id="dex-list">
+      <div class="feed-item" data-name="infernape"><div class="feed-sprite">&#128293;</div><div class="feed-text"><div class="feed-primary">Infernape</div><div class="feed-secondary">Oreburgh Gate &middot; "Blaze"</div></div><span class="feed-accessory fa-team">Team</span></div>
+      <div class="feed-item" data-name="staraptor"><div class="feed-sprite">&#129413;</div><div class="feed-text"><div class="feed-primary">Staraptor</div><div class="feed-secondary">Route 201 &middot; "Wingman"</div></div><span class="feed-accessory fa-team">Team</span></div>
+      <div class="feed-item" data-name="luxray"><div class="feed-sprite">&#9889;</div><div class="feed-text"><div class="feed-primary">Luxray</div><div class="feed-secondary">Route 202 &middot; "Sparks"</div></div><span class="feed-accessory fa-team">Team</span></div>
+      <div class="feed-item" data-name="gastrodon"><div class="feed-sprite">&#127754;</div><div class="feed-text"><div class="feed-primary">Gastrodon</div><div class="feed-secondary">Route 205 &middot; "Sluggo"</div></div><span class="feed-accessory fa-team">Team</span></div>
+      <div class="feed-item" data-name="roserade"><div class="feed-sprite">&#127801;</div><div class="feed-text"><div class="feed-primary">Roserade</div><div class="feed-secondary">Route 204 &middot; "Thorn"</div></div><span class="feed-accessory fa-team">Team</span></div>
+      <div class="feed-item" data-name="lucario"><div class="feed-sprite">&#129354;</div><div class="feed-text"><div class="feed-primary">Lucario</div><div class="feed-secondary">Route 207 &middot; "Aura"</div></div><span class="feed-accessory fa-team">Team</span></div>
+      <div class="feed-item" data-name="bibarel"><div class="feed-sprite">&#129451;</div><div class="feed-text"><div class="feed-primary">Bibarel</div><div class="feed-secondary">Route 208 &middot; "Chomps"</div></div><span class="feed-accessory fa-stored">Stored</span></div>
+      <div class="feed-item" data-name="bronzong"><div class="feed-sprite">&#128276;</div><div class="feed-text"><div class="feed-primary">Bronzong</div><div class="feed-secondary">Mt. Coronet &middot; "Gong"</div></div><span class="feed-accessory fa-stored">Stored</span></div>
+      <div class="feed-item is-dead" data-name="geodude"><div class="feed-sprite">&#9760;</div><div class="feed-text"><div class="feed-primary"><s>Geodude</s></div><div class="feed-secondary">Oreburgh Mine &middot; "Rocky"</div></div><span class="feed-accessory fa-dead">Dead</span></div>
+      <div class="feed-item is-dead" data-name="zubat"><div class="feed-sprite">&#9760;</div><div class="feed-text"><div class="feed-primary"><s>Zubat</s></div><div class="feed-secondary">Ravaged Path &middot; "Screech"</div></div><span class="feed-accessory fa-dead">Dead</span></div>
+      <div class="feed-item is-dead" data-name="buizel"><div class="feed-sprite">&#9760;</div><div class="feed-text"><div class="feed-primary"><s>Buizel</s></div><div class="feed-secondary">Route 205 &middot; "Splash"</div></div><span class="feed-accessory fa-dead">Dead</span></div>
+    </div>
+  </div>
+
+  <!-- ═══ GYMS PAGE ═══ -->
+  <div class="page" id="page-gyms">
+    <div class="page-header">Gyms</div>
+
+    <div class="gym-circles">
+      <div class="gym-circle gym-done">1</div>
+      <div class="gym-circle gym-done">2</div>
+      <div class="gym-circle gym-done">3</div>
+      <div class="gym-circle gym-done">4</div>
+      <div class="gym-circle gym-done">5</div>
+      <div class="gym-circle gym-next">6</div>
+      <div class="gym-circle gym-pending">7</div>
+      <div class="gym-circle gym-pending">8</div>
+    </div>
+
+    <div class="gym-leader-card">
+      <div class="gym-leader-num gym-leader-done">1</div>
+      <div style="flex: 1;"><div class="gym-leader-name">Roark</div><div class="gym-leader-meta">Rock &middot; Oreburgh City</div></div>
+      <span style="color: var(--purple);">&#10003;</span>
+    </div>
+    <div class="gym-leader-card">
+      <div class="gym-leader-num gym-leader-done">2</div>
+      <div style="flex: 1;"><div class="gym-leader-name">Gardenia</div><div class="gym-leader-meta">Grass &middot; Eterna City</div></div>
+      <span style="color: var(--purple);">&#10003;</span>
+    </div>
+    <div class="gym-leader-card">
+      <div class="gym-leader-num gym-leader-done">3</div>
+      <div style="flex: 1;"><div class="gym-leader-name">Maylene</div><div class="gym-leader-meta">Fighting &middot; Veilstone City</div></div>
+      <span style="color: var(--purple);">&#10003;</span>
+    </div>
+    <div class="gym-leader-card">
+      <div class="gym-leader-num gym-leader-done">4</div>
+      <div style="flex: 1;"><div class="gym-leader-name">Crasher Wake</div><div class="gym-leader-meta">Water &middot; Pastoria City</div></div>
+      <span style="color: var(--purple);">&#10003;</span>
+    </div>
+    <div class="gym-leader-card">
+      <div class="gym-leader-num gym-leader-done">5</div>
+      <div style="flex: 1;"><div class="gym-leader-name">Fantina</div><div class="gym-leader-meta">Ghost &middot; Hearthome City</div></div>
+      <span style="color: var(--purple);">&#10003;</span>
+    </div>
+    <div class="gym-leader-card" style="border: 1px solid rgba(3, 218, 198, 0.2);">
+      <div class="gym-leader-num gym-leader-next-num">6</div>
+      <div style="flex: 1;"><div class="gym-leader-name">Byron</div><div class="gym-leader-meta">Steel &middot; Canalave City</div></div>
+      <span class="gym-next-badge">Next</span>
+    </div>
+    <div class="gym-leader-card" style="opacity: 0.4;">
+      <div class="gym-leader-num">7</div>
+      <div style="flex: 1;"><div class="gym-leader-name">Candice</div><div class="gym-leader-meta">Ice &middot; Snowpoint City</div></div>
+    </div>
+    <div class="gym-leader-card" style="opacity: 0.4;">
+      <div class="gym-leader-num">8</div>
+      <div style="flex: 1;"><div class="gym-leader-name">Volkner</div><div class="gym-leader-meta">Electric &middot; Sunyshore City</div></div>
+    </div>
+  </div>
+
+  <!-- ═══ PROFILE PAGE ═══ -->
+  <div class="page" id="page-profile">
+    <div class="page-header">Profile</div>
+
+    <div class="profile-section">
+      <div class="profile-header">
+        <div class="profile-avatar">G</div>
+        <div>
+          <div class="profile-name">Grey</div>
+          <div class="profile-sub">Platinum Soul Link &middot; Run #1</div>
+          <div class="profile-sub">4 days active</div>
+        </div>
+      </div>
+      <div class="profile-stat-grid">
+        <div><div class="ps-num" style="color: var(--purple);">11</div><div class="ps-label">Caught</div></div>
+        <div><div class="ps-num" style="color: var(--error);">3</div><div class="ps-label">Deaths</div></div>
+        <div><div class="ps-num" style="color: var(--teal);">72.7%</div><div class="ps-label">Survival</div></div>
+      </div>
+    </div>
+
+    <div class="profile-section">
+      <div class="coverage-section-title">Strong Against (15)</div>
+      <div class="coverage-pills" style="margin-bottom: 14px;">
+        <span class="cp-pill cp-good">Fire</span><span class="cp-pill cp-good">Water</span><span class="cp-pill cp-good">Grass</span><span class="cp-pill cp-good">Electric</span><span class="cp-pill cp-good">Normal</span><span class="cp-pill cp-good">Fighting</span><span class="cp-pill cp-good">Flying</span><span class="cp-pill cp-good">Poison</span><span class="cp-pill cp-good">Ground</span><span class="cp-pill cp-good">Rock</span><span class="cp-pill cp-good">Psychic</span><span class="cp-pill cp-good">Ghost</span><span class="cp-pill cp-good">Steel</span><span class="cp-pill cp-good">Dark</span><span class="cp-pill cp-good">Bug</span>
+      </div>
+      <div class="coverage-section-title" style="color: var(--error);">No Coverage (2)</div>
+      <div class="coverage-pills" style="margin-bottom: 14px;">
+        <span class="cp-pill cp-bad">Ice</span><span class="cp-pill cp-bad">Dragon</span>
+      </div>
+      <div class="coverage-section-title" style="color: var(--error);">Shared Weakness</div>
+      <div style="font-size: 13px; font-weight: 500; color: var(--error);">Ground x3</div>
+      <div style="font-size: 12px; color: var(--on-bg-sec); margin-top: 2px;">Infernape, Luxray, Lucario</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Page Dots -->
+<div class="page-dots" id="pageDots">
+  <div class="page-dot active"></div>
+  <div class="page-dot"></div>
+  <div class="page-dot"></div>
+  <div class="page-dot"></div>
+  <div class="page-dot"></div>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+  <button class="tab active" onclick="goToPage(0, this)"><span class="tab-icon">&#9632;</span><span class="tab-label">Home</span></button>
+  <button class="tab" onclick="goToPage(1, this)"><span class="tab-icon">&#9734;</span><span class="tab-label">Team</span></button>
+  <button class="tab" onclick="goToPage(2, this)"><span class="tab-icon">&#128218;</span><span class="tab-label">Dex</span></button>
+  <button class="tab" onclick="goToPage(3, this)"><span class="tab-icon">&#127942;</span><span class="tab-label">Gyms</span></button>
+  <button class="tab" onclick="goToPage(4, this)"><span class="tab-icon">&#128100;</span><span class="tab-label">Profile</span></button>
+</div>
+
+<!-- FAB -->
+<button class="fab">+</button>
+
+<script>
+  const pages = document.getElementById('pages');
+  const tabs = document.querySelectorAll('.tab');
+  const dots = document.querySelectorAll('.page-dot');
+
+  function goToPage(index, btn) {
+    pages.children[index].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+    tabs.forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    dots.forEach((d, i) => d.classList.toggle('active', i === index));
+  }
+
+  // Update tabs on scroll
+  let scrollTimeout;
+  pages.addEventListener('scroll', () => {
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      const index = Math.round(pages.scrollLeft / pages.offsetWidth);
+      tabs.forEach((t, i) => t.classList.toggle('active', i === index));
+      dots.forEach((d, i) => d.classList.toggle('active', i === index));
+    }, 50);
+  });
+
+  // Dex search
+  function filterDex() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    document.querySelectorAll('#dex-list .feed-item').forEach(item => {
+      item.style.display = item.dataset.name.includes(q) ? '' : 'none';
+    });
+  }
+</script>
+
+</body>
+</html>

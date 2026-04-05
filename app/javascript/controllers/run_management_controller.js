@@ -5,7 +5,8 @@ export default class extends Controller {
   static targets = [
     "currentRunPanel", "noRunPanel", "historyList",
     "runNumber", "gymsDefeated", "caughtCount", "deadCount", "startedAt",
-    "setupDiscordButton"
+    "setupDiscordButton",
+    "errorMessage"
   ]
   static values = {
     guildId: String,
@@ -23,6 +24,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    clearTimeout(this._errorTimeout)
     if (this.subscription) {
       this.subscription.unsubscribe()
     }
@@ -31,11 +33,37 @@ export default class extends Controller {
   handleMessage(data) {
     if (data.error) {
       console.error("Run error:", data.error)
+      this.showError(data.error)
+      this.resetButtons()
       return
     }
     if (data.type === "state_update") {
       this.state = data.state
+      this.clearError()
       this.render()
+    }
+  }
+
+  showError(message) {
+    clearTimeout(this._errorTimeout)
+    this.errorMessageTargets.forEach(el => {
+      el.textContent = message
+      el.classList.remove("hidden")
+    })
+    this._errorTimeout = setTimeout(() => this.clearError(), 8000)
+  }
+
+  clearError() {
+    this.errorMessageTargets.forEach(el => {
+      el.textContent = ""
+      el.classList.add("hidden")
+    })
+  }
+
+  resetButtons() {
+    if (this.hasSetupDiscordButtonTarget) {
+      this.setupDiscordButtonTarget.disabled = false
+      this.setupDiscordButtonTarget.textContent = "Setup Discord Channels"
     }
   }
 

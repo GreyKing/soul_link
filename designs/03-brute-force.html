@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BRUTE FORCE // Soul Link</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --black: #1a1a1a;
+    --cream: #fffbe6;
+    --coral: #ff6b6b;
+    --teal: #4ecdc4;
+    --yellow: #ffe66d;
+    --mint: #a8e6cf;
+    --peach: #ff8a5c;
+    --lilac: #c3aed6;
+    --border: 3px solid var(--black);
+    --shadow: 6px 6px 0px var(--black);
+    --shadow-sm: 4px 4px 0px var(--black);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--cream);
+    color: var(--black);
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Tab Navigation ── */
+  .tab-bar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--cream);
+    border-bottom: var(--border);
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .tab-bar::-webkit-scrollbar { display: none; }
+
+  .tab-btn {
+    flex-shrink: 0;
+    padding: 12px 24px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: none;
+    border-right: var(--border);
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+    position: relative;
+  }
+
+  .tab-btn:nth-child(1) { background: var(--coral); }
+  .tab-btn:nth-child(2) { background: var(--teal); }
+  .tab-btn:nth-child(3) { background: var(--yellow); }
+  .tab-btn:nth-child(4) { background: var(--mint); }
+  .tab-btn:nth-child(5) { background: var(--peach); }
+  .tab-btn:nth-child(6) { background: var(--lilac); }
+
+  .tab-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0px var(--black);
+  }
+
+  .tab-btn.active {
+    transform: translate(-3px, -3px);
+    box-shadow: var(--shadow);
+  }
+
+  .tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--black);
+  }
+
+  /* ── Container ── */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+  }
+
+  /* ── Cards ── */
+  .card {
+    border: var(--border);
+    box-shadow: var(--shadow);
+    position: relative;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+
+  .card:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 8px 8px 0px var(--black);
+  }
+
+  .card-header {
+    padding: 10px 16px;
+    border-bottom: var(--border);
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .card-body { padding: 16px; }
+
+  /* ── Masonry Grid ── */
+  .masonry {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    grid-auto-flow: dense;
+  }
+
+  .w2 { grid-column: span 2; }
+  .w3 { grid-column: span 3; }
+
+  /* ── Player Banner ── */
+  .banner {
+    background: var(--yellow);
+    padding: 24px;
+    border: var(--border);
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 24px;
+    transform: rotate(-0.5deg);
+  }
+
+  .banner-avatar {
+    width: 64px;
+    height: 64px;
+    border: var(--border);
+    background: var(--cream);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 800;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .banner-name {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+  }
+
+  .banner-sub {
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 2px;
+    opacity: 0.7;
+  }
+
+  /* ── Stat Cards ── */
+  .stat-card {
+    text-align: center;
+    padding: 20px 12px;
+  }
+
+  .stat-number {
+    font-family: 'Space Mono', monospace;
+    font-size: 48px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    opacity: 0.7;
+  }
+
+  /* ── Pokemon Row ── */
+  .poke-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 2px solid var(--black);
+  }
+
+  .poke-row:last-child { border-bottom: none; }
+
+  .poke-sprite {
+    width: 48px;
+    height: 48px;
+    border: var(--border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .poke-name {
+    font-weight: 700;
+    font-size: 16px;
+    text-transform: uppercase;
+  }
+
+  .poke-nick {
+    font-size: 12px;
+    opacity: 0.6;
+    font-weight: 500;
+  }
+
+  .poke-location {
+    font-size: 11px;
+    opacity: 0.5;
+    font-weight: 500;
+  }
+
+  /* ── Type Badges ── */
+  .type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border: 2px solid var(--black);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .type-fire { background: #ff6b35; color: #fff; }
+  .type-fighting { background: #c03028; color: #fff; }
+  .type-normal { background: #c8c4b8; }
+  .type-flying { background: #a890f0; }
+  .type-electric { background: #f8d030; }
+  .type-water { background: #6890f0; color: #fff; }
+  .type-ground { background: #e0c068; }
+  .type-grass { background: #78c850; }
+  .type-poison { background: #a040a0; color: #fff; }
+  .type-steel { background: #b8b8d0; }
+  .type-psychic { background: #f85888; color: #fff; }
+  .type-rock { background: #b8a038; }
+  .type-ghost { background: #705898; color: #fff; }
+  .type-ice { background: #98d8d8; }
+  .type-dragon { background: #7038f8; color: #fff; }
+
+  /* ── Dead Pokemon ── */
+  .dead-card {
+    background: var(--black) !important;
+    color: #fff;
+  }
+
+  .dead-stamp {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-15deg);
+    font-size: 42px;
+    font-weight: 800;
+    color: var(--coral);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.25;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* ── Gym Squares ── */
+  .gym-grid {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .gym-square {
+    width: 52px;
+    height: 52px;
+    border: var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .gym-earned {
+    background: var(--yellow);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .gym-empty {
+    background: var(--cream);
+    color: #ccc;
+  }
+
+  .gym-list {
+    font-size: 13px;
+    line-height: 2;
+  }
+
+  .gym-list-item { display: flex; align-items: center; gap: 8px; }
+
+  .gym-x {
+    display: inline-block;
+    width: 20px;
+    text-align: center;
+    font-weight: 700;
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ── Type Analysis ── */
+  .type-text-block {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 2;
+  }
+
+  .gap-highlight {
+    background: var(--coral);
+    padding: 2px 8px;
+    border: 2px solid var(--black);
+    display: inline-block;
+    font-weight: 700;
+    box-shadow: 2px 2px 0 var(--black);
+  }
+
+  .good-highlight {
+    background: var(--mint);
+    padding: 1px 6px;
+    border: 2px solid var(--black);
+    display: inline-block;
+  }
+
+  /* ── Progress Bar ── */
+  .progress-thick {
+    height: 28px;
+    border: var(--border);
+    background: var(--cream);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .progress-fill-thick {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  /* ── Decorative ── */
+  .zigzag {
+    height: 12px;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--black) 0px,
+      var(--black) 8px,
+      transparent 8px,
+      transparent 16px
+    );
+    margin: 20px 0;
+    opacity: 0.15;
+  }
+
+  /* ── Table ── */
+  .catch-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .catch-table th {
+    text-align: left;
+    padding: 8px 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 10px;
+    border-bottom: var(--border);
+  }
+
+  .catch-table td {
+    padding: 8px 10px;
+    border-bottom: 2px solid var(--black);
+    font-weight: 500;
+  }
+
+  .catch-table tr:nth-child(even) td { background: var(--mint); }
+  .catch-table tr:nth-child(odd) td { background: var(--cream); }
+
+  .catch-table tr.dead-row td {
+    background: var(--black) !important;
+    color: #fff;
+    text-decoration: line-through;
+    text-decoration-color: var(--coral);
+  }
+
+  /* ── Rotation for fun ── */
+  .tilt-left { transform: rotate(-1deg); }
+  .tilt-right { transform: rotate(0.8deg); }
+  .tilt-slight { transform: rotate(-0.4deg); }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .masonry {
+      grid-template-columns: 1fr;
+    }
+    .w2, .w3 { grid-column: span 1; }
+    .banner { flex-direction: column; text-align: center; transform: none; }
+    .banner-name { font-size: 28px; }
+    .stat-number { font-size: 36px; }
+    .tilt-left, .tilt-right, .tilt-slight { transform: none; }
+    .tab-btn { padding: 10px 16px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Tab Bar -->
+<nav class="tab-bar">
+  <button class="tab-btn active" onclick="navTo('top')">Dashboard</button>
+  <button class="tab-btn" onclick="navTo('team-sec')">Team</button>
+  <button class="tab-btn" onclick="navTo('catches-sec')">Catches</button>
+  <button class="tab-btn" onclick="navTo('gyms-sec')">Gyms</button>
+  <button class="tab-btn" onclick="navTo('types-sec')">Types</button>
+  <button class="tab-btn" onclick="navTo('stats-sec')">Stats</button>
+</nav>
+
+<div class="container" id="top">
+
+  <!-- Player Banner -->
+  <div class="banner">
+    <div class="banner-avatar">G</div>
+    <div>
+      <div class="banner-name">Grey</div>
+      <div class="banner-sub">Platinum Soul Link &bull; Run #1 &bull; 4 days in</div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="masonry">
+
+    <!-- Stat: Catches -->
+    <div class="card tilt-slight" style="background: var(--teal);">
+      <div class="card-body stat-card">
+        <div class="stat-number">11</div>
+        <div class="stat-label">Total Catches</div>
+      </div>
+    </div>
+
+    <!-- Stat: Deaths -->
+    <div class="card tilt-right" style="background: var(--coral);">
+      <div class="card-body stat-card">
+        <div class="stat-number">3</div>
+        <div class="stat-label">Deaths</div>
+      </div>
+    </div>
+
+    <!-- Stat: Survival -->
+    <div class="card tilt-left" style="background: var(--mint);">
+      <div class="card-body stat-card">
+        <div class="stat-number">72.7%</div>
+        <div class="stat-label">Survival Rate</div>
+      </div>
+    </div>
+
+    <!-- Team -->
+    <div class="card w2 tilt-slight" style="background: var(--cream);" id="team-sec">
+      <div class="card-header" style="background: var(--yellow);">Active Team &bull; 6/6</div>
+      <div class="card-body">
+        <div class="poke-row">
+          <div class="poke-sprite" style="background: var(--coral);">🔥</div>
+          <div style="flex: 1;">
+            <div class="poke-name">Infernape</div>
+            <div class="poke-nick">"Blaze"</div>
+            <div class="poke-location">Oreburgh Gate</div>
+          </div>
+          <div><span class="type-badge type-fire">Fire</span> <span class="type-badge type-fighting">Fight</span></div>
+        </div>
+        <div class="poke-row">
+          <div class="poke-sprite" style="background: var(--lilac);">🦅</div>
+          <div style="flex: 1;">
+            <div class="poke-name">Staraptor</div>
+            <div class="poke-nick">"Wingman"</div>
+            <div class="poke-location">Route 201</div>
+          </div>
+          <div><span class="type-badge type-normal">Norm</span> <span class="type-badge type-flying">Fly</span></div>
+        </div>
+        <div class="poke-row">
+          <div class="poke-sprite" style="background: var(--yellow);">⚡</div>
+          <div style="flex: 1;">
+            <div class="poke-name">Luxray</div>
+            <div class="poke-nick">"Sparks"</div>
+            <div class="poke-location">Route 202</div>
+          </div>
+          <div><span class="type-badge type-electric">Elec</span></div>
+        </div>
+        <div class="poke-row">
+          <div class="poke-sprite" style="background: var(--teal);">🌊</div>
+          <div style="flex: 1;">
+            <div class="poke-name">Gastrodon</div>
+            <div class="poke-nick">"Sluggo"</div>
+            <div class="poke-location">Route 205</div>
+          </div>
+          <div><span class="type-badge type-water">Water</span> <span class="type-badge type-ground">Gnd</span></div>
+        </div>
+        <div class="poke-row">
+          <div class="poke-sprite" style="background: var(--mint);">🌹</div>
+          <div style="flex: 1;">
+            <div class="poke-name">Roserade</div>
+            <div class="poke-nick">"Thorn"</div>
+            <div class="poke-location">Route 204</div>
+          </div>
+          <div><span class="type-badge type-grass">Grass</span> <span class="type-badge type-poison">Psn</span></div>
+        </div>
+        <div class="poke-row">
+          <div class="poke-sprite" style="background: var(--peach);">🥊</div>
+          <div style="flex: 1;">
+            <div class="poke-name">Lucario</div>
+            <div class="poke-nick">"Aura"</div>
+            <div class="poke-location">Route 207</div>
+          </div>
+          <div><span class="type-badge type-fighting">Fight</span> <span class="type-badge type-steel">Steel</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gym Progress -->
+    <div class="card tilt-right" style="background: var(--yellow);" id="gyms-sec">
+      <div class="card-header" style="background: var(--peach);">Gym Badges</div>
+      <div class="card-body">
+        <div class="gym-grid">
+          <div class="gym-square gym-earned">X</div>
+          <div class="gym-square gym-earned">X</div>
+          <div class="gym-square gym-earned">X</div>
+          <div class="gym-square gym-earned">X</div>
+          <div class="gym-square gym-earned">X</div>
+          <div class="gym-square gym-empty">&middot;</div>
+          <div class="gym-square gym-empty">&middot;</div>
+          <div class="gym-square gym-empty">&middot;</div>
+        </div>
+        <div class="progress-thick" style="margin-bottom: 12px;">
+          <div class="progress-fill-thick" style="width: 62.5%; background: var(--peach);">62.5%</div>
+        </div>
+        <div class="gym-list">
+          <div class="gym-list-item"><span class="gym-x" style="color: var(--black);">X</span> Roark <span class="type-badge type-rock" style="font-size: 8px;">Rock</span></div>
+          <div class="gym-list-item"><span class="gym-x">X</span> Gardenia <span class="type-badge type-grass" style="font-size: 8px;">Grass</span></div>
+          <div class="gym-list-item"><span class="gym-x">X</span> Maylene <span class="type-badge type-fighting" style="font-size: 8px;">Fight</span></div>
+          <div class="gym-list-item"><span class="gym-x">X</span> Crasher Wake <span class="type-badge type-water" style="font-size: 8px;">Water</span></div>
+          <div class="gym-list-item"><span class="gym-x">X</span> Fantina <span class="type-badge type-ghost" style="font-size: 8px;">Ghost</span></div>
+          <div class="gym-list-item" style="font-weight: 700; font-size: 14px; margin-top: 4px;">
+            <span class="gym-x" style="color: var(--coral);">?</span> Byron <span class="type-badge type-steel" style="font-size: 8px;">Steel</span>
+            <span style="font-size: 10px; background: var(--coral); color: #fff; padding: 1px 6px; border: 2px solid var(--black); margin-left: 4px;">NEXT</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Catches Table -->
+    <div class="card w3 tilt-slight" style="background: var(--cream);" id="catches-sec">
+      <div class="card-header" style="background: var(--teal);">All Catches</div>
+      <div class="card-body" style="padding: 0;">
+        <table class="catch-table">
+          <thead>
+            <tr style="background: var(--cream);">
+              <th>#</th>
+              <th>Species</th>
+              <th>Nickname</th>
+              <th>Types</th>
+              <th>Location</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td style="font-weight: 700;">INFERNAPE</td>
+              <td>"Blaze"</td>
+              <td><span class="type-badge type-fire" style="font-size: 8px;">Fire</span> <span class="type-badge type-fighting" style="font-size: 8px;">Fight</span></td>
+              <td>Oreburgh Gate</td>
+              <td style="font-weight: 700; color: green;">TEAM</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td style="font-weight: 700;">STARAPTOR</td>
+              <td>"Wingman"</td>
+              <td><span class="type-badge type-normal" style="font-size: 8px;">Norm</span> <span class="type-badge type-flying" style="font-size: 8px;">Fly</span></td>
+              <td>Route 201</td>
+              <td style="font-weight: 700; color: green;">TEAM</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td style="font-weight: 700;">LUXRAY</td>
+              <td>"Sparks"</td>
+              <td><span class="type-badge type-electric" style="font-size: 8px;">Elec</span></td>
+              <td>Route 202</td>
+              <td style="font-weight: 700; color: green;">TEAM</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td style="font-weight: 700;">GASTRODON</td>
+              <td>"Sluggo"</td>
+              <td><span class="type-badge type-water" style="font-size: 8px;">Water</span> <span class="type-badge type-ground" style="font-size: 8px;">Gnd</span></td>
+              <td>Route 205</td>
+              <td style="font-weight: 700; color: green;">TEAM</td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td style="font-weight: 700;">ROSERADE</td>
+              <td>"Thorn"</td>
+              <td><span class="type-badge type-grass" style="font-size: 8px;">Grass</span> <span class="type-badge type-poison" style="font-size: 8px;">Psn</span></td>
+              <td>Route 204</td>
+              <td style="font-weight: 700; color: green;">TEAM</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td style="font-weight: 700;">LUCARIO</td>
+              <td>"Aura"</td>
+              <td><span class="type-badge type-fighting" style="font-size: 8px;">Fight</span> <span class="type-badge type-steel" style="font-size: 8px;">Steel</span></td>
+              <td>Route 207</td>
+              <td style="font-weight: 700; color: green;">TEAM</td>
+            </tr>
+            <tr>
+              <td>7</td>
+              <td style="font-weight: 700;">BIBAREL</td>
+              <td>"Chomps"</td>
+              <td><span class="type-badge type-normal" style="font-size: 8px;">Norm</span> <span class="type-badge type-water" style="font-size: 8px;">Water</span></td>
+              <td>Route 208</td>
+              <td style="font-weight: 600; opacity: 0.6;">STORED</td>
+            </tr>
+            <tr>
+              <td>8</td>
+              <td style="font-weight: 700;">BRONZONG</td>
+              <td>"Gong"</td>
+              <td><span class="type-badge type-steel" style="font-size: 8px;">Steel</span> <span class="type-badge type-psychic" style="font-size: 8px;">Psy</span></td>
+              <td>Mt. Coronet</td>
+              <td style="font-weight: 600; opacity: 0.6;">STORED</td>
+            </tr>
+            <tr class="dead-row">
+              <td>9</td>
+              <td>GEODUDE</td>
+              <td>"Rocky"</td>
+              <td><span class="type-badge type-rock" style="font-size: 8px; opacity: 0.6;">Rock</span></td>
+              <td>Oreburgh Mine</td>
+              <td style="font-weight: 800; color: var(--coral); text-decoration: none;">DEAD</td>
+            </tr>
+            <tr class="dead-row">
+              <td>10</td>
+              <td>ZUBAT</td>
+              <td>"Screech"</td>
+              <td><span class="type-badge type-poison" style="font-size: 8px; opacity: 0.6;">Psn</span></td>
+              <td>Ravaged Path</td>
+              <td style="font-weight: 800; color: var(--coral); text-decoration: none;">DEAD</td>
+            </tr>
+            <tr class="dead-row">
+              <td>11</td>
+              <td>BUIZEL</td>
+              <td>"Splash"</td>
+              <td><span class="type-badge type-water" style="font-size: 8px; opacity: 0.6;">Water</span></td>
+              <td>Route 205</td>
+              <td style="font-weight: 800; color: var(--coral); text-decoration: none;">DEAD</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Type Analysis -->
+    <div class="card w2 tilt-right" style="background: var(--lilac);" id="types-sec">
+      <div class="card-header" style="background: var(--mint);">Type Analysis</div>
+      <div class="card-body">
+        <div class="type-text-block">
+          <div style="margin-bottom: 12px;">
+            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; opacity: 0.6; margin-bottom: 6px;">You Can Hit:</div>
+            <span class="good-highlight">Fire</span>
+            <span class="good-highlight">Water</span>
+            <span class="good-highlight">Grass</span>
+            <span class="good-highlight">Electric</span>
+            <span class="good-highlight">Normal</span>
+            <span class="good-highlight">Fighting</span>
+            <span class="good-highlight">Flying</span>
+            <span class="good-highlight">Poison</span>
+            <span class="good-highlight">Ground</span>
+            <span class="good-highlight">Rock</span>
+            <span class="good-highlight">Psychic</span>
+            <span class="good-highlight">Ghost</span>
+            <span class="good-highlight">Steel</span>
+            <span class="good-highlight">Dark</span>
+            <span class="good-highlight">Bug</span>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; opacity: 0.6; margin-bottom: 6px;">You Cannot Hit:</div>
+            <span class="gap-highlight">ICE</span>
+            <span class="gap-highlight">DRAGON</span>
+          </div>
+          <div>
+            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; opacity: 0.6; margin-bottom: 6px;">Danger Zone:</div>
+            <span class="gap-highlight">GROUND x3</span>
+            <span style="font-size: 12px; font-weight: 500; display: block; margin-top: 6px; opacity: 0.7;">Infernape, Luxray, and Lucario are all weak to Ground moves.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dead Memorial (special card) -->
+    <div class="card dead-card tilt-left" style="overflow: hidden;" id="stats-sec">
+      <div class="dead-stamp">FALLEN</div>
+      <div class="card-header" style="background: var(--coral); color: var(--black);">Casualties</div>
+      <div class="card-body">
+        <div style="display: flex; flex-direction: column; gap: 8px; position: relative; z-index: 1;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 18px;">💀</span>
+            <div>
+              <div style="font-weight: 700; font-size: 14px;">Geodude <span style="opacity: 0.5; font-weight: 400;">"Rocky"</span></div>
+              <div style="font-size: 11px; opacity: 0.5;">Oreburgh Mine</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 18px;">💀</span>
+            <div>
+              <div style="font-weight: 700; font-size: 14px;">Zubat <span style="opacity: 0.5; font-weight: 400;">"Screech"</span></div>
+              <div style="font-size: 11px; opacity: 0.5;">Ravaged Path</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 18px;">💀</span>
+            <div>
+              <div style="font-weight: 700; font-size: 14px;">Buizel <span style="opacity: 0.5; font-weight: 400;">"Splash"</span></div>
+              <div style="font-size: 11px; opacity: 0.5;">Route 205</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function navTo(id) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>War Room // Soul Link</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #030712;
+    --sidebar: #0f172a;
+    --surface: #1e293b;
+    --surface-light: #283548;
+    --cyan: #22d3ee;
+    --violet: #a78bfa;
+    --amber: #fbbf24;
+    --red: #ef4444;
+    --green: #22c55e;
+    --text: #e2e8f0;
+    --text-dim: #64748b;
+    --text-muted: #475569;
+    --grid-line: rgba(148, 163, 184, 0.06);
+    --border: rgba(148, 163, 184, 0.1);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 56px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0;
+    gap: 4px;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+
+  .sidebar-logo {
+    font-size: 18px;
+    margin-bottom: 12px;
+    opacity: 0.7;
+  }
+
+  .sidebar-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: none;
+    background: none;
+    color: var(--text-dim);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    position: relative;
+    font-family: inherit;
+  }
+
+  .sidebar-btn:hover {
+    background: rgba(148, 163, 184, 0.08);
+    color: var(--text);
+  }
+
+  .sidebar-btn.active {
+    color: var(--cyan);
+  }
+
+  .sidebar-btn.active::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 20px;
+    background: var(--cyan);
+    border-radius: 0 2px 2px 0;
+  }
+
+  .sidebar-spacer { flex: 1; }
+
+  /* ── Main Area ── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── Top KPI Bar ── */
+  .kpi-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .kpi-card {
+    background: var(--bg);
+    padding: 14px 16px;
+    position: relative;
+  }
+
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+  }
+
+  .kpi-card:nth-child(1)::before { background: var(--cyan); }
+  .kpi-card:nth-child(2)::before { background: var(--red); }
+  .kpi-card:nth-child(3)::before { background: var(--green); }
+  .kpi-card:nth-child(4)::before { background: var(--amber); }
+
+  .kpi-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  .kpi-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .kpi-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* ── Content Grid ── */
+  .content-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    overflow: hidden;
+  }
+
+  .panel {
+    background: var(--bg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .panel-title {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--cyan);
+  }
+
+  .panel-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+  }
+
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 14px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface) transparent;
+  }
+
+  /* ── Team Roster (dense rows) ── */
+  .roster-row {
+    display: grid;
+    grid-template-columns: 24px 20px 1fr 80px 50px 20px;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .roster-row:last-child { border-bottom: none; }
+
+  .roster-pos {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: right;
+  }
+
+  .roster-sprite {
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .roster-name {
+    font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .roster-types {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .roster-nick {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .dot-alive { background: var(--green); box-shadow: 0 0 4px rgba(34, 197, 94, 0.4); }
+  .dot-dead { background: var(--red); }
+  .dot-stored { background: var(--text-muted); }
+
+  /* ── Heat Map ── */
+  .heatmap {
+    display: grid;
+    grid-template-columns: 90px repeat(17, 1fr);
+    gap: 1px;
+    font-size: 7px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .hm-header {
+    padding: 3px 2px;
+    text-align: center;
+    color: var(--text-dim);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    background: var(--surface);
+  }
+
+  .hm-label {
+    padding: 4px 6px;
+    color: var(--text);
+    font-weight: 500;
+    background: var(--surface);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hm-cell {
+    padding: 4px 2px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 8px;
+  }
+
+  .hm-super { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+  .hm-resist { background: rgba(34, 197, 94, 0.15); color: #86efac; }
+  .hm-immune { background: rgba(34, 197, 94, 0.25); color: #4ade80; }
+  .hm-neutral { background: rgba(148, 163, 184, 0.04); color: var(--text-muted); }
+  .hm-gap { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
+
+  /* ── Timeline (catches) ── */
+  .timeline-strip {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    padding: 12px 0;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface) transparent;
+  }
+
+  .timeline-tick {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    cursor: default;
+  }
+
+  .tick-bar {
+    width: 14px;
+    height: 32px;
+    border-radius: 2px 2px 0 0;
+    transition: all 0.15s;
+  }
+
+  .tick-bar.alive { background: var(--green); opacity: 0.6; }
+  .tick-bar.dead { background: var(--red); opacity: 0.6; }
+  .tick-bar.stored { background: var(--text-muted); opacity: 0.3; }
+
+  .timeline-tick:hover .tick-bar { opacity: 1; }
+
+  .tick-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 7px;
+    color: var(--text-muted);
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    white-space: nowrap;
+    max-height: 60px;
+    overflow: hidden;
+  }
+
+  /* ── Gym Segment Bar ── */
+  .gym-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .gym-seg {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .gym-seg-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--surface);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .gym-seg-fill {
+    height: 100%;
+    border-radius: 1px;
+    transition: width 0.5s ease;
+  }
+
+  .gym-seg-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    width: 68px;
+    flex-shrink: 0;
+  }
+
+  .gym-seg-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    width: 36px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* ── Blinking live indicator ── */
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--cyan);
+    display: inline-block;
+    animation: livePulse 2s ease infinite;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    body { flex-direction: column; }
+    .kpi-bar { grid-template-columns: repeat(2, 1fr); }
+    .content-grid {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto;
+      overflow-y: auto;
+    }
+    .panel { min-height: 300px; }
+    .heatmap { overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-logo">&#9876;</div>
+  <button class="sidebar-btn active" title="Dashboard">&#9632;</button>
+  <button class="sidebar-btn" title="Team">&#9734;</button>
+  <button class="sidebar-btn" title="Map">&#9673;</button>
+  <button class="sidebar-btn" title="Gyms">&#9830;</button>
+  <div class="sidebar-spacer"></div>
+  <button class="sidebar-btn" title="Settings" style="font-size: 14px;">&#9881;</button>
+</nav>
+
+<div class="main">
+
+  <!-- KPI Bar -->
+  <div class="kpi-bar">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Catches</div>
+      <div class="kpi-value" style="color: var(--cyan);">11</div>
+      <div class="kpi-sub">8 alive / 3 dead</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Deaths</div>
+      <div class="kpi-value" style="color: var(--red);">3</div>
+      <div class="kpi-sub">27.3% casualty rate</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Survival Rate</div>
+      <div class="kpi-value" style="color: var(--green);">72.7<span style="font-size: 14px;">%</span></div>
+      <div class="kpi-sub">target: >80%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Gym Progress</div>
+      <div class="kpi-value" style="color: var(--amber);">5<span style="font-size: 14px; color: var(--text-muted);">/8</span></div>
+      <div class="kpi-sub">next: Byron [STEEL]</div>
+    </div>
+  </div>
+
+  <!-- Content Grid -->
+  <div class="content-grid">
+
+    <!-- Team Roster -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="live-dot"></span> Team Roster</div>
+        <div class="panel-badge">6/6 ACTIVE</div>
+      </div>
+      <div class="panel-body">
+        <div class="roster-row" style="border-bottom: 1px solid var(--border);">
+          <div class="roster-pos" style="color: var(--text-dim); font-size: 8px;">#</div>
+          <div></div>
+          <div style="font-size: 8px; color: var(--text-dim); letter-spacing: 0.1em;">SPECIES</div>
+          <div style="font-size: 8px; color: var(--text-dim); letter-spacing: 0.1em;">TYPES</div>
+          <div style="font-size: 8px; color: var(--text-dim); letter-spacing: 0.1em;">NICK</div>
+          <div></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-pos">01</div>
+          <div class="roster-sprite">&#128293;</div>
+          <div class="roster-name">INFERNAPE</div>
+          <div class="roster-types">FIR/FGT</div>
+          <div class="roster-nick">Blaze</div>
+          <div><span class="status-dot dot-alive"></span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-pos">02</div>
+          <div class="roster-sprite">&#129413;</div>
+          <div class="roster-name">STARAPTOR</div>
+          <div class="roster-types">NRM/FLY</div>
+          <div class="roster-nick">Wingman</div>
+          <div><span class="status-dot dot-alive"></span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-pos">03</div>
+          <div class="roster-sprite">&#9889;</div>
+          <div class="roster-name">LUXRAY</div>
+          <div class="roster-types">ELC</div>
+          <div class="roster-nick">Sparks</div>
+          <div><span class="status-dot dot-alive"></span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-pos">04</div>
+          <div class="roster-sprite">&#127754;</div>
+          <div class="roster-name">GASTRODON</div>
+          <div class="roster-types">WTR/GND</div>
+          <div class="roster-nick">Sluggo</div>
+          <div><span class="status-dot dot-alive"></span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-pos">05</div>
+          <div class="roster-sprite">&#127801;</div>
+          <div class="roster-name">ROSERADE</div>
+          <div class="roster-types">GRS/PSN</div>
+          <div class="roster-nick">Thorn</div>
+          <div><span class="status-dot dot-alive"></span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-pos">06</div>
+          <div class="roster-sprite">&#129354;</div>
+          <div class="roster-name">LUCARIO</div>
+          <div class="roster-types">FGT/STL</div>
+          <div class="roster-nick">Aura</div>
+          <div><span class="status-dot dot-alive"></span></div>
+        </div>
+        <div class="roster-row" style="opacity: 0.45;">
+          <div class="roster-pos">--</div>
+          <div class="roster-sprite">&#129451;</div>
+          <div class="roster-name">BIBAREL</div>
+          <div class="roster-types">NRM/WTR</div>
+          <div class="roster-nick">Chomps</div>
+          <div><span class="status-dot dot-stored"></span></div>
+        </div>
+        <div class="roster-row" style="opacity: 0.45;">
+          <div class="roster-pos">--</div>
+          <div class="roster-sprite">&#128276;</div>
+          <div class="roster-name">BRONZONG</div>
+          <div class="roster-types">STL/PSY</div>
+          <div class="roster-nick">Gong</div>
+          <div><span class="status-dot dot-stored"></span></div>
+        </div>
+        <div class="roster-row" style="opacity: 0.35; text-decoration: line-through; text-decoration-color: rgba(239,68,68,0.3);">
+          <div class="roster-pos">--</div>
+          <div class="roster-sprite">&#9760;</div>
+          <div class="roster-name" style="color: var(--red);">GEODUDE</div>
+          <div class="roster-types">RCK/GND</div>
+          <div class="roster-nick">Rocky</div>
+          <div><span class="status-dot dot-dead"></span></div>
+        </div>
+        <div class="roster-row" style="opacity: 0.35; text-decoration: line-through; text-decoration-color: rgba(239,68,68,0.3);">
+          <div class="roster-pos">--</div>
+          <div class="roster-sprite">&#9760;</div>
+          <div class="roster-name" style="color: var(--red);">ZUBAT</div>
+          <div class="roster-types">PSN/FLY</div>
+          <div class="roster-nick">Screech</div>
+          <div><span class="status-dot dot-dead"></span></div>
+        </div>
+        <div class="roster-row" style="opacity: 0.35; text-decoration: line-through; text-decoration-color: rgba(239,68,68,0.3);">
+          <div class="roster-pos">--</div>
+          <div class="roster-sprite">&#9760;</div>
+          <div class="roster-name" style="color: var(--red);">BUIZEL</div>
+          <div class="roster-types">WTR</div>
+          <div class="roster-nick">Splash</div>
+          <div><span class="status-dot dot-dead"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Type Matrix -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Weakness Matrix</div>
+        <div class="panel-badge">15/17 COVERED</div>
+      </div>
+      <div class="panel-body" style="overflow-x: auto;">
+        <div style="font-size: 9px; color: var(--text-dim); margin-bottom: 8px; font-family: 'IBM Plex Mono', monospace;">
+          Defensive weaknesses by team member
+        </div>
+        <div class="heatmap" style="min-width: 400px;">
+          <!-- Header row -->
+          <div class="hm-header"></div>
+          <div class="hm-header">FIR</div>
+          <div class="hm-header">WTR</div>
+          <div class="hm-header">GRS</div>
+          <div class="hm-header">ELC</div>
+          <div class="hm-header">ICE</div>
+          <div class="hm-header">FGT</div>
+          <div class="hm-header">PSN</div>
+          <div class="hm-header">GND</div>
+          <div class="hm-header">FLY</div>
+          <div class="hm-header">PSY</div>
+          <div class="hm-header">BUG</div>
+          <div class="hm-header">RCK</div>
+          <div class="hm-header">GHO</div>
+          <div class="hm-header">DRG</div>
+          <div class="hm-header">DRK</div>
+          <div class="hm-header">STL</div>
+          <div class="hm-header">NRM</div>
+
+          <!-- Infernape FIR/FGT -->
+          <div class="hm-label">INFERNAPE</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-neutral">-</div>
+
+          <!-- Staraptor NRM/FLY -->
+          <div class="hm-label">STARAPTOR</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-immune">0</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-immune">0</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+
+          <!-- Luxray ELC -->
+          <div class="hm-label">LUXRAY</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-neutral">-</div>
+
+          <!-- Gastrodon WTR/GND -->
+          <div class="hm-label">GASTRODON</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-immune">0</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-neutral">-</div>
+
+          <!-- Roserade GRS/PSN -->
+          <div class="hm-label">ROSERADE</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+
+          <!-- Lucario FGT/STL -->
+          <div class="hm-label">LUCARIO</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-immune">0</div>
+          <div class="hm-cell hm-super">W</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-neutral">-</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-resist">R</div>
+          <div class="hm-cell hm-resist">R</div>
+        </div>
+
+        <div style="margin-top: 12px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--text-muted);">
+          <span style="color: #fca5a5;">W</span>=Weak &nbsp;
+          <span style="color: #86efac;">R</span>=Resist &nbsp;
+          <span style="color: #4ade80;">0</span>=Immune &nbsp;
+          <span>-</span>=Neutral
+        </div>
+      </div>
+    </div>
+
+    <!-- Catches Timeline -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Catch Timeline</div>
+        <div class="panel-badge">11 ENCOUNTERS</div>
+      </div>
+      <div class="panel-body">
+        <div class="timeline-strip">
+          <div class="timeline-tick"><div class="tick-bar alive" style="height: 40px;"></div><div class="tick-label">Infernape</div></div>
+          <div class="timeline-tick"><div class="tick-bar alive" style="height: 38px;"></div><div class="tick-label">Staraptor</div></div>
+          <div class="timeline-tick"><div class="tick-bar alive" style="height: 36px;"></div><div class="tick-label">Luxray</div></div>
+          <div class="timeline-tick"><div class="tick-bar dead" style="height: 20px;"></div><div class="tick-label">Geodude</div></div>
+          <div class="timeline-tick"><div class="tick-bar dead" style="height: 18px;"></div><div class="tick-label">Zubat</div></div>
+          <div class="timeline-tick"><div class="tick-bar alive" style="height: 34px;"></div><div class="tick-label">Roserade</div></div>
+          <div class="timeline-tick"><div class="tick-bar alive" style="height: 36px;"></div><div class="tick-label">Gastrodon</div></div>
+          <div class="timeline-tick"><div class="tick-bar dead" style="height: 16px;"></div><div class="tick-label">Buizel</div></div>
+          <div class="timeline-tick"><div class="tick-bar alive" style="height: 38px;"></div><div class="tick-label">Lucario</div></div>
+          <div class="timeline-tick"><div class="tick-bar stored" style="height: 28px;"></div><div class="tick-label">Bibarel</div></div>
+          <div class="timeline-tick"><div class="tick-bar stored" style="height: 30px;"></div><div class="tick-label">Bronzong</div></div>
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--text-muted);">
+          <span><span class="status-dot dot-alive" style="vertical-align: middle;"></span> Alive</span>
+          <span><span class="status-dot dot-dead" style="vertical-align: middle;"></span> Dead</span>
+          <span><span class="status-dot dot-stored" style="vertical-align: middle;"></span> Stored</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gym Status -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Gym Status</div>
+        <div class="panel-badge">62.5%</div>
+      </div>
+      <div class="panel-body">
+        <div class="gym-bar">
+          <div class="gym-seg">
+            <div class="gym-seg-label">Roark</div>
+            <div class="gym-seg-bar"><div class="gym-seg-fill" style="width: 100%; background: var(--cyan);"></div></div>
+            <div class="gym-seg-status" style="color: var(--cyan);">DONE</div>
+          </div>
+          <div class="gym-seg">
+            <div class="gym-seg-label">Gardenia</div>
+            <div class="gym-seg-bar"><div class="gym-seg-fill" style="width: 100%; background: var(--cyan);"></div></div>
+            <div class="gym-seg-status" style="color: var(--cyan);">DONE</div>
+          </div>
+          <div class="gym-seg">
+            <div class="gym-seg-label">Maylene</div>
+            <div class="gym-seg-bar"><div class="gym-seg-fill" style="width: 100%; background: var(--cyan);"></div></div>
+            <div class="gym-seg-status" style="color: var(--cyan);">DONE</div>
+          </div>
+          <div class="gym-seg">
+            <div class="gym-seg-label">C. Wake</div>
+            <div class="gym-seg-bar"><div class="gym-seg-fill" style="width: 100%; background: var(--cyan);"></div></div>
+            <div class="gym-seg-status" style="color: var(--cyan);">DONE</div>
+          </div>
+          <div class="gym-seg">
+            <div class="gym-seg-label">Fantina</div>
+            <div class="gym-seg-bar"><div class="gym-seg-fill" style="width: 100%; background: var(--cyan);"></div></div>
+            <div class="gym-seg-status" style="color: var(--cyan);">DONE</div>
+          </div>
+          <div class="gym-seg" style="border: 1px solid rgba(251,191,36,0.2); padding: 6px; border-radius: 4px; background: rgba(251,191,36,0.03);">
+            <div class="gym-seg-label" style="color: var(--amber); font-weight: 600;">Byron</div>
+            <div class="gym-seg-bar"><div class="gym-seg-fill" style="width: 0%; background: var(--amber);"></div></div>
+            <div class="gym-seg-status" style="color: var(--amber);">NEXT</div>
+          </div>
+          <div class="gym-seg" style="opacity: 0.3;">
+            <div class="gym-seg-label">Candice</div>
+            <div class="gym-seg-bar"><div class="gym-seg-fill" style="width: 0%;"></div></div>
+            <div class="gym-seg-status">--</div>
+          </div>
+          <div class="gym-seg" style="opacity: 0.3;">
+            <div class="gym-seg-label">Volkner</div>
+            <div class="gym-seg-bar"><div class="gym-seg-fill" style="width: 0%;"></div></div>
+            <div class="gym-seg-status">--</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 9px;">
+          <div style="color: var(--amber); font-weight: 600; margin-bottom: 4px;">INTEL: BYRON</div>
+          <div style="color: var(--text-dim);">Type: STEEL</div>
+          <div style="color: var(--text-dim);">Location: Canalave City</div>
+          <div style="color: var(--text-dim); margin-top: 4px;">Threat: <span style="color: var(--amber);">MODERATE</span></div>
+          <div style="color: var(--text-dim);">Ground weakness shared by 3 team members</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

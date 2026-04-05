@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crystal Link // Soul Link</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.04);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-hover: rgba(255, 255, 255, 0.07);
+    --violet: #7c3aed;
+    --violet-glow: rgba(124, 58, 237, 0.35);
+    --violet-dim: rgba(124, 58, 237, 0.15);
+    --emerald: #34d399;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --text: #f0f0f0;
+    --text-dim: rgba(255, 255, 255, 0.45);
+    --text-muted: rgba(255, 255, 255, 0.25);
+    --radius: 20px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0f0a1a 0%, #12102e 30%, #0c1a3a 60%, #0a1628 100%);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: 'Outfit', system-ui, sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+
+  /* ── Floating particles ── */
+  .particles {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .particle {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background: rgba(124, 58, 237, 0.3);
+    border-radius: 50%;
+    animation: drift linear infinite;
+  }
+
+  .particle:nth-child(1) { left: 15%; top: 20%; animation-duration: 18s; animation-delay: 0s; width: 2px; height: 2px; background: rgba(124, 58, 237, 0.2); }
+  .particle:nth-child(2) { left: 45%; top: 70%; animation-duration: 22s; animation-delay: -4s; }
+  .particle:nth-child(3) { left: 75%; top: 30%; animation-duration: 20s; animation-delay: -8s; width: 4px; height: 4px; background: rgba(52, 211, 153, 0.15); }
+  .particle:nth-child(4) { left: 85%; top: 80%; animation-duration: 25s; animation-delay: -12s; width: 2px; height: 2px; }
+  .particle:nth-child(5) { left: 30%; top: 50%; animation-duration: 19s; animation-delay: -6s; background: rgba(124, 58, 237, 0.15); }
+  .particle:nth-child(6) { left: 60%; top: 10%; animation-duration: 23s; animation-delay: -2s; width: 2px; height: 2px; background: rgba(52, 211, 153, 0.1); }
+
+  @keyframes drift {
+    0% { transform: translateY(0) translateX(0); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(-100vh) translateX(40px); opacity: 0; }
+  }
+
+  /* ── Glass panel ── */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    transition: all 0.3s ease;
+  }
+
+  .glass:hover {
+    background: var(--glass-hover);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  }
+
+  /* ── Navigation ── */
+  .nav-bar {
+    position: sticky;
+    top: 16px;
+    z-index: 50;
+    margin: 16px auto;
+    max-width: 620px;
+    padding: 6px;
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .nav-pill {
+    padding: 8px 18px;
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.25s ease;
+    border: none;
+    background: none;
+    font-family: inherit;
+    letter-spacing: 0.02em;
+  }
+
+  .nav-pill:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .nav-pill.active {
+    color: #fff;
+    background: var(--violet-dim);
+    box-shadow: 0 0 20px var(--violet-glow), inset 0 0 12px rgba(124, 58, 237, 0.1);
+  }
+
+  /* ── Layout ── */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 20px 60px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .grid-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+
+  .span-2 { grid-column: span 2; }
+  .span-3 { grid-column: span 3; }
+
+  /* ── Section labels ── */
+  .section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  /* ── Player header ── */
+  .player-header {
+    padding: 28px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+
+  .avatar-ring {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--violet), #a78bfa);
+    padding: 3px;
+    margin: 0 auto 14px;
+    box-shadow: 0 0 30px var(--violet-glow), 0 0 60px rgba(124, 58, 237, 0.15);
+  }
+
+  .avatar-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: #1a1040;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 700;
+    color: #a78bfa;
+  }
+
+  .player-name {
+    font-size: 26px;
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+
+  .player-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+
+  /* ── Stat gauge (SVG ring) ── */
+  .gauge-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+
+  .gauge-svg {
+    width: 90px;
+    height: 90px;
+    transform: rotate(-90deg);
+  }
+
+  .gauge-track {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.06);
+    stroke-width: 6;
+  }
+
+  .gauge-fill {
+    fill: none;
+    stroke-width: 6;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s ease;
+  }
+
+  .gauge-label {
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: -58px;
+    margin-bottom: 22px;
+  }
+
+  .gauge-caption {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  /* ── Team grid ── */
+  .team-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 20px;
+  }
+
+  .team-card {
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.25s;
+  }
+
+  .team-card:hover {
+    background: rgba(124, 58, 237, 0.06);
+    border-color: rgba(124, 58, 237, 0.15);
+    transform: translateY(-1px);
+  }
+
+  .sprite-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .team-card-info { flex: 1; min-width: 0; }
+
+  .team-card-name {
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+  }
+
+  .team-card-nickname {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 300;
+  }
+
+  .type-pill {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* Type colors - glass style */
+  .type-fire { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+  .type-fighting { background: rgba(194, 65, 12, 0.2); color: #fdba74; }
+  .type-normal { background: rgba(168, 162, 158, 0.15); color: #d6d3d1; }
+  .type-flying { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; }
+  .type-electric { background: rgba(234, 179, 8, 0.15); color: #fde68a; }
+  .type-water { background: rgba(59, 130, 246, 0.15); color: #93c5fd; }
+  .type-ground { background: rgba(180, 140, 80, 0.2); color: #e0c68e; }
+  .type-grass { background: rgba(34, 197, 94, 0.15); color: #86efac; }
+  .type-poison { background: rgba(168, 85, 247, 0.15); color: #d8b4fe; }
+  .type-steel { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+  .type-psychic { background: rgba(236, 72, 153, 0.15); color: #f9a8d4; }
+  .type-rock { background: rgba(161, 130, 50, 0.2); color: #d4b85e; }
+  .type-ghost { background: rgba(107, 33, 168, 0.2); color: #c084fc; }
+  .type-ice { background: rgba(103, 232, 249, 0.12); color: #a5f3fc; }
+  .type-dragon { background: rgba(99, 47, 220, 0.2); color: #a78bfa; }
+
+  /* ── Gym progress (vertical stepper) ── */
+  .gym-stepper {
+    padding: 24px 20px;
+  }
+
+  .gym-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    position: relative;
+  }
+
+  .gym-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 32px;
+    bottom: -8px;
+    width: 2px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .gym-step.completed:not(:last-child)::after {
+    background: var(--violet-dim);
+  }
+
+  .gym-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .gym-step.completed .gym-dot {
+    border-color: var(--violet);
+    background: var(--violet-dim);
+    color: #c4b5fd;
+    box-shadow: 0 0 12px var(--violet-glow);
+  }
+
+  .gym-step.next .gym-dot {
+    border-color: var(--amber);
+    background: rgba(251, 191, 36, 0.1);
+    color: var(--amber);
+    animation: pulse 2s ease infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.3); }
+    50% { box-shadow: 0 0 12px 4px rgba(251, 191, 36, 0.15); }
+  }
+
+  .gym-step.future .gym-dot {
+    opacity: 0.3;
+  }
+
+  .gym-info { flex: 1; }
+  .gym-leader { font-weight: 500; font-size: 13px; }
+  .gym-city { font-size: 11px; color: var(--text-dim); }
+
+  /* ── Catches ── */
+  .catches-scroll {
+    padding: 20px;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(124, 58, 237, 0.3) transparent;
+  }
+
+  .catch-chip {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s;
+    cursor: default;
+  }
+
+  .catch-chip:hover {
+    background: rgba(124, 58, 237, 0.08);
+    border-color: rgba(124, 58, 237, 0.2);
+  }
+
+  .catch-chip.dead {
+    opacity: 0.45;
+    border-color: rgba(248, 113, 113, 0.15);
+  }
+
+  .catch-chip.dead:hover {
+    opacity: 0.7;
+    background: rgba(248, 113, 113, 0.06);
+  }
+
+  .catch-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .catch-dot.alive { background: var(--emerald); box-shadow: 0 0 6px rgba(52, 211, 153, 0.4); }
+  .catch-dot.dead { background: var(--red); }
+
+  /* ── Type coverage ── */
+  .coverage-panel {
+    padding: 20px;
+  }
+
+  .coverage-dots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .cov-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .cov-dot.covered { opacity: 1; }
+  .cov-dot.gap {
+    border: 1px dashed rgba(251, 191, 36, 0.4);
+    background: rgba(251, 191, 36, 0.06);
+    color: var(--amber);
+  }
+
+  .weakness-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 12px;
+  }
+
+  .weakness-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(248, 113, 113, 0.3);
+    flex: 1;
+    max-width: 80px;
+  }
+
+  .weakness-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--red);
+    box-shadow: 0 0 6px rgba(248, 113, 113, 0.3);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .grid-main {
+      grid-template-columns: 1fr;
+    }
+    .span-2, .span-3 { grid-column: span 1; }
+    .team-grid { grid-template-columns: 1fr; }
+    .nav-bar { max-width: 100%; margin: 8px 12px; }
+    .nav-pill { padding: 6px 12px; font-size: 11px; }
+    .container { padding: 0 12px 40px; }
+  }
+
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .grid-main {
+      grid-template-columns: 1fr 1fr;
+    }
+    .span-3 { grid-column: span 2; }
+  }
+
+  /* ── Entrance animations ── */
+  .fade-up {
+    opacity: 0;
+    transform: translateY(16px);
+    animation: fadeUp 0.6s ease forwards;
+  }
+
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-up:nth-child(1) { animation-delay: 0.05s; }
+  .fade-up:nth-child(2) { animation-delay: 0.1s; }
+  .fade-up:nth-child(3) { animation-delay: 0.15s; }
+  .fade-up:nth-child(4) { animation-delay: 0.2s; }
+  .fade-up:nth-child(5) { animation-delay: 0.25s; }
+  .fade-up:nth-child(6) { animation-delay: 0.3s; }
+  .fade-up:nth-child(7) { animation-delay: 0.35s; }
+  .fade-up:nth-child(8) { animation-delay: 0.4s; }
+  .fade-up:nth-child(9) { animation-delay: 0.45s; }
+</style>
+</head>
+<body>
+
+<!-- Particles -->
+<div class="particles">
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+</div>
+
+<!-- Navigation -->
+<nav class="nav-bar glass">
+  <button class="nav-pill active" onclick="scrollToSection('overview')">Overview</button>
+  <button class="nav-pill" onclick="scrollToSection('team-section')">Team</button>
+  <button class="nav-pill" onclick="scrollToSection('catches-section')">Catches</button>
+  <button class="nav-pill" onclick="scrollToSection('gyms-section')">Gyms</button>
+  <button class="nav-pill" onclick="scrollToSection('analysis-section')">Analysis</button>
+</nav>
+
+<div class="container">
+
+  <!-- Player Header -->
+  <div class="player-header glass fade-up" id="overview">
+    <div class="avatar-ring">
+      <div class="avatar-inner">G</div>
+    </div>
+    <div class="player-name">Grey</div>
+    <div class="player-sub">Platinum Soul Link &middot; Run #1 &middot; 4 days active</div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid-main" style="margin-bottom: 16px;">
+    <div class="glass gauge-container fade-up">
+      <svg class="gauge-svg" viewBox="0 0 36 36">
+        <circle class="gauge-track" cx="18" cy="18" r="15.5"/>
+        <circle class="gauge-fill" cx="18" cy="18" r="15.5"
+          stroke="var(--emerald)"
+          stroke-dasharray="97.4"
+          stroke-dashoffset="26.6"/>
+      </svg>
+      <div class="gauge-label" style="color: var(--emerald);">72.7%</div>
+      <div class="gauge-caption">Survival</div>
+    </div>
+
+    <div class="glass gauge-container fade-up">
+      <svg class="gauge-svg" viewBox="0 0 36 36">
+        <circle class="gauge-track" cx="18" cy="18" r="15.5"/>
+        <circle class="gauge-fill" cx="18" cy="18" r="15.5"
+          stroke="var(--violet)"
+          stroke-dasharray="97.4"
+          stroke-dashoffset="0"/>
+      </svg>
+      <div class="gauge-label" style="color: #c4b5fd;">6/6</div>
+      <div class="gauge-caption">Team</div>
+    </div>
+
+    <div class="glass gauge-container fade-up">
+      <svg class="gauge-svg" viewBox="0 0 36 36">
+        <circle class="gauge-track" cx="18" cy="18" r="15.5"/>
+        <circle class="gauge-fill" cx="18" cy="18" r="15.5"
+          stroke="var(--amber)"
+          stroke-dasharray="97.4"
+          stroke-dashoffset="36.5"/>
+      </svg>
+      <div class="gauge-label" style="color: var(--amber);">5/8</div>
+      <div class="gauge-caption">Badges</div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="grid-main">
+
+    <!-- Team Panel -->
+    <div class="glass span-2 fade-up" id="team-section">
+      <div style="padding: 20px 20px 8px;">
+        <div class="section-label">Active Team</div>
+      </div>
+      <div class="team-grid">
+        <div class="team-card">
+          <div class="sprite-circle" style="background: rgba(239, 68, 68, 0.12);">🔥</div>
+          <div class="team-card-info">
+            <div class="team-card-name">Infernape</div>
+            <div class="team-card-nickname">"Blaze" &middot; Oreburgh Gate</div>
+            <div><span class="type-pill type-fire">Fire</span> <span class="type-pill type-fighting">Fighting</span></div>
+          </div>
+        </div>
+        <div class="team-card">
+          <div class="sprite-circle" style="background: rgba(139, 92, 246, 0.1);">🦅</div>
+          <div class="team-card-info">
+            <div class="team-card-name">Staraptor</div>
+            <div class="team-card-nickname">"Wingman" &middot; Route 201</div>
+            <div><span class="type-pill type-normal">Normal</span> <span class="type-pill type-flying">Flying</span></div>
+          </div>
+        </div>
+        <div class="team-card">
+          <div class="sprite-circle" style="background: rgba(234, 179, 8, 0.1);">⚡</div>
+          <div class="team-card-info">
+            <div class="team-card-name">Luxray</div>
+            <div class="team-card-nickname">"Sparks" &middot; Route 202</div>
+            <div><span class="type-pill type-electric">Electric</span></div>
+          </div>
+        </div>
+        <div class="team-card">
+          <div class="sprite-circle" style="background: rgba(59, 130, 246, 0.1);">🌊</div>
+          <div class="team-card-info">
+            <div class="team-card-name">Gastrodon</div>
+            <div class="team-card-nickname">"Sluggo" &middot; Route 205</div>
+            <div><span class="type-pill type-water">Water</span> <span class="type-pill type-ground">Ground</span></div>
+          </div>
+        </div>
+        <div class="team-card">
+          <div class="sprite-circle" style="background: rgba(34, 197, 94, 0.1);">🌹</div>
+          <div class="team-card-info">
+            <div class="team-card-name">Roserade</div>
+            <div class="team-card-nickname">"Thorn" &middot; Route 204</div>
+            <div><span class="type-pill type-grass">Grass</span> <span class="type-pill type-poison">Poison</span></div>
+          </div>
+        </div>
+        <div class="team-card">
+          <div class="sprite-circle" style="background: rgba(148, 163, 184, 0.1);">🥊</div>
+          <div class="team-card-info">
+            <div class="team-card-name">Lucario</div>
+            <div class="team-card-nickname">"Aura" &middot; Route 207</div>
+            <div><span class="type-pill type-fighting">Fighting</span> <span class="type-pill type-steel">Steel</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gym Progress -->
+    <div class="glass fade-up" id="gyms-section">
+      <div style="padding: 20px 20px 0;">
+        <div class="section-label">Gym Progress</div>
+      </div>
+      <div class="gym-stepper">
+        <div class="gym-step completed">
+          <div class="gym-dot">1</div>
+          <div class="gym-info">
+            <div class="gym-leader">Roark <span class="type-pill type-rock" style="margin-left: 4px;">Rock</span></div>
+            <div class="gym-city">Oreburgh City</div>
+          </div>
+        </div>
+        <div class="gym-step completed">
+          <div class="gym-dot">2</div>
+          <div class="gym-info">
+            <div class="gym-leader">Gardenia <span class="type-pill type-grass" style="margin-left: 4px;">Grass</span></div>
+            <div class="gym-city">Eterna City</div>
+          </div>
+        </div>
+        <div class="gym-step completed">
+          <div class="gym-dot">3</div>
+          <div class="gym-info">
+            <div class="gym-leader">Maylene <span class="type-pill type-fighting" style="margin-left: 4px;">Fighting</span></div>
+            <div class="gym-city">Veilstone City</div>
+          </div>
+        </div>
+        <div class="gym-step completed">
+          <div class="gym-dot">4</div>
+          <div class="gym-info">
+            <div class="gym-leader">Crasher Wake <span class="type-pill type-water" style="margin-left: 4px;">Water</span></div>
+            <div class="gym-city">Pastoria City</div>
+          </div>
+        </div>
+        <div class="gym-step completed">
+          <div class="gym-dot">5</div>
+          <div class="gym-info">
+            <div class="gym-leader">Fantina <span class="type-pill type-ghost" style="margin-left: 4px;">Ghost</span></div>
+            <div class="gym-city">Hearthome City</div>
+          </div>
+        </div>
+        <div class="gym-step next">
+          <div class="gym-dot">6</div>
+          <div class="gym-info">
+            <div class="gym-leader" style="color: var(--amber);">Byron <span class="type-pill type-steel" style="margin-left: 4px;">Steel</span></div>
+            <div class="gym-city" style="color: var(--amber); opacity: 0.7;">Canalave City</div>
+          </div>
+        </div>
+        <div class="gym-step future">
+          <div class="gym-dot">7</div>
+          <div class="gym-info">
+            <div class="gym-leader">Candice <span class="type-pill type-ice" style="margin-left: 4px; opacity: 0.4;">Ice</span></div>
+            <div class="gym-city">Snowpoint City</div>
+          </div>
+        </div>
+        <div class="gym-step future">
+          <div class="gym-dot">8</div>
+          <div class="gym-info">
+            <div class="gym-leader">Volkner <span class="type-pill type-electric" style="margin-left: 4px; opacity: 0.4;">Electric</span></div>
+            <div class="gym-city">Sunyshore City</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Catches -->
+    <div class="glass span-3 fade-up" id="catches-section">
+      <div style="padding: 20px 20px 8px;">
+        <div class="section-label">All Catches &middot; 11 total</div>
+      </div>
+      <div class="catches-scroll">
+        <div class="catch-chip"><span class="catch-dot alive"></span> Infernape <span class="type-pill type-fire" style="font-size: 8px;">Fire</span></div>
+        <div class="catch-chip"><span class="catch-dot alive"></span> Staraptor <span class="type-pill type-normal" style="font-size: 8px;">Norm</span></div>
+        <div class="catch-chip"><span class="catch-dot alive"></span> Luxray <span class="type-pill type-electric" style="font-size: 8px;">Elec</span></div>
+        <div class="catch-chip"><span class="catch-dot alive"></span> Gastrodon <span class="type-pill type-water" style="font-size: 8px;">Water</span></div>
+        <div class="catch-chip"><span class="catch-dot alive"></span> Roserade <span class="type-pill type-grass" style="font-size: 8px;">Grass</span></div>
+        <div class="catch-chip"><span class="catch-dot alive"></span> Lucario <span class="type-pill type-fighting" style="font-size: 8px;">Fight</span></div>
+        <div class="catch-chip"><span class="catch-dot alive"></span> Bibarel <span class="type-pill type-normal" style="font-size: 8px;">Norm</span></div>
+        <div class="catch-chip"><span class="catch-dot alive"></span> Bronzong <span class="type-pill type-steel" style="font-size: 8px;">Steel</span></div>
+        <div class="catch-chip dead"><span class="catch-dot dead"></span> <s>Geodude</s></div>
+        <div class="catch-chip dead"><span class="catch-dot dead"></span> <s>Zubat</s></div>
+        <div class="catch-chip dead"><span class="catch-dot dead"></span> <s>Buizel</s></div>
+      </div>
+    </div>
+
+    <!-- Type Coverage -->
+    <div class="glass span-2 fade-up" id="analysis-section">
+      <div class="coverage-panel">
+        <div class="section-label">Type Coverage</div>
+
+        <div style="margin-bottom: 16px;">
+          <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 6px;">Offensive Coverage (15/17)</div>
+          <div class="coverage-dots">
+            <div class="cov-dot covered type-fire">FIR</div>
+            <div class="cov-dot covered type-water">WAT</div>
+            <div class="cov-dot covered type-grass">GRS</div>
+            <div class="cov-dot covered type-electric">ELC</div>
+            <div class="cov-dot covered type-normal">NRM</div>
+            <div class="cov-dot covered type-fighting">FGT</div>
+            <div class="cov-dot covered type-flying">FLY</div>
+            <div class="cov-dot covered type-poison">PSN</div>
+            <div class="cov-dot covered type-ground">GND</div>
+            <div class="cov-dot covered type-rock">RCK</div>
+            <div class="cov-dot covered type-psychic">PSY</div>
+            <div class="cov-dot covered type-ghost">GHO</div>
+            <div class="cov-dot covered type-steel">STL</div>
+            <div class="cov-dot covered" style="background: rgba(112,88,72,0.2); color: #a89080;">DRK</div>
+            <div class="cov-dot covered" style="background: rgba(168,184,32,0.15); color: #c8d040;">BUG</div>
+            <div class="cov-dot gap">ICE</div>
+            <div class="cov-dot gap">DRG</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size: 11px; color: var(--red); margin-bottom: 8px;">Shared Weaknesses</div>
+          <div class="weakness-item">
+            <span class="type-pill type-ground" style="font-size: 9px; min-width: 50px; text-align: center;">Ground</span>
+            <div class="weakness-bar"><div class="weakness-fill" style="width: 100%;"></div></div>
+            <span style="font-size: 11px; color: var(--red);">3 weak</span>
+          </div>
+          <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">Infernape, Luxray, Lucario vulnerable</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Storage -->
+    <div class="glass fade-up">
+      <div style="padding: 20px;">
+        <div class="section-label">In Storage</div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="team-card">
+            <div class="sprite-circle" style="background: rgba(59, 130, 246, 0.08);">🦫</div>
+            <div class="team-card-info">
+              <div class="team-card-name">Bibarel</div>
+              <div class="team-card-nickname">"Chomps"</div>
+              <div><span class="type-pill type-normal">Normal</span> <span class="type-pill type-water">Water</span></div>
+            </div>
+          </div>
+          <div class="team-card">
+            <div class="sprite-circle" style="background: rgba(148, 163, 184, 0.08);">🔔</div>
+            <div class="team-card-info">
+              <div class="team-card-name">Bronzong</div>
+              <div class="team-card-nickname">"Gong"</div>
+              <div><span class="type-pill type-steel">Steel</span> <span class="type-pill type-psychic">Psychic</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function scrollToSection(id) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelectorAll('.nav-pill').forEach(p => p.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+
+  // Intersection observer for nav highlighting
+  const sections = ['overview', 'team-section', 'catches-section', 'gyms-section', 'analysis-section'];
+  const navMap = { 'overview': 0, 'team-section': 1, 'catches-section': 2, 'gyms-section': 3, 'analysis-section': 4 };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const idx = navMap[entry.target.id];
+        if (idx !== undefined) {
+          document.querySelectorAll('.nav-pill').forEach((p, i) => {
+            p.classList.toggle('active', i === idx);
+          });
+        }
+      }
+    });
+  }, { threshold: 0.3 });
+
+  sections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) observer.observe(el);
+  });
+</script>
+
+</body>
+</html>

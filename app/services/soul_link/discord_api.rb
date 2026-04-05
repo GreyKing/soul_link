@@ -1,6 +1,8 @@
 require "discordrb"
 
 module SoulLink
+  class DiscordApiError < StandardError; end
+
   class DiscordApi
     def initialize
       @token = "Bot #{Rails.application.credentials.discord[:token]}"
@@ -32,6 +34,17 @@ module SoulLink
       )
 
       run
+    rescue RestClient::Forbidden
+      raise DiscordApiError, "Bot lacks permission to create channels. Check the bot's role in Discord server settings."
+    rescue RestClient::Unauthorized
+      raise DiscordApiError, "Discord authentication failed. The bot token may be invalid."
+    rescue RestClient::ExceptionWithResponse => e
+      body = JSON.parse(e.response.body) rescue {}
+      msg = body["message"] || "Unknown Discord error"
+      Rails.logger.error "Discord API error: #{e.response.code} - #{e.response.body}"
+      raise DiscordApiError, "Discord API error: #{msg}"
+    rescue SocketError, Errno::ECONNREFUSED, Errno::ETIMEDOUT
+      raise DiscordApiError, "Could not reach Discord. Please try again in a moment."
     end
 
     private

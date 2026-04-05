@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trainer's Album // Soul Link</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800&family=Lora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #1a1625;
+    --bg-light: #231e30;
+    --gold: #ffd700;
+    --gold-dim: rgba(255, 215, 0, 0.3);
+    --silver: #c0c0c0;
+    --text: #e8e0f0;
+    --text-dim: rgba(232, 224, 240, 0.5);
+    --card-inner: #f5f1e8;
+    --card-text: #1a1a1a;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Lora', serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* Binder texture background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(100, 50, 150, 0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 30%, rgba(50, 50, 120, 0.06) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  /* ── Breadcrumb + Filters ── */
+  .top-bar {
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    position: sticky;
+    top: 0;
+    background: rgba(26, 22, 37, 0.95);
+    backdrop-filter: blur(8px);
+    z-index: 40;
+  }
+
+  .breadcrumb {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+  }
+
+  .breadcrumb span { color: var(--gold); }
+
+  .filter-row {
+    display: flex;
+    gap: 6px;
+  }
+
+  .filter-chip {
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: none;
+    color: var(--text-dim);
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+
+  .filter-chip:hover {
+    border-color: var(--gold-dim);
+    color: var(--gold);
+  }
+
+  .filter-chip.active {
+    background: rgba(255, 215, 0, 0.1);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  /* ── Container ── */
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 20px 60px;
+    position: relative;
+  }
+
+  /* Binder ring holes decoration */
+  .binder-rings {
+    position: fixed;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 80px;
+    z-index: 30;
+  }
+
+  .binder-ring {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 3px solid rgba(100, 80, 60, 0.4);
+    background: rgba(30, 20, 15, 0.6);
+  }
+
+  /* ── Section titles ── */
+  .section-title {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--gold);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.15);
+  }
+
+  /* ── Card Grid ���─ */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 32px;
+  }
+
+  .card-grid.dense {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+
+  /* ── Pokemon Trading Card ── */
+  .pokemon-card {
+    aspect-ratio: 5 / 7;
+    border-radius: 12px;
+    padding: 6px;
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    perspective: 800px;
+  }
+
+  .pokemon-card:hover {
+    transform: translateY(-6px) scale(1.02);
+    z-index: 10;
+  }
+
+  /* Type-colored gradient borders */
+  .card-fire { background: linear-gradient(135deg, #ff6b35, #ff3d00, #ff6b35); }
+  .card-water { background: linear-gradient(135deg, #2196f3, #0d47a1, #2196f3); }
+  .card-grass { background: linear-gradient(135deg, #4caf50, #1b5e20, #4caf50); }
+  .card-electric { background: linear-gradient(135deg, #f8d030, #c8a000, #f8d030); }
+  .card-normal { background: linear-gradient(135deg, #a8a878, #787860, #a8a878); }
+  .card-fighting { background: linear-gradient(135deg, #c03028, #802018, #c03028); }
+  .card-flying { background: linear-gradient(135deg, #a890f0, #7060c0, #a890f0); }
+  .card-poison { background: linear-gradient(135deg, #a040a0, #702070, #a040a0); }
+  .card-ground { background: linear-gradient(135deg, #e0c068, #b09030, #e0c068); }
+  .card-steel { background: linear-gradient(135deg, #b8b8d0, #8888a0, #b8b8d0); }
+  .card-psychic { background: linear-gradient(135deg, #f85888, #c83060, #f85888); }
+  .card-rock { background: linear-gradient(135deg, #b8a038, #887018, #b8a038); }
+  .card-ghost { background: linear-gradient(135deg, #705898, #483868, #705898); }
+
+  .card-inner {
+    background: var(--card-inner);
+    border-radius: 8px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Holofoil shimmer */
+  .card-inner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      var(--holo-angle, 135deg),
+      transparent 30%,
+      rgba(255, 255, 255, 0.15) 45%,
+      rgba(200, 170, 255, 0.1) 50%,
+      rgba(255, 215, 0, 0.08) 55%,
+      transparent 70%
+    );
+    pointer-events: none;
+    z-index: 2;
+    border-radius: 8px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .pokemon-card:hover .card-inner::before {
+    opacity: 1;
+  }
+
+  .card-top {
+    padding: 8px 10px 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .card-species {
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--card-text);
+    letter-spacing: 0.03em;
+  }
+
+  .card-nick {
+    font-size: 9px;
+    color: #888;
+    font-style: italic;
+  }
+
+  .card-sprite-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, rgba(200, 190, 170, 0.3) 0%, rgba(220, 210, 190, 0.2) 100%);
+    margin: 0 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    font-size: 48px;
+    position: relative;
+    min-height: 80px;
+  }
+
+  .card-location {
+    position: absolute;
+    bottom: 4px;
+    right: 6px;
+    font-size: 8px;
+    color: #999;
+    font-style: italic;
+  }
+
+  .card-bottom {
+    padding: 6px 10px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .card-types {
+    display: flex;
+    gap: 4px;
+  }
+
+  .card-type-pill {
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #fff;
+  }
+
+  .ctp-fire { background: #e25822; }
+  .ctp-fighting { background: #9e2a2b; }
+  .ctp-normal { background: #908870; }
+  .ctp-flying { background: #8a70d0; }
+  .ctp-electric { background: #c8a000; }
+  .ctp-water { background: #1a6fc4; }
+  .ctp-ground { background: #a07828; }
+  .ctp-grass { background: #2e7d32; }
+  .ctp-poison { background: #7b2d8e; }
+  .ctp-steel { background: #6e6e88; }
+  .ctp-psychic { background: #c02860; }
+  .ctp-rock { background: #887018; }
+  .ctp-ghost { background: #4a3070; }
+
+  .card-slot {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--card-text);
+    opacity: 0.5;
+  }
+
+  /* ── Dead card overlay ── */
+  .pokemon-card.dead {
+    filter: grayscale(0.6) brightness(0.7);
+  }
+
+  .pokemon-card.dead .card-inner::after {
+    content: 'FALLEN';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-20deg);
+    font-family: 'Cinzel', serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: rgba(200, 30, 30, 0.5);
+    letter-spacing: 0.15em;
+    z-index: 5;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .pokemon-card.dead:hover {
+    transform: translateY(-2px) scale(1.01);
+  }
+
+  /* ── Empty card slot ── */
+  .empty-slot {
+    aspect-ratio: 5 / 7;
+    border-radius: 12px;
+    border: 2px dashed rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Cinzel', serif;
+    font-size: 32px;
+    color: rgba(255, 255, 255, 0.1);
+  }
+
+  /* ── Badge Cards ── */
+  .badge-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+
+  .badge-card {
+    width: 80px;
+    height: 56px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    transition: all 0.2s;
+    cursor: default;
+  }
+
+  .badge-earned {
+    background: linear-gradient(135deg, #ffd700, #ffaa00);
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+    border: 2px solid rgba(255, 215, 0, 0.6);
+  }
+
+  .badge-earned:hover {
+    transform: scale(1.08);
+    box-shadow: 0 4px 16px rgba(255, 215, 0, 0.4);
+  }
+
+  .badge-empty {
+    background: var(--bg-light);
+    border: 2px dashed rgba(255, 255, 255, 0.08);
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.15);
+  }
+
+  /* ── Stats Bar ── */
+  .stats-bar {
+    display: flex;
+    gap: 24px;
+    padding: 16px 20px;
+    background: var(--bg-light);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+  }
+
+  .stat-item {
+    text-align: center;
+  }
+
+  .stat-num {
+    font-family: 'Cinzel', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--gold);
+    line-height: 1;
+  }
+
+  .stat-caption {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Gym Leader Info ── */
+  .next-gym-banner {
+    padding: 16px 20px;
+    background: var(--bg-light);
+    border: 1px solid rgba(255, 215, 0, 0.15);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .gym-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 215, 0, 0.1);
+    border: 2px solid var(--gold-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .gym-detail {
+    flex: 1;
+  }
+
+  .gym-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-family: 'Cinzel', serif;
+  }
+
+  .gym-name {
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .gym-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .card-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .card-grid.dense { grid-template-columns: repeat(2, 1fr); }
+    .binder-rings { display: none; }
+    .stats-bar { gap: 16px; }
+    .container { padding: 16px 12px 40px; }
+  }
+
+  @media (max-width: 480px) {
+    .card-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  }
+
+  /* ── Animations ── */
+  .fade-in {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: fadeIn 0.4s ease forwards;
+  }
+
+  @keyframes fadeIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in:nth-child(1) { animation-delay: 0.05s; }
+  .fade-in:nth-child(2) { animation-delay: 0.1s; }
+  .fade-in:nth-child(3) { animation-delay: 0.15s; }
+  .fade-in:nth-child(4) { animation-delay: 0.2s; }
+  .fade-in:nth-child(5) { animation-delay: 0.25s; }
+  .fade-in:nth-child(6) { animation-delay: 0.3s; }
+</style>
+</head>
+<body>
+
+<!-- Binder rings -->
+<div class="binder-rings">
+  <div class="binder-ring"></div>
+  <div class="binder-ring"></div>
+  <div class="binder-ring"></div>
+</div>
+
+<!-- Top Bar -->
+<div class="top-bar">
+  <div class="breadcrumb">Collection &rsaquo; <span>Grey's Album</span></div>
+  <div class="filter-row">
+    <button class="filter-chip active" onclick="filterCards('all', this)">All</button>
+    <button class="filter-chip" onclick="filterCards('team', this)">Team</button>
+    <button class="filter-chip" onclick="filterCards('alive', this)">Alive</button>
+    <button class="filter-chip" onclick="filterCards('dead', this)">Fallen</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Collector Stats -->
+  <div class="stats-bar fade-in">
+    <div class="stat-item">
+      <div class="stat-num">11</div>
+      <div class="stat-caption">Collected</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">8</div>
+      <div class="stat-caption">Alive</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">3</div>
+      <div class="stat-caption">Fallen</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">72.7%</div>
+      <div class="stat-caption">Survival</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">6/6</div>
+      <div class="stat-caption">Team</div>
+    </div>
+  </div>
+
+  <!-- Badge Case -->
+  <div class="section-title">Badge Case</div>
+  <div class="badge-row fade-in">
+    <div class="badge-card badge-earned" title="Roark - Rock">&#9733;</div>
+    <div class="badge-card badge-earned" title="Gardenia - Grass">&#9733;</div>
+    <div class="badge-card badge-earned" title="Maylene - Fighting">&#9733;</div>
+    <div class="badge-card badge-earned" title="Crasher Wake - Water">&#9733;</div>
+    <div class="badge-card badge-earned" title="Fantina - Ghost">&#9733;</div>
+    <div class="badge-card badge-empty">?</div>
+    <div class="badge-card badge-empty">?</div>
+    <div class="badge-card badge-empty">?</div>
+  </div>
+
+  <!-- Next Gym -->
+  <div class="next-gym-banner fade-in">
+    <div class="gym-icon">&#9876;</div>
+    <div class="gym-detail">
+      <div class="gym-label">Next Challenge</div>
+      <div class="gym-name">Byron</div>
+      <div class="gym-sub">Steel-type &middot; Canalave City &middot; Gym 6</div>
+    </div>
+  </div>
+
+  <!-- Active Team Cards -->
+  <div class="section-title">Active Team</div>
+  <div class="card-grid" id="team-cards">
+    <!-- Infernape -->
+    <div class="pokemon-card card-fire fade-in" data-filter="team alive">
+      <div class="card-inner">
+        <div class="card-top">
+          <div><div class="card-species">Infernape</div><div class="card-nick">"Blaze"</div></div>
+          <div class="card-slot">#1</div>
+        </div>
+        <div class="card-sprite-area">
+          &#128293;
+          <div class="card-location">Oreburgh Gate</div>
+        </div>
+        <div class="card-bottom">
+          <div class="card-types"><span class="card-type-pill ctp-fire">Fire</span><span class="card-type-pill ctp-fighting">Fight</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Staraptor -->
+    <div class="pokemon-card card-normal fade-in" data-filter="team alive">
+      <div class="card-inner">
+        <div class="card-top">
+          <div><div class="card-species">Staraptor</div><div class="card-nick">"Wingman"</div></div>
+          <div class="card-slot">#2</div>
+        </div>
+        <div class="card-sprite-area">
+          &#129413;
+          <div class="card-location">Route 201</div>
+        </div>
+        <div class="card-bottom">
+          <div class="card-types"><span class="card-type-pill ctp-normal">Normal</span><span class="card-type-pill ctp-flying">Flying</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Luxray -->
+    <div class="pokemon-card card-electric fade-in" data-filter="team alive">
+      <div class="card-inner">
+        <div class="card-top">
+          <div><div class="card-species">Luxray</div><div class="card-nick">"Sparks"</div></div>
+          <div class="card-slot">#3</div>
+        </div>
+        <div class="card-sprite-area">
+          &#9889;
+          <div class="card-location">Route 202</div>
+        </div>
+        <div class="card-bottom">
+          <div class="card-types"><span class="card-type-pill ctp-electric">Electric</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gastrodon -->
+    <div class="pokemon-card card-water fade-in" data-filter="team alive">
+      <div class="card-inner">
+        <div class="card-top">
+          <div><div class="card-species">Gastrodon</div><div class="card-nick">"Sluggo"</div></div>
+          <div class="card-slot">#4</div>
+        </div>
+        <div class="card-sprite-area">
+          &#127754;
+          <div class="card-location">Route 205</div>
+        </div>
+        <div class="card-bottom">
+          <div class="card-types"><span class="card-type-pill ctp-water">Water</span><span class="card-type-pill ctp-ground">Ground</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Roserade -->
+    <div class="pokemon-card card-grass fade-in" data-filter="team alive">
+      <div class="card-inner">
+        <div class="card-top">
+          <div><div class="card-species">Roserade</div><div class="card-nick">"Thorn"</div></div>
+          <div class="card-slot">#5</div>
+        </div>
+        <div class="card-sprite-area">
+          &#127801;
+          <div class="card-location">Route 204</div>
+        </div>
+        <div class="card-bottom">
+          <div class="card-types"><span class="card-type-pill ctp-grass">Grass</span><span class="card-type-pill ctp-poison">Poison</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lucario -->
+    <div class="pokemon-card card-steel fade-in" data-filter="team alive">
+      <div class="card-inner">
+        <div class="card-top">
+          <div><div class="card-species">Lucario</div><div class="card-nick">"Aura"</div></div>
+          <div class="card-slot">#6</div>
+        </div>
+        <div class="card-sprite-area">
+          &#129354;
+          <div class="card-location">Route 207</div>
+        </div>
+        <div class="card-bottom">
+          <div class="card-types"><span class="card-type-pill ctp-fighting">Fight</span><span class="card-type-pill ctp-steel">Steel</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Storage Cards -->
+  <div class="section-title">In Storage</div>
+  <div class="card-grid dense" id="storage-cards">
+    <!-- Bibarel -->
+    <div class="pokemon-card card-normal fade-in" data-filter="alive" style="aspect-ratio: 5/7;">
+      <div class="card-inner">
+        <div class="card-top">
+          <div><div class="card-species">Bibarel</div><div class="card-nick">"Chomps"</div></div>
+        </div>
+        <div class="card-sprite-area" style="font-size: 36px;">&#129451;<div class="card-location">Route 208</div></div>
+        <div class="card-bottom">
+          <div class="card-types"><span class="card-type-pill ctp-normal">Norm</span><span class="card-type-pill ctp-water" style="background: #1a6fc4;">Water</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bronzong -->
+    <div class="pokemon-card card-steel fade-in" data-filter="alive">
+      <div class="card-inner">
+        <div class="card-top">
+          <div><div class="card-species">Bronzong</div><div class="card-nick">"Gong"</div></div>
+        </div>
+        <div class="card-sprite-area" style="font-size: 36px;">&#128276;<div class="card-location">Mt. Coronet</div></div>
+        <div class="card-bottom">
+          <div class="card-types"><span class="card-type-pill ctp-steel">Steel</span><span class="card-type-pill ctp-psychic">Psychic</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fallen Cards -->
+  <div class="section-title" style="color: #cc4444;">Fallen</div>
+  <div class="card-grid dense" id="dead-cards">
+    <div class="pokemon-card card-rock dead fade-in" data-filter="dead">
+      <div class="card-inner">
+        <div class="card-top">
+          <div><div class="card-species">Geodude</div><div class="card-nick">"Rocky"</div></div>
+        </div>
+        <div class="card-sprite-area" style="font-size: 36px;">&#9760;<div class="card-location">Oreburgh Mine</div></div>
+        <div class="card-bottom">
+          <div class="card-types"><span class="card-type-pill ctp-rock">Rock</span><span class="card-type-pill ctp-ground" style="background: #a07828;">Ground</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pokemon-card card-poison dead fade-in" data-filter="dead">
+      <div class="card-inner">
+        <div class="card-top">
+          <div><div class="card-species">Zubat</div><div class="card-nick">"Screech"</div></div>
+        </div>
+        <div class="card-sprite-area" style="font-size: 36px;">&#9760;<div class="card-location">Ravaged Path</div></div>
+        <div class="card-bottom">
+          <div class="card-types"><span class="card-type-pill ctp-poison">Poison</span><span class="card-type-pill ctp-flying">Flying</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pokemon-card card-water dead fade-in" data-filter="dead">
+      <div class="card-inner">
+        <div class="card-top">
+          <div><div class="card-species">Buizel</div><div class="card-nick">"Splash"</div></div>
+        </div>
+        <div class="card-sprite-area" style="font-size: 36px;">&#9760;<div class="card-location">Route 205</div></div>
+        <div class="card-bottom">
+          <div class="card-types"><span class="card-type-pill ctp-water">Water</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Holofoil mouse tracking
+  document.querySelectorAll('.pokemon-card:not(.dead)').forEach(card => {
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width;
+      const y = (e.clientY - rect.top) / rect.height;
+      const angle = Math.atan2(y - 0.5, x - 0.5) * (180 / Math.PI) + 90;
+      card.querySelector('.card-inner').style.setProperty('--holo-angle', angle + 'deg');
+    });
+  });
+
+  // Filter
+  function filterCards(filter, btn) {
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+
+    document.querySelectorAll('.pokemon-card').forEach(card => {
+      const f = card.dataset.filter || '';
+      if (filter === 'all') {
+        card.style.display = '';
+      } else {
+        card.style.display = f.includes(filter) ? '' : 'none';
+      }
+    });
+
+    // Show/hide section titles
+    document.querySelectorAll('.section-title').forEach(t => t.style.display = '');
+    if (filter === 'team') {
+      document.querySelectorAll('.section-title').forEach((t, i) => {
+        if (i > 1) t.style.display = 'none';
+      });
+    }
+  }
+</script>
+
+</body>
+</html>

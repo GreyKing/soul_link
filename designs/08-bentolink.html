@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BentoLink // Soul Link</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --black: #000000;
+    --tile: #111111;
+    --tile-hover: #1a1a1a;
+    --white: #ffffff;
+    --gray: #888888;
+    --muted: #444444;
+    --blue: #0071e3;
+    --green: #30d158;
+    --red: #ff453a;
+    --amber: #ffd60a;
+    --radius: 20px;
+    --gap: 8px;
+  }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 16px var(--gap) 40px;
+  }
+
+  /* ── Bento Grid ── */
+  .bento {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: minmax(120px, auto);
+    gap: var(--gap);
+  }
+
+  .tile {
+    background: var(--tile);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: transform 0.25s ease, background 0.25s ease;
+    cursor: default;
+    position: relative;
+  }
+
+  .tile:hover {
+    transform: scale(1.015);
+    background: var(--tile-hover);
+  }
+
+  .c2 { grid-column: span 2; }
+  .c3 { grid-column: span 3; }
+  .c4 { grid-column: span 4; }
+  .r2 { grid-row: span 2; }
+
+  .tile-pad { padding: 28px; }
+  .tile-pad-sm { padding: 20px; }
+
+  /* ── Labels ── */
+  .tile-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  /* ── Hero Numbers ── */
+  .hero-num {
+    font-size: 64px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  .hero-num-lg {
+    font-size: 80px;
+    font-weight: 700;
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+  }
+
+  .hero-sub {
+    font-size: 13px;
+    color: var(--gray);
+    margin-top: 4px;
+    font-weight: 400;
+  }
+
+  /* ── Team Hero ── */
+  .team-hero {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+  }
+
+  .team-sprites {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 12px;
+    padding: 16px 0 0;
+    flex: 1;
+  }
+
+  .team-sprite-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    transition: transform 0.2s;
+  }
+
+  .team-sprite-col:hover { transform: translateY(-4px); }
+
+  .sprite-emoji {
+    font-size: 40px;
+    line-height: 1;
+    display: block;
+  }
+
+  .sprite-name {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--gray);
+    text-align: center;
+    letter-spacing: 0.02em;
+  }
+
+  .sprite-nick {
+    font-size: 8px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* ── Type Dots ── */
+  .type-dots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .type-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 6px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    transition: transform 0.15s;
+    cursor: default;
+  }
+
+  .type-dot:hover { transform: scale(1.15); }
+
+  .td-fire { background: #ff6b35; color: #fff; }
+  .td-water { background: #2196f3; color: #fff; }
+  .td-grass { background: #4caf50; color: #fff; }
+  .td-electric { background: #f8d030; color: #333; }
+  .td-normal { background: #a8a878; color: #fff; }
+  .td-fighting { background: #c03028; color: #fff; }
+  .td-flying { background: #a890f0; color: #fff; }
+  .td-poison { background: #a040a0; color: #fff; }
+  .td-ground { background: #e0c068; color: #333; }
+  .td-rock { background: #b8a038; color: #fff; }
+  .td-psychic { background: #f85888; color: #fff; }
+  .td-ghost { background: #705898; color: #fff; }
+  .td-steel { background: #b8b8d0; color: #333; }
+  .td-dark { background: #705848; color: #fff; }
+  .td-bug { background: #a8b820; color: #fff; }
+  .td-gap { background: transparent; border: 2px dashed var(--red); color: var(--red); }
+
+  /* ── Gym Bars ── */
+  .gym-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .gym-bar {
+    height: 10px;
+    border-radius: 3px;
+    background: #1a1a1a;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+
+  .gym-bar:hover { transform: scaleY(1.4); }
+
+  .gym-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+
+  /* ── Catches Strip ── */
+  .catches-strip {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    overflow-x: auto;
+    padding: 4px 0;
+    scrollbar-width: none;
+  }
+
+  .catches-strip::-webkit-scrollbar { display: none; }
+
+  .catch-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+    transition: transform 0.15s;
+    background: #1a1a1a;
+  }
+
+  .catch-circle:hover { transform: scale(1.2); }
+  .catch-circle.dead { opacity: 0.25; }
+
+  /* ── Player tile ── */
+  .player-name {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .player-run {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .player-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--blue), #5856d6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+
+  /* ── Next Gym ── */
+  .next-gym-name {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--amber);
+  }
+
+  .next-gym-detail {
+    font-size: 12px;
+    color: var(--gray);
+    margin-top: 2px;
+  }
+
+  /* ── Warning tile ── */
+  .warning-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--red);
+    line-height: 1.4;
+  }
+
+  .warning-detail {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .bento {
+      grid-template-columns: repeat(2, 1fr);
+      grid-auto-rows: minmax(100px, auto);
+    }
+    .c3, .c4 { grid-column: span 2; }
+    .hero-num { font-size: 48px; }
+    .hero-num-lg { font-size: 56px; }
+    .tile-pad { padding: 20px; }
+    .sprite-emoji { font-size: 30px; }
+    .team-sprites { gap: 8px; }
+    .player-name { font-size: 22px; }
+    .next-gym-name { font-size: 22px; }
+  }
+
+  @media (max-width: 480px) {
+    .bento { grid-template-columns: 1fr; }
+    .c2, .c3, .c4 { grid-column: span 1; }
+    .r2 { grid-row: span 1; }
+  }
+
+  /* ── Entry animation ── */
+  .tile {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+    animation: tileIn 0.5s ease forwards;
+  }
+
+  @keyframes tileIn {
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .tile:nth-child(1) { animation-delay: 0.02s; }
+  .tile:nth-child(2) { animation-delay: 0.06s; }
+  .tile:nth-child(3) { animation-delay: 0.1s; }
+  .tile:nth-child(4) { animation-delay: 0.14s; }
+  .tile:nth-child(5) { animation-delay: 0.18s; }
+  .tile:nth-child(6) { animation-delay: 0.22s; }
+  .tile:nth-child(7) { animation-delay: 0.26s; }
+  .tile:nth-child(8) { animation-delay: 0.3s; }
+  .tile:nth-child(9) { animation-delay: 0.34s; }
+  .tile:nth-child(10) { animation-delay: 0.38s; }
+  .tile:nth-child(11) { animation-delay: 0.42s; }
+
+  /* Home button */
+  .home-pill {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: var(--tile);
+    color: var(--gray);
+    border: 1px solid #222;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    z-index: 30;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+
+  .home-pill:hover {
+    background: var(--tile-hover);
+    color: var(--white);
+    border-color: #444;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="bento">
+
+    <!-- Player Tile -->
+    <div class="tile tile-pad">
+      <div class="player-avatar">G</div>
+      <div class="player-name">Grey</div>
+      <div class="player-run">Platinum Soul Link</div>
+    </div>
+
+    <!-- Team Hero (2 col, 2 row) -->
+    <div class="tile c2 r2 tile-pad">
+      <div class="team-hero">
+        <div class="tile-label">Active Team</div>
+        <div class="team-sprites">
+          <div class="team-sprite-col">
+            <span class="sprite-emoji">&#128293;</span>
+            <span class="sprite-name">Infernape</span>
+            <span class="sprite-nick">"Blaze"</span>
+          </div>
+          <div class="team-sprite-col">
+            <span class="sprite-emoji">&#129413;</span>
+            <span class="sprite-name">Staraptor</span>
+            <span class="sprite-nick">"Wingman"</span>
+          </div>
+          <div class="team-sprite-col">
+            <span class="sprite-emoji">&#9889;</span>
+            <span class="sprite-name">Luxray</span>
+            <span class="sprite-nick">"Sparks"</span>
+          </div>
+          <div class="team-sprite-col">
+            <span class="sprite-emoji">&#127754;</span>
+            <span class="sprite-name">Gastrodon</span>
+            <span class="sprite-nick">"Sluggo"</span>
+          </div>
+          <div class="team-sprite-col">
+            <span class="sprite-emoji">&#127801;</span>
+            <span class="sprite-name">Roserade</span>
+            <span class="sprite-nick">"Thorn"</span>
+          </div>
+          <div class="team-sprite-col">
+            <span class="sprite-emoji">&#129354;</span>
+            <span class="sprite-name">Lucario</span>
+            <span class="sprite-nick">"Aura"</span>
+          </div>
+        </div>
+        <div style="text-align: center; margin-top: 12px;">
+          <span style="font-size: 11px; color: var(--gray);">6/6 slots filled</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Survival Rate -->
+    <div class="tile tile-pad" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
+      <div class="tile-label">Survival</div>
+      <div class="hero-num-lg" style="color: var(--green);">73<span style="font-size: 36px;">%</span></div>
+    </div>
+
+    <!-- Deaths -->
+    <div class="tile tile-pad" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
+      <div class="tile-label">Deaths</div>
+      <div class="hero-num" style="color: var(--red);">3</div>
+      <div class="hero-sub">of 11 caught</div>
+    </div>
+
+    <!-- Gym Progress -->
+    <div class="tile tile-pad">
+      <div class="tile-label">Badges</div>
+      <div class="hero-num" style="color: var(--amber);">5</div>
+      <div class="hero-sub">of 8</div>
+      <div class="gym-bars" style="margin-top: 14px;">
+        <div class="gym-bar"><div class="gym-fill" style="width: 100%; background: var(--blue);"></div></div>
+        <div class="gym-bar"><div class="gym-fill" style="width: 100%; background: var(--blue);"></div></div>
+        <div class="gym-bar"><div class="gym-fill" style="width: 100%; background: var(--blue);"></div></div>
+        <div class="gym-bar"><div class="gym-fill" style="width: 100%; background: var(--blue);"></div></div>
+        <div class="gym-bar"><div class="gym-fill" style="width: 100%; background: var(--blue);"></div></div>
+        <div class="gym-bar"><div class="gym-fill" style="width: 0%;"></div></div>
+        <div class="gym-bar"><div class="gym-fill" style="width: 0%;"></div></div>
+        <div class="gym-bar"><div class="gym-fill" style="width: 0%;"></div></div>
+      </div>
+    </div>
+
+    <!-- Catches -->
+    <div class="tile c3 tile-pad">
+      <div class="tile-label">All Catches &middot; 11</div>
+      <div class="catches-strip" style="margin-top: 8px;">
+        <div class="catch-circle">&#128293;</div>
+        <div class="catch-circle">&#129413;</div>
+        <div class="catch-circle">&#9889;</div>
+        <div class="catch-circle">&#127754;</div>
+        <div class="catch-circle">&#127801;</div>
+        <div class="catch-circle">&#129354;</div>
+        <div class="catch-circle">&#129451;</div>
+        <div class="catch-circle">&#128276;</div>
+        <div class="catch-circle dead">&#9760;</div>
+        <div class="catch-circle dead">&#9760;</div>
+        <div class="catch-circle dead">&#9760;</div>
+      </div>
+    </div>
+
+    <!-- Coverage -->
+    <div class="tile c2 tile-pad">
+      <div class="tile-label">Type Coverage &middot; 15/17</div>
+      <div class="type-dots" style="margin-top: 10px;">
+        <div class="type-dot td-fire">FIR</div>
+        <div class="type-dot td-water">WTR</div>
+        <div class="type-dot td-grass">GRS</div>
+        <div class="type-dot td-electric">ELC</div>
+        <div class="type-dot td-normal">NRM</div>
+        <div class="type-dot td-fighting">FGT</div>
+        <div class="type-dot td-flying">FLY</div>
+        <div class="type-dot td-poison">PSN</div>
+        <div class="type-dot td-ground">GND</div>
+        <div class="type-dot td-rock">RCK</div>
+        <div class="type-dot td-psychic">PSY</div>
+        <div class="type-dot td-ghost">GHO</div>
+        <div class="type-dot td-steel">STL</div>
+        <div class="type-dot td-dark">DRK</div>
+        <div class="type-dot td-bug">BUG</div>
+        <div class="type-dot td-gap">ICE</div>
+        <div class="type-dot td-gap">DRG</div>
+      </div>
+    </div>
+
+    <!-- Next Gym -->
+    <div class="tile tile-pad" style="border: 1px solid rgba(255, 214, 10, 0.15);">
+      <div class="tile-label" style="color: var(--amber);">Next Gym</div>
+      <div class="next-gym-name">Byron</div>
+      <div class="next-gym-detail">Steel-type</div>
+      <div class="next-gym-detail">Canalave City</div>
+    </div>
+
+    <!-- Weakness Warning -->
+    <div class="tile tile-pad" style="border: 1px solid rgba(255, 69, 58, 0.15);">
+      <div class="tile-label" style="color: var(--red);">Warning</div>
+      <div class="warning-text">Ground x3</div>
+      <div class="warning-detail">Infernape, Luxray, and Lucario share a Ground weakness</div>
+    </div>
+
+    <!-- Storage -->
+    <div class="tile c2 tile-pad-sm">
+      <div class="tile-label">In Storage &middot; 2</div>
+      <div style="display: flex; gap: 16px; margin-top: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 24px;">&#129451;</span>
+          <div>
+            <div style="font-size: 13px; font-weight: 600;">Bibarel</div>
+            <div style="font-size: 10px; color: var(--muted);">"Chomps" &middot; Route 208</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 24px;">&#128276;</span>
+          <div>
+            <div style="font-size: 13px; font-weight: 600;">Bronzong</div>
+            <div style="font-size: 10px; color: var(--muted);">"Gong" &middot; Mt. Coronet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<button class="home-pill" onclick="window.scrollTo({top:0,behavior:'smooth'})">&#8962; Overview</button>
+
+</body>
+</html>

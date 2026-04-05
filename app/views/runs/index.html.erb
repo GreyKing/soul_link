@@ -38,6 +38,10 @@
         </div>
       </div>
 
+      <div data-run-management-target="errorMessage"
+           class="hidden mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-200 text-sm">
+      </div>
+
       <div class="flex items-center gap-3">
         <button data-action="click->run-management#endRun"
                 class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition font-medium text-sm">
@@ -56,6 +60,9 @@
   <div data-run-management-target="noRunPanel" class="<%= 'hidden' if @current_run %>">
     <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-6 mb-6 text-center">
       <p class="text-gray-400 mb-4">No active run. Start a new one to begin tracking.</p>
+      <div data-run-management-target="errorMessage"
+           class="hidden mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-200 text-sm">
+      </div>
       <button data-action="click->run-management#startRun"
               class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition font-medium text-sm">
         Start New Run

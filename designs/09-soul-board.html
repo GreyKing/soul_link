@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Soul Board // Soul Link</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #f8fafc;
+    --white: #ffffff;
+    --text: #0f172a;
+    --text-sec: #64748b;
+    --text-muted: #94a3b8;
+    --border: #e2e8f0;
+    --border-light: #f1f5f9;
+    --indigo: #6366f1;
+    --green: #22c55e;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --violet: #8b5cf6;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Top Bar ── */
+  .top-bar {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .top-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--indigo);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .top-name {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .top-run {
+    font-size: 12px;
+    color: var(--text-sec);
+  }
+
+  .top-spacer { flex: 1; }
+
+  .top-stat {
+    text-align: center;
+    padding: 0 12px;
+    border-left: 1px solid var(--border);
+  }
+
+  .top-stat:first-of-type { border-left: none; }
+
+  .top-stat-num {
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .top-stat-label {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Filter pills */
+  .filter-pills {
+    display: flex;
+    gap: 4px;
+  }
+
+  .filter-pill {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--white);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-sec);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .filter-pill:hover {
+    border-color: var(--indigo);
+    color: var(--indigo);
+  }
+
+  .filter-pill.active {
+    background: var(--indigo);
+    border-color: var(--indigo);
+    color: #fff;
+  }
+
+  /* ── Board (columns) ── */
+  .board {
+    flex: 1;
+    display: flex;
+    gap: 1px;
+    background: var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .column {
+    min-width: 260px;
+    flex: 1;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .col-header {
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--white);
+    flex-shrink: 0;
+  }
+
+  .col-accent {
+    width: 4px;
+    height: 20px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .col-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text);
+  }
+
+  .col-count {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--border-light);
+    padding: 1px 7px;
+    border-radius: 10px;
+  }
+
+  .col-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  /* ── Cards ── */
+  .kanban-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor: default;
+    transition: all 0.15s;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .kanban-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-1px);
+  }
+
+  .card-top-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .card-sprite {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .card-name {
+    font-weight: 600;
+    font-size: 13px;
+    flex: 1;
+  }
+
+  .card-drag {
+    color: var(--text-muted);
+    font-size: 10px;
+    cursor: grab;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .kanban-card:hover .card-drag { opacity: 1; }
+
+  .card-nickname {
+    font-size: 11px;
+    color: var(--text-sec);
+    margin-bottom: 4px;
+  }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+  }
+
+  .card-location {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .card-types {
+    display: flex;
+    gap: 3px;
+  }
+
+  .card-type {
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .ct-fire { background: #fef2f2; color: #dc2626; }
+  .ct-fighting { background: #fff7ed; color: #c2410c; }
+  .ct-normal { background: #f9fafb; color: #6b7280; }
+  .ct-flying { background: #f5f3ff; color: #7c3aed; }
+  .ct-electric { background: #fefce8; color: #ca8a04; }
+  .ct-water { background: #eff6ff; color: #2563eb; }
+  .ct-ground { background: #fef3c7; color: #92400e; }
+  .ct-grass { background: #f0fdf4; color: #16a34a; }
+  .ct-poison { background: #faf5ff; color: #9333ea; }
+  .ct-steel { background: #f1f5f9; color: #475569; }
+  .ct-psychic { background: #fdf2f8; color: #db2777; }
+  .ct-rock { background: #fef9c3; color: #854d0e; }
+  .ct-ghost { background: #faf5ff; color: #6b21a8; }
+
+  /* Team card position badge */
+  .card-pos {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--indigo);
+    background: #eef2ff;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* Dead card */
+  .kanban-card.dead-card {
+    opacity: 0.65;
+    border-left: 3px solid var(--red);
+  }
+
+  .kanban-card.dead-card .card-name {
+    text-decoration: line-through;
+    text-decoration-color: rgba(239, 68, 68, 0.4);
+  }
+
+  .dead-badge {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--red);
+    background: #fef2f2;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* ── Add card button ── */
+  .add-card {
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    background: none;
+    width: 100%;
+    font-family: inherit;
+  }
+
+  .add-card:hover {
+    border-color: var(--indigo);
+    color: var(--indigo);
+    background: rgba(99, 102, 241, 0.03);
+  }
+
+  /* ── Gym header card ── */
+  .gym-header-card {
+    background: linear-gradient(135deg, #fefce8, #fef9c3);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+  }
+
+  .gym-leader {
+    font-weight: 600;
+    font-size: 13px;
+    color: #92400e;
+  }
+
+  .gym-type-info {
+    font-size: 10px;
+    color: #a16207;
+  }
+
+  /* ── Stats drawer ── */
+  .stats-drawer {
+    background: var(--white);
+    border-left: 1px solid var(--border);
+    width: 200px;
+    padding: 14px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .drawer-section-title {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+
+  .coverage-mini {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+
+  .cov-mini-pill {
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .cov-good { background: #f0fdf4; color: #16a34a; }
+  .cov-bad { background: #fef2f2; color: #dc2626; border: 1px dashed #fca5a5; }
+
+  .drawer-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    font-size: 11px;
+  }
+
+  .drawer-stat-label { color: var(--text-sec); }
+  .drawer-stat-val { font-weight: 600; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .board { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+    .column { min-width: unset; min-height: 200px; }
+    .stats-drawer { display: none; }
+    .top-stat { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="top-bar">
+  <div class="top-avatar">G</div>
+  <div>
+    <div class="top-name">Grey</div>
+    <div class="top-run">Platinum Soul Link &middot; Run #1</div>
+  </div>
+  <div class="top-spacer"></div>
+  <div class="top-stat">
+    <div class="top-stat-num" style="color: var(--indigo);">11</div>
+    <div class="top-stat-label">Caught</div>
+  </div>
+  <div class="top-stat">
+    <div class="top-stat-num" style="color: var(--red);">3</div>
+    <div class="top-stat-label">Dead</div>
+  </div>
+  <div class="top-stat">
+    <div class="top-stat-num" style="color: var(--green);">72.7%</div>
+    <div class="top-stat-label">Survival</div>
+  </div>
+  <div class="top-stat">
+    <div class="top-stat-num" style="color: var(--amber);">5/8</div>
+    <div class="top-stat-label">Badges</div>
+  </div>
+</div>
+
+<div style="display: flex; flex: 1; overflow: hidden;">
+
+  <!-- Board -->
+  <div class="board">
+
+    <!-- Column: Team -->
+    <div class="column">
+      <div class="col-header">
+        <div class="col-accent" style="background: var(--indigo);"></div>
+        <div class="col-title">Team</div>
+        <div class="col-count">6/6</div>
+      </div>
+      <div class="col-body">
+        <div class="kanban-card">
+          <div class="card-top-row">
+            <span class="card-sprite">&#128293;</span>
+            <span class="card-name">Infernape</span>
+            <span class="card-pos">#1</span>
+            <span class="card-drag">&#8942;&#8942;</span>
+          </div>
+          <div class="card-nickname">"Blaze"</div>
+          <div class="card-meta">
+            <span class="card-location">Oreburgh Gate</span>
+            <div class="card-types"><span class="card-type ct-fire">Fire</span><span class="card-type ct-fighting">Fight</span></div>
+          </div>
+        </div>
+        <div class="kanban-card">
+          <div class="card-top-row">
+            <span class="card-sprite">&#129413;</span>
+            <span class="card-name">Staraptor</span>
+            <span class="card-pos">#2</span>
+            <span class="card-drag">&#8942;&#8942;</span>
+          </div>
+          <div class="card-nickname">"Wingman"</div>
+          <div class="card-meta">
+            <span class="card-location">Route 201</span>
+            <div class="card-types"><span class="card-type ct-normal">Norm</span><span class="card-type ct-flying">Fly</span></div>
+          </div>
+        </div>
+        <div class="kanban-card">
+          <div class="card-top-row">
+            <span class="card-sprite">&#9889;</span>
+            <span class="card-name">Luxray</span>
+            <span class="card-pos">#3</span>
+            <span class="card-drag">&#8942;&#8942;</span>
+          </div>
+          <div class="card-nickname">"Sparks"</div>
+          <div class="card-meta">
+            <span class="card-location">Route 202</span>
+            <div class="card-types"><span class="card-type ct-electric">Elec</span></div>
+          </div>
+        </div>
+        <div class="kanban-card">
+          <div class="card-top-row">
+            <span class="card-sprite">&#127754;</span>
+            <span class="card-name">Gastrodon</span>
+            <span class="card-pos">#4</span>
+            <span class="card-drag">&#8942;&#8942;</span>
+          </div>
+          <div class="card-nickname">"Sluggo"</div>
+          <div class="card-meta">
+            <span class="card-location">Route 205</span>
+            <div class="card-types"><span class="card-type ct-water">Water</span><span class="card-type ct-ground">Gnd</span></div>
+          </div>
+        </div>
+        <div class="kanban-card">
+          <div class="card-top-row">
+            <span class="card-sprite">&#127801;</span>
+            <span class="card-name">Roserade</span>
+            <span class="card-pos">#5</span>
+            <span class="card-drag">&#8942;&#8942;</span>
+          </div>
+          <div class="card-nickname">"Thorn"</div>
+          <div class="card-meta">
+            <span class="card-location">Route 204</span>
+            <div class="card-types"><span class="card-type ct-grass">Grass</span><span class="card-type ct-poison">Psn</span></div>
+          </div>
+        </div>
+        <div class="kanban-card">
+          <div class="card-top-row">
+            <span class="card-sprite">&#129354;</span>
+            <span class="card-name">Lucario</span>
+            <span class="card-pos">#6</span>
+            <span class="card-drag">&#8942;&#8942;</span>
+          </div>
+          <div class="card-nickname">"Aura"</div>
+          <div class="card-meta">
+            <span class="card-location">Route 207</span>
+            <div class="card-types"><span class="card-type ct-fighting">Fight</span><span class="card-type ct-steel">Steel</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column: Alive (stored) -->
+    <div class="column">
+      <div class="col-header">
+        <div class="col-accent" style="background: var(--green);"></div>
+        <div class="col-title">Stored</div>
+        <div class="col-count">2</div>
+      </div>
+      <div class="col-body">
+        <div class="kanban-card">
+          <div class="card-top-row">
+            <span class="card-sprite">&#129451;</span>
+            <span class="card-name">Bibarel</span>
+          </div>
+          <div class="card-nickname">"Chomps"</div>
+          <div class="card-meta">
+            <span class="card-location">Route 208</span>
+            <div class="card-types"><span class="card-type ct-normal">Norm</span><span class="card-type ct-water">Water</span></div>
+          </div>
+        </div>
+        <div class="kanban-card">
+          <div class="card-top-row">
+            <span class="card-sprite">&#128276;</span>
+            <span class="card-name">Bronzong</span>
+          </div>
+          <div class="card-nickname">"Gong"</div>
+          <div class="card-meta">
+            <span class="card-location">Mt. Coronet</span>
+            <div class="card-types"><span class="card-type ct-steel">Steel</span><span class="card-type ct-psychic">Psy</span></div>
+          </div>
+        </div>
+        <button class="add-card">+ New Catch</button>
+      </div>
+    </div>
+
+    <!-- Column: Dead -->
+    <div class="column">
+      <div class="col-header">
+        <div class="col-accent" style="background: var(--red);"></div>
+        <div class="col-title">Fallen</div>
+        <div class="col-count">3</div>
+      </div>
+      <div class="col-body">
+        <div class="kanban-card dead-card">
+          <div class="card-top-row">
+            <span class="card-sprite">&#9760;</span>
+            <span class="card-name">Geodude</span>
+            <span class="dead-badge">DEAD</span>
+          </div>
+          <div class="card-nickname">"Rocky"</div>
+          <div class="card-meta">
+            <span class="card-location">Oreburgh Mine</span>
+            <div class="card-types"><span class="card-type ct-rock">Rock</span><span class="card-type ct-ground">Gnd</span></div>
+          </div>
+        </div>
+        <div class="kanban-card dead-card">
+          <div class="card-top-row">
+            <span class="card-sprite">&#9760;</span>
+            <span class="card-name">Zubat</span>
+            <span class="dead-badge">DEAD</span>
+          </div>
+          <div class="card-nickname">"Screech"</div>
+          <div class="card-meta">
+            <span class="card-location">Ravaged Path</span>
+            <div class="card-types"><span class="card-type ct-poison">Psn</span><span class="card-type ct-flying">Fly</span></div>
+          </div>
+        </div>
+        <div class="kanban-card dead-card">
+          <div class="card-top-row">
+            <span class="card-sprite">&#9760;</span>
+            <span class="card-name">Buizel</span>
+            <span class="dead-badge">DEAD</span>
+          </div>
+          <div class="card-nickname">"Splash"</div>
+          <div class="card-meta">
+            <span class="card-location">Route 205</span>
+            <div class="card-types"><span class="card-type ct-water">Water</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column: Gym Queue -->
+    <div class="column">
+      <div class="col-header">
+        <div class="col-accent" style="background: var(--amber);"></div>
+        <div class="col-title">Gym Queue</div>
+        <div class="col-count">3 left</div>
+      </div>
+      <div class="col-body">
+        <div class="gym-header-card">
+          <div class="gym-leader">Byron &middot; Gym 6</div>
+          <div class="gym-type-info">Steel-type &middot; Canalave City</div>
+          <div style="font-size: 9px; color: #b45309; margin-top: 4px; font-weight: 600;">NEXT CHALLENGE</div>
+        </div>
+        <div class="kanban-card" style="opacity: 0.5;">
+          <div class="card-top-row">
+            <span class="card-name" style="font-size: 12px;">Candice &middot; Gym 7</span>
+          </div>
+          <div class="card-nickname">Ice-type &middot; Snowpoint City</div>
+        </div>
+        <div class="kanban-card" style="opacity: 0.5;">
+          <div class="card-top-row">
+            <span class="card-name" style="font-size: 12px;">Volkner &middot; Gym 8</span>
+          </div>
+          <div class="card-nickname">Electric-type &middot; Sunyshore City</div>
+        </div>
+
+        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);">
+          <div style="font-size: 9px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;">Completed</div>
+          <div style="font-size: 11px; color: var(--green); display: flex; align-items: center; gap: 4px; padding: 2px 0;">&#10003; Roark <span class="card-type ct-rock">Rock</span></div>
+          <div style="font-size: 11px; color: var(--green); display: flex; align-items: center; gap: 4px; padding: 2px 0;">&#10003; Gardenia <span class="card-type ct-grass">Grass</span></div>
+          <div style="font-size: 11px; color: var(--green); display: flex; align-items: center; gap: 4px; padding: 2px 0;">&#10003; Maylene <span class="card-type ct-fighting">Fight</span></div>
+          <div style="font-size: 11px; color: var(--green); display: flex; align-items: center; gap: 4px; padding: 2px 0;">&#10003; C. Wake <span class="card-type ct-water">Water</span></div>
+          <div style="font-size: 11px; color: var(--green); display: flex; align-items: center; gap: 4px; padding: 2px 0;">&#10003; Fantina <span class="card-type ct-ghost">Ghost</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Stats Drawer -->
+  <div class="stats-drawer">
+    <div>
+      <div class="drawer-section-title">Overview</div>
+      <div class="drawer-stat-row"><span class="drawer-stat-label">Caught</span><span class="drawer-stat-val">11</span></div>
+      <div class="drawer-stat-row"><span class="drawer-stat-label">Alive</span><span class="drawer-stat-val" style="color: var(--green);">8</span></div>
+      <div class="drawer-stat-row"><span class="drawer-stat-label">Dead</span><span class="drawer-stat-val" style="color: var(--red);">3</span></div>
+      <div class="drawer-stat-row"><span class="drawer-stat-label">Survival</span><span class="drawer-stat-val">72.7%</span></div>
+      <div class="drawer-stat-row"><span class="drawer-stat-label">Badges</span><span class="drawer-stat-val" style="color: var(--amber);">5/8</span></div>
+    </div>
+
+    <div>
+      <div class="drawer-section-title">Coverage 15/17</div>
+      <div class="coverage-mini">
+        <span class="cov-mini-pill cov-good">FIR</span>
+        <span class="cov-mini-pill cov-good">WTR</span>
+        <span class="cov-mini-pill cov-good">GRS</span>
+        <span class="cov-mini-pill cov-good">ELC</span>
+        <span class="cov-mini-pill cov-good">NRM</span>
+        <span class="cov-mini-pill cov-good">FGT</span>
+        <span class="cov-mini-pill cov-good">FLY</span>
+        <span class="cov-mini-pill cov-good">PSN</span>
+        <span class="cov-mini-pill cov-good">GND</span>
+        <span class="cov-mini-pill cov-good">RCK</span>
+        <span class="cov-mini-pill cov-good">PSY</span>
+        <span class="cov-mini-pill cov-good">GHO</span>
+        <span class="cov-mini-pill cov-good">STL</span>
+        <span class="cov-mini-pill cov-good">DRK</span>
+        <span class="cov-mini-pill cov-good">BUG</span>
+        <span class="cov-mini-pill cov-bad">ICE</span>
+        <span class="cov-mini-pill cov-bad">DRG</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="drawer-section-title" style="color: var(--red);">Weaknesses</div>
+      <div style="font-size: 11px;">
+        <div style="font-weight: 600; color: var(--red);">Ground x3</div>
+        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Infernape, Luxray, Lucario</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="drawer-section-title">Next Gym</div>
+      <div style="font-size: 12px; font-weight: 600;">Byron</div>
+      <div style="font-size: 10px; color: var(--text-muted);">Steel &middot; Canalave City</div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

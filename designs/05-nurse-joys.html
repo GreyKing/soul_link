@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nurse Joy's Station // Soul Link</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --pink: #ec4899;
+    --pink-light: #fce7f3;
+    --pink-pale: #fdf2f8;
+    --pink-glow: rgba(236, 72, 153, 0.15);
+    --orange: #f97316;
+    --text: #1f2937;
+    --text-sec: #6b7280;
+    --text-dim: #9ca3af;
+    --emerald: #10b981;
+    --red: #ef4444;
+    --white: #ffffff;
+    --border: #fce7f3;
+    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+    --card-shadow-hover: 0 4px 12px rgba(236, 72, 153, 0.1), 0 2px 4px rgba(0, 0, 0, 0.04);
+    --radius: 20px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--pink-pale);
+    color: var(--text);
+    font-family: 'Nunito', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Navigation ── */
+  .nav {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    box-shadow: 0 1px 4px rgba(236, 72, 153, 0.06);
+  }
+
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 12px;
+    border: none;
+    background: none;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-sec);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .nav-btn:hover {
+    background: var(--pink-light);
+    color: var(--pink);
+  }
+
+  .nav-btn.active {
+    background: var(--pink);
+    color: #fff;
+    box-shadow: 0 2px 8px var(--pink-glow);
+    animation: navPulse 2s ease infinite;
+  }
+
+  @keyframes navPulse {
+    0%, 100% { box-shadow: 0 2px 8px var(--pink-glow); }
+    50% { box-shadow: 0 2px 16px rgba(236, 72, 153, 0.25); }
+  }
+
+  .nav-icon {
+    font-size: 16px;
+    line-height: 1;
+  }
+
+  /* ── Container ── */
+  .container {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+  }
+
+  /* ── Welcome Banner ── */
+  .welcome {
+    background: var(--white);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 28px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--card-shadow);
+  }
+
+  .avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--pink), #f9a8d4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: 800;
+    color: #fff;
+    box-shadow: 0 4px 12px var(--pink-glow);
+  }
+
+  .avatar-ring {
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid var(--pink-light);
+  }
+
+  .welcome-text h1 {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .welcome-text p {
+    font-size: 13px;
+    color: var(--text-sec);
+    font-weight: 500;
+  }
+
+  /* ── Two Column Layout ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 20px;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--white);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--card-shadow);
+    transition: box-shadow 0.2s;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+
+  .card:hover { box-shadow: var(--card-shadow-hover); }
+
+  .card-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--pink);
+    padding: 18px 20px 0;
+  }
+
+  .card-body { padding: 12px 20px 20px; }
+
+  /* ── Team Grid ── */
+  .team-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .team-member {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+    cursor: default;
+  }
+
+  .team-member:hover {
+    border-color: var(--pink);
+    box-shadow: 0 0 0 3px var(--pink-glow);
+  }
+
+  .type-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .member-info { flex: 1; min-width: 0; }
+  .member-name { font-weight: 700; font-size: 14px; }
+  .member-nick { font-size: 11px; color: var(--text-dim); font-weight: 500; }
+
+  .health-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: #e5e7eb;
+    margin-top: 6px;
+    overflow: hidden;
+  }
+
+  .health-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--emerald);
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.3);
+  }
+
+  .health-fill.dead {
+    background: var(--red);
+    width: 0% !important;
+  }
+
+  /* ── Type Pills ── */
+  .type-pill {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 3px;
+  }
+
+  .tp-fire { background: #fef2f2; color: #dc2626; }
+  .tp-fighting { background: #fff7ed; color: #c2410c; }
+  .tp-normal { background: #f9fafb; color: #6b7280; }
+  .tp-flying { background: #f5f3ff; color: #7c3aed; }
+  .tp-electric { background: #fefce8; color: #ca8a04; }
+  .tp-water { background: #eff6ff; color: #2563eb; }
+  .tp-ground { background: #fef3c7; color: #92400e; }
+  .tp-grass { background: #f0fdf4; color: #16a34a; }
+  .tp-poison { background: #faf5ff; color: #9333ea; }
+  .tp-steel { background: #f1f5f9; color: #475569; }
+  .tp-psychic { background: #fdf2f8; color: #db2777; }
+  .tp-rock { background: #fef9c3; color: #854d0e; }
+  .tp-ghost { background: #faf5ff; color: #6b21a8; }
+  .tp-ice { background: #ecfeff; color: #0891b2; }
+  .tp-dragon { background: #eef2ff; color: #4338ca; }
+
+  /* ── Stat cards row ── */
+  .stat-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .stat-mini {
+    flex: 1;
+    background: var(--white);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    padding: 14px;
+    text-align: center;
+    box-shadow: var(--card-shadow);
+  }
+
+  .stat-num {
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Gym progress ── */
+  .gym-timeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 4px 0;
+    margin-bottom: 16px;
+    justify-content: center;
+  }
+
+  .gym-ball {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+
+  .gym-ball.earned {
+    background: var(--pink);
+    color: #fff;
+    box-shadow: 0 2px 8px var(--pink-glow);
+  }
+
+  .gym-ball.next {
+    background: var(--orange);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+    animation: gymPulse 1.5s ease infinite;
+  }
+
+  @keyframes gymPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+
+  .gym-ball.future {
+    background: #f3f4f6;
+    color: #d1d5db;
+  }
+
+  .gym-line {
+    width: 16px;
+    height: 3px;
+    flex-shrink: 0;
+  }
+
+  .gym-line.done { background: var(--pink); }
+  .gym-line.pending { background: #e5e7eb; }
+
+  .gym-info-row {
+    font-size: 12px;
+    color: var(--text-sec);
+    padding: 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .gym-check {
+    color: var(--pink);
+    font-weight: 700;
+  }
+
+  /* ── Catches list ── */
+  .catch-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .catch-tab {
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text-sec);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+
+  .catch-tab.active {
+    background: var(--pink);
+    color: #fff;
+    border-color: var(--pink);
+  }
+
+  .catch-tab:hover:not(.active) {
+    border-color: var(--pink);
+    color: var(--pink);
+  }
+
+  .catch-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #fce7f3;
+    font-size: 13px;
+  }
+
+  .catch-item:last-child { border-bottom: none; }
+
+  .catch-sprite {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .catch-name { font-weight: 700; flex: 1; }
+  .catch-loc { font-size: 11px; color: var(--text-dim); }
+
+  .status-pill {
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .status-alive { background: #ecfdf5; color: var(--emerald); }
+  .status-dead { background: #fef2f2; color: var(--red); }
+  .status-stored { background: #f3f4f6; color: var(--text-dim); }
+
+  .catch-item.is-dead {
+    opacity: 0.55;
+  }
+
+  .catch-item.is-dead .catch-sprite {
+    filter: grayscale(1);
+  }
+
+  /* ── Coverage accordion ── */
+  .coverage-section {
+    margin-top: 8px;
+  }
+
+  .coverage-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-sec);
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .coverage-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 10px 0;
+  }
+
+  /* ── FAB ── */
+  .fab {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--pink), #f472b6);
+    color: #fff;
+    border: none;
+    font-size: 26px;
+    font-weight: 300;
+    cursor: pointer;
+    box-shadow: 0 4px 16px var(--pink-glow), 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 40;
+  }
+
+  .fab:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 24px rgba(236, 72, 153, 0.3);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+    .team-grid { grid-template-columns: 1fr; }
+    .welcome { padding: 20px; }
+    .stat-row { flex-direction: column; }
+    .nav { gap: 2px; padding: 6px 8px; }
+    .nav-btn { padding: 6px 10px; font-size: 11px; }
+    .nav-btn span:not(.nav-icon) { display: none; }
+  }
+
+  /* ── Entrance ── */
+  .slide-up {
+    opacity: 0;
+    transform: translateY(12px);
+    animation: slideUp 0.5s ease forwards;
+  }
+
+  @keyframes slideUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .slide-up:nth-child(1) { animation-delay: 0.05s; }
+  .slide-up:nth-child(2) { animation-delay: 0.1s; }
+  .slide-up:nth-child(3) { animation-delay: 0.15s; }
+  .slide-up:nth-child(4) { animation-delay: 0.2s; }
+  .slide-up:nth-child(5) { animation-delay: 0.25s; }
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="nav">
+  <button class="nav-btn active" onclick="scrollNav('top', this)"><span class="nav-icon">&#127968;</span> <span>Home</span></button>
+  <button class="nav-btn" onclick="scrollNav('team-card', this)"><span class="nav-icon">&#11088;</span> <span>Team</span></button>
+  <button class="nav-btn" onclick="scrollNav('catches-card', this)"><span class="nav-icon">&#128218;</span> <span>Catches</span></button>
+  <button class="nav-btn" onclick="scrollNav('gym-card', this)"><span class="nav-icon">&#127942;</span> <span>Gyms</span></button>
+</nav>
+
+<div class="container" id="top">
+
+  <!-- Welcome -->
+  <div class="welcome slide-up">
+    <div class="avatar-wrap">
+      <div class="avatar-ring"></div>
+      <div class="avatar">G</div>
+    </div>
+    <div class="welcome-text">
+      <h1>Welcome back, Grey!</h1>
+      <p>Platinum Soul Link &middot; Run #1 &middot; Your team is looking healthy today.</p>
+    </div>
+  </div>
+
+  <!-- Stat Row -->
+  <div class="stat-row slide-up">
+    <div class="stat-mini">
+      <div class="stat-num" style="color: var(--pink);">11</div>
+      <div class="stat-label">Caught</div>
+    </div>
+    <div class="stat-mini">
+      <div class="stat-num" style="color: var(--red);">3</div>
+      <div class="stat-label">Deaths</div>
+    </div>
+    <div class="stat-mini">
+      <div class="stat-num" style="color: var(--emerald);">72.7%</div>
+      <div class="stat-label">Survival</div>
+    </div>
+  </div>
+
+  <!-- Two Column Layout -->
+  <div class="layout">
+
+    <!-- Left Column -->
+    <div>
+
+      <!-- Team -->
+      <div class="card slide-up" id="team-card">
+        <div class="card-title">Your Team</div>
+        <div class="card-body">
+          <div class="team-grid">
+            <div class="team-member">
+              <div class="type-circle" style="background: #fef2f2;">&#128293;</div>
+              <div class="member-info">
+                <div class="member-name">Infernape</div>
+                <div class="member-nick">"Blaze" &middot; Oreburgh Gate</div>
+                <div><span class="type-pill tp-fire">Fire</span> <span class="type-pill tp-fighting">Fighting</span></div>
+                <div class="health-bar"><div class="health-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+            <div class="team-member">
+              <div class="type-circle" style="background: #f5f3ff;">&#129413;</div>
+              <div class="member-info">
+                <div class="member-name">Staraptor</div>
+                <div class="member-nick">"Wingman" &middot; Route 201</div>
+                <div><span class="type-pill tp-normal">Normal</span> <span class="type-pill tp-flying">Flying</span></div>
+                <div class="health-bar"><div class="health-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+            <div class="team-member">
+              <div class="type-circle" style="background: #fefce8;">&#9889;</div>
+              <div class="member-info">
+                <div class="member-name">Luxray</div>
+                <div class="member-nick">"Sparks" &middot; Route 202</div>
+                <div><span class="type-pill tp-electric">Electric</span></div>
+                <div class="health-bar"><div class="health-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+            <div class="team-member">
+              <div class="type-circle" style="background: #eff6ff;">&#127754;</div>
+              <div class="member-info">
+                <div class="member-name">Gastrodon</div>
+                <div class="member-nick">"Sluggo" &middot; Route 205</div>
+                <div><span class="type-pill tp-water">Water</span> <span class="type-pill tp-ground">Ground</span></div>
+                <div class="health-bar"><div class="health-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+            <div class="team-member">
+              <div class="type-circle" style="background: #f0fdf4;">&#127801;</div>
+              <div class="member-info">
+                <div class="member-name">Roserade</div>
+                <div class="member-nick">"Thorn" &middot; Route 204</div>
+                <div><span class="type-pill tp-grass">Grass</span> <span class="type-pill tp-poison">Poison</span></div>
+                <div class="health-bar"><div class="health-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+            <div class="team-member">
+              <div class="type-circle" style="background: #f1f5f9;">&#129354;</div>
+              <div class="member-info">
+                <div class="member-name">Lucario</div>
+                <div class="member-nick">"Aura" &middot; Route 207</div>
+                <div><span class="type-pill tp-fighting">Fighting</span> <span class="type-pill tp-steel">Steel</span></div>
+                <div class="health-bar"><div class="health-fill" style="width: 100%;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Type Coverage -->
+      <div class="card slide-up">
+        <div class="card-title">Type Analysis</div>
+        <div class="card-body">
+          <div class="coverage-section">
+            <div class="coverage-header">
+              <span>Offensive Coverage (15/17)</span>
+              <span style="font-size: 10px;">&#9660;</span>
+            </div>
+            <div class="coverage-pills">
+              <span class="type-pill tp-fire">Fire</span>
+              <span class="type-pill tp-water">Water</span>
+              <span class="type-pill tp-grass">Grass</span>
+              <span class="type-pill tp-electric">Electric</span>
+              <span class="type-pill tp-normal">Normal</span>
+              <span class="type-pill tp-fighting">Fighting</span>
+              <span class="type-pill tp-flying">Flying</span>
+              <span class="type-pill tp-poison">Poison</span>
+              <span class="type-pill tp-ground">Ground</span>
+              <span class="type-pill tp-rock">Rock</span>
+              <span class="type-pill tp-psychic">Psychic</span>
+              <span class="type-pill tp-ghost">Ghost</span>
+              <span class="type-pill tp-steel">Steel</span>
+              <span class="type-pill" style="background: #f5f5f4; color: #78716c;">Dark</span>
+              <span class="type-pill" style="background: #f7fee7; color: #65a30d;">Bug</span>
+            </div>
+          </div>
+          <div class="coverage-section">
+            <div class="coverage-header" style="color: var(--red);">
+              <span>Gaps (No Coverage)</span>
+            </div>
+            <div class="coverage-pills">
+              <span class="type-pill tp-ice" style="border: 2px dashed #0891b2;">Ice</span>
+              <span class="type-pill tp-dragon" style="border: 2px dashed #4338ca;">Dragon</span>
+            </div>
+          </div>
+          <div class="coverage-section">
+            <div class="coverage-header" style="color: var(--red);">
+              <span>Shared Weaknesses</span>
+            </div>
+            <div style="padding: 8px 0;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <span class="type-pill tp-ground">Ground &times;3</span>
+                <div style="flex: 1; height: 4px; border-radius: 2px; background: #fee2e2;">
+                  <div style="height: 100%; width: 100%; border-radius: 2px; background: var(--red);"></div>
+                </div>
+              </div>
+              <div style="font-size: 11px; color: var(--text-dim);">Infernape, Luxray, Lucario are all weak to Ground</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column -->
+    <div>
+
+      <!-- Gym Progress -->
+      <div class="card slide-up" id="gym-card">
+        <div class="card-title">Gym Progress</div>
+        <div class="card-body">
+          <div class="gym-timeline">
+            <div class="gym-ball earned">1</div><div class="gym-line done"></div>
+            <div class="gym-ball earned">2</div><div class="gym-line done"></div>
+            <div class="gym-ball earned">3</div><div class="gym-line done"></div>
+            <div class="gym-ball earned">4</div><div class="gym-line done"></div>
+            <div class="gym-ball earned">5</div><div class="gym-line pending"></div>
+            <div class="gym-ball next">6</div><div class="gym-line pending"></div>
+            <div class="gym-ball future">7</div><div class="gym-line pending"></div>
+            <div class="gym-ball future">8</div>
+          </div>
+
+          <div style="font-size: 12px;">
+            <div class="gym-info-row"><span class="gym-check">&#10003;</span> Roark <span class="type-pill tp-rock">Rock</span></div>
+            <div class="gym-info-row"><span class="gym-check">&#10003;</span> Gardenia <span class="type-pill tp-grass">Grass</span></div>
+            <div class="gym-info-row"><span class="gym-check">&#10003;</span> Maylene <span class="type-pill tp-fighting">Fighting</span></div>
+            <div class="gym-info-row"><span class="gym-check">&#10003;</span> Crasher Wake <span class="type-pill tp-water">Water</span></div>
+            <div class="gym-info-row"><span class="gym-check">&#10003;</span> Fantina <span class="type-pill tp-ghost">Ghost</span></div>
+            <div class="gym-info-row" style="background: #fff7ed; padding: 6px 8px; border-radius: 8px; margin-top: 4px;">
+              <span style="color: var(--orange); font-weight: 800;">&#9654;</span>
+              <span style="font-weight: 700; color: var(--orange);">Byron</span>
+              <span class="type-pill tp-steel">Steel</span>
+              <span style="font-size: 10px; color: var(--orange);">NEXT</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Catches -->
+      <div class="card slide-up" id="catches-card">
+        <div class="card-title">All Catches</div>
+        <div class="card-body">
+          <div class="catch-tabs">
+            <button class="catch-tab active" onclick="filterCatches('all', this)">All (11)</button>
+            <button class="catch-tab" onclick="filterCatches('alive', this)">Alive (8)</button>
+            <button class="catch-tab" onclick="filterCatches('dead', this)">Dead (3)</button>
+          </div>
+
+          <div id="catches-list">
+            <div class="catch-item" data-status="alive"><div class="catch-sprite" style="background: #fef2f2;">&#128293;</div><div class="catch-name">Infernape</div><div class="catch-loc">Oreburgh Gate</div><span class="status-pill status-alive">Team</span></div>
+            <div class="catch-item" data-status="alive"><div class="catch-sprite" style="background: #f5f3ff;">&#129413;</div><div class="catch-name">Staraptor</div><div class="catch-loc">Route 201</div><span class="status-pill status-alive">Team</span></div>
+            <div class="catch-item" data-status="alive"><div class="catch-sprite" style="background: #fefce8;">&#9889;</div><div class="catch-name">Luxray</div><div class="catch-loc">Route 202</div><span class="status-pill status-alive">Team</span></div>
+            <div class="catch-item" data-status="alive"><div class="catch-sprite" style="background: #eff6ff;">&#127754;</div><div class="catch-name">Gastrodon</div><div class="catch-loc">Route 205</div><span class="status-pill status-alive">Team</span></div>
+            <div class="catch-item" data-status="alive"><div class="catch-sprite" style="background: #f0fdf4;">&#127801;</div><div class="catch-name">Roserade</div><div class="catch-loc">Route 204</div><span class="status-pill status-alive">Team</span></div>
+            <div class="catch-item" data-status="alive"><div class="catch-sprite" style="background: #f1f5f9;">&#129354;</div><div class="catch-name">Lucario</div><div class="catch-loc">Route 207</div><span class="status-pill status-alive">Team</span></div>
+            <div class="catch-item" data-status="alive"><div class="catch-sprite" style="background: #eff6ff;">&#129451;</div><div class="catch-name">Bibarel</div><div class="catch-loc">Route 208</div><span class="status-pill status-stored">Stored</span></div>
+            <div class="catch-item" data-status="alive"><div class="catch-sprite" style="background: #f1f5f9;">&#128276;</div><div class="catch-name">Bronzong</div><div class="catch-loc">Mt. Coronet</div><span class="status-pill status-stored">Stored</span></div>
+            <div class="catch-item is-dead" data-status="dead"><div class="catch-sprite" style="background: #fef2f2;">&#9760;</div><div class="catch-name"><s>Geodude</s></div><div class="catch-loc">Oreburgh Mine</div><span class="status-pill status-dead">Dead</span></div>
+            <div class="catch-item is-dead" data-status="dead"><div class="catch-sprite" style="background: #fef2f2;">&#9760;</div><div class="catch-name"><s>Zubat</s></div><div class="catch-loc">Ravaged Path</div><span class="status-pill status-dead">Dead</span></div>
+            <div class="catch-item is-dead" data-status="dead"><div class="catch-sprite" style="background: #fef2f2;">&#9760;</div><div class="catch-name"><s>Buizel</s></div><div class="catch-loc">Route 205</div><span class="status-pill status-dead">Dead</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- FAB -->
+<button class="fab" title="New Catch">+</button>
+
+<script>
+  function scrollNav(id, btn) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  function filterCatches(filter, btn) {
+    document.querySelectorAll('.catch-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.catch-item').forEach(item => {
+      const status = item.dataset.status;
+      if (filter === 'all') item.style.display = '';
+      else item.style.display = status === filter ? '' : 'none';
+    });
+  }
+</script>
+
+</body>
+</html>

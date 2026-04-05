@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TerminalDex // Soul Link</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --green: #33ff33;
+    --green-dim: #1a8c1a;
+    --green-dark: #0d4a0d;
+    --green-glow: rgba(51, 255, 51, 0.5);
+    --green-faint: rgba(51, 255, 51, 0.08);
+    --bg: #0a0a0a;
+    --bg-panel: #0c0c0c;
+    --red: #ff3333;
+    --red-dim: #8b1a1a;
+    --amber: #ffcc00;
+    --cyan: #00cccc;
+    --border: #1a3a1a;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+    padding-bottom: 120px;
+  }
+
+  /* ══════════════ SCANLINE OVERLAY ══════════════ */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 2px,
+      rgba(51, 255, 51, 0.025) 2px,
+      rgba(51, 255, 51, 0.025) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* CRT screen curvature vignette */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 60%,
+      rgba(0, 0, 0, 0.4) 100%
+    );
+    pointer-events: none;
+    z-index: 9998;
+  }
+
+  /* ══════════════ GLOW EFFECTS ══════════════ */
+  .glow { text-shadow: 0 0 8px var(--green-glow), 0 0 2px var(--green-glow); }
+  .glow-strong { text-shadow: 0 0 12px var(--green-glow), 0 0 4px var(--green-glow), 0 0 20px rgba(51, 255, 51, 0.2); }
+  .glow-red { text-shadow: 0 0 8px rgba(255, 51, 51, 0.5), 0 0 2px rgba(255, 51, 51, 0.3); }
+  .glow-amber { text-shadow: 0 0 8px rgba(255, 204, 0, 0.4); }
+
+  /* ══════════════ MAIN CONTAINER ══════════════ */
+  .terminal-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px 16px;
+  }
+
+  /* ══════════════ TERMINAL SECTIONS ══════════════ */
+  .terminal-section {
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    position: relative;
+  }
+
+  .terminal-section::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border: 1px solid rgba(51, 255, 51, 0.05);
+    pointer-events: none;
+  }
+
+  .section-header {
+    background: rgba(51, 255, 51, 0.04);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--green-dim);
+  }
+
+  .section-header .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .section-header .dot-red { background: #5c2020; border: 1px solid #8b3030; }
+  .section-header .dot-yellow { background: #5c5c20; border: 1px solid #8b8b30; }
+  .section-header .dot-green { background: var(--green-dark); border: 1px solid var(--green-dim); }
+
+  .section-body {
+    padding: 16px;
+  }
+
+  .prompt-path {
+    color: var(--cyan);
+    font-weight: 600;
+  }
+
+  .prompt-user {
+    color: var(--green);
+    font-weight: 700;
+  }
+
+  .prompt-separator {
+    color: var(--green-dim);
+  }
+
+  /* ══════════════ ASCII ART HEADER ══════════════ */
+  .ascii-art {
+    color: var(--green);
+    font-size: 10px;
+    line-height: 1.2;
+    letter-spacing: 0.5px;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  .motd-box {
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    margin: 12px 0;
+    background: rgba(51, 255, 51, 0.02);
+  }
+
+  /* ══════════════ DATA TABLE ROWS ══════════════ */
+  .data-row {
+    display: grid;
+    grid-template-columns: 40px 1fr auto auto;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(51, 255, 51, 0.04);
+    align-items: center;
+  }
+
+  .data-row:last-child { border-bottom: none; }
+
+  .data-row.dead {
+    color: var(--red);
+    text-decoration: line-through;
+    text-decoration-color: rgba(255, 51, 51, 0.4);
+  }
+
+  .data-row .slot-num {
+    color: var(--green-dim);
+    font-weight: 300;
+    text-align: right;
+    padding-right: 4px;
+  }
+
+  .data-row .species-name {
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .data-row .location {
+    color: var(--green-dim);
+    font-size: 11px;
+  }
+
+  .type-tag {
+    display: inline-block;
+    padding: 0 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .type-fire { color: #ff6b35; }
+  .type-fighting { color: #c03028; }
+  .type-normal { color: #a8a878; }
+  .type-flying { color: #a890f0; }
+  .type-electric { color: #f8d030; }
+  .type-water { color: #6890f0; }
+  .type-ground { color: #e0c068; }
+  .type-grass { color: #78c850; }
+  .type-poison { color: #a040a0; }
+  .type-steel { color: #b8b8d0; }
+  .type-psychic { color: #f85888; }
+  .type-rock { color: #b8a038; }
+  .type-bug { color: #a8b820; }
+  .type-ghost { color: #705898; }
+  .type-dragon { color: #7038f8; }
+  .type-dark { color: #705848; }
+  .type-ice { color: #98d8d8; }
+
+  .status-alive { color: var(--green); font-weight: 600; }
+  .status-dead { color: var(--red); font-weight: 700; }
+  .status-pool { color: var(--green-dim); }
+
+  /* ══════════════ GYM BADGES ══════════════ */
+  .badge-row {
+    display: flex;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 700;
+    margin: 8px 0;
+  }
+
+  .badge-slot {
+    width: 36px;
+    height: 24px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+  }
+
+  .badge-earned {
+    color: var(--amber);
+    border-color: rgba(255, 204, 0, 0.3);
+    background: rgba(255, 204, 0, 0.06);
+  }
+
+  .badge-empty {
+    color: var(--green-dim);
+    opacity: 0.4;
+  }
+
+  /* ══════════════ TYPE MATRIX ══════════════ */
+  .type-matrix {
+    font-size: 11px;
+    line-height: 1.8;
+  }
+
+  .coverage-good { color: var(--green); }
+  .coverage-gap { color: var(--amber); font-weight: 700; }
+  .coverage-weak { color: var(--red); font-weight: 700; }
+
+  /* ══════════════ STAT LINE ══════════════ */
+  .stat-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    border-bottom: 1px dotted rgba(51, 255, 51, 0.08);
+  }
+
+  .stat-label { color: var(--green-dim); }
+  .stat-value { font-weight: 700; }
+
+  .stat-bar {
+    display: inline-block;
+    height: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  .stat-bar-fill {
+    display: inline-block;
+    height: 100%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green-glow);
+  }
+
+  .stat-bar-empty {
+    display: inline-block;
+    height: 100%;
+    background: rgba(51, 255, 51, 0.08);
+  }
+
+  /* ══════════════ COMMAND BAR ══════════════ */
+  .command-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    padding: 8px 16px 12px;
+    z-index: 100;
+  }
+
+  .command-bar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(51, 255, 51, 0.015);
+    pointer-events: none;
+  }
+
+  .shortcut-row {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  .shortcut-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--green-dim);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+  }
+
+  .shortcut-btn:hover {
+    color: var(--green);
+    border-color: var(--green-dim);
+    background: rgba(51, 255, 51, 0.05);
+    text-shadow: 0 0 8px var(--green-glow);
+  }
+
+  .command-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .command-prompt-text {
+    color: var(--green);
+    font-weight: 700;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .command-input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--green);
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+    caret-color: var(--green);
+  }
+
+  .cursor-blink {
+    display: inline-block;
+    width: 8px;
+    height: 14px;
+    background: var(--green);
+    animation: blink 1s step-end infinite;
+    vertical-align: middle;
+    box-shadow: 0 0 6px var(--green-glow);
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+
+  /* ══════════════ BOOT SEQUENCE ══════════════ */
+  .boot-line {
+    opacity: 0;
+    animation: bootFade 0.08s ease forwards;
+  }
+
+  @keyframes bootFade {
+    to { opacity: 1; }
+  }
+
+  /* Stagger each line */
+  .boot-line:nth-child(1) { animation-delay: 0.05s; }
+  .boot-line:nth-child(2) { animation-delay: 0.1s; }
+  .boot-line:nth-child(3) { animation-delay: 0.18s; }
+  .boot-line:nth-child(4) { animation-delay: 0.25s; }
+  .boot-line:nth-child(5) { animation-delay: 0.32s; }
+  .boot-line:nth-child(6) { animation-delay: 0.38s; }
+  .boot-line:nth-child(7) { animation-delay: 0.45s; }
+  .boot-line:nth-child(8) { animation-delay: 0.55s; }
+
+  .section-reveal {
+    opacity: 0;
+    transform: translateY(4px);
+    animation: sectionIn 0.3s ease forwards;
+  }
+
+  .section-reveal:nth-of-type(1) { animation-delay: 0.6s; }
+  .section-reveal:nth-of-type(2) { animation-delay: 0.8s; }
+  .section-reveal:nth-of-type(3) { animation-delay: 1.0s; }
+  .section-reveal:nth-of-type(4) { animation-delay: 1.2s; }
+  .section-reveal:nth-of-type(5) { animation-delay: 1.4s; }
+  .section-reveal:nth-of-type(6) { animation-delay: 1.6s; }
+
+  @keyframes sectionIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ══════════════ COMMAND FLASH ══════════════ */
+  .cmd-flash {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--green);
+    text-shadow: 0 0 20px var(--green-glow), 0 0 40px rgba(51, 255, 51, 0.2);
+    pointer-events: none;
+    z-index: 200;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .cmd-flash.active {
+    opacity: 1;
+    animation: flashOut 0.6s ease forwards;
+  }
+
+  @keyframes flashOut {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    70% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.05); }
+  }
+
+  /* ══════════════ PROGRESS BAR ══════════════ */
+  .progress-track {
+    display: flex;
+    height: 8px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    margin: 6px 0;
+  }
+
+  .progress-fill {
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green-glow);
+    transition: width 0.5s ease;
+  }
+
+  /* ══════════════ SCROLLBAR ══════════════ */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--green-dark); border: 1px solid var(--border); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--green-dim); }
+
+  /* ══════════════ SELECTION ══════════════ */
+  ::selection {
+    background: var(--green);
+    color: var(--bg);
+  }
+
+  /* ══════════════ RESPONSIVE ══════════════ */
+  @media (max-width: 640px) {
+    body { font-size: 11px; }
+    .ascii-art { font-size: 7px; }
+    .data-row { grid-template-columns: 28px 1fr auto; }
+    .data-row .location { display: none; }
+    .section-body { padding: 10px; }
+    .terminal-container { padding: 12px 8px; }
+  }
+
+  /* Flicker on load */
+  @keyframes screenOn {
+    0% { opacity: 0; }
+    5% { opacity: 0.8; }
+    8% { opacity: 0.2; }
+    12% { opacity: 0.9; }
+    15% { opacity: 0.4; }
+    20% { opacity: 1; }
+    100% { opacity: 1; }
+  }
+
+  .screen-on {
+    animation: screenOn 0.5s ease-out forwards;
+  }
+
+  /* Subtle CRT flicker */
+  @keyframes subtleFlicker {
+    0%, 100% { opacity: 1; }
+    92% { opacity: 1; }
+    93% { opacity: 0.97; }
+    94% { opacity: 1; }
+  }
+
+  .terminal-container {
+    animation: subtleFlicker 8s infinite;
+  }
+</style>
+</head>
+<body>
+
+<div class="cmd-flash" id="cmdFlash"></div>
+
+<div class="terminal-container screen-on">
+
+  <!-- ════════════ BOOT SEQUENCE ════════════ -->
+  <div id="bootSection" style="margin-bottom: 24px;">
+    <div class="boot-line" style="color: var(--green-dim); font-size: 10px;">BIOS v3.14 ... OK</div>
+    <div class="boot-line" style="color: var(--green-dim); font-size: 10px;">Memory check: 65536K ... OK</div>
+    <div class="boot-line" style="color: var(--green-dim); font-size: 10px;">Loading SoulLink kernel .......... done</div>
+    <div class="boot-line" style="color: var(--green-dim); font-size: 10px;">Mounting /dev/pokedex ............ done</div>
+    <div class="boot-line" style="color: var(--green-dim); font-size: 10px;">Initializing type_chart.sys ..... done</div>
+    <div class="boot-line" style="color: var(--green-dim); font-size: 10px;">Connecting to Discord gateway .... <span style="color: var(--green);">CONNECTED</span></div>
+    <div class="boot-line" style="color: var(--green-dim); font-size: 10px;">Authenticating user .............. <span style="color: var(--green);">grey#0001</span></div>
+    <div class="boot-line" style="color: var(--green-dim); font-size: 10px;"><br></div>
+  </div>
+
+  <!-- ════════════ MOTD BANNER ════════════ -->
+  <div class="terminal-section section-reveal" id="motd">
+    <div class="section-header">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span style="margin-left: 4px;"><span class="prompt-user">grey</span><span class="prompt-separator">@</span><span class="prompt-path">soullink</span><span class="prompt-separator">:~$</span></span>
+    </div>
+    <div class="section-body">
+<pre class="ascii-art glow-strong">
+ ___  ___  _   _ _      _    ___ _  _ _  __
+/ __|/ _ \| | | | |    | |  |_ _| \| | |/ /
+\__ \ (_) | |_| | |__  | |__ | || .` | ' &lt;
+|___/\___/ \___/|____| |____|___|_|\_|_|\_\
+ ══════════════════════════════════════════
+   PLATINUM NUZLOCKE  //  RUN #1  //  v2.4
+</pre>
+      <div class="motd-box">
+        <div style="color: var(--amber); font-weight: 600; margin-bottom: 4px;" class="glow-amber">// MESSAGE OF THE DAY</div>
+        <div style="color: var(--green-dim); font-size: 11px;">Welcome back, <span style="color: var(--green);" class="glow">Grey</span>. Current run: <span style="color: var(--green);">Platinum Soul Link</span></div>
+        <div style="color: var(--green-dim); font-size: 11px;">Last login: 2026-04-04 23:14:07 from discord-gateway</div>
+        <div style="color: var(--green-dim); font-size: 11px;">Active players: Grey, ARatypuss, Mango, Jolt</div>
+        <div style="color: var(--amber); font-size: 11px; margin-top: 6px;" class="glow-amber">WARNING: 3 casualties this run. Stay sharp, trainer.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════ TEAM SECTION ════════════ -->
+  <div class="terminal-section section-reveal" id="team">
+    <div class="section-header">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span style="margin-left: 4px;"><span class="prompt-user">grey</span><span class="prompt-separator">@</span><span class="prompt-path">soullink</span><span class="prompt-separator">:~/team$</span> <span style="color: var(--green-dim);">cat roster.dat</span></span>
+    </div>
+    <div class="section-body">
+      <div style="color: var(--green-dim); font-size: 11px; margin-bottom: 8px;">
+        <span class="glow">ACTIVE TEAM</span> <span style="opacity: 0.4;">// 6/6 slots filled</span>
+      </div>
+      <div style="font-size: 11px; color: var(--border); margin-bottom: 6px;">
+        ╔══════╦═══════════════╦══════════════════╦════════════════════╦════════╗
+      </div>
+
+      <!-- Team rows -->
+      <div class="data-row">
+        <span class="slot-num">#1</span>
+        <span><span class="species-name glow">INFERNAPE</span> <span style="opacity:0.5;">"Blaze"</span></span>
+        <span><span class="type-tag type-fire">[FIRE]</span> <span class="type-tag type-fighting">[FIGHT]</span></span>
+        <span class="location">Oreburgh Gate</span>
+      </div>
+      <div class="data-row">
+        <span class="slot-num">#2</span>
+        <span><span class="species-name glow">STARAPTOR</span> <span style="opacity:0.5;">"Wingman"</span></span>
+        <span><span class="type-tag type-normal">[NORM]</span> <span class="type-tag type-flying">[FLY]</span></span>
+        <span class="location">Route 201</span>
+      </div>
+      <div class="data-row">
+        <span class="slot-num">#3</span>
+        <span><span class="species-name glow">LUXRAY</span> <span style="opacity:0.5;">"Sparks"</span></span>
+        <span><span class="type-tag type-electric">[ELEC]</span></span>
+        <span class="location">Route 202</span>
+      </div>
+      <div class="data-row">
+        <span class="slot-num">#4</span>
+        <span><span class="species-name glow">GASTRODON</span> <span style="opacity:0.5;">"Sluggo"</span></span>
+        <span><span class="type-tag type-water">[WATER]</span> <span class="type-tag type-ground">[GND]</span></span>
+        <span class="location">Route 205</span>
+      </div>
+      <div class="data-row">
+        <span class="slot-num">#5</span>
+        <span><span class="species-name glow">ROSERADE</span> <span style="opacity:0.5;">"Thorn"</span></span>
+        <span><span class="type-tag type-grass">[GRASS]</span> <span class="type-tag type-poison">[PSN]</span></span>
+        <span class="location">Route 204</span>
+      </div>
+      <div class="data-row">
+        <span class="slot-num">#6</span>
+        <span><span class="species-name glow">LUCARIO</span> <span style="opacity:0.5;">"Aura"</span></span>
+        <span><span class="type-tag type-fighting">[FIGHT]</span> <span class="type-tag type-steel">[STEEL]</span></span>
+        <span class="location">Route 207</span>
+      </div>
+
+      <div style="font-size: 11px; color: var(--border); margin-top: 6px;">
+        ╚══════╩═══════════════╩══════════════════╩════════════════════╩════════╝
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════ CATCHES LOG ════════════ -->
+  <div class="terminal-section section-reveal" id="catches">
+    <div class="section-header">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span style="margin-left: 4px;"><span class="prompt-user">grey</span><span class="prompt-separator">@</span><span class="prompt-path">soullink</span><span class="prompt-separator">:~/catches$</span> <span style="color: var(--green-dim);">tail -f catch.log</span></span>
+    </div>
+    <div class="section-body">
+      <div style="color: var(--green-dim); font-size: 11px; margin-bottom: 10px;">
+        <span class="glow">CATCH LOG</span> <span style="opacity: 0.4;">// showing all 11 entries</span>
+      </div>
+
+      <!-- Active team Pokemon -->
+      <div style="color: var(--green-dim); font-size: 10px; margin-bottom: 4px; letter-spacing: 0.15em;">── ACTIVE TEAM ──</div>
+
+      <div style="font-size: 11px; line-height: 1.9;">
+        <div><span style="color: var(--green-dim);">[04-01 08:22]</span> <span class="status-alive">CAUGHT</span> <span class="glow" style="font-weight: 600;">INFERNAPE</span> <span class="type-tag type-fire">[FIRE]</span><span class="type-tag type-fighting">[FIGHT]</span> <span style="color: var(--green-dim);">@ Oreburgh Gate</span> <span style="color: var(--green-dim); opacity: 0.5;">"Blaze"</span></div>
+        <div><span style="color: var(--green-dim);">[04-01 08:15]</span> <span class="status-alive">CAUGHT</span> <span class="glow" style="font-weight: 600;">STARAPTOR</span> <span class="type-tag type-normal">[NORM]</span><span class="type-tag type-flying">[FLY]</span> <span style="color: var(--green-dim);">@ Route 201</span> <span style="color: var(--green-dim); opacity: 0.5;">"Wingman"</span></div>
+        <div><span style="color: var(--green-dim);">[04-01 09:03]</span> <span class="status-alive">CAUGHT</span> <span class="glow" style="font-weight: 600;">LUXRAY</span> <span class="type-tag type-electric">[ELEC]</span> <span style="color: var(--green-dim);">@ Route 202</span> <span style="color: var(--green-dim); opacity: 0.5;">"Sparks"</span></div>
+        <div><span style="color: var(--green-dim);">[04-01 14:17]</span> <span class="status-alive">CAUGHT</span> <span class="glow" style="font-weight: 600;">GASTRODON</span> <span class="type-tag type-water">[WATER]</span><span class="type-tag type-ground">[GND]</span> <span style="color: var(--green-dim);">@ Route 205</span> <span style="color: var(--green-dim); opacity: 0.5;">"Sluggo"</span></div>
+        <div><span style="color: var(--green-dim);">[04-01 11:45]</span> <span class="status-alive">CAUGHT</span> <span class="glow" style="font-weight: 600;">ROSERADE</span> <span class="type-tag type-grass">[GRASS]</span><span class="type-tag type-poison">[PSN]</span> <span style="color: var(--green-dim);">@ Route 204</span> <span style="color: var(--green-dim); opacity: 0.5;">"Thorn"</span></div>
+        <div><span style="color: var(--green-dim);">[04-02 10:30]</span> <span class="status-alive">CAUGHT</span> <span class="glow" style="font-weight: 600;">LUCARIO</span> <span class="type-tag type-fighting">[FIGHT]</span><span class="type-tag type-steel">[STEEL]</span> <span style="color: var(--green-dim);">@ Route 207</span> <span style="color: var(--green-dim); opacity: 0.5;">"Aura"</span></div>
+      </div>
+
+      <!-- Pool -->
+      <div style="color: var(--green-dim); font-size: 10px; margin: 10px 0 4px; letter-spacing: 0.15em;">── IN STORAGE ──</div>
+
+      <div style="font-size: 11px; line-height: 1.9;">
+        <div><span style="color: var(--green-dim);">[04-02 16:08]</span> <span class="status-pool">STORED</span> <span style="font-weight: 600; color: var(--green-dim);">BIBAREL</span> <span class="type-tag type-normal">[NORM]</span><span class="type-tag type-water">[WATER]</span> <span style="color: var(--green-dim);">@ Route 208</span> <span style="color: var(--green-dim); opacity: 0.5;">"Chomps"</span></div>
+        <div><span style="color: var(--green-dim);">[04-03 09:55]</span> <span class="status-pool">STORED</span> <span style="font-weight: 600; color: var(--green-dim);">BRONZONG</span> <span class="type-tag type-steel">[STEEL]</span><span class="type-tag type-psychic">[PSY]</span> <span style="color: var(--green-dim);">@ Mt. Coronet</span> <span style="color: var(--green-dim); opacity: 0.5;">"Gong"</span></div>
+      </div>
+
+      <!-- Dead -->
+      <div style="color: var(--red-dim); font-size: 10px; margin: 10px 0 4px; letter-spacing: 0.15em;">── CASUALTIES ──</div>
+
+      <div style="font-size: 11px; line-height: 1.9;">
+        <div class="dead glow-red"><span style="color: var(--red); opacity: 0.5; text-decoration: none;">[04-01 12:33]</span> <span class="status-dead" style="text-decoration: none;">DEAD</span> <span style="font-weight: 600;">GEODUDE</span> <span class="type-tag type-rock">[ROCK]</span><span class="type-tag type-ground">[GND]</span> <span style="opacity: 0.6;">@ Oreburgh Mine</span> <span style="opacity: 0.4;">"Rocky"</span></div>
+        <div class="dead glow-red"><span style="color: var(--red); opacity: 0.5; text-decoration: none;">[04-01 13:10]</span> <span class="status-dead" style="text-decoration: none;">DEAD</span> <span style="font-weight: 600;">ZUBAT</span> <span class="type-tag type-poison">[PSN]</span><span class="type-tag type-flying">[FLY]</span> <span style="opacity: 0.6;">@ Ravaged Path</span> <span style="opacity: 0.4;">"Screech"</span></div>
+        <div class="dead glow-red"><span style="color: var(--red); opacity: 0.5; text-decoration: none;">[04-02 15:44]</span> <span class="status-dead" style="text-decoration: none;">DEAD</span> <span style="font-weight: 600;">BUIZEL</span> <span class="type-tag type-water">[WATER]</span> <span style="opacity: 0.6;">@ Route 205</span> <span style="opacity: 0.4;">"Splash"</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════ TYPE ANALYSIS ════════════ -->
+  <div class="terminal-section section-reveal" id="types">
+    <div class="section-header">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span style="margin-left: 4px;"><span class="prompt-user">grey</span><span class="prompt-separator">@</span><span class="prompt-path">soullink</span><span class="prompt-separator">:~/types$</span> <span style="color: var(--green-dim);">./analyze --team</span></span>
+    </div>
+    <div class="section-body type-matrix">
+      <div style="color: var(--green-dim); font-size: 11px; margin-bottom: 10px;">
+        <span class="glow">TYPE COVERAGE ANALYSIS</span> <span style="opacity: 0.4;">// generated from current team</span>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <div style="color: var(--green-dim); font-size: 10px; letter-spacing: 0.15em; margin-bottom: 6px;">── OFFENSIVE COVERAGE ──</div>
+        <div style="line-height: 2;">
+          <span class="coverage-good">[FIRE]</span>
+          <span class="coverage-good">[FIGHT]</span>
+          <span class="coverage-good">[NORM]</span>
+          <span class="coverage-good">[FLY]</span>
+          <span class="coverage-good">[ELEC]</span>
+          <span class="coverage-good">[WATER]</span>
+          <span class="coverage-good">[GND]</span>
+          <span class="coverage-good">[GRASS]</span>
+          <span class="coverage-good">[PSN]</span>
+          <span class="coverage-good">[STEEL]</span>
+          <span class="coverage-good">[PSY]</span>
+          <span class="coverage-good">[ROCK]</span>
+          <span class="coverage-good">[BUG]</span>
+          <span class="coverage-good">[GHOST]</span>
+          <span class="coverage-good">[DARK]</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <div style="color: var(--amber); font-size: 10px; letter-spacing: 0.15em; margin-bottom: 6px;" class="glow-amber">── COVERAGE GAPS ──</div>
+        <div>
+          <span class="coverage-gap glow-amber">[ICE]</span>
+          <span class="coverage-gap glow-amber">[DRAGON]</span>
+          <span style="color: var(--amber); font-size: 10px; margin-left: 8px;">!! No super-effective moves against these types</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <div style="color: var(--red); font-size: 10px; letter-spacing: 0.15em; margin-bottom: 6px;" class="glow-red">── SHARED WEAKNESSES ──</div>
+        <div>
+          <span class="coverage-weak glow-red">[GROUND] x3</span>
+          <span style="color: var(--red); font-size: 10px; margin-left: 8px;">!! Infernape, Luxray, Lucario vulnerable</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="color: var(--green-dim); font-size: 10px; letter-spacing: 0.15em; margin-bottom: 6px;">── TEAM TYPE SPREAD ──</div>
+<pre style="font-size: 10px; color: var(--green-dim); line-height: 1.5;">
+  FIRE     <span style="color: var(--green);">█</span><span style="color: var(--border);">░░░░░</span>  1
+  FIGHT    <span style="color: var(--green);">██</span><span style="color: var(--border);">░░░░</span>  2
+  NORMAL   <span style="color: var(--green);">█</span><span style="color: var(--border);">░░░░░</span>  1
+  FLYING   <span style="color: var(--green);">█</span><span style="color: var(--border);">░░░░░</span>  1
+  ELECTRIC <span style="color: var(--green);">█</span><span style="color: var(--border);">░░░░░</span>  1
+  WATER    <span style="color: var(--green);">█</span><span style="color: var(--border);">░░░░░</span>  1
+  GROUND   <span style="color: var(--green);">█</span><span style="color: var(--border);">░░░░░</span>  1
+  GRASS    <span style="color: var(--green);">█</span><span style="color: var(--border);">░░░░░</span>  1
+  POISON   <span style="color: var(--green);">█</span><span style="color: var(--border);">░░░░░</span>  1
+  STEEL    <span style="color: var(--green);">██</span><span style="color: var(--border);">░░░░</span>  2
+</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════ GYM PROGRESS ════════════ -->
+  <div class="terminal-section section-reveal" id="gyms">
+    <div class="section-header">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span style="margin-left: 4px;"><span class="prompt-user">grey</span><span class="prompt-separator">@</span><span class="prompt-path">soullink</span><span class="prompt-separator">:~/gyms$</span> <span style="color: var(--green-dim);">./badge_case --show</span></span>
+    </div>
+    <div class="section-body">
+      <div style="color: var(--green-dim); font-size: 11px; margin-bottom: 10px;">
+        <span class="glow">GYM BADGE TRACKER</span> <span style="opacity: 0.4;">// 5/8 complete</span>
+      </div>
+
+      <div class="badge-row">
+        <div class="badge-slot badge-earned glow-amber">[X]</div>
+        <div class="badge-slot badge-earned glow-amber">[X]</div>
+        <div class="badge-slot badge-earned glow-amber">[X]</div>
+        <div class="badge-slot badge-earned glow-amber">[X]</div>
+        <div class="badge-slot badge-earned glow-amber">[X]</div>
+        <div class="badge-slot badge-empty">[ ]</div>
+        <div class="badge-slot badge-empty">[ ]</div>
+        <div class="badge-slot badge-empty">[ ]</div>
+      </div>
+
+      <div style="font-size: 11px; line-height: 1.8; margin-top: 8px;">
+        <div><span style="color: var(--amber);" class="glow-amber">[X]</span> <span style="color: var(--green);">Gym 1</span> <span style="color: var(--green-dim);">Roark</span> <span class="type-tag type-rock">[ROCK]</span> <span style="color: var(--green-dim); opacity: 0.5;">Oreburgh City</span></div>
+        <div><span style="color: var(--amber);" class="glow-amber">[X]</span> <span style="color: var(--green);">Gym 2</span> <span style="color: var(--green-dim);">Gardenia</span> <span class="type-tag type-grass">[GRASS]</span> <span style="color: var(--green-dim); opacity: 0.5;">Eterna City</span></div>
+        <div><span style="color: var(--amber);" class="glow-amber">[X]</span> <span style="color: var(--green);">Gym 3</span> <span style="color: var(--green-dim);">Maylene</span> <span class="type-tag type-fighting">[FIGHT]</span> <span style="color: var(--green-dim); opacity: 0.5;">Veilstone City</span></div>
+        <div><span style="color: var(--amber);" class="glow-amber">[X]</span> <span style="color: var(--green);">Gym 4</span> <span style="color: var(--green-dim);">Crasher Wake</span> <span class="type-tag type-water">[WATER]</span> <span style="color: var(--green-dim); opacity: 0.5;">Pastoria City</span></div>
+        <div><span style="color: var(--amber);" class="glow-amber">[X]</span> <span style="color: var(--green);">Gym 5</span> <span style="color: var(--green-dim);">Fantina</span> <span class="type-tag type-ghost">[GHOST]</span> <span style="color: var(--green-dim); opacity: 0.5;">Hearthome City</span></div>
+        <div style="margin-top: 4px; padding: 6px 8px; border: 1px solid var(--amber); background: rgba(255,204,0,0.04);">
+          <span style="color: var(--amber);" class="glow-amber">[ ]</span> <span style="color: var(--amber); font-weight: 700;" class="glow-amber">Gym 6</span> <span style="color: var(--amber);">Byron</span> <span class="type-tag type-steel">[STEEL]</span> <span style="color: var(--amber); opacity: 0.7;">Canalave City</span> <span style="color: var(--amber); font-size: 10px;"> &lt;&lt; NEXT TARGET</span>
+        </div>
+        <div style="opacity: 0.3;"><span>[ ]</span> <span>Gym 7</span> <span>Candice</span> <span>[ICE]</span> <span>Snowpoint City</span></div>
+        <div style="opacity: 0.3;"><span>[ ]</span> <span>Gym 8</span> <span>Volkner</span> <span>[ELEC]</span> <span>Sunyshore City</span></div>
+      </div>
+
+      <div class="progress-track" style="margin-top: 12px;">
+        <div class="progress-fill" style="width: 62.5%;"></div>
+      </div>
+      <div style="font-size: 10px; color: var(--green-dim); text-align: right;">62.5% complete</div>
+    </div>
+  </div>
+
+  <!-- ════════════ STATS ════════════ -->
+  <div class="terminal-section section-reveal" id="stats">
+    <div class="section-header">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span style="margin-left: 4px;"><span class="prompt-user">grey</span><span class="prompt-separator">@</span><span class="prompt-path">soullink</span><span class="prompt-separator">:~/stats$</span> <span style="color: var(--green-dim);">neofetch --pokemon</span></span>
+    </div>
+    <div class="section-body">
+      <div style="color: var(--green-dim); font-size: 11px; margin-bottom: 10px;">
+        <span class="glow">RUN STATISTICS</span> <span style="opacity: 0.4;">// Platinum Soul Link #1</span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px 32px; font-size: 12px;">
+        <div class="stat-line">
+          <span class="stat-label">Total Catches</span>
+          <span class="stat-value glow">11</span>
+        </div>
+        <div class="stat-line">
+          <span class="stat-label">Alive</span>
+          <span class="stat-value" style="color: var(--green);">8</span>
+        </div>
+        <div class="stat-line">
+          <span class="stat-label">Deaths</span>
+          <span class="stat-value glow-red" style="color: var(--red);">3</span>
+        </div>
+        <div class="stat-line">
+          <span class="stat-label">On Team</span>
+          <span class="stat-value glow">6</span>
+        </div>
+        <div class="stat-line">
+          <span class="stat-label">In Storage</span>
+          <span class="stat-value" style="color: var(--green-dim);">2</span>
+        </div>
+        <div class="stat-line">
+          <span class="stat-label">Badges</span>
+          <span class="stat-value glow-amber" style="color: var(--amber);">5/8</span>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px;">
+        <div style="font-size: 11px; margin-bottom: 4px;">
+          <span class="stat-label">Survival Rate</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="progress-track" style="flex: 1; margin: 0;">
+            <div class="progress-fill" style="width: 72.7%;"></div>
+          </div>
+          <span class="stat-value glow" style="font-size: 14px;">72.7%</span>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px;">
+        <div style="font-size: 11px; margin-bottom: 4px;">
+          <span class="stat-label">Team Fill</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="progress-track" style="flex: 1; margin: 0;">
+            <div class="progress-fill" style="width: 100%;"></div>
+          </div>
+          <span class="stat-value glow" style="font-size: 14px;">6/6</span>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);">
+<pre style="font-size: 10px; color: var(--green-dim); line-height: 1.4;">
+<span style="color: var(--green);">grey@soullink</span> <span style="color: var(--green-dim);">$ uptime</span>
+ Run started: 2026-04-01 08:00:12
+ Duration:    4 days, 16 hours
+ Encounters:  11 total (8 alive, 3 dead)
+ Next gym:    Byron [STEEL] @ Canalave City
+ Threat lvl:  <span style="color: var(--amber);" class="glow-amber">MODERATE</span> (ground weakness detected)
+</pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ════════════ COMMAND BAR ════════════ -->
+<div class="command-bar">
+  <div style="max-width: 900px; margin: 0 auto;">
+    <div class="shortcut-row">
+      <button class="shortcut-btn" onclick="navTo('team')">[team]</button>
+      <button class="shortcut-btn" onclick="navTo('catches')">[catches]</button>
+      <button class="shortcut-btn" onclick="navTo('types')">[types]</button>
+      <button class="shortcut-btn" onclick="navTo('gyms')">[gyms]</button>
+      <button class="shortcut-btn" onclick="navTo('stats')">[stats]</button>
+    </div>
+    <div class="command-input-row">
+      <span class="command-prompt-text glow"><span class="prompt-user">grey</span><span class="prompt-separator">@</span><span class="prompt-path">soullink</span><span class="prompt-separator">:~$</span></span>
+      <input class="command-input" id="cmdInput" type="text" spellcheck="false" autocomplete="off" placeholder="">
+      <span class="cursor-blink" id="cursorBlink"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Navigation with flash ──
+  const flash = document.getElementById('cmdFlash');
+
+  function navTo(section) {
+    flash.textContent = `> cd ~/${section}`;
+    flash.classList.remove('active');
+    void flash.offsetWidth;
+    flash.classList.add('active');
+
+    setTimeout(() => {
+      document.getElementById(section).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
+
+  // ── Command input handling ──
+  const cmdInput = document.getElementById('cmdInput');
+  const cursorBlink = document.getElementById('cursorBlink');
+
+  cmdInput.addEventListener('focus', () => { cursorBlink.style.display = 'none'; });
+  cmdInput.addEventListener('blur', () => { cursorBlink.style.display = 'inline-block'; });
+
+  cmdInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const cmd = cmdInput.value.trim().toLowerCase();
+      const sections = ['team', 'catches', 'types', 'gyms', 'stats', 'motd'];
+      const match = sections.find(s => cmd.includes(s));
+      if (match) {
+        navTo(match);
+      } else if (cmd === 'help') {
+        navTo('motd');
+      } else if (cmd === 'clear' || cmd === 'cls') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      cmdInput.value = '';
+    }
+  });
+
+  // ── Keep input accessible ──
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && document.activeElement !== cmdInput) {
+      e.preventDefault();
+      cmdInput.focus();
+    }
+  });
+</script>
+
+</body>
+</html>
