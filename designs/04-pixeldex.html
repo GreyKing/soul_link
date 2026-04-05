@@ -15,213 +15,239 @@
     --l1: #8bac0f;
     --l2: #9bbc0f;
     --white: #c6de8a;
-    --border: 2px solid var(--d1);
+    --border: 3px solid var(--d1);
+    --border-thin: 2px solid var(--d1);
     --border-double: 4px double var(--d1);
   }
 
   html { scroll-behavior: smooth; }
 
   body {
-    background: #2a3a0a;
+    background: var(--d1);
     color: var(--d1);
     font-family: 'Press Start 2P', monospace;
-    font-size: 10px;
-    line-height: 2;
-    display: flex;
-    justify-content: center;
+    font-size: 19px;
+    line-height: 1.8;
     min-height: 100vh;
-    padding: 12px;
     image-rendering: pixelated;
+    display: flex;
+    flex-direction: column;
   }
 
-  /* ── Game Boy Housing ── */
-  .gameboy-frame {
-    width: 100%;
-    max-width: 520px;
-    background: #6b7b3a;
-    border: 4px solid #4a5a2a;
-    border-radius: 12px 12px 4px 4px;
-    padding: 16px 12px 12px;
-    box-shadow:
-      inset 0 2px 0 rgba(255,255,255,0.1),
-      0 4px 12px rgba(0,0,0,0.5);
-    position: relative;
+  /* ── Top title bar ── */
+  .title-bar {
+    background: var(--d2);
+    color: var(--l2);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: var(--border);
+    flex-shrink: 0;
   }
 
-  .gameboy-frame::before {
-    content: 'SOUL LINK';
-    position: absolute;
-    top: 4px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 6px;
-    color: #4a5a2a;
-    letter-spacing: 0.3em;
+  .title-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
-  /* ── Screen ── */
-  .screen {
+  .title-logo {
+    font-size: 18px;
+  }
+
+  .title-text {
+    font-size: 18px;
+    letter-spacing: 0.08em;
+  }
+
+  .title-sub {
+    font-size: 13px;
+    color: var(--l1);
+    letter-spacing: 0.05em;
+  }
+
+  .title-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .title-stat {
+    text-align: center;
+  }
+
+  .title-stat-num {
+    font-size: 21px;
+    color: var(--l2);
+  }
+
+  .title-stat-label {
+    font-size: 11px;
+    color: var(--l1);
+  }
+
+  /* ── Tab bar ── */
+  .tab-bar {
+    display: flex;
+    background: var(--d1);
+    border-bottom: var(--border);
+    flex-shrink: 0;
+  }
+
+  .tab-item {
+    flex: 1;
+    padding: 10px 8px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--l1);
+    cursor: pointer;
+    border-right: 2px solid var(--d2);
+    font-family: 'Press Start 2P', monospace;
+    background: var(--d2);
+    border-top: none;
+    border-bottom: none;
+    border-left: none;
+    transition: background 0.05s;
+    letter-spacing: 0.05em;
+  }
+
+  .tab-item:last-child { border-right: none; }
+  .tab-item:hover { background: var(--d1); color: var(--l2); }
+  .tab-item.active { background: var(--d1); color: var(--l2); }
+
+  .tab-icon {
+    display: block;
+    font-size: 20px;
+    margin-bottom: 4px;
+  }
+
+  /* ── Main 3-panel layout ── */
+  .pc-layout {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr 300px;
+    min-height: 0;
     background: var(--l2);
-    border: 4px solid var(--d2);
-    border-radius: 4px;
-    padding: 0;
-    position: relative;
-    overflow: hidden;
-    box-shadow:
-      inset 0 0 20px rgba(15, 56, 15, 0.15);
   }
 
-  .screen::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent 0px,
-      transparent 2px,
-      rgba(15, 56, 15, 0.03) 2px,
-      rgba(15, 56, 15, 0.03) 4px
-    );
-    pointer-events: none;
-  }
-
-  /* ── Screen content area ── */
-  .screen-inner {
-    height: 600px;
+  .panel {
+    border-right: var(--border);
     overflow-y: auto;
-    padding: 8px;
     scrollbar-width: thin;
     scrollbar-color: var(--d2) var(--l1);
   }
 
-  .screen-inner::-webkit-scrollbar { width: 8px; }
-  .screen-inner::-webkit-scrollbar-track { background: var(--l1); }
-  .screen-inner::-webkit-scrollbar-thumb { background: var(--d2); border: 1px solid var(--d1); }
+  .panel:last-child { border-right: none; }
 
-  /* ── Menu sections ── */
-  .menu-section {
-    margin-bottom: 12px;
-  }
+  .panel::-webkit-scrollbar { width: 10px; }
+  .panel::-webkit-scrollbar-track { background: var(--l1); }
+  .panel::-webkit-scrollbar-thumb { background: var(--d2); border: 2px solid var(--d1); }
 
-  .menu-header {
+  .panel-header {
     background: var(--d1);
     color: var(--l2);
-    padding: 4px 8px;
-    font-size: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
     letter-spacing: 0.1em;
-    margin-bottom: 2px;
-  }
-
-  .menu-body {
-    background: var(--l1);
-    border: var(--border);
-    padding: 8px;
-  }
-
-  /* ── Pixel borders ── */
-  .pixel-box {
-    border: var(--border);
-    background: var(--l1);
-    padding: 6px;
-  }
-
-  .pixel-box-inner {
-    border: 1px solid var(--d2);
-    background: var(--l2);
-    padding: 6px;
-  }
-
-  /* ── Selection cursor ── */
-  .cursor-item {
+    position: sticky;
+    top: 0;
+    z-index: 5;
     display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 2px 0;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .panel-header-sub {
+    font-size: 10px;
+    color: var(--l1);
+  }
+
+  .panel-body {
+    padding: 10px;
+  }
+
+  /* ── Scanline overlay on all panels ── */
+  .pc-layout::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 3px,
+      rgba(15, 56, 15, 0.025) 3px,
+      rgba(15, 56, 15, 0.025) 6px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* ── Team panel (left) ── */
+  .team-slot {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 8px;
+    border: var(--border-thin);
+    background: var(--l1);
+    margin-bottom: 6px;
     cursor: pointer;
     transition: background 0.05s;
   }
 
-  .cursor-item:hover {
+  .team-slot:hover {
     background: var(--d2);
     color: var(--l2);
   }
 
-  .cursor-item:hover .cursor-arrow { visibility: visible; }
+  .team-slot:hover .team-nick { color: var(--l1); }
+  .team-slot:hover .team-types .type-text { border-color: var(--l1); }
 
-  .cursor-arrow {
-    visibility: hidden;
-    flex-shrink: 0;
-    font-size: 8px;
-    line-height: 2;
-  }
-
-  /* ── Trainer Card ── */
-  .trainer-card {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-  }
-
-  .trainer-avatar {
-    width: 40px;
-    height: 40px;
-    border: var(--border);
-    background: var(--d2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    color: var(--l2);
-    flex-shrink: 0;
-  }
-
-  .trainer-info {
-    flex: 1;
-  }
-
-  .trainer-name {
-    font-size: 12px;
-    margin-bottom: 2px;
-  }
-
-  .trainer-detail {
-    font-size: 7px;
+  .team-slot-num {
+    font-size: 18px;
     color: var(--d2);
-    line-height: 1.8;
-  }
-
-  /* ── Pokemon list item ── */
-  .poke-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 0;
-    border-bottom: 1px solid var(--d2);
-  }
-
-  .poke-item:last-child { border-bottom: none; }
-
-  .poke-sprite-box {
-    width: 24px;
-    height: 24px;
-    background: var(--l2);
-    border: 1px solid var(--d2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
+    width: 20px;
+    text-align: center;
     flex-shrink: 0;
   }
 
-  .poke-item-name {
-    font-size: 8px;
-    flex: 1;
+  .team-slot:hover .team-slot-num { color: var(--l1); }
+
+  .team-sprite {
+    width: 36px;
+    height: 36px;
+    background: var(--l2);
+    border: var(--border-thin);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 25px;
+    flex-shrink: 0;
+  }
+
+  .team-info { flex: 1; min-width: 0; }
+
+  .team-name {
+    font-size: 14px;
+    letter-spacing: 0.03em;
+  }
+
+  .team-nick {
+    font-size: 10px;
+    color: var(--d2);
+  }
+
+  .team-types {
+    display: flex;
+    gap: 3px;
+    margin-top: 3px;
   }
 
   .hp-bar {
-    width: 48px;
-    height: 6px;
-    border: 1px solid var(--d1);
+    width: 56px;
+    height: 8px;
+    border: 2px solid var(--d1);
     background: var(--l2);
     overflow: hidden;
     flex-shrink: 0;
@@ -232,32 +258,139 @@
     background: var(--d1);
   }
 
-  .hp-fill.dead {
-    background: transparent;
+  .hp-fill.dead { background: transparent; }
+
+  /* ── PC Box (center) ── */
+  .box-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
   }
 
-  .poke-item.dead {
-    opacity: 0.5;
+  .box-cell {
+    aspect-ratio: 1;
+    border: var(--border-thin);
+    background: var(--l1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    cursor: pointer;
+    transition: background 0.05s;
+    position: relative;
+    padding: 4px;
   }
 
-  .poke-item.dead .poke-item-name {
+  .box-cell:hover {
+    background: var(--d2);
+    color: var(--l2);
+  }
+
+  .box-cell:hover .box-cell-name { color: var(--l2); }
+  .box-cell:hover .box-cell-loc { color: var(--l1); }
+
+  .box-cell-sprite {
+    font-size: 35px;
+    line-height: 1;
+  }
+
+  .box-cell-name {
+    font-size: 9px;
+    text-align: center;
+    letter-spacing: 0.03em;
+    line-height: 1.3;
+  }
+
+  .box-cell-loc {
+    font-size: 8px;
+    color: var(--d2);
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .box-cell.dead {
+    opacity: 0.4;
+  }
+
+  .box-cell.dead .box-cell-name {
     text-decoration: line-through;
   }
 
-  /* ── Badge case ── */
-  .badge-grid {
+  .box-cell.dead::after {
+    content: 'X';
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: 10px;
+    color: var(--d1);
+    font-weight: bold;
+  }
+
+  .box-cell.empty {
+    border-style: dashed;
+    opacity: 0.3;
+  }
+
+  .box-cell.on-team::before {
+    content: '★';
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    font-size: 10px;
+    color: var(--d1);
+  }
+
+  .box-section-label {
+    font-size: 11px;
+    color: var(--d2);
+    padding: 6px 0 4px;
+    letter-spacing: 0.08em;
+    border-bottom: 2px solid var(--d2);
+    margin-bottom: 8px;
+  }
+
+  /* ── Right panel: Map / Route / Gym ── */
+  .route-card {
+    background: var(--l1);
+    border: var(--border-thin);
+    padding: 10px;
+    margin-bottom: 8px;
+  }
+
+  .route-label {
+    font-size: 10px;
+    color: var(--d2);
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+  }
+
+  .route-name {
+    font-size: 15px;
+    margin-bottom: 2px;
+  }
+
+  .route-detail {
+    font-size: 10px;
+    color: var(--d2);
+    line-height: 1.8;
+  }
+
+  /* Gym badge row */
+  .badge-row {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 6px;
+    margin-top: 6px;
   }
 
   .badge-cell {
     aspect-ratio: 1;
-    border: var(--border);
+    border: var(--border-thin);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: 20px;
   }
 
   .badge-earned {
@@ -268,37 +401,91 @@
   .badge-empty {
     background: var(--l2);
     color: var(--d2);
-    font-size: 8px;
+    font-size: 13px;
   }
 
-  /* ── Stats ── */
+  /* Gym list */
+  .gym-list-item {
+    font-size: 11px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--d2);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.6;
+  }
+
+  .gym-list-item:last-child { border-bottom: none; }
+
+  .gym-check {
+    flex-shrink: 0;
+    width: 14px;
+    text-align: center;
+    font-size: 13px;
+  }
+
+  .gym-next-highlight {
+    background: var(--d2);
+    color: var(--l2);
+    padding: 6px 8px;
+    margin: 4px -6px;
+    font-size: 11px;
+  }
+
+  /* Map ASCII art area */
+  .map-area {
+    background: var(--l1);
+    border: var(--border-thin);
+    padding: 10px;
+    margin-bottom: 8px;
+    font-size: 9px;
+    line-height: 1.4;
+    color: var(--d2);
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  .map-you { color: var(--d1); font-weight: bold; }
+
+  /* ── Type text ── */
+  .type-text {
+    font-size: 10px;
+    display: inline-block;
+    padding: 1px 4px;
+    border: 2px solid var(--d2);
+    margin: 0 1px;
+    line-height: 1.6;
+  }
+
+  /* ── Stats section ── */
   .stat-row {
     display: flex;
     justify-content: space-between;
-    padding: 2px 0;
-    font-size: 8px;
+    padding: 3px 0;
+    font-size: 11px;
     border-bottom: 1px dotted var(--d2);
   }
 
   .stat-row:last-child { border-bottom: none; }
-
-  .stat-val { color: var(--d1); font-size: 10px; }
+  .stat-val { font-size: 14px; }
 
   /* ── Dialog box ── */
   .dialog {
     border: var(--border-double);
     background: var(--l2);
-    padding: 8px 10px;
-    margin-top: 8px;
+    padding: 10px 12px;
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.8;
     position: relative;
   }
 
   .dialog::after {
     content: '\25BC';
     position: absolute;
-    bottom: 4px;
-    right: 8px;
-    font-size: 6px;
+    bottom: 6px;
+    right: 10px;
+    font-size: 10px;
     animation: dialogBlink 1s step-end infinite;
   }
 
@@ -306,457 +493,357 @@
     50% { opacity: 0; }
   }
 
-  /* ── Type text ── */
-  .type-text {
-    font-size: 6px;
-    display: inline-block;
-    padding: 0 3px;
-    border: 1px solid var(--d2);
-    margin: 0 1px;
-    line-height: 1.8;
-  }
-
-  /* ── Bottom controls (decorative) ── */
-  .controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 14px;
-    padding: 0 8px;
-  }
-
-  .dpad {
-    width: 56px;
-    height: 56px;
-    position: relative;
-  }
-
-  .dpad-h, .dpad-v {
-    position: absolute;
-    background: #3a4a1a;
-    border-radius: 2px;
-  }
-
-  .dpad-h {
-    width: 56px;
-    height: 18px;
-    top: 19px;
-    left: 0;
-  }
-
-  .dpad-v {
-    width: 18px;
-    height: 56px;
-    top: 0;
-    left: 19px;
-  }
-
-  .dpad-center {
-    position: absolute;
-    width: 18px;
-    height: 18px;
-    top: 19px;
-    left: 19px;
-    background: #2a3a0a;
-    z-index: 1;
-  }
-
-  .ab-buttons {
-    display: flex;
-    gap: 10px;
-    transform: rotate(-20deg);
-  }
-
-  .btn-ab {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: #5a1a3a;
-    border: 2px solid #3a0a2a;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 8px;
-    color: #8a4a6a;
-    box-shadow: inset 0 -2px 0 rgba(0,0,0,0.2);
-  }
-
-  .start-select {
-    display: flex;
-    gap: 12px;
-    margin-top: 8px;
-    justify-content: center;
-  }
-
-  .btn-ss {
-    width: 24px;
-    height: 8px;
-    background: #4a5a2a;
-    border-radius: 4px;
-    transform: rotate(-25deg);
-  }
-
-  /* ── Bottom tab bar ── */
-  .tab-bar {
-    display: flex;
-    border-top: var(--border);
-    background: var(--d2);
-  }
-
-  .tab-item {
-    flex: 1;
-    padding: 6px 4px;
-    text-align: center;
-    font-size: 6px;
-    color: var(--l1);
-    cursor: pointer;
-    border-right: 1px solid var(--d1);
-    transition: background 0.05s;
-    font-family: 'Press Start 2P', monospace;
-    background: none;
-    border-top: none;
-    border-bottom: none;
-    border-left: none;
-  }
-
-  .tab-item:last-child { border-right: none; }
-  .tab-item:hover { background: var(--d1); color: var(--l2); }
-  .tab-item.active { background: var(--d1); color: var(--l2); }
-
-  .tab-icon {
-    display: block;
-    font-size: 12px;
-    margin-bottom: 2px;
-  }
-
-  /* ── Responsive ── */
-  @media (max-width: 540px) {
-    body { padding: 4px; }
-    .gameboy-frame { padding: 8px 6px 8px; border-radius: 8px 8px 4px 4px; }
-    .screen-inner { height: 500px; }
-    .controls { display: none; }
+  /* ── Selection highlight ── */
+  ::selection {
+    background: var(--d1);
+    color: var(--l2);
   }
 
   /* ── Entrance ── */
   @keyframes screenFlash {
     0% { background: var(--d1); }
-    20% { background: var(--l2); }
+    15% { background: var(--l2); }
     100% { background: var(--l2); }
   }
 
-  .screen {
-    animation: screenFlash 0.4s ease-out;
+  .pc-layout {
+    animation: screenFlash 0.3s ease-out;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .pc-layout {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto;
+    }
+    .panel { border-right: none; border-bottom: var(--border); max-height: 500px; }
+    .panel:last-child { border-bottom: none; }
+  }
+
+  @media (min-width: 901px) and (max-width: 1200px) {
+    .pc-layout {
+      grid-template-columns: 240px 1fr 260px;
+    }
   }
 </style>
 </head>
 <body>
 
-<div class="gameboy-frame">
-  <div class="screen">
-    <!-- Tab bar at top of screen -->
-    <div class="tab-bar">
-      <button class="tab-item active" onclick="showSection('sec-team', this)"><span class="tab-icon">&#9876;</span>TEAM</button>
-      <button class="tab-item" onclick="showSection('sec-box', this)"><span class="tab-icon">&#9635;</span>BOX</button>
-      <button class="tab-item" onclick="showSection('sec-badge', this)"><span class="tab-icon">&#9733;</span>BADGE</button>
-      <button class="tab-item" onclick="showSection('sec-stats', this)"><span class="tab-icon">&#9670;</span>STATS</button>
-    </div>
-
-    <div class="screen-inner">
-
-      <!-- ═══ TEAM Section ═══ -->
-      <div id="sec-team" class="section-page">
-
-        <!-- Trainer Card -->
-        <div class="menu-section">
-          <div class="menu-header">TRAINER CARD</div>
-          <div class="menu-body">
-            <div class="trainer-card">
-              <div class="trainer-avatar">G</div>
-              <div class="trainer-info">
-                <div class="trainer-name">GREY</div>
-                <div class="trainer-detail">PLATINUM SOUL LINK</div>
-                <div class="trainer-detail">RUN #1 . 4 DAYS</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Team Pokemon -->
-        <div class="menu-section">
-          <div class="menu-header">PARTY POKEMON</div>
-          <div class="menu-body">
-            <div class="cursor-item">
-              <span class="cursor-arrow">&#9654;</span>
-              <div class="poke-sprite-box">&#128293;</div>
-              <div style="flex: 1;">
-                <div class="poke-item-name">INFERNAPE</div>
-                <div style="font-size: 6px; color: var(--d2);">"Blaze"</div>
-              </div>
-              <div>
-                <span class="type-text">FIR</span><span class="type-text">FGT</span>
-                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
-              </div>
-            </div>
-            <div class="cursor-item">
-              <span class="cursor-arrow">&#9654;</span>
-              <div class="poke-sprite-box">&#129413;</div>
-              <div style="flex: 1;">
-                <div class="poke-item-name">STARAPTOR</div>
-                <div style="font-size: 6px; color: var(--d2);">"Wingman"</div>
-              </div>
-              <div>
-                <span class="type-text">NRM</span><span class="type-text">FLY</span>
-                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
-              </div>
-            </div>
-            <div class="cursor-item">
-              <span class="cursor-arrow">&#9654;</span>
-              <div class="poke-sprite-box">&#9889;</div>
-              <div style="flex: 1;">
-                <div class="poke-item-name">LUXRAY</div>
-                <div style="font-size: 6px; color: var(--d2);">"Sparks"</div>
-              </div>
-              <div>
-                <span class="type-text">ELC</span>
-                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
-              </div>
-            </div>
-            <div class="cursor-item">
-              <span class="cursor-arrow">&#9654;</span>
-              <div class="poke-sprite-box">&#127754;</div>
-              <div style="flex: 1;">
-                <div class="poke-item-name">GASTRODON</div>
-                <div style="font-size: 6px; color: var(--d2);">"Sluggo"</div>
-              </div>
-              <div>
-                <span class="type-text">WTR</span><span class="type-text">GND</span>
-                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
-              </div>
-            </div>
-            <div class="cursor-item">
-              <span class="cursor-arrow">&#9654;</span>
-              <div class="poke-sprite-box">&#127801;</div>
-              <div style="flex: 1;">
-                <div class="poke-item-name">ROSERADE</div>
-                <div style="font-size: 6px; color: var(--d2);">"Thorn"</div>
-              </div>
-              <div>
-                <span class="type-text">GRS</span><span class="type-text">PSN</span>
-                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
-              </div>
-            </div>
-            <div class="cursor-item">
-              <span class="cursor-arrow">&#9654;</span>
-              <div class="poke-sprite-box">&#129354;</div>
-              <div style="flex: 1;">
-                <div class="poke-item-name">LUCARIO</div>
-                <div style="font-size: 6px; color: var(--d2);">"Aura"</div>
-              </div>
-              <div>
-                <span class="type-text">FGT</span><span class="type-text">STL</span>
-                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="dialog">
-          GREY's team is ready!
-          Next gym: BYRON (Steel)
-          at Canalave City.
-        </div>
-      </div>
-
-      <!-- ═══ BOX Section ═══ -->
-      <div id="sec-box" class="section-page" style="display: none;">
-
-        <div class="menu-section">
-          <div class="menu-header">PC BOX - STORAGE</div>
-          <div class="menu-body">
-            <div class="cursor-item">
-              <span class="cursor-arrow">&#9654;</span>
-              <div class="poke-sprite-box">&#129451;</div>
-              <div style="flex: 1;">
-                <div class="poke-item-name">BIBAREL</div>
-                <div style="font-size: 6px; color: var(--d2);">"Chomps" . Route 208</div>
-              </div>
-              <div>
-                <span class="type-text">NRM</span><span class="type-text">WTR</span>
-                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
-              </div>
-            </div>
-            <div class="cursor-item">
-              <span class="cursor-arrow">&#9654;</span>
-              <div class="poke-sprite-box">&#128276;</div>
-              <div style="flex: 1;">
-                <div class="poke-item-name">BRONZONG</div>
-                <div style="font-size: 6px; color: var(--d2);">"Gong" . Mt. Coronet</div>
-              </div>
-              <div>
-                <span class="type-text">STL</span><span class="type-text">PSY</span>
-                <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="menu-section">
-          <div class="menu-header">FALLEN POKEMON</div>
-          <div class="menu-body">
-            <div class="poke-item dead">
-              <div class="poke-sprite-box" style="opacity: 0.4;">&#9760;</div>
-              <div class="poke-item-name">GEODUDE "Rocky"</div>
-              <div class="hp-bar"><div class="hp-fill dead"></div></div>
-            </div>
-            <div class="poke-item dead">
-              <div class="poke-sprite-box" style="opacity: 0.4;">&#9760;</div>
-              <div class="poke-item-name">ZUBAT "Screech"</div>
-              <div class="hp-bar"><div class="hp-fill dead"></div></div>
-            </div>
-            <div class="poke-item dead">
-              <div class="poke-sprite-box" style="opacity: 0.4;">&#9760;</div>
-              <div class="poke-item-name">BUIZEL "Splash"</div>
-              <div class="hp-bar"><div class="hp-fill dead"></div></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="dialog">
-          3 Pokemon have fallen
-          in this run. Rest in
-          peace, brave ones.
-        </div>
-      </div>
-
-      <!-- ═══ BADGE Section ═══ -->
-      <div id="sec-badge" class="section-page" style="display: none;">
-
-        <div class="menu-section">
-          <div class="menu-header">BADGE CASE</div>
-          <div class="menu-body">
-            <div class="badge-grid">
-              <div class="badge-cell badge-earned">&#9733;</div>
-              <div class="badge-cell badge-earned">&#9733;</div>
-              <div class="badge-cell badge-earned">&#9733;</div>
-              <div class="badge-cell badge-earned">&#9733;</div>
-              <div class="badge-cell badge-earned">&#9733;</div>
-              <div class="badge-cell badge-empty">...</div>
-              <div class="badge-cell badge-empty">...</div>
-              <div class="badge-cell badge-empty">...</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="menu-section">
-          <div class="menu-header">GYM LEADERS</div>
-          <div class="menu-body" style="font-size: 7px; line-height: 2.2;">
-            <div>&#9733; GYM 1: ROARK <span class="type-text">RCK</span></div>
-            <div>&#9733; GYM 2: GARDENIA <span class="type-text">GRS</span></div>
-            <div>&#9733; GYM 3: MAYLENE <span class="type-text">FGT</span></div>
-            <div>&#9733; GYM 4: C.WAKE <span class="type-text">WTR</span></div>
-            <div>&#9733; GYM 5: FANTINA <span class="type-text">GHO</span></div>
-            <div style="background: var(--d2); color: var(--l2); padding: 2px 4px; margin: 2px -4px;">
-              &#9654; GYM 6: BYRON <span class="type-text">STL</span> &lt;NEXT
-            </div>
-            <div style="opacity: 0.4;">. GYM 7: CANDICE <span class="type-text">ICE</span></div>
-            <div style="opacity: 0.4;">. GYM 8: VOLKNER <span class="type-text">ELC</span></div>
-          </div>
-        </div>
-
-        <div class="dialog">
-          5 of 8 badges earned.
-          BYRON awaits in
-          Canalave City!
-        </div>
-      </div>
-
-      <!-- ═══ STATS Section ═══ -->
-      <div id="sec-stats" class="section-page" style="display: none;">
-
-        <div class="menu-section">
-          <div class="menu-header">RUN STATISTICS</div>
-          <div class="menu-body">
-            <div class="stat-row"><span>CAUGHT</span><span class="stat-val">11</span></div>
-            <div class="stat-row"><span>ALIVE</span><span class="stat-val">8</span></div>
-            <div class="stat-row"><span>DEAD</span><span class="stat-val">3</span></div>
-            <div class="stat-row"><span>ON TEAM</span><span class="stat-val">6</span></div>
-            <div class="stat-row"><span>IN BOX</span><span class="stat-val">2</span></div>
-            <div class="stat-row"><span>BADGES</span><span class="stat-val">5/8</span></div>
-            <div class="stat-row"><span>SURVIVAL</span><span class="stat-val">72.7%</span></div>
-          </div>
-        </div>
-
-        <div class="menu-section">
-          <div class="menu-header">TYPE ANALYSIS</div>
-          <div class="menu-body" style="font-size: 7px; line-height: 2.2;">
-            <div style="margin-bottom: 4px;">SUPER EFFECTIVE:</div>
-            <div>
-              <span class="type-text">FIR</span>
-              <span class="type-text">WTR</span>
-              <span class="type-text">GRS</span>
-              <span class="type-text">ELC</span>
-              <span class="type-text">NRM</span>
-              <span class="type-text">FGT</span>
-              <span class="type-text">FLY</span>
-              <span class="type-text">PSN</span>
-              <span class="type-text">GND</span>
-              <span class="type-text">RCK</span>
-              <span class="type-text">PSY</span>
-              <span class="type-text">GHO</span>
-              <span class="type-text">STL</span>
-              <span class="type-text">DRK</span>
-              <span class="type-text">BUG</span>
-            </div>
-            <div style="margin-top: 8px; margin-bottom: 4px;">NO COVERAGE:</div>
-            <div style="background: var(--d2); color: var(--l2); display: inline-block; padding: 2px 4px;">
-              <span class="type-text" style="border-color: var(--l1);">ICE</span>
-              <span class="type-text" style="border-color: var(--l1);">DRG</span>
-              !! DANGER
-            </div>
-            <div style="margin-top: 8px; margin-bottom: 4px;">WEAKNESS:</div>
-            <div>GROUND x3 (Infernape,</div>
-            <div>Luxray, Lucario)</div>
-          </div>
-        </div>
-
-        <div class="dialog">
-          Team coverage is good
-          but watch out for
-          Ground-type moves!
-        </div>
-      </div>
-
+<!-- Title Bar -->
+<div class="title-bar">
+  <div class="title-left">
+    <span class="title-logo">&#9876;</span>
+    <div>
+      <div class="title-text">GREY's PC</div>
+      <div class="title-sub">PLATINUM SOUL LINK . RUN #1</div>
     </div>
   </div>
-
-  <!-- Decorative controls -->
-  <div class="controls">
-    <div class="dpad">
-      <div class="dpad-h"></div>
-      <div class="dpad-v"></div>
-      <div class="dpad-center"></div>
+  <div class="title-right">
+    <div class="title-stat">
+      <div class="title-stat-num">11</div>
+      <div class="title-stat-label">CAUGHT</div>
     </div>
-    <div class="ab-buttons">
-      <div class="btn-ab">B</div>
-      <div class="btn-ab">A</div>
+    <div class="title-stat">
+      <div class="title-stat-num">8</div>
+      <div class="title-stat-label">ALIVE</div>
     </div>
-  </div>
-  <div class="start-select">
-    <div class="btn-ss"></div>
-    <div class="btn-ss"></div>
+    <div class="title-stat">
+      <div class="title-stat-num">3</div>
+      <div class="title-stat-label">DEAD</div>
+    </div>
+    <div class="title-stat">
+      <div class="title-stat-num">5/8</div>
+      <div class="title-stat-label">BADGES</div>
+    </div>
   </div>
 </div>
 
-<script>
-  function showSection(id, btn) {
-    document.querySelectorAll('.section-page').forEach(s => s.style.display = 'none');
-    document.getElementById(id).style.display = 'block';
-    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-    btn.classList.add('active');
-    // Scroll to top of screen
-    document.querySelector('.screen-inner').scrollTop = 0;
-  }
-</script>
+<!-- 3-Panel PC Layout -->
+<div class="pc-layout">
+
+  <!-- ═══ LEFT: PARTY ═══ -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>PARTY</span>
+      <span class="panel-header-sub">6/6</span>
+    </div>
+    <div class="panel-body">
+
+      <div class="team-slot">
+        <div class="team-slot-num">1</div>
+        <div class="team-sprite">&#128293;</div>
+        <div class="team-info">
+          <div class="team-name">INFERNAPE</div>
+          <div class="team-nick">"Blaze"</div>
+          <div class="team-types"><span class="type-text">FIR</span><span class="type-text">FGT</span></div>
+        </div>
+        <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+      </div>
+
+      <div class="team-slot">
+        <div class="team-slot-num">2</div>
+        <div class="team-sprite">&#129413;</div>
+        <div class="team-info">
+          <div class="team-name">STARAPTOR</div>
+          <div class="team-nick">"Wingman"</div>
+          <div class="team-types"><span class="type-text">NRM</span><span class="type-text">FLY</span></div>
+        </div>
+        <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+      </div>
+
+      <div class="team-slot">
+        <div class="team-slot-num">3</div>
+        <div class="team-sprite">&#9889;</div>
+        <div class="team-info">
+          <div class="team-name">LUXRAY</div>
+          <div class="team-nick">"Sparks"</div>
+          <div class="team-types"><span class="type-text">ELC</span></div>
+        </div>
+        <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+      </div>
+
+      <div class="team-slot">
+        <div class="team-slot-num">4</div>
+        <div class="team-sprite">&#127754;</div>
+        <div class="team-info">
+          <div class="team-name">GASTRODON</div>
+          <div class="team-nick">"Sluggo"</div>
+          <div class="team-types"><span class="type-text">WTR</span><span class="type-text">GND</span></div>
+        </div>
+        <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+      </div>
+
+      <div class="team-slot">
+        <div class="team-slot-num">5</div>
+        <div class="team-sprite">&#127801;</div>
+        <div class="team-info">
+          <div class="team-name">ROSERADE</div>
+          <div class="team-nick">"Thorn"</div>
+          <div class="team-types"><span class="type-text">GRS</span><span class="type-text">PSN</span></div>
+        </div>
+        <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+      </div>
+
+      <div class="team-slot">
+        <div class="team-slot-num">6</div>
+        <div class="team-sprite">&#129354;</div>
+        <div class="team-info">
+          <div class="team-name">LUCARIO</div>
+          <div class="team-nick">"Aura"</div>
+          <div class="team-types"><span class="type-text">FGT</span><span class="type-text">STL</span></div>
+        </div>
+        <div class="hp-bar"><div class="hp-fill" style="width: 100%;"></div></div>
+      </div>
+
+      <!-- Stats underneath team -->
+      <div style="margin-top: 10px; padding-top: 8px; border-top: var(--border-thin);">
+        <div class="stat-row"><span>SURVIVAL</span><span class="stat-val">72.7%</span></div>
+        <div class="stat-row"><span>COVERAGE</span><span class="stat-val">15/17</span></div>
+      </div>
+
+      <div class="dialog" style="font-size: 11px;">
+        Team is at full
+        strength! Watch out
+        for GROUND moves.
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CENTER: PC BOX ═══ -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>PC BOX - ALL POKEMON</span>
+      <span class="panel-header-sub">11 TOTAL</span>
+    </div>
+    <div class="panel-body">
+
+      <div class="box-section-label">&#9733; ON TEAM (6)</div>
+      <div class="box-grid">
+        <div class="box-cell on-team">
+          <div class="box-cell-sprite">&#128293;</div>
+          <div class="box-cell-name">INFERNAPE</div>
+          <div class="box-cell-loc">Oreburgh Gate</div>
+        </div>
+        <div class="box-cell on-team">
+          <div class="box-cell-sprite">&#129413;</div>
+          <div class="box-cell-name">STARAPTOR</div>
+          <div class="box-cell-loc">Route 201</div>
+        </div>
+        <div class="box-cell on-team">
+          <div class="box-cell-sprite">&#9889;</div>
+          <div class="box-cell-name">LUXRAY</div>
+          <div class="box-cell-loc">Route 202</div>
+        </div>
+        <div class="box-cell on-team">
+          <div class="box-cell-sprite">&#127754;</div>
+          <div class="box-cell-name">GASTRODON</div>
+          <div class="box-cell-loc">Route 205</div>
+        </div>
+        <div class="box-cell on-team">
+          <div class="box-cell-sprite">&#127801;</div>
+          <div class="box-cell-name">ROSERADE</div>
+          <div class="box-cell-loc">Route 204</div>
+        </div>
+        <div class="box-cell on-team">
+          <div class="box-cell-sprite">&#129354;</div>
+          <div class="box-cell-name">LUCARIO</div>
+          <div class="box-cell-loc">Route 207</div>
+        </div>
+      </div>
+
+      <div class="box-section-label" style="margin-top: 14px;">IN STORAGE (2)</div>
+      <div class="box-grid">
+        <div class="box-cell">
+          <div class="box-cell-sprite">&#129451;</div>
+          <div class="box-cell-name">BIBAREL</div>
+          <div class="box-cell-loc">Route 208</div>
+        </div>
+        <div class="box-cell">
+          <div class="box-cell-sprite">&#128276;</div>
+          <div class="box-cell-name">BRONZONG</div>
+          <div class="box-cell-loc">Mt. Coronet</div>
+        </div>
+        <div class="box-cell empty"></div>
+        <div class="box-cell empty"></div>
+        <div class="box-cell empty"></div>
+      </div>
+
+      <div class="box-section-label" style="margin-top: 14px;">FALLEN (3)</div>
+      <div class="box-grid">
+        <div class="box-cell dead">
+          <div class="box-cell-sprite">&#9760;</div>
+          <div class="box-cell-name">GEODUDE</div>
+          <div class="box-cell-loc">Oreburgh Mine</div>
+        </div>
+        <div class="box-cell dead">
+          <div class="box-cell-sprite">&#9760;</div>
+          <div class="box-cell-name">ZUBAT</div>
+          <div class="box-cell-loc">Ravaged Path</div>
+        </div>
+        <div class="box-cell dead">
+          <div class="box-cell-sprite">&#9760;</div>
+          <div class="box-cell-name">BUIZEL</div>
+          <div class="box-cell-loc">Route 205</div>
+        </div>
+        <div class="box-cell empty"></div>
+        <div class="box-cell empty"></div>
+      </div>
+
+      <!-- Type coverage at bottom of box -->
+      <div style="margin-top: 16px; padding-top: 10px; border-top: var(--border-thin);">
+        <div class="box-section-label" style="margin-bottom: 6px;">TYPE COVERAGE</div>
+        <div style="font-size: 10px; line-height: 2.2;">
+          <span class="type-text">FIR</span>
+          <span class="type-text">WTR</span>
+          <span class="type-text">GRS</span>
+          <span class="type-text">ELC</span>
+          <span class="type-text">NRM</span>
+          <span class="type-text">FGT</span>
+          <span class="type-text">FLY</span>
+          <span class="type-text">PSN</span>
+          <span class="type-text">GND</span>
+          <span class="type-text">RCK</span>
+          <span class="type-text">PSY</span>
+          <span class="type-text">GHO</span>
+          <span class="type-text">STL</span>
+          <span class="type-text">DRK</span>
+          <span class="type-text">BUG</span>
+        </div>
+        <div style="margin-top: 6px; font-size: 10px;">
+          <span style="background: var(--d2); color: var(--l2); padding: 2px 6px;">
+            NO COVERAGE: <span class="type-text" style="border-color: var(--l1);">ICE</span> <span class="type-text" style="border-color: var(--l1);">DRG</span>
+          </span>
+        </div>
+        <div style="margin-top: 6px; font-size: 10px; color: var(--d2);">
+          WEAKNESS: GROUND x3
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ RIGHT: MAP / ROUTE / GYM ═══ -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>MAP & GYMS</span>
+      <span class="panel-header-sub">SINNOH</span>
+    </div>
+    <div class="panel-body">
+
+      <!-- Mini ASCII map -->
+      <div class="map-area"><span class="map-you">SINNOH REGION</span>
+═══════════════════════
+                 Snowpoint
+                    |
+  Eterna---Celestic-+-Veilstone
+    |         |         |
+  Floaroma  Mt.Coronet  Pastoria
+    |         |         |
+  Jubilife-Oreburgh  Hearthome
+    |                   |
+  <span class="map-you">Canalave</span>          Solaceon
+  <span class="map-you">  ▲ YOU</span>
+═══════════════════════</div>
+
+      <!-- Current location -->
+      <div class="route-card">
+        <div class="route-label">CURRENT LOCATION</div>
+        <div class="route-name">CANALAVE CITY</div>
+        <div class="route-detail">Preparing for Gym 6</div>
+        <div class="route-detail">Next objective: BYRON</div>
+      </div>
+
+      <!-- Badge case -->
+      <div class="route-card">
+        <div class="route-label">BADGE CASE</div>
+        <div class="badge-row">
+          <div class="badge-cell badge-earned">&#9733;</div>
+          <div class="badge-cell badge-earned">&#9733;</div>
+          <div class="badge-cell badge-earned">&#9733;</div>
+          <div class="badge-cell badge-earned">&#9733;</div>
+          <div class="badge-cell badge-earned">&#9733;</div>
+          <div class="badge-cell badge-empty">...</div>
+          <div class="badge-cell badge-empty">...</div>
+          <div class="badge-cell badge-empty">...</div>
+        </div>
+      </div>
+
+      <!-- Gym Leaders list -->
+      <div class="route-card">
+        <div class="route-label">GYM LEADERS</div>
+        <div class="gym-list-item"><span class="gym-check">&#9733;</span> ROARK <span class="type-text">RCK</span></div>
+        <div class="gym-list-item"><span class="gym-check">&#9733;</span> GARDENIA <span class="type-text">GRS</span></div>
+        <div class="gym-list-item"><span class="gym-check">&#9733;</span> MAYLENE <span class="type-text">FGT</span></div>
+        <div class="gym-list-item"><span class="gym-check">&#9733;</span> C.WAKE <span class="type-text">WTR</span></div>
+        <div class="gym-list-item"><span class="gym-check">&#9733;</span> FANTINA <span class="type-text">GHO</span></div>
+        <div class="gym-next-highlight">
+          &#9654; BYRON <span class="type-text" style="border-color: var(--l1);">STL</span> &lt;NEXT
+          <div style="font-size: 9px; color: var(--l1); margin-top: 2px;">Canalave City</div>
+        </div>
+        <div class="gym-list-item" style="opacity: 0.35;"><span class="gym-check">.</span> CANDICE <span class="type-text">ICE</span></div>
+        <div class="gym-list-item" style="opacity: 0.35;"><span class="gym-check">.</span> VOLKNER <span class="type-text">ELC</span></div>
+      </div>
+
+      <!-- Route encounters -->
+      <div class="route-card">
+        <div class="route-label">RECENT ROUTES</div>
+        <div style="font-size: 10px; line-height: 2;">
+          <div>Route 218 - uncaught</div>
+          <div>Iron Island - uncaught</div>
+          <div>Canalave City - &#9733;</div>
+        </div>
+      </div>
+
+      <div class="dialog" style="font-size: 11px;">
+        BYRON uses STEEL
+        types. Your team has
+        FIRE and FIGHTING
+        coverage. You're
+        prepared, trainer!
+      </div>
+    </div>
+  </div>
+
+</div>
 
 </body>
 </html>

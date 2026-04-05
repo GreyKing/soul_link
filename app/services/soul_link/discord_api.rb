@@ -16,7 +16,7 @@ module SoulLink
         @token, server_id,
         GameState.category_name(run.run_number),
         4, # category type
-        nil, nil, nil, nil, nil, nil, nil
+        nil, nil, nil, nil, nil, nil, nil, nil
       )
       category_data = JSON.parse(category.body)
       category_id = category_data["id"]
@@ -54,7 +54,7 @@ module SoulLink
         @token, server_id,
         name,
         0, # text channel type
-        nil, nil, nil, nil, nil, parent_id, nil
+        nil, nil, nil, nil, parent_id, nil, nil, nil
       )
       JSON.parse(response.body)
     end
