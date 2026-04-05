@@ -40,14 +40,14 @@ class GymScheduleDiscordUpdateJob < ApplicationJob
     end
 
     status_text = case schedule.status
-                  when "proposed" then "\uD83D\uDCCB Proposed"
+                  when "proposed" then "\u{1F4CB} Proposed"
                   when "confirmed" then "\u2705 Confirmed"
-                  when "completed" then "\uD83C\uDFC6 Completed"
+                  when "completed" then "\u{1F3C6} Completed"
                   when "cancelled" then "\u274C Cancelled"
                   end
 
     {
-      title: "\uD83D\uDCC5 Gym Day Schedule",
+      title: "\u{1F4C5} Gym Day Schedule",
       description: "**When:** #{schedule.scheduled_at.strftime('%A, %B %d at %I:%M %p')}\n" \
         "**Proposed by:** #{schedule.proposer_name}\n" \
         "**Status:** #{status_text}\n\n" \
