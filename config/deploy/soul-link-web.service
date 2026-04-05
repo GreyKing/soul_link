@@ -10,6 +10,7 @@
 [Unit]
 Description=Soul Link Web (Puma)
 After=network.target mysql.service
+OnFailure=systemd-failure-notify@%n.service
 
 [Service]
 Type=simple

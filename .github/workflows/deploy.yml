@@ -72,8 +72,18 @@ jobs:
             ~/.rbenv/shims/ruby bin/rails db:migrate
             ~/.rbenv/shims/ruby bin/rails assets:precompile
 
-            # Reload nginx if location includes changed (safe — certbot manages the main config)
-            nginx -t && systemctl reload nginx
+            # Install/update systemd units from repo
+            cp config/deploy/soul-link-web.service /etc/systemd/system/
+            cp config/deploy/soul-link-bot.service /etc/systemd/system/
+            cp config/deploy/systemd-failure-notify@.service /etc/systemd/system/
+            mkdir -p /etc/systemd/system/nginx.service.d
+            cp config/deploy/nginx-override.conf /etc/systemd/system/nginx.service.d/override.conf
+            cp config/deploy/notify-failure.sh /usr/local/bin/notify-failure
+            chmod +x /usr/local/bin/notify-failure
+            systemctl daemon-reload
+
+            # Reload nginx if running, restart if failed (safe — certbot manages the main config)
+            nginx -t && systemctl reload-or-restart nginx
 
             systemctl restart soul-link-bot
             systemctl restart soul-link-web
