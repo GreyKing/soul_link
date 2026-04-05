@@ -14,7 +14,7 @@ class GymDraftChannel < ApplicationCable::Channel
     @draft.mark_ready!(current_user_id)
     broadcast_state
   rescue => e
-    transmit(error: e.message)
+    transmit({ error: e.message })
   end
 
   def vote(data)
@@ -22,7 +22,7 @@ class GymDraftChannel < ApplicationCable::Channel
     @draft.cast_vote!(current_user_id, data["voted_for"])
     broadcast_state
   rescue => e
-    transmit(error: e.message)
+    transmit({ error: e.message })
   end
 
   def pick(data)
@@ -30,7 +30,7 @@ class GymDraftChannel < ApplicationCable::Channel
     @draft.make_pick!(current_user_id, data["group_id"])
     broadcast_state
   rescue => e
-    transmit(error: e.message)
+    transmit({ error: e.message })
   end
 
   def nominate(data)
@@ -38,7 +38,7 @@ class GymDraftChannel < ApplicationCable::Channel
     @draft.submit_nomination!(current_user_id, data["group_id"])
     broadcast_state
   rescue => e
-    transmit(error: e.message)
+    transmit({ error: e.message })
   end
 
   def vote_nomination(data)
@@ -46,7 +46,7 @@ class GymDraftChannel < ApplicationCable::Channel
     @draft.vote_on_nomination!(current_user_id, data["approve"])
     broadcast_state
   rescue => e
-    transmit(error: e.message)
+    transmit({ error: e.message })
   end
 
   private

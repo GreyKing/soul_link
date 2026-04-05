@@ -181,6 +181,8 @@ class GymDraftTest < ActiveSupport::TestCase
     @draft.reload
     @draft.vote_on_nomination!(SCYTHE, true)
     @draft.reload
+    @draft.vote_on_nomination!(ZEALOUS, false)
+    @draft.reload
     # 2 out of 3 others approved — pick should be added
     assert_equal picks_before + 1, @draft.picks.size
     assert_equal @groups[4].id, @draft.picks.last["group_id"]
@@ -196,6 +198,8 @@ class GymDraftTest < ActiveSupport::TestCase
     @draft.reload
     @draft.vote_on_nomination!(SCYTHE, false)
     @draft.reload
+    @draft.vote_on_nomination!(ZEALOUS, true)
+    @draft.reload
     assert_equal picks_before, @draft.picks.size
     assert_nil @draft.current_nomination
   end
@@ -209,6 +213,8 @@ class GymDraftTest < ActiveSupport::TestCase
     @draft.reload
     @draft.vote_on_nomination!(SCYTHE, true)
     @draft.reload
+    @draft.vote_on_nomination!(ZEALOUS, true)
+    @draft.reload
     assert_equal "nominating", @draft.status
 
     @draft.submit_nomination!(ARATY, @groups[5].id)
@@ -216,6 +222,8 @@ class GymDraftTest < ActiveSupport::TestCase
     @draft.vote_on_nomination!(GREY, true)
     @draft.reload
     @draft.vote_on_nomination!(SCYTHE, true)
+    @draft.reload
+    @draft.vote_on_nomination!(ZEALOUS, true)
     @draft.reload
     assert_equal "complete", @draft.status
     assert_equal 6, @draft.picks.size

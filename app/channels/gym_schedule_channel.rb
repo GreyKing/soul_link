@@ -15,7 +15,7 @@ class GymScheduleChannel < ApplicationCable::Channel
     broadcast_state
     GymScheduleDiscordUpdateJob.perform_later(@schedule.id) if @schedule.discord_message_id
   rescue => e
-    transmit(error: e.message)
+    transmit({ error: e.message })
   end
 
   def cancel(_data)
@@ -23,7 +23,7 @@ class GymScheduleChannel < ApplicationCable::Channel
     @schedule.cancel!
     broadcast_state
   rescue => e
-    transmit(error: e.message)
+    transmit({ error: e.message })
   end
 
   private

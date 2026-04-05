@@ -28,8 +28,9 @@ class GymDraftChannelTest < ActionCable::Channel::TestCase
   end
 
   test "subscribes and broadcasts initial state" do
-    subscribe(draft_id: @draft.id)
-    assert_broadcast_on(@draft, hash_including(type: "state_update"))
+    assert_broadcasts(@draft, 1) do
+      subscribe(draft_id: @draft.id)
+    end
   end
 
   test "ready action marks player ready" do
@@ -41,7 +42,7 @@ class GymDraftChannelTest < ActionCable::Channel::TestCase
 
   test "ready action broadcasts state update" do
     subscribe(draft_id: @draft.id)
-    assert_broadcast_on(@draft, hash_including(type: "state_update")) do
+    assert_broadcasts(@draft, 1) do
       perform :ready
     end
   end
@@ -49,7 +50,7 @@ class GymDraftChannelTest < ActionCable::Channel::TestCase
   test "vote action records vote" do
     move_to_voting!
     subscribe(draft_id: @draft.id)
-    perform :vote, voted_for: ARATY
+    perform :vote, { "voted_for" => ARATY }
     @draft.reload
     assert_equal ARATY, @draft.first_pick_votes[GREY.to_s]
   end
@@ -57,7 +58,7 @@ class GymDraftChannelTest < ActionCable::Channel::TestCase
   test "pick action records pick in drafting phase" do
     move_to_drafting!(first_picker: GREY)
     subscribe(draft_id: @draft.id)
-    perform :pick, group_id: @groups[0].id
+    perform :pick, { "group_id" => @groups[0].id }
     @draft.reload
     assert_equal 1, @draft.picks.size
     assert_equal @groups[0].id, @draft.picks.first["group_id"]
@@ -66,7 +67,7 @@ class GymDraftChannelTest < ActionCable::Channel::TestCase
   test "nominate action creates nomination" do
     move_to_nominating!
     subscribe(draft_id: @draft.id)
-    perform :nominate, group_id: @groups[4].id
+    perform :nominate, { "group_id" => @groups[4].id }
     @draft.reload
     assert_equal @groups[4].id, @draft.current_nomination["group_id"]
   end
@@ -76,7 +77,7 @@ class GymDraftChannelTest < ActionCable::Channel::TestCase
     @draft.submit_nomination!(ARATY, @groups[4].id)
     @draft.reload
     subscribe(draft_id: @draft.id)
-    perform :vote_nomination, approve: true
+    perform :vote_nomination, { "approve" => true }
     @draft.reload
     assert_equal true, @draft.current_nomination["votes"][GREY.to_s]
   end
@@ -84,7 +85,7 @@ class GymDraftChannelTest < ActionCable::Channel::TestCase
   test "wrong phase action transmits error" do
     subscribe(draft_id: @draft.id)
     # Try to vote in lobby phase — should transmit error
-    perform :vote, voted_for: ARATY
+    perform :vote, { "voted_for" => ARATY }
     assert_equal({ "error" => "Not in voting phase" }, transmissions.last)
   end
 

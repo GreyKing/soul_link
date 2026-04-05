@@ -1,6 +1,7 @@
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
+require "minitest/mock"
 
 # OmniAuth test mode — prevents real OAuth calls
 OmniAuth.config.test_mode = true
@@ -29,9 +30,12 @@ module LoginHelper
       credentials: { token: "fake_token" }
     )
 
-    # Stub the Faraday guild API call made by SessionsController#create
+    # Stub the Faraday guild API call made by SessionsController#create.
+    # Use a lambda so Minitest calls it (handling the block Faraday.get yields)
+    # instead of trying to return a static value that ignores the block.
     fake_response = Struct.new(:body).new([{ "id" => guild_id.to_s }].to_json)
-    Faraday.stub(:get, fake_response) do
+    stub_get = lambda { |_url, &_block| fake_response }
+    Faraday.stub(:get, stub_get) do
       get "/auth/discord/callback"
     end
   end
