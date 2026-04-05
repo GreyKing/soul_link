@@ -20,11 +20,7 @@ ExecStart=/root/.rbenv/shims/bundle exec puma -C config/puma.rb
 Restart=always
 RestartSec=3
 
-Environment=RAILS_ENV=production
-Environment=RAILS_MASTER_KEY=REPLACE_ME
-Environment=DATABASE_USERNAME=soul_link
-Environment=DATABASE_PASSWORD=REPLACE_ME
-Environment=SOUL_LINK_HOST=4luckyclovers.com
+EnvironmentFile=/etc/soul_link/env
 
 [Install]
 WantedBy=multi-user.target

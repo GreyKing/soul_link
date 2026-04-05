@@ -8,6 +8,22 @@
 UNIT="$1"
 HOST="$(hostname)"
 TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+
+# --- Cooldown: skip if notified within the last 30 minutes ---
+COOLDOWN=1800
+STAMP_FILE="/tmp/notify-failure-${UNIT}.last"
+NOW="$(date +%s)"
+
+if [ -f "$STAMP_FILE" ]; then
+  LAST="$(cat "$STAMP_FILE")"
+  if [ $(( NOW - LAST )) -lt $COOLDOWN ]; then
+    exit 0
+  fi
+fi
+
+echo "$NOW" > "$STAMP_FILE"
+# --- End cooldown ---
+
 LOGS="$(journalctl -u "$UNIT" -n 30 --no-pager 2>/dev/null)"
 
 RECIPIENT="gmferm@gmail.com"

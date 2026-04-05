@@ -72,6 +72,17 @@ jobs:
             ~/.rbenv/shims/ruby bin/rails db:migrate
             ~/.rbenv/shims/ruby bin/rails assets:precompile
 
+            # Write environment file from secrets (not stored in repo)
+            mkdir -p /etc/soul_link
+            cat > /etc/soul_link/env <<ENVEOF
+RAILS_ENV=production
+RAILS_MASTER_KEY=${RAILS_MASTER_KEY}
+DATABASE_USERNAME=${DATABASE_USERNAME}
+DATABASE_PASSWORD=${DATABASE_PASSWORD}
+SOUL_LINK_HOST=${SOUL_LINK_HOST}
+ENVEOF
+            chmod 600 /etc/soul_link/env
+
             # Install/update systemd units from repo
             cp config/deploy/soul-link-web.service /etc/systemd/system/
             cp config/deploy/soul-link-bot.service /etc/systemd/system/
