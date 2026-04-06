@@ -287,6 +287,7 @@ export default class extends Controller {
 
     try {
       if (pokemonId) {
+        // Update existing pokemon
         const pokemonRes = await fetch(`${this.pokemonUpdateUrlValue}/${pokemonId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", "X-CSRF-Token": this.csrfValue },
@@ -295,6 +296,19 @@ export default class extends Controller {
 
         if (!pokemonRes.ok) {
           const data = await pokemonRes.json()
+          this.modalStatusTarget.textContent = data.error || "SAVE FAILED"
+          return
+        }
+      } else if (species && groupId) {
+        // Create new pokemon record for this user in the group
+        const createRes = await fetch(this.pokemonUpdateUrlValue, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": this.csrfValue },
+          body: JSON.stringify({ group_id: groupId, species, level, ability, nature })
+        })
+
+        if (!createRes.ok) {
+          const data = await createRes.json()
           this.modalStatusTarget.textContent = data.error || "SAVE FAILED"
           return
         }
