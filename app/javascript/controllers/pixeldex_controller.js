@@ -390,32 +390,66 @@ export default class extends Controller {
       return
     }
 
-    pokemonData.forEach(p => {
-      const row = document.createElement("div")
-      row.className = "stat-row"
-      row.style.fontSize = "10px"
+    const naturesData = this.naturesDataValue || {}
 
+    pokemonData.forEach(p => {
+      const card = document.createElement("div")
+      card.style.cssText = "border: var(--border-thin); padding: 6px 8px; margin-bottom: 4px; font-size: 10px;"
+      if (p.is_mine) card.style.borderWidth = "3px"
+
+      // Player name row
+      const nameRow = document.createElement("div")
+      nameRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;"
       const nameSpan = document.createElement("span")
       nameSpan.textContent = p.player_name
       if (p.is_mine) nameSpan.style.fontWeight = "bold"
+      nameRow.appendChild(nameSpan)
 
-      const speciesSpan = document.createElement("span")
+      if (p.is_mine) {
+        const youBadge = document.createElement("span")
+        youBadge.textContent = "YOU"
+        youBadge.className = "type-text"
+        youBadge.style.cssText = "font-size: 8px; background: var(--d2); color: var(--l2); border-color: var(--d1);"
+        nameRow.appendChild(youBadge)
+      }
+      card.appendChild(nameRow)
+
       if (p.species) {
-        let html = ""
+        // Species + sprite row
+        const speciesRow = document.createElement("div")
+        speciesRow.style.cssText = "display: flex; align-items: center; gap: 4px; margin-bottom: 3px;"
         if (p.sprite_url) {
-          html += `<img src="${p.sprite_url}" width="16" height="16" style="image-rendering: pixelated; vertical-align: middle;"> `
+          speciesRow.innerHTML = `<img src="${p.sprite_url}" width="20" height="20" style="image-rendering: pixelated;"> `
         }
-        html += p.species
-        speciesSpan.innerHTML = html
+        const specName = document.createElement("span")
+        specName.textContent = p.species
+        speciesRow.appendChild(specName)
+        card.appendChild(speciesRow)
+
+        // Stats row: level, ability, nature
+        const stats = []
+        if (p.level) stats.push(`Lv.${p.level}`)
+        if (p.ability) stats.push(p.ability)
+        if (p.nature) {
+          const info = naturesData[p.nature]
+          const effect = (info && info.up) ? ` (+${info.up} -${info.down})` : ""
+          stats.push(`${p.nature}${effect}`)
+        }
+
+        if (stats.length) {
+          const statsRow = document.createElement("div")
+          statsRow.style.cssText = "font-size: 9px; color: var(--d2);"
+          statsRow.textContent = stats.join(" / ")
+          card.appendChild(statsRow)
+        }
       } else {
-        speciesSpan.textContent = "(unassigned)"
-        speciesSpan.style.color = "var(--d2)"
-        speciesSpan.style.fontStyle = "italic"
+        const unassigned = document.createElement("div")
+        unassigned.textContent = "(unassigned)"
+        unassigned.style.cssText = "color: var(--d2); font-style: italic;"
+        card.appendChild(unassigned)
       }
 
-      row.appendChild(nameSpan)
-      row.appendChild(speciesSpan)
-      container.appendChild(row)
+      container.appendChild(card)
     })
   }
 
