@@ -5,23 +5,23 @@
      data-timeline-create-group-url-value="<%= pokemon_groups_path %>"
      data-timeline-pokedex-species-value="<%= @pokedex_species.to_json %>"
      data-timeline-sprite-map-value="<%= SoulLink::GameState.pokedex.to_json %>"
-     class="relative">
+     style="position: relative;">
 
   <%# ── HEADER: Title + Gym Badges ── %>
-  <div class="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+  <div style="margin-bottom: 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
     <div>
-      <h1 class="text-2xl font-bold text-white">Route Progression</h1>
-      <p class="text-gray-400 text-sm mt-1">Click a location to view catches or add new ones.</p>
+      <div class="gb-page-title">ROUTE PROGRESSION</div>
+      <div class="gb-page-subtitle">Click a location to view catches or add new ones.</div>
     </div>
 
-    <%# Gym badges progress bar %>
-    <div class="flex items-center gap-1.5">
-      <span class="text-xs text-gray-400 mr-1">Badges:</span>
+    <%# Gym badges %>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <span style="font-size: 10px; color: var(--d2); margin-right: 4px;">Badges:</span>
       <% SoulLink::GameState.gym_info.each do |key, gym| %>
         <% num = gym['number'] %>
         <% beaten = @gyms_defeated >= num %>
-        <button class="w-7 h-7 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition
-                       <%= beaten ? 'bg-yellow-500 border-yellow-400 text-gray-900' : 'bg-gray-700 border-gray-600 text-gray-400 hover:border-gray-500' %>"
+        <button style="width: 28px; height: 28px; border: var(--border-thin); display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer;
+                       <%= beaten ? 'background: var(--d1); color: var(--l2);' : 'background: var(--l2); color: var(--d2);' %>"
                 data-action="click->timeline#toggleGym"
                 data-gym-number="<%= num %>"
                 title="<%= gym['name'] %> — <%= gym['leader'] %> (<%= gym['type'] %>) — Lv. <%= gym['max_level'] %>">
@@ -34,23 +34,24 @@
   <%# ── LEVEL CAP INFO ── %>
   <% next_gym = SoulLink::GameState.next_gym_info(@gyms_defeated) %>
   <% if next_gym %>
-    <div class="mb-4 px-4 py-2 bg-indigo-900/30 border border-indigo-800 rounded-lg inline-flex items-center gap-2 text-sm">
-      <span class="text-indigo-300">Next Gym:</span>
-      <span class="text-white font-medium"><%= next_gym['name'] %></span>
-      <span class="text-gray-400">(<%= next_gym['leader'] %> — <%= next_gym['type'] %>)</span>
-      <span class="text-yellow-400 font-medium ml-2">Level Cap: <%= next_gym['max_level'] %></span>
+    <div class="gb-card-dark" style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; margin-bottom: 12px; font-size: 10px;">
+      <span style="color: var(--l1);">Next Gym:</span>
+      <span style="color: var(--l2);"><%= next_gym['name'] %></span>
+      <span style="color: var(--l1);">(<%= next_gym['leader'] %> &mdash; <%= next_gym['type'] %>)</span>
+      <span style="color: var(--l2); margin-left: 6px;">Level Cap: <%= next_gym['max_level'] %></span>
     </div>
   <% else %>
-    <div class="mb-4 px-4 py-2 bg-yellow-900/30 border border-yellow-800 rounded-lg inline-flex items-center gap-2 text-sm">
-      <span class="text-yellow-300 font-medium">All 8 badges earned! Prepare for the Elite Four.</span>
+    <div class="gb-card-dark" style="display: inline-flex; padding: 6px 12px; margin-bottom: 12px; font-size: 10px;">
+      <span style="color: var(--l2);">All 8 badges earned! Prepare for the Elite Four.</span>
     </div>
   <% end %>
 
   <%# ── HORIZONTAL TIMELINE ── %>
-  <div class="bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
-    <div class="overflow-x-auto overflow-y-hidden pb-2 timeline-scroll"
+  <div class="gb-card" style="overflow: hidden; padding: 0;">
+    <div style="overflow-x: auto; overflow-y: hidden; padding-bottom: 8px; scrollbar-width: thin; scrollbar-color: var(--d2) var(--l1);"
+         class="timeline-scroll"
          data-timeline-target="scrollContainer">
-      <div class="flex items-start gap-0 px-6 pt-8 pb-4 min-w-max"
+      <div style="display: flex; align-items: flex-start; gap: 0; padding: 24px 16px 12px; min-width: max-content;"
            data-timeline-target="track">
 
         <% segments = @progression['segments'] || [] %>
@@ -63,15 +64,14 @@
             <% loc_type = loc_data['type'] || 'route' %>
             <% group = primary_group(groups) %>
 
-            <%# Connecting line before node (skip for very first) %>
+            <%# Connecting line %>
             <% unless seg_idx == 0 && loc_idx == 0 %>
-              <div class="w-6 sm:w-8 h-0.5 flex-shrink-0 mt-4
-                          <%= status != 'uncaught' ? 'bg-blue-500/40' : 'bg-gray-600' %>"></div>
+              <div style="width: 24px; height: 2px; flex-shrink: 0; margin-top: 16px;
+                          background: <%= status != 'uncaught' ? 'var(--d2)' : 'var(--l1)' %>;"></div>
             <% end %>
 
             <%# Location Node %>
-            <button class="flex-shrink-0 flex flex-col items-center gap-1 group cursor-pointer relative"
-                    style="min-width: 56px;"
+            <button style="flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; min-width: 56px; background: none; border: none; font-family: 'Press Start 2P', monospace; position: relative;"
                     data-action="click->timeline#selectLocation"
                     data-timeline-target="locationNode"
                     data-location-key="<%= loc_key %>"
@@ -80,45 +80,42 @@
                     data-groups="<%= groups_json_for(groups) %>">
 
               <%# Node circle %>
-              <div class="timeline-node <%= timeline_node_size(loc_type) %>
-                          rounded-full border-2 flex items-center justify-center
-                          transition-all duration-200 group-hover:scale-110
+              <div class="timeline-node" style="<%= timeline_node_size(loc_type) == 'w-8 h-8' ? 'width: 32px; height: 32px;' : 'width: 28px; height: 28px;' %>
+                          border: var(--border-thin); display: flex; align-items: center; justify-content: center;
                           <% if status == 'caught' %>
-                            bg-blue-600 border-blue-400 shadow-md shadow-blue-500/30
+                            background: var(--d2); border-color: var(--d1);
                           <% elsif status == 'dead' %>
-                            bg-red-600 border-red-400 shadow-md shadow-red-500/30
+                            background: #4a1c1c; border-color: #6b2c2c;
                           <% else %>
-                            bg-gray-700 border-gray-500 opacity-60 group-hover:opacity-100 group-hover:border-gray-400
+                            background: var(--l2); border-color: var(--d2); opacity: 0.6;
                           <% end %>">
                 <% if status == 'dead' %>
-                  <span class="text-[10px]">💀</span>
+                  <span style="font-size: 10px;">&#9760;</span>
                 <% elsif status == 'caught' && group %>
                   <% first_pokemon = group.soul_link_pokemon.first %>
                   <% if first_pokemon %>
                     <%= pokemon_sprite_tag(first_pokemon.species, size: 20) %>
                   <% else %>
-                    <span class="text-white text-[10px]">✓</span>
+                    <span style="color: var(--l2); font-size: 10px;">&#10003;</span>
                   <% end %>
                 <% elsif loc_type == 'special' %>
-                  <span class="text-gray-400 text-xs">★</span>
+                  <span style="color: var(--d2); font-size: 10px;">&#9733;</span>
                 <% end %>
               </div>
 
               <%# Location label %>
-              <span class="text-[9px] sm:text-[10px] text-gray-400 whitespace-nowrap max-w-[56px]
-                           truncate text-center group-hover:text-white transition leading-tight">
+              <span style="font-size: 9px; color: var(--d2); white-space: nowrap; max-width: 56px; overflow: hidden; text-overflow: ellipsis; text-align: center; line-height: 1.3;">
                 <%= loc_data['name'] %>
               </span>
 
-              <%# Nickname label for caught/dead %>
+              <%# Nickname label %>
               <% if group %>
-                <span class="text-[9px] font-medium leading-tight
-                             <%= status == 'dead' ? 'text-red-400' : 'text-blue-400' %>
-                             whitespace-nowrap truncate max-w-[56px]">
+                <span style="font-size: 9px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 56px;
+                             <%= status == 'dead' ? 'color: #e8a0a0;' : 'color: var(--d1);' %>">
                   <%= group.nickname&.truncate(10) %>
                 </span>
               <% else %>
-                <span class="text-[9px] text-transparent leading-tight">&nbsp;</span>
+                <span style="font-size: 9px; color: transparent; line-height: 1.3;">&nbsp;</span>
               <% end %>
             </button>
           <% end %>
@@ -129,86 +126,80 @@
             <% if gym %>
               <% beaten = @gyms_defeated >= gym['number'] %>
 
-              <%# Line to gym %>
-              <div class="w-4 sm:w-6 h-0.5 flex-shrink-0 mt-4
-                          <%= beaten ? 'bg-yellow-500/50' : 'bg-gray-600' %>"></div>
+              <div style="width: 16px; height: 2px; flex-shrink: 0; margin-top: 16px;
+                          background: <%= beaten ? 'var(--d1)' : 'var(--l1)' %>;"></div>
 
-              <%# Gym badge milestone %>
-              <div class="flex-shrink-0 flex flex-col items-center gap-1" style="min-width: 56px;">
-                <button class="w-10 h-10 rounded-full border-2 flex items-center justify-center
-                               text-sm font-bold transition-all
-                               <%= beaten ? 'bg-yellow-500 border-yellow-400 text-gray-900 shadow-lg shadow-yellow-500/30'
-                                          : 'bg-gray-700 border-gray-600 text-gray-500 hover:border-gray-500' %>"
+              <div style="flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 56px;">
+                <button style="width: 36px; height: 36px; border: var(--border-thin); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; cursor: pointer; font-family: 'Press Start 2P', monospace;
+                               <%= beaten ? 'background: var(--d1); color: var(--l2); border-color: var(--d1);' : 'background: var(--l2); color: var(--d2); border-color: var(--d2);' %>"
                         data-action="click->timeline#toggleGym"
                         data-gym-number="<%= gym['number'] %>"
                         title="<%= gym['name'] %> — <%= gym['leader'] %> (<%= gym['type'] %>)">
                   <%= gym['number'] %>
                 </button>
-                <span class="text-[9px] sm:text-[10px] font-medium whitespace-nowrap leading-tight
-                             <%= beaten ? 'text-yellow-400' : 'text-gray-500' %>">
+                <span style="font-size: 9px; white-space: nowrap; line-height: 1.3;
+                             <%= beaten ? 'color: var(--d1);' : 'color: var(--d2);' %>">
                   <%= gym['leader'] %>
                 </span>
-                <span class="text-[9px] text-gray-500 whitespace-nowrap leading-tight">
+                <span style="font-size: 9px; color: var(--d2); white-space: nowrap; line-height: 1.3;">
                   Lv. <%= gym['max_level'] %>
                 </span>
               </div>
 
-              <%# Line after gym %>
-              <div class="w-4 sm:w-6 h-0.5 flex-shrink-0 mt-4
-                          <%= beaten ? 'bg-yellow-500/50' : 'bg-gray-600' %>"></div>
+              <div style="width: 16px; height: 2px; flex-shrink: 0; margin-top: 16px;
+                          background: <%= beaten ? 'var(--d1)' : 'var(--l1)' %>;"></div>
             <% end %>
           <% end %>
         <% end %>
 
         <%# ── ENDPOINT: Elite Four ── %>
-        <div class="w-6 sm:w-8 h-0.5 flex-shrink-0 mt-4 bg-gray-600"></div>
-        <div class="flex-shrink-0 flex flex-col items-center gap-1" style="min-width: 56px;">
-          <div class="w-11 h-11 rounded-full border-2 border-purple-500 bg-purple-900/50
-                      flex items-center justify-center">
-            <span class="text-lg">👑</span>
+        <div style="width: 24px; height: 2px; flex-shrink: 0; margin-top: 16px; background: var(--l1);"></div>
+        <div style="flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 56px;">
+          <div style="width: 40px; height: 40px; border: var(--border-thin); border-color: var(--d1); background: var(--d2); display: flex; align-items: center; justify-content: center; font-size: 16px;">
+            &#128081;
           </div>
-          <span class="text-[9px] sm:text-[10px] font-medium text-purple-400 whitespace-nowrap leading-tight">
-            Elite Four
-          </span>
-          <span class="text-[9px] text-transparent leading-tight">&nbsp;</span>
+          <span style="font-size: 9px; color: var(--d1); white-space: nowrap; line-height: 1.3;">Elite Four</span>
+          <span style="font-size: 9px; color: transparent; line-height: 1.3;">&nbsp;</span>
         </div>
       </div>
     </div>
   </div>
 
-  <%# ── SPECIAL ENCOUNTERS (below timeline) ── %>
-  <div class="mt-6">
-    <h2 class="text-lg font-semibold text-white mb-3">Special Encounters</h2>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+  <%# ── SPECIAL ENCOUNTERS ── %>
+  <div style="margin-top: 16px;">
+    <div class="gb-section-header">SPECIAL ENCOUNTERS</div>
+    <div class="gb-grid-4">
       <% %w[gift egg trade other].each do |key| %>
         <% groups = @groups_by_location[key] %>
         <% status = location_status(groups) %>
         <% loc = @locations[key] %>
-        <button class="rounded-lg border p-3 text-left transition cursor-pointer
-                       <%= status == 'caught' ? 'bg-blue-900/30 border-blue-700 hover:border-blue-500' :
-                           status == 'dead' ? 'bg-red-900/30 border-red-700 hover:border-red-500' :
-                           'bg-gray-800 border-gray-700 hover:border-gray-500' %>"
+        <button class="<%= status == 'dead' ? 'gb-status-dead' : '' %>"
+                style="border: var(--border-thin); padding: 8px; text-align: left; cursor: pointer; font-family: 'Press Start 2P', monospace;
+                       <%= if status == 'caught' then 'background: var(--d2); color: var(--l2);'
+                           elsif status == 'dead' then 'background: #4a1c1c; border-color: #6b2c2c;'
+                           else 'background: var(--l1);'
+                           end %>"
                 data-action="click->timeline#selectLocation"
                 data-timeline-target="locationNode"
                 data-location-key="<%= key %>"
                 data-location-name="<%= loc&.dig('name') || key.titleize %>"
                 data-status="<%= status %>"
                 data-groups="<%= groups_json_for(groups) %>">
-          <div class="text-sm font-medium <%= status == 'caught' ? 'text-blue-300' : status == 'dead' ? 'text-red-300' : 'text-gray-300' %>">
+          <div style="font-size: 11px; <%= status == 'caught' ? 'color: var(--l2);' : status == 'dead' ? 'color: #e8a0a0;' : '' %>">
             <%= loc&.dig('name') || key.titleize %>
           </div>
           <% if groups.present? %>
             <% group = primary_group(groups) %>
-            <div class="text-xs text-gray-400 mt-1">
-              <%= group.dead? ? '💀 ' : '' %><%= group.nickname %>
+            <div style="font-size: 9px; margin-top: 4px; <%= status == 'dead' ? 'color: #e8a0a0;' : 'color: var(--l1);' %>">
+              <%= group.dead? ? "\u{1F480} " : '' %><%= group.nickname %>
             </div>
-            <div class="flex flex-wrap gap-1 mt-1">
+            <div style="display: flex; flex-wrap: wrap; gap: 2px; margin-top: 4px;">
               <% group.soul_link_pokemon.each do |pokemon| %>
-                <span class="inline-flex items-center"><%= pokemon_sprite_tag(pokemon.species, size: 16) %></span>
+                <%= pokemon_sprite_tag(pokemon.species, size: 16) %>
               <% end %>
             </div>
           <% else %>
-            <div class="text-xs text-gray-500 mt-1">No catch yet</div>
+            <div style="font-size: 9px; color: var(--d2); margin-top: 4px;">No catch yet</div>
           <% end %>
         </button>
       <% end %>
@@ -217,69 +208,58 @@
 
   <%# ── SLIDE-OUT PANEL ── %>
   <div data-timeline-target="panel"
-       class="fixed inset-y-0 right-0 z-40 w-full sm:w-96 max-w-full
-              transform translate-x-full transition-transform duration-300 ease-in-out
-              bg-gray-800 border-l border-gray-700 shadow-2xl overflow-y-auto">
+       style="position: fixed; inset: 0 0 0 auto; z-index: 40; width: 100%; max-width: 380px;
+              transform: translateX(100%); transition: transform 0.3s ease-in-out;
+              background: var(--l1); border-left: var(--border); overflow-y: auto;">
 
     <%# Panel header %>
-    <div class="sticky top-0 bg-gray-800 border-b border-gray-700 px-5 py-4
-                flex items-center justify-between z-10">
-      <h2 class="text-lg font-bold text-white" data-timeline-target="panelTitle"></h2>
+    <div style="position: sticky; top: 0; background: var(--d1); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; z-index: 10;">
+      <span style="font-size: 14px; color: var(--l2);" data-timeline-target="panelTitle"></span>
       <button data-action="click->timeline#closePanel"
-              class="text-gray-400 hover:text-white transition text-2xl leading-none">&times;</button>
+              style="font-size: 18px; color: var(--l1); background: none; border: none; cursor: pointer; font-family: 'Press Start 2P', monospace;">&times;</button>
     </div>
 
     <%# Panel body (populated by JS) %>
-    <div data-timeline-target="panelBody" class="px-5 py-4"></div>
+    <div data-timeline-target="panelBody" style="padding: 12px 16px;"></div>
 
-    <%# Catch form (in panel) %>
-    <div data-timeline-target="panelForm" class="hidden px-5 py-4 border-t border-gray-700">
-      <h3 class="text-sm font-semibold text-white mb-3">New Catch</h3>
+    <%# Catch form %>
+    <div data-timeline-target="panelForm" class="hidden" style="padding: 12px 16px; border-top: var(--border-thin);">
+      <div style="font-size: 12px; margin-bottom: 8px;">NEW CATCH</div>
       <form data-action="submit->timeline#submitCatch">
         <input type="hidden" name="location" data-timeline-target="formLocationKey">
 
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-300 mb-1.5">Group Nickname</label>
+        <div style="margin-bottom: 10px;">
+          <label class="gb-label">GROUP NICKNAME</label>
           <input type="text" name="nickname" required autocomplete="off"
                  data-timeline-target="nicknameInput"
-                 class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
-                        focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                 class="gb-input"
                  placeholder="e.g. Chandler, RACHEL...">
         </div>
 
-        <div class="space-y-3">
-          <% @players.each do |player| %>
-            <div class="relative" data-timeline-target="speciesSearchWrapper">
-              <label class="block text-sm font-medium text-gray-300 mb-1.5">
-                <%= player['display_name'] %>'s Species
-              </label>
-              <div class="flex items-center gap-2">
-                <span data-timeline-target="speciesPreview" class="w-8 h-8 flex-shrink-0"></span>
-                <input type="text"
-                       placeholder="Search species..."
-                       autocomplete="off"
-                       data-action="input->timeline#filterSpecies focus->timeline#filterSpecies"
-                       data-player-id="<%= player['discord_user_id'] %>"
-                       class="flex-1 bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
-                              focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none">
-              </div>
-              <input type="hidden"
-                     name="species[<%= player['discord_user_id'] %>]"
-                     data-timeline-target="speciesHidden">
-              <div class="hidden absolute z-10 left-10 right-0 mt-1 max-h-48 overflow-y-auto
-                          bg-gray-900 border border-gray-600 rounded-lg shadow-lg"
-                   data-timeline-target="speciesDropdown">
-              </div>
+        <% @players.each do |player| %>
+          <div style="margin-bottom: 10px; position: relative;" data-timeline-target="speciesSearchWrapper">
+            <label class="gb-label"><%= player['display_name'].upcase %>'S SPECIES</label>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span data-timeline-target="speciesPreview" style="width: 28px; height: 28px; flex-shrink: 0;"></span>
+              <input type="text"
+                     placeholder="Search species..."
+                     autocomplete="off"
+                     data-action="input->timeline#filterSpecies focus->timeline#filterSpecies"
+                     data-player-id="<%= player['discord_user_id'] %>"
+                     class="gb-input" style="flex: 1;">
             </div>
-          <% end %>
-        </div>
+            <input type="hidden"
+                   name="species[<%= player['discord_user_id'] %>]"
+                   data-timeline-target="speciesHidden">
+            <div class="hidden" data-timeline-target="speciesDropdown"
+                 style="position: absolute; z-index: 10; left: 34px; right: 0; margin-top: 2px; max-height: 180px; overflow-y: auto;
+                        background: var(--l2); border: var(--border-thin);"></div>
+          </div>
+        <% end %>
 
-        <div class="flex items-center justify-between mt-5">
-          <span data-timeline-target="formStatus" class="text-xs text-gray-500"></span>
-          <button type="submit"
-                  class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition font-medium">
-            Add Catch
-          </button>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px;">
+          <span data-timeline-target="formStatus" style="font-size: 10px; color: var(--d2);"></span>
+          <button type="submit" class="gb-btn-primary gb-btn-sm">ADD CATCH</button>
         </div>
       </form>
     </div>
@@ -288,5 +268,5 @@
   <%# Backdrop overlay %>
   <div data-timeline-target="backdrop"
        data-action="click->timeline#closePanel"
-       class="hidden fixed inset-0 z-30 bg-black/50 transition-opacity"></div>
+       class="hidden" style="position: fixed; inset: 0; z-index: 30; background: rgba(15, 56, 15, 0.5);"></div>
 </div>

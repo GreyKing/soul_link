@@ -1,139 +1,135 @@
 <%# ── HEADER ── %>
-<div class="mb-6 flex items-center justify-between">
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
   <div>
-    <h1 class="text-2xl font-bold text-white">Gym Ready Check</h1>
-    <p class="text-gray-400 text-sm mt-1"><%= @player_name %>'s team readiness analysis.</p>
+    <div class="gb-page-title">GYM READY CHECK</div>
+    <div class="gb-page-subtitle"><%= @player_name %>'s team readiness analysis.</div>
   </div>
-  <%= button_to "Start Gym Draft", gym_drafts_path, method: :post,
-        class: "px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition font-medium" %>
+  <%= button_to "START GYM DRAFT", gym_drafts_path, method: :post, class: "gb-btn-primary gb-btn-sm" %>
 </div>
 
 <%# ── NEXT GYM INFO ── %>
 <% if @next_gym %>
-  <div class="mb-6 p-4 bg-indigo-900/30 border border-indigo-800 rounded-xl flex items-center gap-4">
-    <div class="w-14 h-14 rounded-full bg-indigo-800 border-2 border-indigo-600 flex items-center justify-center text-xl font-bold text-white flex-shrink-0">
+  <div class="gb-card-dark" style="display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 16px;">
+    <div style="width: 48px; height: 48px; border: var(--border); background: var(--d1); display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--l2); flex-shrink: 0;">
       <%= @next_gym['number'] %>
     </div>
     <div>
-      <h2 class="text-lg font-semibold text-white"><%= @next_gym['name'] %></h2>
-      <p class="text-sm text-gray-400">
-        Leader: <span class="text-indigo-300"><%= @next_gym['leader'] %></span>
-        &mdash; Type: <%= pokemon_type_badge(@next_gym['type']) %>
-      </p>
-      <p class="text-sm text-yellow-400 font-medium mt-0.5">Level Cap: <%= @next_gym['max_level'] %></p>
+      <div style="font-size: 14px; color: var(--l2);"><%= @next_gym['name'].upcase %></div>
+      <div style="font-size: 10px; color: var(--l1); margin-top: 2px;">
+        Leader: <%= @next_gym['leader'] %> &mdash; Type: <%= pixeldex_type_badge(@next_gym['type']) %>
+      </div>
+      <div style="font-size: 10px; color: var(--l2); margin-top: 2px;">Level Cap: <%= @next_gym['max_level'] %></div>
     </div>
   </div>
 <% else %>
-  <div class="mb-6 p-4 bg-yellow-900/30 border border-yellow-800 rounded-xl">
-    <p class="text-yellow-300 font-medium">All 8 badges earned! Prepare for the Elite Four.</p>
+  <div class="gb-card-dark" style="padding: 12px; margin-bottom: 16px;">
+    <div style="font-size: 11px; color: var(--l2);">All 8 badges earned! Prepare for the Elite Four.</div>
   </div>
 <% end %>
 
 <%# ── YOUR TEAM ── %>
-<div class="mb-6">
-  <h2 class="text-lg font-semibold text-white mb-3">Your Team</h2>
+<div style="margin-bottom: 16px;">
+  <div class="gb-section-header">YOUR TEAM</div>
   <% if @team_groups.any? %>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div class="gb-grid-3">
       <% @team_groups.each_with_index do |group, idx| %>
         <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
         <% is_dead = group.dead? %>
-        <div class="rounded-lg border p-3
-                    <%= is_dead ? 'bg-red-950/20 border-red-900/50' : 'bg-gray-800 border-gray-700' %>">
-          <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-500 font-mono w-5">#<%= idx + 1 %></span>
+        <div class="<%= is_dead ? 'gb-card gb-status-dead' : 'gb-card' %>" style="padding: 8px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 10px; color: var(--d2); width: 16px;">#<%= idx + 1 %></span>
             <% if my_pokemon %>
-              <div class="<%= is_dead ? 'opacity-40' : '' %>">
+              <div style="<%= is_dead ? 'opacity: 0.4;' : '' %>">
                 <%= pokemon_sprite_tag(my_pokemon.species, size: 32) %>
               </div>
               <div>
-                <div class="text-sm font-medium <%= is_dead ? 'text-red-300 line-through' : 'text-white' %>"><%= my_pokemon.species %></div>
+                <div style="font-size: 11px; <%= is_dead ? 'text-decoration: line-through; color: #e8a0a0;' : '' %>"><%= my_pokemon.species %></div>
                 <% if is_dead %>
-                  <div class="text-xs text-red-400/70 mt-0.5">💀 Dead</div>
+                  <div style="font-size: 9px; color: #e8a0a0; margin-top: 2px;">Dead</div>
                 <% else %>
-                  <div class="mt-0.5"><%= pokemon_type_badges(my_pokemon.species) %></div>
+                  <div style="margin-top: 2px;"><%= pixeldex_type_badges(my_pokemon.species) %></div>
                 <% end %>
               </div>
             <% else %>
-              <span class="text-sm text-gray-500">No species assigned</span>
+              <span style="font-size: 10px; color: var(--d2);">No species assigned</span>
             <% end %>
           </div>
         </div>
       <% end %>
     </div>
   <% else %>
-    <p class="text-gray-500 text-sm">No team built yet. Visit <%= link_to "My Team", team_path, class: "text-indigo-400 hover:text-indigo-300" %> to build one.</p>
+    <div class="gb-card" style="font-size: 10px; color: var(--d2); padding: 16px;">
+      No team built yet. Visit <a href="<%= team_path %>" class="gb-link">My Team</a> to build one.
+    </div>
   <% end %>
 </div>
 
 <%# ── TYPE ANALYSIS ── %>
 <% if @player_pokemon.any? %>
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+  <div class="gb-grid-2" style="margin-bottom: 16px;">
     <%# Offensive coverage %>
-    <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-4">
-      <h3 class="text-base font-semibold text-white mb-1">Offensive Coverage</h3>
-      <p class="text-xs text-gray-500 mb-3">Types your team can hit super effectively.</p>
+    <div class="gb-card" style="padding: 10px;">
+      <div style="font-size: 12px; margin-bottom: 4px;">OFFENSIVE COVERAGE</div>
+      <div style="font-size: 9px; color: var(--d2); margin-bottom: 8px;">Types your team can hit super effectively.</div>
 
       <% if @type_analysis[:offensive_coverage].any? %>
-        <div class="flex flex-wrap gap-1.5 mb-3">
+        <div style="margin-bottom: 8px;">
           <% @type_analysis[:offensive_coverage].each do |type_name| %>
-            <%= pokemon_type_badge(type_name) %>
+            <%= pixeldex_type_badge(type_name) %>
           <% end %>
         </div>
       <% end %>
 
       <% if @type_analysis[:offensive_gaps].any? %>
-        <p class="text-xs text-red-400 font-medium mb-1.5">Gaps (no super-effective coverage):</p>
-        <div class="flex flex-wrap gap-1.5">
+        <div style="font-size: 9px; margin-bottom: 4px;">Gaps:</div>
+        <span class="type-coverage-gap">
           <% @type_analysis[:offensive_gaps].each do |type_name| %>
-            <span class="inline-block rounded-full text-xs px-2 py-0.5 font-medium bg-red-900/30 text-red-400 border border-red-800"><%= type_name %></span>
+            <%= pixeldex_type_badge(type_name) %>
           <% end %>
-        </div>
+        </span>
       <% else %>
-        <p class="text-xs text-green-400">Full offensive coverage!</p>
+        <div style="font-size: 10px; color: var(--d2);">Full offensive coverage!</div>
       <% end %>
     </div>
 
-    <%# Defensive weaknesses %>
-    <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-4">
-      <h3 class="text-base font-semibold text-white mb-1">Shared Weaknesses</h3>
-      <p class="text-xs text-gray-500 mb-3">Types that multiple team members are weak to.</p>
+    <%# Shared weaknesses %>
+    <div class="gb-card" style="padding: 10px;">
+      <div style="font-size: 12px; margin-bottom: 4px;">SHARED WEAKNESSES</div>
+      <div style="font-size: 9px; color: var(--d2); margin-bottom: 8px;">Types multiple members are weak to.</div>
 
       <% if @type_analysis[:shared_weaknesses].any? %>
-        <div class="space-y-2">
-          <% @type_analysis[:shared_weaknesses].each do |entry| %>
-            <div class="flex items-center gap-2">
-              <%= pokemon_type_badge(entry[:type]) %>
-              <span class="text-xs text-gray-400">weak on <%= entry[:count] %>/<%= @player_pokemon.size %></span>
+        <% @type_analysis[:shared_weaknesses].each do |entry| %>
+          <div class="stat-row">
+            <span><%= pixeldex_type_badge(entry[:type]) %></span>
+            <span class="stat-val" style="font-size: 11px;">
+              <%= entry[:count] %>/<%= @player_pokemon.size %>
               <% if entry[:count] >= (@player_pokemon.size / 2.0).ceil %>
-                <span class="text-xs text-red-400 font-bold">⚠</span>
+                !
               <% end %>
-            </div>
-          <% end %>
-        </div>
+            </span>
+          </div>
+        <% end %>
       <% else %>
-        <p class="text-sm text-green-400">No shared type weaknesses!</p>
+        <div style="font-size: 10px; color: var(--d2);">No shared type weaknesses!</div>
       <% end %>
     </div>
   </div>
 
   <%# Type distribution + balance notes %>
-  <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-4 mb-6">
-    <h3 class="text-base font-semibold text-white mb-3">Type Distribution</h3>
-    <div class="flex flex-wrap gap-3 mb-3">
+  <div class="gb-card" style="padding: 10px; margin-bottom: 16px;">
+    <div style="font-size: 12px; margin-bottom: 8px;">TYPE DISTRIBUTION</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
       <% @type_analysis[:type_distribution].each do |entry| %>
-        <div class="flex items-center gap-1">
-          <%= pokemon_type_badge(entry[:type]) %>
-          <span class="text-xs text-gray-400">×<%= entry[:count] %></span>
-        </div>
+        <span><%= pixeldex_type_badge(entry[:type]) %> <span style="font-size: 10px; color: var(--d2);">&times;<%= entry[:count] %></span></span>
       <% end %>
     </div>
 
     <% if @type_analysis[:balance_notes].any? %>
-      <div class="border-t border-gray-700 pt-3 mt-3 space-y-1.5">
+      <div style="border-top: var(--border-thin); padding-top: 8px; margin-top: 8px;">
         <% @type_analysis[:balance_notes].each do |note| %>
-          <p class="text-xs <%= note[:level] == :warning ? 'text-yellow-400' : 'text-green-400' %>">
-            <%= note[:level] == :warning ? '⚠ ' : '✓ ' %><%= note[:message] %>
-          </p>
+          <div style="font-size: 10px; color: var(--d2); margin-bottom: 4px;">
+            <%= note[:level] == :warning ? '! ' : '+ ' %><%= note[:message] %>
+          </div>
         <% end %>
       </div>
     <% end %>
@@ -142,80 +138,68 @@
 
 <%# ── AVAILABLE ROUTES ── %>
 <div>
-  <h2 class="text-lg font-semibold text-white mb-1">Available Routes</h2>
-  <p class="text-xs text-gray-500 mb-4">All encounter locations from game start through the current segment.</p>
+  <div class="gb-section-header">AVAILABLE ROUTES</div>
+  <div style="font-size: 9px; color: var(--d2); margin-bottom: 8px;">All encounter locations through the current segment.</div>
 
   <% if @segments.any? %>
-    <div class="space-y-4">
-      <% @segments.each_with_index do |segment, seg_idx| %>
-        <% gym_key = segment['gym'] %>
-        <% gym = gym_key ? @gym_info[gym_key] : nil %>
+    <% @segments.each_with_index do |segment, seg_idx| %>
+      <% gym_key = segment['gym'] %>
+      <% gym = gym_key ? @gym_info[gym_key] : nil %>
 
-        <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-4">
-          <h3 class="text-sm font-semibold text-gray-300 mb-3">
-            <% if gym %>
-              <% beaten = @gyms_defeated >= gym['number'] %>
-              Segment <%= seg_idx + 1 %>
-              <span class="text-gray-500">&mdash;</span>
-              <span class="<%= beaten ? 'text-yellow-400' : 'text-gray-400' %>"><%= gym['name'] %></span>
-              <% if beaten %>
-                <span class="text-xs text-green-400 ml-1">✓</span>
-              <% end %>
-            <% else %>
-              Segment <%= seg_idx + 1 %>
+      <div class="gb-card" style="padding: 10px; margin-bottom: 8px;">
+        <div style="font-size: 11px; margin-bottom: 8px;">
+          <% if gym %>
+            <% beaten = @gyms_defeated >= gym['number'] %>
+            SEGMENT <%= seg_idx + 1 %> &mdash;
+            <span style="<%= beaten ? 'color: var(--d1);' : 'color: var(--d2);' %>"><%= gym['name'].upcase %></span>
+            <% if beaten %>
+              &#9733;
             <% end %>
-          </h3>
-
-          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            <% (segment['locations'] || []).each do |loc_key| %>
-              <% loc_data = @locations[loc_key] %>
-              <% next unless loc_data %>
-              <% groups = @groups_by_location[loc_key] %>
-              <% group = groups&.first %>
-              <% is_dead = group&.dead? %>
-              <% is_caught = group&.caught? %>
-              <% has_encounter = group.present? %>
-              <% has_tall_grass = loc_data['tall_grass'] == true %>
-
-              <div class="rounded-lg border px-3 py-2 text-sm
-                          <%= if is_dead
-                                'bg-red-950/20 border-red-900/50'
-                              elsif is_caught
-                                'bg-blue-900/20 border-blue-800'
-                              elsif has_tall_grass && !has_encounter
-                                'bg-green-950/20 border-green-900/50'
-                              else
-                                'bg-gray-900/50 border-gray-700'
-                              end %>">
-                <div class="flex items-center gap-1">
-                  <% if has_tall_grass %>
-                    <span class="text-green-500 text-xs" title="Tall grass encounters">🌿</span>
-                  <% end %>
-                  <span class="font-medium <%= if is_dead then 'text-red-300' elsif is_caught then 'text-blue-300' elsif has_tall_grass && !has_encounter then 'text-green-400' else 'text-gray-500' end %>">
-                    <%= loc_data['name'] %>
-                  </span>
-                </div>
-                <% if has_encounter %>
-                  <div class="text-xs mt-0.5 <%= is_dead ? 'text-red-400/70' : 'text-gray-400' %>">
-                    <%= "\u{1F480} " if is_dead %><%= group.nickname %>
-                  </div>
-                  <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
-                  <% if my_pokemon %>
-                    <div class="mt-1 flex items-center gap-1 <%= is_dead ? 'opacity-50' : '' %>">
-                      <%= pokemon_sprite_tag(my_pokemon.species, size: 16) %>
-                      <span class="text-[10px] <%= is_dead ? 'text-red-400/70 line-through' : 'text-gray-400' %>"><%= my_pokemon.species %></span>
-                    </div>
-                  <% end %>
-                <% else %>
-                  <div class="text-xs text-gray-600 mt-0.5">No catch</div>
-                <% end %>
-              </div>
-            <% end %>
-          </div>
+          <% else %>
+            SEGMENT <%= seg_idx + 1 %>
+          <% end %>
         </div>
-      <% end %>
-    </div>
+
+        <div class="gb-grid-4">
+          <% (segment['locations'] || []).each do |loc_key| %>
+            <% loc_data = @locations[loc_key] %>
+            <% next unless loc_data %>
+            <% groups = @groups_by_location[loc_key] %>
+            <% group = groups&.first %>
+            <% is_dead = group&.dead? %>
+            <% is_caught = group&.caught? %>
+            <% has_encounter = group.present? %>
+
+            <div class="<%= is_dead ? 'gb-status-dead' : '' %>" style="border: var(--border-thin); padding: 6px; font-size: 10px;
+                        <%= if is_dead then 'background: #4a1c1c; border-color: #6b2c2c;'
+                            elsif is_caught then 'background: var(--d2); color: var(--l2);'
+                            else 'background: var(--l1);'
+                            end %>">
+              <div style="<%= is_dead ? 'color: #e8a0a0;' : is_caught ? 'color: var(--l2);' : 'color: var(--d2);' %>">
+                <%= loc_data['name'] %>
+              </div>
+              <% if has_encounter %>
+                <div style="font-size: 9px; margin-top: 2px; <%= is_dead ? 'color: #e8a0a0;' : 'color: var(--l1);' %>">
+                  <%= "\u{1F480} " if is_dead %><%= group.nickname %>
+                </div>
+                <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
+                <% if my_pokemon %>
+                  <div style="margin-top: 2px; display: flex; align-items: center; gap: 2px; <%= is_dead ? 'opacity: 0.5;' : '' %>">
+                    <%= pokemon_sprite_tag(my_pokemon.species, size: 16) %>
+                    <span style="font-size: 9px; <%= is_dead ? 'text-decoration: line-through;' : '' %>"><%= my_pokemon.species %></span>
+                  </div>
+                <% end %>
+              <% else %>
+                <div style="font-size: 9px; color: var(--d2); margin-top: 2px;">No catch</div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
   <% else %>
-    <p class="text-gray-500 text-sm">No progression data available.</p>
+    <div class="gb-card" style="font-size: 10px; color: var(--d2); text-align: center; padding: 16px;">
+      No progression data available.
+    </div>
   <% end %>
 </div>

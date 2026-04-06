@@ -1,48 +1,48 @@
-<div class="mb-6">
-  <h1 class="text-2xl font-bold text-white">All Teams</h1>
-  <p class="text-gray-400 text-sm mt-1">Everyone's team at a glance.</p>
+<div style="margin-bottom: 16px;">
+  <div class="gb-page-title">ALL TEAMS</div>
+  <div class="gb-page-subtitle">Everyone's team at a glance.</div>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+<div class="gb-grid-4">
   <% @players.each do |player| %>
     <% team = @teams.find { |t| t.discord_user_id == player['discord_user_id'] } %>
-    <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
-      <h2 class="text-lg font-semibold text-white mb-3">
-        <%= player['display_name'] %>
+    <div class="gb-card" style="padding: 12px;">
+      <div style="font-size: 13px; margin-bottom: 8px;">
+        <%= player['display_name'].upcase %>
         <% if team %>
-          <span class="text-xs text-gray-500 font-normal">(<%= team.soul_link_team_slots.size %>/<%= SoulLinkTeam::MAX_SLOTS %>)</span>
+          <span style="font-size: 9px; color: var(--d2);">(<%= team.soul_link_team_slots.size %>/<%= SoulLinkTeam::MAX_SLOTS %>)</span>
         <% end %>
-      </h2>
+      </div>
 
       <% if team && team.soul_link_team_slots.any? %>
-        <div class="space-y-2">
-          <% team.soul_link_team_slots.each do |slot| %>
-            <% group = slot.soul_link_pokemon_group %>
-            <div class="bg-gray-900/50 rounded-lg border border-gray-700/50 p-2">
-              <div class="flex items-center justify-between">
-                <span class="font-medium text-white text-sm"><%= group.nickname %></span>
-                <span class="text-xs text-gray-500">#<%= slot.position %></span>
-              </div>
-              <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == player['discord_user_id'] } %>
-              <% if my_pokemon %>
-                <div class="mt-1 flex items-center gap-1.5">
-                  <%= pokemon_sprite_tag(my_pokemon.species, size: 32) %>
-                  <span class="text-xs text-indigo-300 font-medium"><%= my_pokemon.species %></span>
-                  <%= pokemon_type_badges(my_pokemon.species, size: :xs) %>
-                </div>
-              <% else %>
-                <div class="mt-1 text-xs text-gray-600 italic">No species assigned</div>
-              <% end %>
+        <% team.soul_link_team_slots.each do |slot| %>
+          <% group = slot.soul_link_pokemon_group %>
+          <div class="gb-card-dark" style="padding: 6px 8px; margin-bottom: 4px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 11px; color: var(--l2);"><%= group.nickname %></span>
+              <span style="font-size: 9px; color: var(--l1);">#<%= slot.position %></span>
             </div>
-          <% end %>
-        </div>
+            <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == player['discord_user_id'] } %>
+            <% if my_pokemon %>
+              <div style="margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                <%= pokemon_sprite_tag(my_pokemon.species, size: 32) %>
+                <span style="font-size: 10px; color: var(--l1);"><%= my_pokemon.species %></span>
+                <%= pixeldex_type_badges(my_pokemon.species) %>
+              </div>
+            <% else %>
+              <div style="margin-top: 4px; font-size: 9px; color: var(--l1); font-style: italic;">No species assigned</div>
+            <% end %>
+          </div>
+        <% end %>
       <% else %>
-        <p class="text-gray-500 text-sm text-center py-6">No team built yet</p>
+        <div style="font-size: 10px; color: var(--d2); text-align: center; padding: 16px;">No team built yet</div>
       <% end %>
     </div>
   <% end %>
 </div>
 
 <% if @players.empty? %>
-  <p class="text-gray-500 text-center py-12">No players configured in settings.yml yet.</p>
+  <div class="gb-card" style="font-size: 10px; color: var(--d2); text-align: center; padding: 24px;">
+    No players configured in settings.yml yet.
+  </div>
 <% end %>

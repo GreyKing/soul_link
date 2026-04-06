@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html class="h-full">
+<html>
   <head>
     <title><%= content_for(:title) || "Soul Link" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -15,50 +15,51 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "pixeldex", "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="h-full bg-gray-900 text-gray-100">
+  <body>
     <% if logged_in? %>
-      <nav class="bg-gray-800 border-b border-gray-700">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div class="flex items-center justify-between h-14">
-            <div class="flex items-center gap-6">
-              <span class="text-lg font-bold text-white">⚔️ Soul Link</span>
-              <%= link_to "Dashboard", dashboard_path, class: "text-sm text-gray-300 hover:text-white transition" %>
-              <%= link_to "Map", map_path, class: "text-sm text-gray-300 hover:text-white transition" %>
-              <%= link_to "Species", species_path, class: "text-sm text-gray-300 hover:text-white transition" %>
-              <%= link_to "My Team", team_path, class: "text-sm text-gray-300 hover:text-white transition" %>
-              <%= link_to "All Teams", teams_path, class: "text-sm text-gray-300 hover:text-white transition" %>
-              <%= link_to "Gym Ready", gym_ready_path, class: "text-sm text-gray-300 hover:text-white transition" %>
-              <%= link_to "Runs", runs_path, class: "text-sm text-gray-300 hover:text-white transition" %>
-            </div>
-            <div class="flex items-center gap-3">
-              <% if current_avatar_url %>
-                <img src="<%= current_avatar_url %>" class="w-7 h-7 rounded-full" alt="avatar">
-              <% end %>
-              <span class="text-sm text-gray-300"><%= current_username %></span>
-              <%= button_to "Logout", logout_path, method: :delete, class: "text-xs text-gray-400 hover:text-white transition" %>
-            </div>
-          </div>
+      <nav class="gb-nav">
+        <div class="gb-nav-left">
+          <%= link_to root_path, class: "gb-nav-logo", style: "text-decoration: none;" do %>
+            &#9876; SOUL LINK
+          <% end %>
+          <%= link_to "Dashboard", dashboard_path, class: "gb-nav-link" %>
+          <%= link_to "Map", map_path, class: "gb-nav-link" %>
+          <%= link_to "Species", species_path, class: "gb-nav-link" %>
+          <%= link_to "My Team", team_path, class: "gb-nav-link" %>
+          <%= link_to "All Teams", teams_path, class: "gb-nav-link" %>
+          <%= link_to "Gym Ready", gym_ready_path, class: "gb-nav-link" %>
+          <%= link_to "Runs", runs_path, class: "gb-nav-link" %>
+        </div>
+        <div class="gb-nav-right">
+          <% if current_avatar_url %>
+            <img src="<%= current_avatar_url %>" class="gb-nav-avatar" alt="avatar">
+          <% end %>
+          <span class="gb-nav-user"><%= current_username %></span>
+          <%= button_to "Logout", logout_path, method: :delete, class: "gb-nav-logout" %>
         </div>
       </nav>
     <% end %>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="gb-page">
       <% if flash[:alert] %>
-        <div class="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-200 text-sm">
-          <%= flash[:alert] %>
-        </div>
+        <div class="gb-flash gb-flash-alert"><%= flash[:alert] %></div>
       <% end %>
       <% if flash[:notice] %>
-        <div class="mb-4 p-3 bg-green-900/50 border border-green-700 rounded-lg text-green-200 text-sm">
-          <%= flash[:notice] %>
-        </div>
+        <div class="gb-flash gb-flash-notice"><%= flash[:notice] %></div>
       <% end %>
-      <%= yield %>
+      <div class="gb-page-inner">
+        <%= yield %>
+      </div>
     </main>
   </body>
 </html>

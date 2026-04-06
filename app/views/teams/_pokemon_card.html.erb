@@ -1,28 +1,24 @@
 <%# Each card is draggable. data-group-id is read by Sortable to persist order. %>
-<div class="pokemon-card bg-gray-800 rounded-lg border border-gray-700 p-3 cursor-grab active:cursor-grabbing hover:border-gray-500 transition select-none"
+<div class="pokemon-card gb-drag-item"
      data-group-id="<%= group.id %>">
-  <div class="flex items-center justify-between">
-    <div class="flex items-center gap-2">
-      <span class="position-badge text-xs text-gray-500 font-mono w-5 text-center hidden"></span>
-      <span class="font-semibold text-white text-sm"><%= group.nickname %></span>
-      <span class="text-xs text-gray-500"><%= group.location %></span>
+  <div style="display: flex; align-items: center; justify-content: space-between;">
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <span class="position-badge hidden" style="font-size: 10px; color: var(--d2); width: 16px; text-align: center;"></span>
+      <span style="font-size: 12px;"><%= group.nickname %></span>
+      <span style="font-size: 9px; color: var(--d2);"><%= group.location %></span>
     </div>
-    <div class="text-xs text-gray-500">
-      <svg class="w-4 h-4 inline-block opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
-      </svg>
-    </div>
+    <span style="font-size: 10px; color: var(--d2);">&#9776;</span>
   </div>
 
-  <div class="mt-2 flex flex-wrap gap-2">
+  <div style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px;">
     <% group.soul_link_pokemon.each do |pokemon| %>
       <% is_mine = pokemon.discord_user_id == current_user_id %>
-      <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full
-                   <%= is_mine ? 'bg-indigo-900/60 text-indigo-300 border border-indigo-700' : 'bg-gray-700/50 text-gray-400' %>">
+      <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; padding: 2px 6px;
+                   border: var(--border-thin); <%= is_mine ? 'background: var(--d2); color: var(--l2);' : 'background: var(--l2); color: var(--d2);' %>">
         <%= pokemon_sprite_tag(pokemon.species, size: 20) %>
-        <span class="font-medium"><%= SoulLink::GameState.player_name(pokemon.discord_user_id) %></span>
-        <span class="<%= is_mine ? 'text-indigo-200' : 'text-gray-500' %>"><%= pokemon.species %></span>
-        <%= pokemon_type_badges(pokemon.species, size: :xs) %>
+        <span style="<%= is_mine ? 'color: var(--l2);' : 'color: var(--d2);' %>"><%= SoulLink::GameState.player_name(pokemon.discord_user_id) %></span>
+        <span style="<%= is_mine ? 'color: var(--l1);' : 'color: var(--d2);' %>"><%= pokemon.species %></span>
+        <%= pixeldex_type_badges(pokemon.species) %>
       </span>
     <% end %>
   </div>

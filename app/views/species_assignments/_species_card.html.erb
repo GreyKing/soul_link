@@ -1,11 +1,9 @@
-<div class="species-card bg-indigo-900/40 border border-indigo-700 rounded-lg px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-indigo-900/60 hover:border-indigo-500 transition select-none flex items-center justify-between"
+<div class="species-card gb-drag-item" style="display: flex; align-items: center; justify-content: space-between; background: var(--d2); color: var(--l2); padding: 6px 8px;"
      data-pokemon-id="<%= pokemon.id %>">
-  <span class="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-200">
+  <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px;">
     <%= pokemon_sprite_tag(pokemon.species, size: 24) %>
     <%= pokemon.species %>
-    <%= pokemon_type_badges(pokemon.species, size: :xs) %>
+    <%= pixeldex_type_badges(pokemon.species) %>
   </span>
-  <svg class="w-4 h-4 text-indigo-500 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
-  </svg>
+  <span style="font-size: 10px; color: var(--l1);">&#9776;</span>
 </div>

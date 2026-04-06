@@ -1,87 +1,72 @@
-<div class="<%= group.dead? ? 'bg-gray-800/50 border-red-900/50' : 'bg-gray-800 border-gray-700' %> rounded-lg border p-4"
+<div class="<%= group.dead? ? 'gb-card gb-status-dead' : 'gb-card' %>" style="padding: 10px;"
      data-group-id="<%= group.id %>"
      data-group-nickname="<%= group.nickname %>"
      data-group-location="<%= group.location %>"
      data-group-status="<%= group.status %>"
      data-group-eulogy="<%= group.eulogy %>">
-  <div class="flex items-center justify-between mb-3">
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
     <div>
-      <span class="font-semibold <%= group.dead? ? 'text-red-300' : 'text-white' %>">
-        <%= group.dead? ? '💀 ' : '' %><%= group.nickname %>
+      <span style="font-size: 12px; <%= group.dead? ? 'color: #e8a0a0;' : '' %>">
+        <%= group.dead? ? "\u{1F480} " : '' %><%= group.nickname %>
       </span>
-      <span class="text-xs text-gray-500 ml-2"><%= group.location %></span>
+      <span style="font-size: 9px; color: var(--d2); margin-left: 6px;"><%= group.location %></span>
     </div>
-    <div class="flex items-center gap-2">
+    <div style="display: flex; align-items: center; gap: 6px; font-size: 10px;">
       <% if group.dead? %>
-        <span class="text-xs text-red-400">Dead</span>
+        <span style="color: #e8a0a0;">Dead</span>
       <% elsif group.complete? %>
-        <span class="text-xs text-green-400">Complete</span>
+        <span style="color: var(--d2);">Complete</span>
       <% else %>
-        <span class="text-xs text-yellow-400"><%= group.missing_players.size %> missing</span>
+        <span style="color: var(--d2);"><%= group.missing_players.size %> missing</span>
       <% end %>
 
-      <%# Edit button %>
       <button type="button"
               data-action="click->species-assignment#openEditGroupModal"
-              class="text-gray-500 hover:text-indigo-400 transition p-0.5" title="Edit group">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-        </svg>
+              class="gb-btn gb-btn-sm" style="padding: 2px 4px; font-size: 9px;">
+        EDIT
       </button>
-
-      <%# Delete button %>
       <button type="button"
               data-action="click->species-assignment#deleteGroup"
-              class="text-gray-500 hover:text-red-400 transition p-0.5" title="Delete group">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-        </svg>
+              class="gb-btn-danger gb-btn-sm" style="padding: 2px 4px; font-size: 9px;">
+        DEL
       </button>
     </div>
   </div>
 
-  <div class="space-y-2">
-    <% players.each do |player| %>
-      <% player_id = player['discord_user_id'] %>
-      <% species_entry = group.species_for(player_id) %>
-      <% is_me = player_id == current_user_id %>
+  <% players.each do |player| %>
+    <% player_id = player['discord_user_id'] %>
+    <% species_entry = group.species_for(player_id) %>
+    <% is_me = player_id == current_user_id %>
 
-      <div class="flex items-center gap-2">
-        <span class="text-xs font-medium w-24 truncate <%= is_me ? 'text-indigo-300' : 'text-gray-400' %>">
-          <%= player['display_name'] %>
+    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+      <span style="font-size: 10px; width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                   <%= is_me ? 'color: var(--d1); font-weight: bold;' : 'color: var(--d2);' %>">
+        <%= player['display_name'] %>
+      </span>
+
+      <% if species_entry %>
+        <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; padding: 2px 8px;
+                     border: var(--border-thin); <%= is_me ? 'background: var(--d2); color: var(--l2);' : 'background: var(--l2); color: var(--d2);' %>">
+          <%= pokemon_sprite_tag(species_entry.species, size: 20) %>
+          <%= species_entry.species %>
+          <%= pixeldex_type_badges(species_entry.species) %>
+          <% if is_me %>
+            <button type="button"
+                    data-action="click->species-assignment#unassignSpecies"
+                    data-pokemon-id="<%= species_entry.id %>"
+                    style="margin-left: 4px; color: var(--l1); cursor: pointer; border: none; background: none; font-family: 'Press Start 2P', monospace; font-size: 10px;"
+                    title="Remove">&times;</button>
+          <% end %>
         </span>
-
-        <% if species_entry %>
-          <%# Assigned — show locked species badge %>
-          <span class="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg
-                       <%= is_me ? 'bg-indigo-900/60 text-indigo-200 border border-indigo-700' : 'bg-gray-700/50 text-gray-300 border border-gray-600' %>">
-            <%= pokemon_sprite_tag(species_entry.species, size: 20) %>
-            <%= species_entry.species %>
-            <%= pokemon_type_badges(species_entry.species, size: :xs) %>
-            <% if is_me %>
-              <button type="button"
-                      data-action="click->species-assignment#unassignSpecies"
-                      data-pokemon-id="<%= species_entry.id %>"
-                      class="ml-1 text-indigo-400/50 hover:text-red-400 transition leading-none"
-                      title="Remove from group">
-                &times;
-              </button>
-            <% end %>
-          </span>
-        <% elsif is_me %>
-          <%# My empty slot — drop target %>
-          <div data-species-assignment-target="dropZone"
-               data-group-id="<%= group.id %>"
-               class="drop-zone flex-1 min-h-[36px] px-3 py-1.5 rounded-lg border-2 border-dashed border-indigo-500/50 bg-indigo-950/20 text-xs text-indigo-400 flex items-center justify-center transition hover:border-indigo-400 hover:bg-indigo-950/40">
-            Drop your species here
-          </div>
-        <% else %>
-          <%# Other player's empty slot — not interactive %>
-          <span class="text-xs text-gray-600 italic px-3 py-1.5">waiting...</span>
-        <% end %>
-      </div>
-    <% end %>
-  </div>
+      <% elsif is_me %>
+        <div data-species-assignment-target="dropZone"
+             data-group-id="<%= group.id %>"
+             class="drop-zone gb-drag-zone" style="flex: 1; min-height: 32px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--d2);">
+          Drop your species here
+        </div>
+      <% else %>
+        <span style="font-size: 9px; color: var(--d2); font-style: italic; padding: 2px 8px;">waiting...</span>
+      <% end %>
+    </div>
+  <% end %>
 </div>

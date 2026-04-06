@@ -1,6 +1,6 @@
-<div class="mb-6">
-  <h1 class="text-2xl font-bold text-white">Gym Draft</h1>
-  <p class="text-gray-400 text-sm mt-1">Collaboratively pick your team for the next gym.</p>
+<div style="margin-bottom: 16px;">
+  <div class="gb-page-title">GYM DRAFT</div>
+  <div class="gb-page-subtitle">Collaboratively pick your team for the next gym.</div>
 </div>
 
 <div data-controller="gym-draft"
@@ -19,147 +19,138 @@
      }.to_json %>">
 
   <%# ── STATUS BAR ── %>
-  <div class="mb-6 flex items-center gap-3">
-    <div data-gym-draft-target="phaseLabel"
-         class="px-3 py-1 rounded-full text-sm font-medium bg-indigo-900/50 text-indigo-300 border border-indigo-700">
-      <%= @draft.status.capitalize %>
-    </div>
-    <div data-gym-draft-target="phaseInfo" class="text-sm text-gray-400"></div>
+  <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+    <span data-gym-draft-target="phaseLabel"
+          class="type-text" style="background: var(--d2); color: var(--l2); border-color: var(--d1);">
+      <%= @draft.status.upcase %>
+    </span>
+    <span data-gym-draft-target="phaseInfo" style="font-size: 10px; color: var(--d2);"></span>
   </div>
 
   <%# ── LOBBY PHASE ── %>
   <div data-gym-draft-target="lobbyPanel">
-    <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-6 max-w-lg mx-auto text-center">
-      <h2 class="text-lg font-semibold text-white mb-4">Waiting for Players</h2>
-      <div class="grid grid-cols-2 gap-3 mb-6" data-gym-draft-target="readyGrid">
+    <div class="gb-card" style="max-width: 480px; margin: 0 auto; text-align: center; padding: 16px;">
+      <div style="font-size: 14px; margin-bottom: 12px;">WAITING FOR PLAYERS</div>
+      <div class="gb-grid-2" style="margin-bottom: 16px;" data-gym-draft-target="readyGrid">
         <% @players.each do |player| %>
-          <div class="bg-gray-900/50 rounded-lg border border-gray-700 p-3 text-center"
+          <div class="gb-card-dark" style="text-align: center; padding: 10px;"
                data-player-id="<%= player['discord_user_id'].to_s %>">
-            <div class="text-sm font-medium text-white"><%= player['display_name'] %></div>
-            <div class="text-xs text-gray-500 mt-1 ready-status">Not ready</div>
+            <div style="font-size: 11px; color: var(--l2);"><%= player['display_name'] %></div>
+            <div class="ready-status" style="font-size: 10px; color: var(--l1); margin-top: 4px;">Not ready</div>
           </div>
         <% end %>
       </div>
       <button type="button"
               data-action="click->gym-draft#ready"
               data-gym-draft-target="readyButton"
-              class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition font-medium">
-        Ready
+              class="gb-btn-primary">
+        READY
       </button>
     </div>
   </div>
 
   <%# ── VOTING PHASE ── %>
   <div data-gym-draft-target="votingPanel" class="hidden">
-    <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-6 max-w-lg mx-auto text-center">
-      <h2 class="text-lg font-semibold text-white mb-2">Vote for First Pick</h2>
-      <p class="text-sm text-gray-400 mb-4">Who should choose first?</p>
-      <div class="grid grid-cols-2 gap-3" data-gym-draft-target="voteGrid">
+    <div class="gb-card" style="max-width: 480px; margin: 0 auto; text-align: center; padding: 16px;">
+      <div style="font-size: 14px; margin-bottom: 4px;">VOTE FOR FIRST PICK</div>
+      <div style="font-size: 10px; color: var(--d2); margin-bottom: 12px;">Who should choose first?</div>
+      <div class="gb-grid-2" data-gym-draft-target="voteGrid">
         <% @players.each do |player| %>
           <button type="button"
                   data-action="click->gym-draft#vote"
                   data-vote-for="<%= player['discord_user_id'].to_s %>"
-                  class="bg-gray-900/50 rounded-lg border border-gray-700 p-4 text-center hover:border-indigo-500 hover:bg-indigo-950/30 transition cursor-pointer">
-            <div class="text-sm font-medium text-white"><%= player['display_name'] %></div>
+                  class="gb-btn" style="padding: 12px; text-align: center;">
+            <div style="font-size: 11px;"><%= player['display_name'] %></div>
           </button>
         <% end %>
       </div>
-      <p data-gym-draft-target="voteStatus" class="text-xs text-gray-500 mt-4"></p>
+      <div data-gym-draft-target="voteStatus" style="font-size: 10px; color: var(--d2); margin-top: 10px;"></div>
     </div>
   </div>
 
   <%# ── DRAFTING PHASE ── %>
   <div data-gym-draft-target="draftingPanel" class="hidden">
-    <%# Team Slots %>
-    <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-6 mb-6">
-      <h2 class="text-lg font-semibold text-white mb-4 text-center">Team Slots</h2>
-      <div class="grid grid-cols-3 sm:grid-cols-6 gap-3" data-gym-draft-target="teamSlots">
+    <div class="gb-card" style="padding: 16px; margin-bottom: 12px;">
+      <div style="font-size: 13px; text-align: center; margin-bottom: 12px;">TEAM SLOTS</div>
+      <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;" data-gym-draft-target="teamSlots">
         <% 6.times do |i| %>
-          <div class="bg-gray-900/50 rounded-lg border-2 border-dashed border-gray-600 p-4 text-center min-h-[80px] flex items-center justify-center"
+          <div class="gb-drag-zone" style="text-align: center; min-height: 70px; display: flex; align-items: center; justify-content: center;"
                data-slot-index="<%= i %>">
-            <span class="text-xs text-gray-600">#<%= i + 1 %></span>
+            <span style="font-size: 10px; color: var(--d2);">#<%= i + 1 %></span>
           </div>
         <% end %>
       </div>
     </div>
 
-    <%# Current Turn Indicator %>
-    <div class="text-center mb-4">
-      <p data-gym-draft-target="turnIndicator" class="text-sm text-yellow-400 font-medium"></p>
+    <div style="text-align: center; margin-bottom: 12px;">
+      <span data-gym-draft-target="turnIndicator" style="font-size: 11px; color: var(--d1);"></span>
     </div>
 
-    <%# My Pokemon (for picking) %>
-    <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-4">
-      <h3 class="text-sm font-semibold text-gray-400 mb-3">Your Caught Pokemon</h3>
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2" data-gym-draft-target="myPokemonGrid">
-        <%# Populated by JS from player_groups data %>
+    <div class="gb-card" style="padding: 10px;">
+      <div style="font-size: 11px; color: var(--d2); margin-bottom: 8px;">YOUR CAUGHT POKEMON</div>
+      <div class="gb-grid-4" data-gym-draft-target="myPokemonGrid">
       </div>
     </div>
   </div>
 
   <%# ── NOMINATING PHASE ── %>
   <div data-gym-draft-target="nominatingPanel" class="hidden">
-    <%# Team Slots (reused, populated by JS) %>
-    <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-6 mb-6">
-      <h2 class="text-lg font-semibold text-white mb-4 text-center">Team Slots</h2>
-      <div class="grid grid-cols-3 sm:grid-cols-6 gap-3" data-gym-draft-target="nomTeamSlots">
+    <div class="gb-card" style="padding: 16px; margin-bottom: 12px;">
+      <div style="font-size: 13px; text-align: center; margin-bottom: 12px;">TEAM SLOTS</div>
+      <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;" data-gym-draft-target="nomTeamSlots">
         <% 6.times do |i| %>
-          <div class="bg-gray-900/50 rounded-lg border-2 border-dashed border-gray-600 p-4 text-center min-h-[80px] flex items-center justify-center"
+          <div class="gb-drag-zone" style="text-align: center; min-height: 70px; display: flex; align-items: center; justify-content: center;"
                data-slot-index="<%= i %>">
-            <span class="text-xs text-gray-600">#<%= i + 1 %></span>
+            <span style="font-size: 10px; color: var(--d2);">#<%= i + 1 %></span>
           </div>
         <% end %>
       </div>
     </div>
 
-    <%# Nomination Area %>
-    <div class="text-center mb-4">
-      <p data-gym-draft-target="nomStatus" class="text-sm text-yellow-400 font-medium"></p>
+    <div style="text-align: center; margin-bottom: 12px;">
+      <span data-gym-draft-target="nomStatus" style="font-size: 11px; color: var(--d1);"></span>
     </div>
 
-    <%# Nomination voting buttons %>
-    <div data-gym-draft-target="nomVoteArea" class="hidden mb-4 text-center">
-      <p data-gym-draft-target="nomVotePrompt" class="text-sm text-white mb-3"></p>
-      <div class="flex justify-center gap-3">
+    <div data-gym-draft-target="nomVoteArea" class="hidden" style="text-align: center; margin-bottom: 12px;">
+      <div data-gym-draft-target="nomVotePrompt" style="font-size: 11px; margin-bottom: 8px;"></div>
+      <div style="display: flex; justify-content: center; gap: 8px;">
         <button type="button"
                 data-action="click->gym-draft#approveNomination"
-                class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition font-medium">
-          Agree
+                class="gb-btn-primary gb-btn-sm">
+          AGREE
         </button>
         <button type="button"
                 data-action="click->gym-draft#rejectNomination"
-                class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition font-medium">
-          Disagree
+                class="gb-btn-danger gb-btn-sm">
+          DISAGREE
         </button>
       </div>
     </div>
 
-    <%# My Pokemon (for nominating) %>
-    <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-4">
-      <h3 class="text-sm font-semibold text-gray-400 mb-3">Nominate a Pokemon (click to nominate)</h3>
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2" data-gym-draft-target="nomPokemonGrid">
+    <div class="gb-card" style="padding: 10px;">
+      <div style="font-size: 11px; color: var(--d2); margin-bottom: 8px;">NOMINATE A POKEMON (click to nominate)</div>
+      <div class="gb-grid-4" data-gym-draft-target="nomPokemonGrid">
       </div>
     </div>
   </div>
 
   <%# ── COMPLETE PHASE ── %>
   <div data-gym-draft-target="completePanel" class="hidden">
-    <div class="bg-gray-800/50 rounded-xl border border-gray-700 p-6 mb-6">
-      <h2 class="text-lg font-semibold text-white mb-4 text-center">Draft Complete!</h2>
-      <p class="text-sm text-gray-400 text-center mb-6">Here's your recommended team composition.</p>
+    <div class="gb-card" style="padding: 16px;">
+      <div style="font-size: 14px; text-align: center; margin-bottom: 4px;">DRAFT COMPLETE!</div>
+      <div style="font-size: 10px; color: var(--d2); text-align: center; margin-bottom: 16px;">Here's your recommended team composition.</div>
 
-      <div class="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-6" data-gym-draft-target="finalTeamSlots">
+      <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 16px;" data-gym-draft-target="finalTeamSlots">
         <% 6.times do |i| %>
-          <div class="bg-gray-900/50 rounded-lg border border-gray-700 p-3 text-center min-h-[80px] flex flex-col items-center justify-center"
+          <div class="gb-card-dark" style="text-align: center; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px;"
                data-slot-index="<%= i %>">
-            <span class="text-xs text-gray-600">#<%= i + 1 %></span>
+            <span style="font-size: 10px; color: var(--l1);">#<%= i + 1 %></span>
           </div>
         <% end %>
       </div>
 
-      <div class="text-center">
-        <%= link_to "Back to Gym Ready", gym_ready_path,
-              class: "px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition font-medium inline-block" %>
+      <div style="text-align: center;">
+        <%= link_to "BACK TO GYM READY", gym_ready_path, class: "gb-btn-primary" %>
       </div>
     </div>
   </div>

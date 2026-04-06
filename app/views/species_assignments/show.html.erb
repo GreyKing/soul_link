@@ -1,6 +1,6 @@
-<div class="mb-6">
-  <h1 class="text-2xl font-bold text-white">Species Assignment</h1>
-  <p class="text-gray-400 text-sm mt-1">Drag your species from the pool onto the correct group.</p>
+<div style="margin-bottom: 16px;">
+  <div class="gb-page-title">SPECIES ASSIGNMENT</div>
+  <div class="gb-page-subtitle">Drag your species from the pool onto the correct group.</div>
 </div>
 
 <div data-controller="species-assignment"
@@ -12,108 +12,108 @@
      data-species-assignment-csrf-value="<%= form_authenticity_token %>"
      data-species-assignment-user-id-value="<%= current_user_id %>"
      data-species-assignment-locations-value="<%= @locations.map { |k, v| { key: k, name: v['name'] } }.to_json %>"
-     class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+     style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
 
-  <%# ── ALL GROUPS (left 2 columns) ── %>
-  <div class="lg:col-span-2">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-white">
-        All Groups
-        <span class="text-sm font-normal text-gray-400">(<%= @groups.size %> groups)</span>
-      </h2>
+  <%# ── ALL GROUPS (left area) ── %>
+  <div>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+      <div style="font-size: 13px;">
+        ALL GROUPS
+        <span style="font-size: 10px; color: var(--d2);">(<%= @groups.size %> groups)</span>
+      </div>
       <button type="button"
               data-action="click->species-assignment#openNewGroupModal"
-              class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition font-medium">
-        + New Group
+              class="gb-btn-primary gb-btn-sm">
+        + NEW GROUP
       </button>
     </div>
 
-    <%# ── Group Name Quick-Nav ── %>
+    <%# Quick-Nav %>
     <% if @groups.any? %>
       <div data-species-assignment-target="quickNavBar"
-           class="flex flex-wrap gap-1.5 mb-3">
+           style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;">
         <% @groups.each do |group| %>
           <button type="button"
                   data-action="click->species-assignment#scrollToGroup"
                   data-scroll-to-group="<%= group.id %>"
-                  class="px-2 py-0.5 text-xs rounded-full border transition cursor-pointer
-                         <%= group.dead? ? 'bg-red-950/40 border-red-900/50 text-red-400 hover:bg-red-950/60' : 'bg-gray-700/50 border-gray-600 text-gray-300 hover:bg-gray-700' %>">
+                  class="gb-btn gb-btn-sm<%= ' gb-status-dead' if group.dead? %>"
+                  style="padding: 2px 6px; font-size: 9px;">
             <%= group.nickname %>
           </button>
         <% end %>
       </div>
     <% end %>
 
-    <div class="space-y-3 max-h-[75vh] overflow-y-auto pr-2">
+    <div style="max-height: 75vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--d2) var(--l1);">
       <% @groups.each do |group| %>
         <%= render "group_card", group: group, current_user_id: current_user_id, players: @players %>
       <% end %>
 
       <% if @groups.empty? %>
-        <p class="text-gray-500 text-sm text-center py-8">No groups yet.</p>
+        <div class="gb-card" style="font-size: 10px; color: var(--d2); text-align: center; padding: 20px;">
+          No groups yet.
+        </div>
       <% end %>
     </div>
   </div>
 
   <%# ── YOUR SPECIES PANEL (right column, tabbed) ── %>
   <div>
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-white">
-        Your Species
-        <span class="text-sm font-normal text-gray-400"
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+      <div style="font-size: 13px;">
+        YOUR SPECIES
+        <span style="font-size: 10px; color: var(--d2);"
               data-species-assignment-target="poolCount">(<%= @pool.size %> remaining)</span>
-      </h2>
-      <span data-species-assignment-target="saveStatus" class="text-xs text-gray-500"></span>
+      </div>
+      <span data-species-assignment-target="saveStatus" style="font-size: 10px; color: var(--d2);"></span>
     </div>
 
-    <%# ── Tab Buttons ── %>
-    <div class="flex border-b border-gray-700 mb-0" role="tablist">
+    <%# Tab Buttons %>
+    <div class="tab-bar" style="margin-bottom: 0;" role="tablist">
       <button type="button" role="tab" aria-selected="true"
               data-species-assignment-target="tabButton"
               data-action="click->species-assignment#switchTab"
               data-tab="pool"
-              class="px-4 py-2 text-sm font-medium text-indigo-300 border-b-2 border-indigo-500 -mb-px transition">
-        Your Pool
+              class="tab-item active" style="font-size: 10px; padding: 6px;">
+        YOUR POOL
       </button>
       <button type="button" role="tab" aria-selected="false"
               data-species-assignment-target="tabButton"
               data-action="click->species-assignment#switchTab"
               data-tab="pokedex"
-              class="px-4 py-2 text-sm font-medium text-gray-400 border-b-2 border-transparent -mb-px hover:text-gray-300 transition">
-        Full Pokédex
+              class="tab-item" style="font-size: 10px; padding: 6px;">
+        POKEDEX
       </button>
     </div>
 
-    <%# ── Pool Tab ── %>
+    <%# Pool Tab %>
     <div data-species-assignment-target="tabPanel" data-tab="pool">
       <div data-species-assignment-target="poolList"
-           class="space-y-2 min-h-[200px] max-h-[75vh] overflow-y-auto p-4 bg-gray-800/50 rounded-b-xl border-2 border-t-0 border-dashed border-gray-600 sticky top-4">
+           class="gb-drag-zone" style="min-height: 200px; max-height: 75vh; overflow-y: auto; border-top: none;">
         <% @pool.each do |pokemon| %>
           <%= render "species_card", pokemon: pokemon %>
         <% end %>
 
-        <p class="text-gray-500 text-sm text-center py-4 <%= @pool.any? ? 'hidden' : '' %>"
-           data-species-assignment-target="poolEmpty">
+        <div style="font-size: 10px; color: var(--d2); text-align: center; padding: 12px; <%= @pool.any? ? 'display: none;' : '' %>"
+             data-species-assignment-target="poolEmpty">
           All species assigned!
-        </p>
+        </div>
       </div>
     </div>
 
-    <%# ── Pokédex Tab ── %>
+    <%# Pokedex Tab %>
     <div data-species-assignment-target="tabPanel" data-tab="pokedex" class="hidden">
-      <div class="bg-gray-800/50 rounded-b-xl border-2 border-t-0 border-dashed border-gray-600 sticky top-4">
-        <%# Search input %>
-        <div class="p-3 border-b border-gray-700">
+      <div style="border: var(--border-thin); border-top: none; background: var(--l2);">
+        <div style="padding: 8px; border-bottom: var(--border-thin);">
           <input type="text"
                  placeholder="Search species..."
                  data-species-assignment-target="pokedexSearch"
                  data-action="input->species-assignment#filterPokedex"
-                 class="w-full px-3 py-2 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                 class="gb-input">
         </div>
 
-        <%# Pokédex list %>
         <div data-species-assignment-target="pokedexList"
-             class="space-y-1 max-h-[65vh] overflow-y-auto p-3">
+             style="max-height: 65vh; overflow-y: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: var(--d2) var(--l1);">
           <% @pokedex_species.each do |species_name| %>
             <%= render "pokedex_card", species_name: species_name %>
           <% end %>
@@ -124,40 +124,34 @@
 
   <%# ── GROUP MODAL (create / edit) ── %>
   <div data-species-assignment-target="modal"
-       class="hidden fixed inset-0 z-50 flex items-center justify-center">
-    <%# Backdrop %>
+       class="hidden"
+       style="position: fixed; inset: 0; z-index: 50;">
     <div data-action="click->species-assignment#closeModal"
-         class="absolute inset-0 bg-black/60"></div>
+         style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.75);"></div>
 
-    <%# Modal content %>
-    <div class="relative bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 data-species-assignment-target="modalTitle" class="text-lg font-bold text-white">New Group</h3>
-        <button data-action="click->species-assignment#closeModal"
-                class="text-gray-400 hover:text-white transition text-2xl leading-none">&times;</button>
-      </div>
+    <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
+      <div class="gb-modal">
+        <div class="gb-modal-title">
+          <span data-species-assignment-target="modalTitle">NEW GROUP</span>
+          <button data-action="click->species-assignment#closeModal"
+                  class="gb-modal-close">&times;</button>
+        </div>
 
-      <form data-action="submit->species-assignment#submitGroup">
-        <input type="hidden" data-species-assignment-target="groupIdInput">
+        <form data-action="submit->species-assignment#submitGroup">
+          <input type="hidden" data-species-assignment-target="groupIdInput">
 
-        <div class="space-y-4">
-          <%# Nickname %>
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Nickname</label>
+          <div style="margin-bottom: 10px;">
+            <label class="gb-label">NICKNAME</label>
             <input type="text" required autocomplete="off"
                    data-species-assignment-target="groupNicknameInput"
-                   class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
-                          focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                   class="gb-input"
                    placeholder="e.g. Tommy, RACHEL...">
           </div>
 
-          <%# Location %>
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Location</label>
+          <div style="margin-bottom: 10px;">
+            <label class="gb-label">LOCATION</label>
             <select data-species-assignment-target="groupLocationSelect"
-                    required
-                    class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
-                           focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none">
+                    required class="gb-select">
               <option value="">Select location...</option>
               <% @locations.each do |key, data| %>
                 <option value="<%= key %>"><%= data['name'] %></option>
@@ -165,44 +159,35 @@
             </select>
           </div>
 
-          <%# Status %>
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Status</label>
+          <div style="margin-bottom: 10px;">
+            <label class="gb-label">STATUS</label>
             <select data-species-assignment-target="groupStatusSelect"
                     data-action="change->species-assignment#toggleEulogy"
-                    class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
-                           focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none">
+                    class="gb-select">
               <option value="caught">Caught</option>
               <option value="dead">Dead</option>
             </select>
           </div>
 
-          <%# Eulogy (shown when dead) %>
-          <div data-species-assignment-target="eulogyWrapper" class="hidden">
-            <label class="block text-sm font-medium text-gray-300 mb-1">Eulogy</label>
+          <div data-species-assignment-target="eulogyWrapper" class="hidden" style="margin-bottom: 10px;">
+            <label class="gb-label">EULOGY</label>
             <input type="text" autocomplete="off"
                    data-species-assignment-target="groupEulogyInput"
-                   class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
-                          focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                   class="gb-input"
                    placeholder="Rest in peace...">
           </div>
-        </div>
 
-        <div class="flex items-center justify-between mt-6">
-          <span data-species-assignment-target="modalStatus" class="text-xs text-gray-500"></span>
-          <div class="flex gap-2">
-            <button type="button"
-                    data-action="click->species-assignment#closeModal"
-                    class="px-4 py-2 text-sm text-gray-400 hover:text-white transition">
-              Cancel
-            </button>
-            <button type="submit"
-                    class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition font-medium">
-              Save
-            </button>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px;">
+            <span data-species-assignment-target="modalStatus" style="font-size: 10px; color: var(--d2);"></span>
+            <div style="display: flex; gap: 8px;">
+              <button type="button"
+                      data-action="click->species-assignment#closeModal"
+                      class="gb-btn gb-btn-sm">Cancel</button>
+              <button type="submit" class="gb-btn-primary gb-btn-sm">SAVE</button>
+            </div>
           </div>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   </div>
 </div>

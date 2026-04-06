@@ -8,6 +8,8 @@ module SoulLink
     MAP_COORDINATES_PATH = Rails.root.join('config', 'soul_link', 'map_coordinates.yml')
     PROGRESSION_PATH = Rails.root.join('config', 'soul_link', 'progression.yml')
     TYPES_PATH = Rails.root.join('config', 'soul_link', 'types.yml')
+    ABILITIES_PATH = Rails.root.join('config', 'soul_link', 'abilities.yml')
+    EVOLUTIONS_PATH = Rails.root.join('config', 'soul_link', 'evolutions.yml')
 
     class << self
       def gym_info
@@ -98,6 +100,28 @@ module SoulLink
         pokemon_types[species_name] || []
       end
 
+      # Abilities: species name → array of ability strings
+      def pokemon_abilities
+        @pokemon_abilities ||= File.exist?(ABILITIES_PATH) ? YAML.load_file(ABILITIES_PATH) : {}
+      end
+
+      # Returns abilities array for a species, e.g. ["Overgrow"], or []
+      def abilities_for(species_name)
+        pokemon_abilities[species_name] || []
+      end
+
+      # Evolutions: species name → hash with evolves_to, level/method
+      def evolutions
+        @evolutions ||= File.exist?(EVOLUTIONS_PATH) ? YAML.load_file(EVOLUTIONS_PATH) : {}
+      end
+
+      # Returns evolution info hash for a species, or nil if no evolution
+      def evolution_info(species_name)
+        data = evolutions[species_name]
+        return nil if data.nil? || data.empty?
+        data
+      end
+
       def reload!
         @gym_info = nil
         @locations = nil
@@ -106,6 +130,8 @@ module SoulLink
         @map_coordinates = nil
         @progression = nil
         @pokemon_types = nil
+        @pokemon_abilities = nil
+        @evolutions = nil
       end
     end
   end

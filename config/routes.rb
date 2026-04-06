@@ -38,7 +38,8 @@ Rails.application.routes.draw do
   resources :pokemon_groups, only: [ :create, :update, :destroy ] do
     patch :reorder, on: :collection
   end
+  resources :pokemon, only: [ :update ], controller: "pokemon"
   resource :gym_progress, only: [ :update ], controller: "gym_progress"
 
-  root "teams#show"
+  root "dashboard#show"
 end
