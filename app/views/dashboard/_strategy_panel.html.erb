@@ -1,0 +1,64 @@
+<div class="panel-header">
+  <span>STRATEGY</span>
+  <span class="panel-header-sub">TYPE ANALYSIS</span>
+</div>
+<div class="panel-body">
+
+  <%# Offensive Coverage %>
+  <div class="box-section-label">OFFENSIVE COVERAGE</div>
+  <div style="font-size: 9px; color: var(--d2); margin-bottom: 8px;">Types your team can hit super effectively.</div>
+  <% coverage = pixeldex_type_coverage(@type_analysis) %>
+  <div style="font-size: 10px; line-height: 2.2; margin-bottom: 8px;">
+    <% coverage[:covered].each do |abbr| %>
+      <span class="type-text"><%= abbr %></span>
+    <% end %>
+    <% if coverage[:covered].empty? %>
+      <span style="color: var(--d2); font-size: 10px;">No coverage yet &mdash; build a team first!</span>
+    <% end %>
+  </div>
+
+  <% if coverage[:gaps].any? %>
+    <div style="margin-bottom: 12px;">
+      <span class="type-coverage-gap">
+        NO COVERAGE:
+        <% coverage[:gaps].each do |abbr| %>
+          <span class="type-text" style="border-color: var(--l1);"><%= abbr %></span>
+        <% end %>
+      </span>
+    </div>
+  <% else %>
+    <div style="font-size: 10px; color: var(--d2); margin-bottom: 12px;">Full offensive coverage!</div>
+  <% end %>
+
+  <%# Shared Weaknesses %>
+  <div class="box-section-label" style="margin-top: 14px;">SHARED WEAKNESSES</div>
+  <div style="font-size: 9px; color: var(--d2); margin-bottom: 8px;">Types that multiple team members are weak to.</div>
+  <% if (@type_analysis[:shared_weaknesses] || []).any? %>
+    <% @type_analysis[:shared_weaknesses].each do |entry| %>
+      <div class="stat-row">
+        <span><%= pixeldex_type_badge(entry[:type]) %></span>
+        <span class="stat-val" style="font-size: 11px;">
+          x<%= entry[:count] %>/<%= @team_pokemon.size %>
+          <% if entry[:count] >= (@team_pokemon.size / 2.0).ceil %> !<% end %>
+        </span>
+      </div>
+    <% end %>
+  <% else %>
+    <div style="font-size: 10px; color: var(--d2);">No shared weaknesses!</div>
+  <% end %>
+
+  <%# Balance Notes %>
+  <% if (@type_analysis[:balance_notes] || []).any? %>
+    <div class="box-section-label" style="margin-top: 14px;">NOTES</div>
+    <% @type_analysis[:balance_notes].each do |note| %>
+      <div style="font-size: 10px; color: var(--d2); padding: 3px 0;">
+        <%= note[:level] == :warning ? '! ' : '+ ' %><%= note[:message] %>
+      </div>
+    <% end %>
+  <% end %>
+
+  <%# Strategy Dialog %>
+  <div class="dialog" style="font-size: 11px; margin-top: 14px;">
+    <%= pixeldex_gym_strategy(@next_gym, @type_analysis) %>
+  </div>
+</div>

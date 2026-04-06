@@ -1,0 +1,125 @@
+<%# Pokemon Detail/Edit Modal — shown when clicking a PC box cell %>
+<div data-pixeldex-target="pokemonModal"
+     class="hidden"
+     style="position: fixed; inset: 0; z-index: 50;">
+  <div data-action="click->pixeldex#closePokemonModal"
+       style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.75);"></div>
+
+  <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
+    <div class="gb-modal" style="max-width: 520px;">
+      <div class="gb-modal-title">
+        POKEMON DETAILS
+        <button data-action="click->pixeldex#closePokemonModal"
+                class="gb-modal-close">&times;</button>
+      </div>
+
+      <%# ── Header: Sprite + Species + Types ── %>
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: var(--border-thin);">
+        <div data-pixeldex-target="modalSprite"
+             style="width: 80px; height: 80px; background: var(--l2); border: var(--border-thin); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden;">
+        </div>
+        <div>
+          <div data-pixeldex-target="modalSpeciesName" style="font-size: 16px;"></div>
+          <div data-pixeldex-target="modalNickLoc" style="font-size: 10px; color: var(--d2); margin-top: 2px;"></div>
+          <div data-pixeldex-target="modalTypes" style="margin-top: 4px;"></div>
+        </div>
+      </div>
+
+      <%# ── Your Pokemon Section ── %>
+      <div class="box-section-label">YOUR POKEMON</div>
+
+      <div style="margin-bottom: 10px;">
+        <label class="gb-label">SPECIES</label>
+        <input type="text"
+               data-pixeldex-target="modalSpeciesInput"
+               data-action="input->pixeldex#searchSpecies focus->pixeldex#searchSpecies"
+               class="gb-input"
+               placeholder="Search species..."
+               autocomplete="off"
+               list="modal-pokedex-species">
+        <datalist id="modal-pokedex-species">
+          <% @pokedex_species.each do |species| %>
+            <option value="<%= species %>">
+          <% end %>
+        </datalist>
+        <input type="hidden" data-pixeldex-target="modalSpeciesHidden">
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+        <div>
+          <label class="gb-label">LEVEL</label>
+          <input type="number" min="1" max="100"
+                 data-pixeldex-target="modalLevel"
+                 class="gb-input"
+                 placeholder="1-100">
+        </div>
+        <div>
+          <label class="gb-label">ABILITY</label>
+          <select data-pixeldex-target="modalAbility" class="gb-select">
+            <option value="">Select...</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+        <div>
+          <label class="gb-label">NATURE</label>
+          <select data-pixeldex-target="modalNature" class="gb-select"
+                  data-action="change->pixeldex#updateNatureLabel">
+            <option value="">Select...</option>
+            <% PixeldexHelper::NATURES.each do |name, info| %>
+              <option value="<%= name %>"><%= name %></option>
+            <% end %>
+          </select>
+        </div>
+        <div>
+          <label class="gb-label">STAT EFFECT</label>
+          <div data-pixeldex-target="modalNatureLabel" style="font-size: 11px; color: var(--d2); padding: 8px 0;"></div>
+        </div>
+      </div>
+
+      <%# Evolution info (read-only, populated by JS) %>
+      <div data-pixeldex-target="modalEvoInfo" class="hidden" style="margin-bottom: 10px;">
+        <label class="gb-label">EVOLUTION</label>
+        <div data-pixeldex-target="modalEvoText" style="font-size: 10px; color: var(--d2); padding: 4px 0;"></div>
+      </div>
+
+      <%# ── Linked Pokemon Section ── %>
+      <div class="box-section-label" style="margin-top: 10px;">LINKED POKEMON</div>
+      <div data-pixeldex-target="modalLinked" style="margin-bottom: 10px;">
+        <%# Populated by JS %>
+      </div>
+
+      <%# ── Group Nickname ── %>
+      <div style="margin-bottom: 10px;">
+        <label class="gb-label">GROUP NICKNAME</label>
+        <input type="text"
+               data-pixeldex-target="modalNickname"
+               class="gb-input"
+               placeholder="e.g. Tommy, RACHEL...">
+      </div>
+
+      <%# ── Actions ── %>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 10px; border-top: var(--border-thin);">
+        <span data-pixeldex-target="modalStatus" style="font-size: 10px; color: var(--d2);"></span>
+        <div style="display: flex; gap: 6px;">
+          <button type="button"
+                  data-pixeldex-target="modalDeadBtn"
+                  data-action="click->dashboard#markDead"
+                  class="gb-btn-danger gb-btn-sm">
+            MARK DEAD
+          </button>
+          <button type="button"
+                  data-action="click->pixeldex#savePokemon"
+                  class="gb-btn-primary gb-btn-sm">
+            SAVE
+          </button>
+        </div>
+      </div>
+
+      <%# Hidden fields for IDs %>
+      <input type="hidden" data-pixeldex-target="modalPokemonId">
+      <input type="hidden" data-pixeldex-target="modalGroupId">
+    </div>
+  </div>
+</div>

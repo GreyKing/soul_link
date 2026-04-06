@@ -1,0 +1,967 @@
+# config/soul_link/evolutions.yml
+# Gen IV Platinum evolution data (National Dex #1-493)
+#
+# Format:
+#   Level-based: evolves_to + level
+#   Other method: evolves_to + method (stone, trade, happiness, etc.)
+#   Final stage / no evolution: {}
+#   Branching evolutions use the first/most common path.
+
+# Generation I (#001-151)
+Bulbasaur:
+  evolves_to: Ivysaur
+  level: 16
+Ivysaur:
+  evolves_to: Venusaur
+  level: 32
+Venusaur: {}
+Charmander:
+  evolves_to: Charmeleon
+  level: 16
+Charmeleon:
+  evolves_to: Charizard
+  level: 36
+Charizard: {}
+Squirtle:
+  evolves_to: Wartortle
+  level: 16
+Wartortle:
+  evolves_to: Blastoise
+  level: 36
+Blastoise: {}
+Caterpie:
+  evolves_to: Metapod
+  level: 7
+Metapod:
+  evolves_to: Butterfree
+  level: 10
+Butterfree: {}
+Weedle:
+  evolves_to: Kakuna
+  level: 7
+Kakuna:
+  evolves_to: Beedrill
+  level: 10
+Beedrill: {}
+Pidgey:
+  evolves_to: Pidgeotto
+  level: 18
+Pidgeotto:
+  evolves_to: Pidgeot
+  level: 36
+Pidgeot: {}
+Rattata:
+  evolves_to: Raticate
+  level: 20
+Raticate: {}
+Spearow:
+  evolves_to: Fearow
+  level: 20
+Fearow: {}
+Ekans:
+  evolves_to: Arbok
+  level: 22
+Arbok: {}
+Pikachu:
+  evolves_to: Raichu
+  method: Thunder Stone
+Raichu: {}
+Sandshrew:
+  evolves_to: Sandslash
+  level: 22
+Sandslash: {}
+Nidoran♀:
+  evolves_to: Nidorina
+  level: 16
+Nidorina:
+  evolves_to: Nidoqueen
+  method: Moon Stone
+Nidoqueen: {}
+Nidoran♂:
+  evolves_to: Nidorino
+  level: 16
+Nidorino:
+  evolves_to: Nidoking
+  method: Moon Stone
+Nidoking: {}
+Clefairy:
+  evolves_to: Clefable
+  method: Moon Stone
+Clefable: {}
+Vulpix:
+  evolves_to: Ninetales
+  method: Fire Stone
+Ninetales: {}
+Jigglypuff:
+  evolves_to: Wigglytuff
+  method: Moon Stone
+Wigglytuff: {}
+Zubat:
+  evolves_to: Golbat
+  level: 22
+Golbat:
+  evolves_to: Crobat
+  method: Happiness
+Oddish:
+  evolves_to: Gloom
+  level: 21
+Gloom:
+  evolves_to: Vileplume
+  method: Leaf Stone
+Vileplume: {}
+Paras:
+  evolves_to: Parasect
+  level: 24
+Parasect: {}
+Venonat:
+  evolves_to: Venomoth
+  level: 31
+Venomoth: {}
+Diglett:
+  evolves_to: Dugtrio
+  level: 26
+Dugtrio: {}
+Meowth:
+  evolves_to: Persian
+  level: 28
+Persian: {}
+Psyduck:
+  evolves_to: Golduck
+  level: 33
+Golduck: {}
+Mankey:
+  evolves_to: Primeape
+  level: 28
+Primeape: {}
+Growlithe:
+  evolves_to: Arcanine
+  method: Fire Stone
+Arcanine: {}
+Poliwag:
+  evolves_to: Poliwhirl
+  level: 25
+Poliwhirl:
+  evolves_to: Poliwrath
+  method: Water Stone
+Poliwrath: {}
+Abra:
+  evolves_to: Kadabra
+  level: 16
+Kadabra:
+  evolves_to: Alakazam
+  method: Trade
+Alakazam: {}
+Machop:
+  evolves_to: Machoke
+  level: 28
+Machoke:
+  evolves_to: Machamp
+  method: Trade
+Machamp: {}
+Bellsprout:
+  evolves_to: Weepinbell
+  level: 21
+Weepinbell:
+  evolves_to: Victreebel
+  method: Leaf Stone
+Victreebel: {}
+Tentacool:
+  evolves_to: Tentacruel
+  level: 30
+Tentacruel: {}
+Geodude:
+  evolves_to: Graveler
+  level: 25
+Graveler:
+  evolves_to: Golem
+  method: Trade
+Golem: {}
+Ponyta:
+  evolves_to: Rapidash
+  level: 40
+Rapidash: {}
+Slowpoke:
+  evolves_to: Slowbro
+  level: 37
+Slowbro: {}
+Magnemite:
+  evolves_to: Magneton
+  level: 30
+Magneton:
+  evolves_to: Magnezone
+  method: Level up at Mt. Coronet
+Farfetch'd: {}
+Doduo:
+  evolves_to: Dodrio
+  level: 31
+Dodrio: {}
+Seel:
+  evolves_to: Dewgong
+  level: 34
+Dewgong: {}
+Grimer:
+  evolves_to: Muk
+  level: 38
+Muk: {}
+Shellder:
+  evolves_to: Cloyster
+  method: Water Stone
+Cloyster: {}
+Gastly:
+  evolves_to: Haunter
+  level: 25
+Haunter:
+  evolves_to: Gengar
+  method: Trade
+Gengar: {}
+Onix:
+  evolves_to: Steelix
+  method: Trade holding Metal Coat
+Drowzee:
+  evolves_to: Hypno
+  level: 26
+Hypno: {}
+Krabby:
+  evolves_to: Kingler
+  level: 28
+Kingler: {}
+Voltorb:
+  evolves_to: Electrode
+  level: 30
+Electrode: {}
+Exeggcute:
+  evolves_to: Exeggutor
+  method: Leaf Stone
+Exeggutor: {}
+Cubone:
+  evolves_to: Marowak
+  level: 28
+Marowak: {}
+Hitmonlee: {}
+Hitmonchan: {}
+Lickitung:
+  evolves_to: Lickilicky
+  method: Level up knowing Rollout
+Koffing:
+  evolves_to: Weezing
+  level: 35
+Weezing: {}
+Rhyhorn:
+  evolves_to: Rhydon
+  level: 42
+Rhydon:
+  evolves_to: Rhyperior
+  method: Trade holding Protector
+Chansey:
+  evolves_to: Blissey
+  method: Happiness
+Tangela:
+  evolves_to: Tangrowth
+  method: Level up knowing AncientPower
+Kangaskhan: {}
+Horsea:
+  evolves_to: Seadra
+  level: 32
+Seadra:
+  evolves_to: Kingdra
+  method: Trade holding Dragon Scale
+Goldeen:
+  evolves_to: Seaking
+  level: 33
+Seaking: {}
+Staryu:
+  evolves_to: Starmie
+  method: Water Stone
+Starmie: {}
+Mr. Mime: {}
+Scyther:
+  evolves_to: Scizor
+  method: Trade holding Metal Coat
+Jynx: {}
+Electabuzz:
+  evolves_to: Electivire
+  method: Trade holding Electirizer
+Magmar:
+  evolves_to: Magmortar
+  method: Trade holding Magmarizer
+Pinsir: {}
+Tauros: {}
+Magikarp:
+  evolves_to: Gyarados
+  level: 20
+Gyarados: {}
+Lapras: {}
+Ditto: {}
+Eevee:
+  evolves_to: Vaporeon
+  method: Water Stone
+Vaporeon: {}
+Jolteon: {}
+Flareon: {}
+Porygon:
+  evolves_to: Porygon2
+  method: Trade holding Up-Grade
+Omanyte:
+  evolves_to: Omastar
+  level: 40
+Omastar: {}
+Kabuto:
+  evolves_to: Kabutops
+  level: 40
+Kabutops: {}
+Aerodactyl: {}
+Snorlax: {}
+Articuno: {}
+Zapdos: {}
+Moltres: {}
+Dratini:
+  evolves_to: Dragonair
+  level: 30
+Dragonair:
+  evolves_to: Dragonite
+  level: 55
+Dragonite: {}
+Mewtwo: {}
+Mew: {}
+
+# Generation II (#152-251)
+Chikorita:
+  evolves_to: Bayleef
+  level: 16
+Bayleef:
+  evolves_to: Meganium
+  level: 32
+Meganium: {}
+Cyndaquil:
+  evolves_to: Quilava
+  level: 14
+Quilava:
+  evolves_to: Typhlosion
+  level: 36
+Typhlosion: {}
+Totodile:
+  evolves_to: Croconaw
+  level: 18
+Croconaw:
+  evolves_to: Feraligatr
+  level: 30
+Feraligatr: {}
+Sentret:
+  evolves_to: Furret
+  level: 15
+Furret: {}
+Hoothoot:
+  evolves_to: Noctowl
+  level: 20
+Noctowl: {}
+Ledyba:
+  evolves_to: Ledian
+  level: 18
+Ledian: {}
+Spinarak:
+  evolves_to: Ariados
+  level: 22
+Ariados: {}
+Crobat: {}
+Chinchou:
+  evolves_to: Lanturn
+  level: 27
+Lanturn: {}
+Pichu:
+  evolves_to: Pikachu
+  method: Happiness
+Cleffa:
+  evolves_to: Clefairy
+  method: Happiness
+Igglybuff:
+  evolves_to: Jigglypuff
+  method: Happiness
+Togepi:
+  evolves_to: Togetic
+  method: Happiness
+Togetic:
+  evolves_to: Togekiss
+  method: Shiny Stone
+Natu:
+  evolves_to: Xatu
+  level: 25
+Xatu: {}
+Mareep:
+  evolves_to: Flaaffy
+  level: 15
+Flaaffy:
+  evolves_to: Ampharos
+  level: 30
+Ampharos: {}
+Bellossom: {}
+Marill:
+  evolves_to: Azumarill
+  level: 18
+Azumarill: {}
+Sudowoodo: {}
+Politoed: {}
+Hoppip:
+  evolves_to: Skiploom
+  level: 18
+Skiploom:
+  evolves_to: Jumpluff
+  level: 27
+Jumpluff: {}
+Aipom:
+  evolves_to: Ambipom
+  method: Level up knowing Double Hit
+Sunkern:
+  evolves_to: Sunflora
+  method: Sun Stone
+Sunflora: {}
+Yanma:
+  evolves_to: Yanmega
+  method: Level up knowing AncientPower
+Wooper:
+  evolves_to: Quagsire
+  level: 20
+Quagsire: {}
+Espeon: {}
+Umbreon: {}
+Murkrow:
+  evolves_to: Honchkrow
+  method: Dusk Stone
+Slowking: {}
+Misdreavus:
+  evolves_to: Mismagius
+  method: Dusk Stone
+Unown: {}
+Wobbuffet: {}
+Girafarig: {}
+Pineco:
+  evolves_to: Forretress
+  level: 31
+Forretress: {}
+Dunsparce: {}
+Gligar:
+  evolves_to: Gliscor
+  method: Level up holding Razor Fang (Night)
+Steelix: {}
+Snubbull:
+  evolves_to: Granbull
+  level: 23
+Granbull: {}
+Qwilfish: {}
+Scizor: {}
+Shuckle: {}
+Heracross: {}
+Sneasel:
+  evolves_to: Weavile
+  method: Level up holding Razor Claw (Night)
+Teddiursa:
+  evolves_to: Ursaring
+  level: 30
+Ursaring: {}
+Slugma:
+  evolves_to: Magcargo
+  level: 38
+Magcargo: {}
+Swinub:
+  evolves_to: Piloswine
+  level: 33
+Piloswine:
+  evolves_to: Mamoswine
+  method: Level up knowing AncientPower
+Corsola: {}
+Remoraid:
+  evolves_to: Octillery
+  level: 25
+Octillery: {}
+Delibird: {}
+Mantine: {}
+Skarmory: {}
+Houndour:
+  evolves_to: Houndoom
+  level: 24
+Houndoom: {}
+Kingdra: {}
+Phanpy:
+  evolves_to: Donphan
+  level: 25
+Donphan: {}
+Porygon2:
+  evolves_to: Porygon-Z
+  method: Trade holding Dubious Disc
+Stantler: {}
+Smeargle: {}
+Tyrogue:
+  evolves_to: Hitmonlee
+  method: "Level 20 (Atk > Def)"
+Hitmontop: {}
+Smoochum:
+  evolves_to: Jynx
+  level: 30
+Elekid:
+  evolves_to: Electabuzz
+  level: 30
+Magby:
+  evolves_to: Magmar
+  level: 30
+Miltank: {}
+Blissey: {}
+Raikou: {}
+Entei: {}
+Suicune: {}
+Larvitar:
+  evolves_to: Pupitar
+  level: 30
+Pupitar:
+  evolves_to: Tyranitar
+  level: 55
+Tyranitar: {}
+Lugia: {}
+Ho-Oh: {}
+Celebi: {}
+
+# Generation III (#252-386)
+Treecko:
+  evolves_to: Grovyle
+  level: 16
+Grovyle:
+  evolves_to: Sceptile
+  level: 36
+Sceptile: {}
+Torchic:
+  evolves_to: Combusken
+  level: 16
+Combusken:
+  evolves_to: Blaziken
+  level: 36
+Blaziken: {}
+Mudkip:
+  evolves_to: Marshtomp
+  level: 16
+Marshtomp:
+  evolves_to: Swampert
+  level: 36
+Swampert: {}
+Poochyena:
+  evolves_to: Mightyena
+  level: 18
+Mightyena: {}
+Zigzagoon:
+  evolves_to: Linoone
+  level: 20
+Linoone: {}
+Wurmple:
+  evolves_to: Silcoon
+  level: 7
+Silcoon:
+  evolves_to: Beautifly
+  level: 10
+Beautifly: {}
+Cascoon:
+  evolves_to: Dustox
+  level: 10
+Dustox: {}
+Lotad:
+  evolves_to: Lombre
+  level: 14
+Lombre:
+  evolves_to: Ludicolo
+  method: Water Stone
+Ludicolo: {}
+Seedot:
+  evolves_to: Nuzleaf
+  level: 14
+Nuzleaf:
+  evolves_to: Shiftry
+  method: Leaf Stone
+Shiftry: {}
+Taillow:
+  evolves_to: Swellow
+  level: 22
+Swellow: {}
+Wingull:
+  evolves_to: Pelipper
+  level: 25
+Pelipper: {}
+Ralts:
+  evolves_to: Kirlia
+  level: 20
+Kirlia:
+  evolves_to: Gardevoir
+  level: 30
+Gardevoir: {}
+Surskit:
+  evolves_to: Masquerain
+  level: 22
+Masquerain: {}
+Shroomish:
+  evolves_to: Breloom
+  level: 23
+Breloom: {}
+Slakoth:
+  evolves_to: Vigoroth
+  level: 18
+Vigoroth:
+  evolves_to: Slaking
+  level: 36
+Slaking: {}
+Nincada:
+  evolves_to: Ninjask
+  level: 20
+Ninjask: {}
+Shedinja: {}
+Whismur:
+  evolves_to: Loudred
+  level: 20
+Loudred:
+  evolves_to: Exploud
+  level: 40
+Exploud: {}
+Makuhita:
+  evolves_to: Hariyama
+  level: 24
+Hariyama: {}
+Azurill:
+  evolves_to: Marill
+  method: Happiness
+Nosepass:
+  evolves_to: Probopass
+  method: Level up at Mt. Coronet
+Skitty:
+  evolves_to: Delcatty
+  method: Moon Stone
+Delcatty: {}
+Sableye: {}
+Mawile: {}
+Aron:
+  evolves_to: Lairon
+  level: 32
+Lairon:
+  evolves_to: Aggron
+  level: 42
+Aggron: {}
+Meditite:
+  evolves_to: Medicham
+  level: 37
+Medicham: {}
+Electrike:
+  evolves_to: Manectric
+  level: 26
+Manectric: {}
+Plusle: {}
+Minun: {}
+Volbeat: {}
+Illumise: {}
+Roselia:
+  evolves_to: Roserade
+  method: Shiny Stone
+Gulpin:
+  evolves_to: Swalot
+  level: 26
+Swalot: {}
+Carvanha:
+  evolves_to: Sharpedo
+  level: 30
+Sharpedo: {}
+Wailmer:
+  evolves_to: Wailord
+  level: 40
+Wailord: {}
+Numel:
+  evolves_to: Camerupt
+  level: 33
+Camerupt: {}
+Torkoal: {}
+Spoink:
+  evolves_to: Grumpig
+  level: 32
+Grumpig: {}
+Spinda: {}
+Trapinch:
+  evolves_to: Vibrava
+  level: 35
+Vibrava:
+  evolves_to: Flygon
+  level: 45
+Flygon: {}
+Cacnea:
+  evolves_to: Cacturne
+  level: 32
+Cacturne: {}
+Swablu:
+  evolves_to: Altaria
+  level: 35
+Altaria: {}
+Zangoose: {}
+Seviper: {}
+Lunatone: {}
+Solrock: {}
+Barboach:
+  evolves_to: Whiscash
+  level: 30
+Whiscash: {}
+Corphish:
+  evolves_to: Crawdaunt
+  level: 30
+Crawdaunt: {}
+Baltoy:
+  evolves_to: Claydol
+  level: 36
+Claydol: {}
+Lileep:
+  evolves_to: Cradily
+  level: 40
+Cradily: {}
+Anorith:
+  evolves_to: Armaldo
+  level: 40
+Armaldo: {}
+Feebas:
+  evolves_to: Milotic
+  method: Level up with high Beauty
+Milotic: {}
+Castform: {}
+Kecleon: {}
+Shuppet:
+  evolves_to: Banette
+  level: 37
+Banette: {}
+Duskull:
+  evolves_to: Dusclops
+  level: 37
+Dusclops:
+  evolves_to: Dusknoir
+  method: Trade holding Reaper Cloth
+Tropius: {}
+Chimecho: {}
+Absol: {}
+Wynaut:
+  evolves_to: Wobbuffet
+  level: 15
+Snorunt:
+  evolves_to: Glalie
+  level: 42
+Glalie: {}
+Spheal:
+  evolves_to: Sealeo
+  level: 32
+Sealeo:
+  evolves_to: Walrein
+  level: 44
+Walrein: {}
+Clamperl:
+  evolves_to: Huntail
+  method: Trade holding DeepSeaTooth
+Huntail: {}
+Gorebyss: {}
+Relicanth: {}
+Luvdisc: {}
+Bagon:
+  evolves_to: Shelgon
+  level: 30
+Shelgon:
+  evolves_to: Salamence
+  level: 50
+Salamence: {}
+Beldum:
+  evolves_to: Metang
+  level: 20
+Metang:
+  evolves_to: Metagross
+  level: 45
+Metagross: {}
+Regirock: {}
+Regice: {}
+Registeel: {}
+Latias: {}
+Latios: {}
+Kyogre: {}
+Groudon: {}
+Rayquaza: {}
+Jirachi: {}
+Deoxys: {}
+
+# Generation IV (#387-493)
+Turtwig:
+  evolves_to: Grotle
+  level: 18
+Grotle:
+  evolves_to: Torterra
+  level: 32
+Torterra: {}
+Chimchar:
+  evolves_to: Monferno
+  level: 14
+Monferno:
+  evolves_to: Infernape
+  level: 36
+Infernape: {}
+Piplup:
+  evolves_to: Prinplup
+  level: 16
+Prinplup:
+  evolves_to: Empoleon
+  level: 36
+Empoleon: {}
+Starly:
+  evolves_to: Staravia
+  level: 14
+Staravia:
+  evolves_to: Staraptor
+  level: 34
+Staraptor: {}
+Bidoof:
+  evolves_to: Bibarel
+  level: 15
+Bibarel: {}
+Kricketot:
+  evolves_to: Kricketune
+  level: 10
+Kricketune: {}
+Shinx:
+  evolves_to: Luxio
+  level: 15
+Luxio:
+  evolves_to: Luxray
+  level: 30
+Luxray: {}
+Budew:
+  evolves_to: Roselia
+  method: Happiness (Day)
+Roserade: {}
+Cranidos:
+  evolves_to: Rampardos
+  level: 30
+Rampardos: {}
+Shieldon:
+  evolves_to: Bastiodon
+  level: 30
+Bastiodon: {}
+Burmy:
+  evolves_to: Wormadam
+  level: 20
+Wormadam: {}
+Mothim: {}
+Combee:
+  evolves_to: Vespiquen
+  method: "Level 21 (Female only)"
+Vespiquen: {}
+Pachirisu: {}
+Buizel:
+  evolves_to: Floatzel
+  level: 26
+Floatzel: {}
+Cherubi:
+  evolves_to: Cherrim
+  level: 25
+Cherrim: {}
+Shellos:
+  evolves_to: Gastrodon
+  level: 30
+Gastrodon: {}
+Ambipom: {}
+Drifloon:
+  evolves_to: Drifblim
+  level: 28
+Drifblim: {}
+Buneary:
+  evolves_to: Lopunny
+  method: Happiness
+Lopunny: {}
+Mismagius: {}
+Honchkrow: {}
+Glameow:
+  evolves_to: Purugly
+  level: 38
+Purugly: {}
+Chingling:
+  evolves_to: Chimecho
+  method: Happiness (Night)
+Stunky:
+  evolves_to: Skuntank
+  level: 34
+Skuntank: {}
+Bronzor:
+  evolves_to: Bronzong
+  level: 33
+Bronzong: {}
+Bonsly:
+  evolves_to: Sudowoodo
+  method: Level up knowing Mimic
+Mime Jr.:
+  evolves_to: Mr. Mime
+  method: Level up knowing Mimic
+Happiny:
+  evolves_to: Chansey
+  method: Level up holding Oval Stone (Day)
+Chatot: {}
+Spiritomb: {}
+Gible:
+  evolves_to: Gabite
+  level: 24
+Gabite:
+  evolves_to: Garchomp
+  level: 48
+Garchomp: {}
+Munchlax:
+  evolves_to: Snorlax
+  method: Happiness
+Riolu:
+  evolves_to: Lucario
+  method: Happiness (Day)
+Lucario: {}
+Hippopotas:
+  evolves_to: Hippowdon
+  level: 34
+Hippowdon: {}
+Skorupi:
+  evolves_to: Drapion
+  level: 40
+Drapion: {}
+Croagunk:
+  evolves_to: Toxicroak
+  level: 37
+Toxicroak: {}
+Carnivine: {}
+Finneon:
+  evolves_to: Lumineon
+  level: 31
+Lumineon: {}
+Mantyke:
+  evolves_to: Mantine
+  method: Level up with Remoraid in party
+Snover:
+  evolves_to: Abomasnow
+  level: 40
+Abomasnow: {}
+Weavile: {}
+Magnezone: {}
+Lickilicky: {}
+Rhyperior: {}
+Tangrowth: {}
+Electivire: {}
+Magmortar: {}
+Togekiss: {}
+Yanmega: {}
+Leafeon: {}
+Glaceon: {}
+Gliscor: {}
+Mamoswine: {}
+Porygon-Z: {}
+Gallade: {}
+Probopass: {}
+Dusknoir: {}
+Froslass: {}
+Rotom: {}
+Uxie: {}
+Mesprit: {}
+Azelf: {}
+Dialga: {}
+Palkia: {}
+Heatran: {}
+Regigigas: {}
+Giratina: {}
+Cresselia: {}
+Phione: {}
+Manaphy: {}
+Darkrai: {}
+Shaymin: {}
+Arceus: {}

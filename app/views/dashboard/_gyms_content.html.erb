@@ -1,0 +1,64 @@
+<div class="panel-header">
+  <span>GYMS</span>
+  <span style="display: flex; align-items: center; gap: 8px;">
+    <span class="panel-header-sub"><%= @gyms_defeated %>/8 BADGES</span>
+    <%= button_to "START GYM DRAFT", gym_drafts_path, method: :post, class: "gb-btn-primary gb-btn-sm", style: "font-size: 9px; padding: 3px 8px;" %>
+  </span>
+</div>
+<div class="panel-body">
+
+  <%# Badge Case — large version %>
+  <div class="route-card">
+    <div class="route-label">BADGE CASE</div>
+    <div class="badge-row" style="gap: 10px; max-width: 320px;">
+      <% (1..8).each do |gym_num| %>
+        <% if gym_num <= @gyms_defeated %>
+          <div class="badge-cell badge-earned" style="font-size: 24px;">&#9733;</div>
+        <% else %>
+          <div class="badge-cell badge-empty" style="font-size: 16px;">...</div>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Gym Leaders — expanded with more detail %>
+  <div class="route-card">
+    <div class="route-label">GYM LEADERS</div>
+    <% @gym_info.each do |_key, gym| %>
+      <% num = gym["number"] %>
+      <% defeated = num <= @gyms_defeated %>
+      <% is_next = num == @gyms_defeated + 1 %>
+
+      <% if is_next %>
+        <div class="gym-next-highlight" style="padding: 8px 10px;">
+          &#9654; <%= gym["leader"]&.upcase %>
+          <span class="type-text" style="border-color: var(--l1);"><%= PixeldexHelper::TYPE_ABBREVIATIONS[gym["type"]] || gym["type"] %></span>
+          &lt;NEXT
+          <% loc_data = @locations[gym["location"]] %>
+          <div style="font-size: 9px; color: var(--l1); margin-top: 4px;">
+            <%= loc_data&.[]("name") || gym["location"] %> &mdash; Level Cap: <%= gym["max_level"] %>
+          </div>
+        </div>
+      <% elsif defeated %>
+        <div class="gym-list-item">
+          <span class="gym-check">&#9733;</span>
+          <%= gym["leader"]&.upcase %>
+          <span class="type-text"><%= PixeldexHelper::TYPE_ABBREVIATIONS[gym["type"]] || gym["type"] %></span>
+          <span style="margin-left: auto; font-size: 9px; color: var(--d2);">Lv. <%= gym["max_level"] %></span>
+        </div>
+      <% else %>
+        <div class="gym-list-item" style="opacity: 0.35;">
+          <span class="gym-check">.</span>
+          <%= gym["leader"]&.upcase %>
+          <span class="type-text"><%= PixeldexHelper::TYPE_ABBREVIATIONS[gym["type"]] || gym["type"] %></span>
+          <span style="margin-left: auto; font-size: 9px; color: var(--d2);">Lv. <%= gym["max_level"] %></span>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+
+  <%# Next gym strategy %>
+  <div class="dialog" style="font-size: 11px;">
+    <%= pixeldex_gym_strategy(@next_gym, @type_analysis) %>
+  </div>
+</div>

@@ -1,0 +1,38 @@
+<div class="title-bar">
+  <div class="title-left">
+    <span class="title-logo">&#9876;</span>
+    <div>
+      <div class="title-text"><%= @player_name&.upcase || "TRAINER" %>'s PC</div>
+      <div class="title-sub" style="display: flex; align-items: center; gap: 6px;">
+        PLATINUM SOUL LINK .
+        <select class="gb-select"
+                onchange="window.location.href = '/?run_id=' + this.value"
+                style="display: inline-block; width: auto; padding: 2px 6px; font-size: 11px; background: var(--d1); color: var(--l2); border-color: var(--l1);">
+          <% @all_runs.each do |r| %>
+            <option value="<%= r.id %>" <%= 'selected' if r.id == @run.id %>>
+              RUN #<%= r.run_number %><%= ' (ACTIVE)' if r.active? %>
+            </option>
+          <% end %>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="title-right">
+    <div class="title-stat">
+      <div class="title-stat-num"><%= @caught_count %></div>
+      <div class="title-stat-label">CAUGHT</div>
+    </div>
+    <div class="title-stat">
+      <div class="title-stat-num"><%= @caught_count - @dead_count %></div>
+      <div class="title-stat-label">ALIVE</div>
+    </div>
+    <div class="title-stat">
+      <div class="title-stat-num"><%= @dead_count %></div>
+      <div class="title-stat-label">DEAD</div>
+    </div>
+    <div class="title-stat">
+      <div class="title-stat-num"><%= @gyms_defeated %>/8</div>
+      <div class="title-stat-label">BADGES</div>
+    </div>
+  </div>
+</div>

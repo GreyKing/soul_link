@@ -1,0 +1,60 @@
+<div class="panel">
+  <div class="panel-header">
+    <span>PARTY</span>
+    <span class="panel-header-sub"><%= @team_groups.size %>/<%= SoulLinkTeam::MAX_SLOTS %></span>
+  </div>
+  <div class="panel-body">
+    <% if @team_groups.any? %>
+      <% @team_groups.each_with_index do |group, idx| %>
+        <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
+        <div class="team-slot">
+          <div class="team-slot-num"><%= idx + 1 %></div>
+          <div class="team-sprite">
+            <% if my_pokemon&.species.present? %>
+              <%= pokemon_sprite_tag(my_pokemon.species, size: 36) %>
+            <% else %>
+              ?
+            <% end %>
+          </div>
+          <div class="team-info">
+            <div class="team-name"><%= my_pokemon&.species&.upcase || "???" %></div>
+            <div class="team-nick">"<%= group.nickname %>"</div>
+            <div class="team-types">
+              <% if my_pokemon&.species.present? %>
+                <%= pixeldex_type_badges(my_pokemon.species) %>
+              <% end %>
+            </div>
+          </div>
+          <div class="hp-bar">
+            <div class="hp-fill<%= ' dead' if group.dead? %>" style="width: <%= group.caught? ? '100%' : '0%' %>;"></div>
+          </div>
+        </div>
+      <% end %>
+
+      <%# Empty slots %>
+      <% (SoulLinkTeam::MAX_SLOTS - @team_groups.size).times do |i| %>
+        <div class="team-slot-empty">- EMPTY -</div>
+      <% end %>
+    <% else %>
+      <% SoulLinkTeam::MAX_SLOTS.times do %>
+        <div class="team-slot-empty">- EMPTY -</div>
+      <% end %>
+    <% end %>
+
+    <%# Stats underneath team %>
+    <div style="margin-top: 10px; padding-top: 8px; border-top: var(--border-thin);">
+      <div class="stat-row">
+        <span>SURVIVAL</span>
+        <span class="stat-val"><%= pixeldex_survival_pct(@caught_count, @dead_count) %></span>
+      </div>
+      <div class="stat-row">
+        <span>COVERAGE</span>
+        <span class="stat-val"><%= pixeldex_coverage_fraction(@type_analysis) %></span>
+      </div>
+    </div>
+
+    <div class="dialog" style="font-size: 11px;">
+      <%= pixeldex_team_dialog(@type_analysis, @team_groups.size) %>
+    </div>
+  </div>
+</div>

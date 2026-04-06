@@ -1,0 +1,128 @@
+<%
+  total_count = @on_team_groups.size + @storage_groups.size + @fallen_groups.size
+%>
+<div class="panel-header">
+  <span>PC BOX - ALL POKEMON</span>
+  <span style="display: flex; align-items: center; gap: 8px;">
+    <span class="panel-header-sub"><%= total_count %> TOTAL</span>
+    <button type="button"
+            data-action="click->dashboard#openCatchModal"
+            class="gb-btn-primary gb-btn-sm" style="font-size: 9px; padding: 3px 8px;">
+      + NEW CATCH
+    </button>
+  </span>
+</div>
+<div class="panel-body">
+
+  <%# ON TEAM section %>
+  <div class="box-section-label">&#9733; ON TEAM (<%= @on_team_groups.size %>)</div>
+  <div class="box-grid box-grid-wide" data-pixeldex-target="onTeamGrid">
+    <% @on_team_groups.each do |group| %>
+      <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
+      <div class="box-cell on-team"
+           data-action="click->pixeldex#selectPokemon"
+           data-group-id="<%= group.id %>"
+           data-group-nickname="<%= group.nickname %>"
+           data-group-species="<%= my_pokemon&.species || '' %>"
+           data-group-location="<%= group.location %>"
+           data-group-status="caught"
+           data-group-types="<%= my_pokemon&.species.present? ? SoulLink::GameState.types_for(my_pokemon.species).join(',') : '' %>"
+           data-group-pokemon="<%= pixeldex_group_pokemon_json(group, current_user_id) %>">
+        <div class="box-cell-name" style="margin-bottom: 4px;"><%= group.nickname.upcase %></div>
+        <div class="box-cell-players">
+          <%= pixeldex_player_sprites(group, current_user_id) %>
+        </div>
+        <div class="box-cell-loc"><%= group.location %></div>
+      </div>
+    <% end %>
+    <% ((3 - @on_team_groups.size % 3) % 3).times do %>
+      <div class="box-cell empty"></div>
+    <% end %>
+  </div>
+
+  <%# IN STORAGE section %>
+  <div class="box-section-label" style="margin-top: 14px;">IN STORAGE (<%= @storage_groups.size %>)</div>
+  <div class="box-grid box-grid-wide" data-pixeldex-target="storageGrid">
+    <% @storage_groups.each do |group| %>
+      <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
+      <div class="box-cell"
+           data-action="click->pixeldex#selectPokemon"
+           data-group-id="<%= group.id %>"
+           data-group-nickname="<%= group.nickname %>"
+           data-group-species="<%= my_pokemon&.species || '' %>"
+           data-group-location="<%= group.location %>"
+           data-group-status="caught"
+           data-group-types="<%= my_pokemon&.species.present? ? SoulLink::GameState.types_for(my_pokemon.species).join(',') : '' %>"
+           data-group-pokemon="<%= pixeldex_group_pokemon_json(group, current_user_id) %>">
+        <div class="box-cell-name" style="margin-bottom: 4px;"><%= group.nickname.upcase %></div>
+        <div class="box-cell-players">
+          <%= pixeldex_player_sprites(group, current_user_id) %>
+        </div>
+        <div class="box-cell-loc"><%= group.location %></div>
+      </div>
+    <% end %>
+    <% if @storage_groups.empty? %>
+      <% 3.times do %><div class="box-cell empty"></div><% end %>
+    <% else %>
+      <% ((3 - @storage_groups.size % 3) % 3).times do %><div class="box-cell empty"></div><% end %>
+    <% end %>
+  </div>
+
+  <%# FALLEN section %>
+  <div class="box-section-label" style="margin-top: 14px;">FALLEN (<%= @fallen_groups.size %>)</div>
+  <div class="box-grid box-grid-wide" data-pixeldex-target="fallenGrid">
+    <% @fallen_groups.each do |group| %>
+      <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
+      <div class="box-cell dead"
+           data-action="click->pixeldex#selectPokemon"
+           data-group-id="<%= group.id %>"
+           data-group-nickname="<%= group.nickname %>"
+           data-group-species="<%= my_pokemon&.species || group.nickname %>"
+           data-group-location="<%= group.location %>"
+           data-group-status="dead"
+           data-group-types=""
+           data-group-pokemon="<%= pixeldex_group_pokemon_json(group, current_user_id) %>">
+        <div class="box-cell-name" style="margin-bottom: 4px;"><%= group.nickname.upcase %></div>
+        <div class="box-cell-players">
+          <%= pixeldex_player_sprites(group, current_user_id) %>
+        </div>
+        <div class="box-cell-loc"><%= group.location %></div>
+      </div>
+    <% end %>
+    <% if @fallen_groups.empty? %>
+      <% 3.times do %><div class="box-cell empty"></div><% end %>
+    <% else %>
+      <% ((3 - @fallen_groups.size % 3) % 3).times do %><div class="box-cell empty"></div><% end %>
+    <% end %>
+  </div>
+
+  <%# Type coverage %>
+  <div style="margin-top: 16px; padding-top: 10px; border-top: var(--border-thin);">
+    <div class="box-section-label" style="margin-bottom: 6px;">TYPE COVERAGE</div>
+    <% coverage = pixeldex_type_coverage(@type_analysis) %>
+    <div style="font-size: 10px; line-height: 2.2;">
+      <% coverage[:covered].each do |abbr| %>
+        <span class="type-text"><%= abbr %></span>
+      <% end %>
+      <% if coverage[:covered].empty? %>
+        <span style="color: var(--d2); font-size: 10px;">No coverage yet</span>
+      <% end %>
+    </div>
+    <% if coverage[:gaps].any? %>
+      <div style="margin-top: 6px; font-size: 10px;">
+        <span class="type-coverage-gap">
+          NO COVERAGE:
+          <% coverage[:gaps].each do |abbr| %>
+            <span class="type-text" style="border-color: var(--l1);"><%= abbr %></span>
+          <% end %>
+        </span>
+      </div>
+    <% end %>
+    <% worst = (@type_analysis[:shared_weaknesses] || []).first %>
+    <% if worst %>
+      <div style="margin-top: 6px; font-size: 10px; color: var(--d2);">
+        WEAKNESS: <%= worst[:type].upcase %> x<%= worst[:count] %>
+      </div>
+    <% end %>
+  </div>
+</div>

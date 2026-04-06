@@ -1,0 +1,426 @@
+import { Controller } from "@hotwired/stimulus"
+import Sortable from "sortablejs"
+
+export default class extends Controller {
+  static targets = [
+    "tabContent", "tabButton",
+    "pokemonDetail",
+    "pokemonModal", "modalSprite", "modalSpeciesName", "modalNickLoc", "modalTypes",
+    "modalSpeciesInput", "modalSpeciesHidden", "modalLevel", "modalAbility",
+    "modalEvoInfo", "modalEvoText", "modalLinked", "modalNickname",
+    "modalDeadBtn", "modalStatus", "modalPokemonId", "modalGroupId",
+    "modalNature", "modalNatureLabel",
+    "onTeamGrid", "storageGrid", "fallenGrid"
+  ]
+
+  static values = {
+    abilitiesData: Object,
+    evolutionsData: Object,
+    spriteMap: Object,
+    naturesData: Object,
+    pokemonUpdateUrl: String,
+    groupUpdateUrl: String,
+    updateSlotsUrl: String,
+    csrf: String
+  }
+
+  connect() {
+    this.#initSortables()
+  }
+
+  // ── Sortable Initialization ──
+
+  #initSortables() {
+    const sortableOpts = {
+      group: "pcbox",
+      animation: 150,
+      filter: ".empty",
+      ghostClass: "sortable-ghost",
+      dragClass: "sortable-drag",
+      onEnd: (evt) => this.#onDragEnd(evt)
+    }
+
+    if (this.hasOnTeamGridTarget) {
+      this.onTeamSortable = Sortable.create(this.onTeamGridTarget, { ...sortableOpts })
+    }
+    if (this.hasStorageGridTarget) {
+      this.storageSortable = Sortable.create(this.storageGridTarget, { ...sortableOpts })
+    }
+    if (this.hasFallenGridTarget) {
+      this.fallenSortable = Sortable.create(this.fallenGridTarget, { ...sortableOpts })
+    }
+  }
+
+  async #onDragEnd(evt) {
+    const item = evt.item
+    const groupId = item.dataset.groupId
+    if (!groupId) return
+
+    const fromEl = evt.from
+    const toEl = evt.to
+    if (fromEl === toEl) {
+      // Reorder within same section — only matters for ON TEAM
+      if (toEl === this.onTeamGridTarget) {
+        await this.#saveTeamSlots()
+      }
+      return
+    }
+
+    const fromSection = this.#sectionName(fromEl)
+    const toSection = this.#sectionName(toEl)
+
+    try {
+      // Handle status transitions
+      if (toSection === "fallen" && fromSection !== "fallen") {
+        // Mark dead
+        await this.#updateGroupStatus(groupId, "dead")
+      } else if (fromSection === "fallen" && toSection !== "fallen") {
+        // Revive
+        await this.#updateGroupStatus(groupId, "caught")
+      }
+
+      // Handle team slot changes
+      if (toSection === "onteam" || fromSection === "onteam") {
+        // Enforce max 6
+        if (toSection === "onteam") {
+          const teamCards = this.onTeamGridTarget.querySelectorAll(".box-cell:not(.empty)")
+          if (teamCards.length > 6) {
+            // Bounce back — reload will fix state
+            window.location.reload()
+            return
+          }
+        }
+        await this.#saveTeamSlots()
+      }
+
+      window.location.reload()
+    } catch (error) {
+      console.error("Drag operation failed:", error)
+      window.location.reload()
+    }
+  }
+
+  #sectionName(el) {
+    if (this.hasOnTeamGridTarget && el === this.onTeamGridTarget) return "onteam"
+    if (this.hasStorageGridTarget && el === this.storageGridTarget) return "storage"
+    if (this.hasFallenGridTarget && el === this.fallenGridTarget) return "fallen"
+    return "unknown"
+  }
+
+  async #updateGroupStatus(groupId, status) {
+    const res = await fetch(`${this.groupUpdateUrlValue}/${groupId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": this.csrfValue },
+      body: JSON.stringify({ status })
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.error || "Status update failed")
+    }
+  }
+
+  async #saveTeamSlots() {
+    if (!this.hasOnTeamGridTarget || !this.updateSlotsUrlValue) return
+
+    const cards = this.onTeamGridTarget.querySelectorAll(".box-cell:not(.empty)")
+    const groupIds = Array.from(cards).map(c => c.dataset.groupId).filter(Boolean)
+
+    const res = await fetch(this.updateSlotsUrlValue, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": this.csrfValue },
+      body: JSON.stringify({ group_ids: groupIds })
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.error || "Team update failed")
+    }
+  }
+
+  // ── Tab Switching ──
+
+  switchTab(event) {
+    const tab = event.currentTarget.dataset.tab
+
+    this.tabContentTargets.forEach(el => el.classList.add("hidden"))
+    const target = this.tabContentTargets.find(el => el.dataset.tab === tab)
+    if (target) target.classList.remove("hidden")
+
+    this.tabButtonTargets.forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.tab === tab)
+    })
+
+    if (this.hasPokemonDetailTarget) {
+      this.pokemonDetailTarget.classList.add("hidden")
+      this.#clearSelected()
+    }
+  }
+
+  // ── PC Box Cell Selection ──
+
+  selectPokemon(event) {
+    // Don't open modal if this was a drag
+    if (event.currentTarget.classList.contains("sortable-chosen")) return
+
+    const cell = event.currentTarget
+
+    if (this.hasPokemonModalTarget) {
+      this.#openModal(cell)
+      return
+    }
+
+    if (!this.hasPokemonDetailTarget) return
+
+    if (cell.classList.contains("selected")) {
+      cell.classList.remove("selected")
+      this.pokemonDetailTarget.classList.add("hidden")
+      return
+    }
+
+    this.#clearSelected()
+    cell.classList.add("selected")
+
+    const detail = this.pokemonDetailTarget
+    const nameEl = detail.querySelector("[data-detail-name]")
+    const nickEl = detail.querySelector("[data-detail-nick]")
+    const locEl = detail.querySelector("[data-detail-loc]")
+    const typesEl = detail.querySelector("[data-detail-types]")
+    const deadBtn = detail.querySelector("[data-detail-dead-btn]")
+    const deadInfo = detail.querySelector("[data-detail-dead-info]")
+
+    if (nameEl) nameEl.textContent = (cell.dataset.groupSpecies || "").toUpperCase()
+    if (nickEl) nickEl.textContent = `"${cell.dataset.groupNickname || ""}"`
+    if (locEl) locEl.textContent = cell.dataset.groupLocation || ""
+    if (typesEl) typesEl.innerHTML = this.#renderTypeBadges(cell.dataset.groupTypes)
+
+    if (cell.dataset.groupStatus === "dead") {
+      if (deadBtn) deadBtn.classList.add("hidden")
+      if (deadInfo) { deadInfo.classList.remove("hidden"); deadInfo.textContent = "FALLEN" }
+    } else {
+      if (deadBtn) {
+        deadBtn.classList.remove("hidden")
+        deadBtn.dataset.groupId = cell.dataset.groupId
+        deadBtn.dataset.groupNickname = cell.dataset.groupNickname
+      }
+      if (deadInfo) deadInfo.classList.add("hidden")
+    }
+
+    detail.classList.remove("hidden")
+  }
+
+  // ── Pokemon Modal ──
+
+  #openModal(cell) {
+    const species = cell.dataset.groupSpecies || ""
+    const nickname = cell.dataset.groupNickname || ""
+    const location = cell.dataset.groupLocation || ""
+    const status = cell.dataset.groupStatus || "caught"
+    const groupId = cell.dataset.groupId || ""
+    const pokemonData = cell.dataset.groupPokemon ? JSON.parse(cell.dataset.groupPokemon) : []
+
+    const myPokemon = pokemonData.find(p => p.is_mine) || {}
+
+    this.modalSpeciesNameTarget.textContent = species.toUpperCase() || "UNASSIGNED"
+    this.modalNickLocTarget.textContent = `"${nickname}" @ ${location}`
+    this.modalTypesTarget.innerHTML = this.#renderTypeBadges(cell.dataset.groupTypes)
+
+    if (species && this.spriteMapValue[species]) {
+      this.modalSpriteTarget.innerHTML =
+        `<img src="${this.spriteMapValue[species]}" width="72" height="72" style="image-rendering: pixelated;">`
+    } else {
+      this.modalSpriteTarget.innerHTML = '<span style="font-size: 24px; color: var(--d2);">?</span>'
+    }
+
+    this.modalSpeciesInputTarget.value = species
+    this.modalSpeciesHiddenTarget.value = species
+    this.modalLevelTarget.value = myPokemon.level || ""
+    this.#populateAbilities(species, myPokemon.ability || "")
+    this.#populateEvolution(species)
+    this.modalNatureTarget.value = myPokemon.nature || ""
+    this.#updateNatureLabelFromValue(myPokemon.nature || "")
+    this.modalNicknameTarget.value = nickname
+    this.#populateLinked(pokemonData)
+    this.modalPokemonIdTarget.value = myPokemon.id || ""
+    this.modalGroupIdTarget.value = groupId
+
+    if (status === "dead") {
+      this.modalDeadBtnTarget.classList.add("hidden")
+    } else {
+      this.modalDeadBtnTarget.classList.remove("hidden")
+      this.modalDeadBtnTarget.dataset.groupId = groupId
+      this.modalDeadBtnTarget.dataset.groupNickname = nickname
+    }
+
+    this.modalStatusTarget.textContent = ""
+    this.pokemonModalTarget.classList.remove("hidden")
+  }
+
+  closePokemonModal() {
+    this.pokemonModalTarget.classList.add("hidden")
+  }
+
+  searchSpecies() {
+    const input = this.modalSpeciesInputTarget.value.trim()
+
+    if (this.abilitiesDataValue[input] || this.evolutionsDataValue[input] !== undefined) {
+      this.modalSpeciesHiddenTarget.value = input
+      this.#populateAbilities(input, "")
+      this.#populateEvolution(input)
+      this.modalSpeciesNameTarget.textContent = input.toUpperCase()
+
+      if (this.spriteMapValue[input]) {
+        this.modalSpriteTarget.innerHTML =
+          `<img src="/assets/sprites/${this.spriteMapValue[input]}.png" width="56" height="56" style="image-rendering: pixelated;">`
+      }
+    }
+  }
+
+  async savePokemon() {
+    const pokemonId = this.modalPokemonIdTarget.value
+    const groupId = this.modalGroupIdTarget.value
+    const species = this.modalSpeciesHiddenTarget.value || this.modalSpeciesInputTarget.value.trim()
+    const level = this.modalLevelTarget.value ? parseInt(this.modalLevelTarget.value) : null
+    const ability = this.modalAbilityTarget.value || null
+    const nature = this.modalNatureTarget.value || null
+    const nickname = this.modalNicknameTarget.value.trim()
+
+    this.modalStatusTarget.textContent = "SAVING..."
+
+    try {
+      if (pokemonId) {
+        const pokemonRes = await fetch(`${this.pokemonUpdateUrlValue}/${pokemonId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": this.csrfValue },
+          body: JSON.stringify({ species, level, ability, nature })
+        })
+
+        if (!pokemonRes.ok) {
+          const data = await pokemonRes.json()
+          this.modalStatusTarget.textContent = data.error || "SAVE FAILED"
+          return
+        }
+      }
+
+      if (groupId && nickname) {
+        const groupRes = await fetch(`${this.groupUpdateUrlValue}/${groupId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": this.csrfValue },
+          body: JSON.stringify({ nickname })
+        })
+
+        if (!groupRes.ok) {
+          const data = await groupRes.json()
+          this.modalStatusTarget.textContent = data.error || "SAVE FAILED"
+          return
+        }
+      }
+
+      window.location.reload()
+    } catch (error) {
+      this.modalStatusTarget.textContent = "NETWORK ERROR"
+    }
+  }
+
+  updateNatureLabel() {
+    this.#updateNatureLabelFromValue(this.modalNatureTarget.value)
+  }
+
+  // ── Private Helpers ──
+
+  #updateNatureLabelFromValue(nature) {
+    if (!this.hasModalNatureLabelTarget) return
+    const info = this.naturesDataValue[nature]
+    if (!info || !info.up) {
+      this.modalNatureLabelTarget.textContent = nature ? "Neutral" : ""
+    } else {
+      this.modalNatureLabelTarget.textContent = `+${info.up}  -${info.down}`
+    }
+  }
+
+  #populateAbilities(species, currentAbility) {
+    const abilities = this.abilitiesDataValue[species] || []
+    const select = this.modalAbilityTarget
+    select.innerHTML = '<option value="">Select...</option>'
+
+    abilities.forEach(ab => {
+      const opt = document.createElement("option")
+      opt.value = ab
+      opt.textContent = ab
+      if (ab === currentAbility) opt.selected = true
+      select.appendChild(opt)
+    })
+  }
+
+  #populateEvolution(species) {
+    const evo = this.evolutionsDataValue[species]
+    if (evo && evo.evolves_to) {
+      this.modalEvoInfoTarget.classList.remove("hidden")
+      let text = `${species} → ${evo.evolves_to}`
+      if (evo.level) {
+        text += ` @ Lv.${evo.level}`
+      } else if (evo.method) {
+        text += ` (${evo.method})`
+      }
+      this.modalEvoTextTarget.textContent = text
+    } else {
+      this.modalEvoInfoTarget.classList.add("hidden")
+      this.modalEvoTextTarget.textContent = ""
+    }
+  }
+
+  #populateLinked(pokemonData) {
+    const container = this.modalLinkedTarget
+    container.innerHTML = ""
+
+    if (!pokemonData.length) {
+      container.innerHTML = '<div style="font-size: 10px; color: var(--d2); padding: 4px 0;">No linked pokemon data</div>'
+      return
+    }
+
+    pokemonData.forEach(p => {
+      const row = document.createElement("div")
+      row.className = "stat-row"
+      row.style.fontSize = "10px"
+
+      const nameSpan = document.createElement("span")
+      nameSpan.textContent = p.player_name
+      if (p.is_mine) nameSpan.style.fontWeight = "bold"
+
+      const speciesSpan = document.createElement("span")
+      if (p.species) {
+        let html = ""
+        if (p.sprite_url) {
+          html += `<img src="${p.sprite_url}" width="16" height="16" style="image-rendering: pixelated; vertical-align: middle;"> `
+        }
+        html += p.species
+        speciesSpan.innerHTML = html
+      } else {
+        speciesSpan.textContent = "(unassigned)"
+        speciesSpan.style.color = "var(--d2)"
+        speciesSpan.style.fontStyle = "italic"
+      }
+
+      row.appendChild(nameSpan)
+      row.appendChild(speciesSpan)
+      container.appendChild(row)
+    })
+  }
+
+  #renderTypeBadges(typesStr) {
+    if (!typesStr) return ""
+    const abbrevs = {
+      "Normal": "NRM", "Fire": "FIR", "Water": "WTR", "Electric": "ELC",
+      "Grass": "GRS", "Ice": "ICE", "Fighting": "FGT", "Poison": "PSN",
+      "Ground": "GND", "Flying": "FLY", "Psychic": "PSY", "Bug": "BUG",
+      "Rock": "RCK", "Ghost": "GHO", "Dragon": "DRG", "Dark": "DRK", "Steel": "STL"
+    }
+    return typesStr.split(",").filter(Boolean).map(t =>
+      `<span class="type-text">${abbrevs[t.trim()] || t.trim()}</span>`
+    ).join(" ")
+  }
+
+  #clearSelected() {
+    this.element.querySelectorAll(".box-cell.selected").forEach(el => {
+      el.classList.remove("selected")
+    })
+  }
+}

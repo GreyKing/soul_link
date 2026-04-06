@@ -1,0 +1,95 @@
+<div class="panel">
+  <div class="panel-header">
+    <span>MAP & GYMS</span>
+    <span class="panel-header-sub">SINNOH</span>
+  </div>
+  <div class="panel-body">
+
+    <%# ASCII Map %>
+    <% current_loc = @next_gym ? @locations[@next_gym["location"]]&.[]("name") : "Sunyshore City" %>
+    <div class="map-area"><%= pixeldex_ascii_map(current_loc.to_s) %></div>
+
+    <%# Current Location %>
+    <div class="route-card">
+      <div class="route-label">CURRENT LOCATION</div>
+      <% if @next_gym %>
+        <% loc_data = @locations[@next_gym["location"]] %>
+        <div class="route-name"><%= loc_data&.[]("name")&.upcase || @next_gym["location"].upcase %></div>
+        <div class="route-detail">Preparing for Gym <%= @gyms_defeated + 1 %></div>
+        <div class="route-detail">Next objective: <%= @next_gym["leader"]&.upcase %></div>
+      <% else %>
+        <div class="route-name">POKEMON LEAGUE</div>
+        <div class="route-detail">All gyms defeated!</div>
+        <div class="route-detail">Prepare for the Elite Four</div>
+      <% end %>
+    </div>
+
+    <%# Badge Case %>
+    <div class="route-card">
+      <div class="route-label">BADGE CASE</div>
+      <div class="badge-row">
+        <% (1..8).each do |gym_num| %>
+          <% if gym_num <= @gyms_defeated %>
+            <div class="badge-cell badge-earned">&#9733;</div>
+          <% else %>
+            <div class="badge-cell badge-empty">...</div>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Gym Leaders %>
+    <div class="route-card">
+      <div class="route-label">GYM LEADERS</div>
+      <% @gym_info.each do |_key, gym| %>
+        <% num = gym["number"] %>
+        <% defeated = num <= @gyms_defeated %>
+        <% is_next = num == @gyms_defeated + 1 %>
+
+        <% if is_next %>
+          <div class="gym-next-highlight">
+            &#9654; <%= gym["leader"]&.upcase %>
+            <span class="type-text" style="border-color: var(--l1);"><%= PixeldexHelper::TYPE_ABBREVIATIONS[gym["type"]] || gym["type"] %></span>
+            &lt;NEXT
+            <% loc_data = @locations[gym["location"]] %>
+            <div style="font-size: 9px; color: var(--l1); margin-top: 2px;"><%= loc_data&.[]("name") || gym["location"] %></div>
+          </div>
+        <% elsif defeated %>
+          <div class="gym-list-item">
+            <span class="gym-check">&#9733;</span>
+            <%= gym["leader"]&.upcase %>
+            <span class="type-text"><%= PixeldexHelper::TYPE_ABBREVIATIONS[gym["type"]] || gym["type"] %></span>
+          </div>
+        <% else %>
+          <div class="gym-list-item" style="opacity: 0.35;">
+            <span class="gym-check">.</span>
+            <%= gym["leader"]&.upcase %>
+            <span class="type-text"><%= PixeldexHelper::TYPE_ABBREVIATIONS[gym["type"]] || gym["type"] %></span>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+
+    <%# Recent Routes %>
+    <% if @current_segment %>
+      <div class="route-card">
+        <div class="route-label">RECENT ROUTES</div>
+        <div style="font-size: 10px; line-height: 2;">
+          <% (@current_segment["locations"] || []).last(5).each do |loc_key| %>
+            <% loc_data = @locations[loc_key] %>
+            <% has_catch = @groups_by_location[loc_key]&.any? %>
+            <div>
+              <%= loc_data&.[]("name") || loc_key %> -
+              <%= has_catch ? "&#9733;".html_safe : "uncaught" %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <%# Strategy Dialog %>
+    <div class="dialog" style="font-size: 11px;">
+      <%= pixeldex_gym_strategy(@next_gym, @type_analysis) %>
+    </div>
+  </div>
+</div>

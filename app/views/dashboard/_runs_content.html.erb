@@ -1,0 +1,118 @@
+<%
+  active_run = @all_runs.find(&:active?)
+  past_runs = @all_runs.reject(&:active?)
+%>
+<div data-controller="run-management"
+     data-run-management-guild-id-value="<%= @guild_id %>"
+     data-run-management-user-id-value="<%= current_user_id %>">
+
+  <div class="panel-header">
+    <span>RUNS</span>
+    <span class="panel-header-sub"><%= @all_runs.size %> TOTAL</span>
+  </div>
+  <div class="panel-body">
+
+    <%# ── Active Run (shown when active_run exists, hidden otherwise) ── %>
+    <div data-run-management-target="currentRunPanel" class="<%= 'hidden' unless active_run %>">
+      <div class="box-section-label">&#9654; ACTIVE RUN</div>
+      <div class="gb-card" style="padding: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+          <div style="font-size: 13px;">
+            RUN <span data-run-management-target="runNumber">#<%= active_run&.run_number %></span>
+            <% if active_run && active_run.id == @run.id %>
+              <span class="type-text" style="border-color: var(--d1); background: var(--d2); color: var(--l2); margin-left: 4px;">VIEWING</span>
+            <% end %>
+          </div>
+          <span class="type-text" style="border-color: var(--d1); background: var(--d2); color: var(--l2);">ACTIVE</span>
+        </div>
+
+        <div class="gb-grid-4" style="margin-bottom: 12px;">
+          <div class="gb-card-dark" style="text-align: center; padding: 8px;">
+            <div style="font-size: 16px; color: var(--l2);" data-run-management-target="gymsDefeated"><%= active_run&.gyms_defeated || 0 %>/8</div>
+            <div style="font-size: 9px; color: var(--l1); margin-top: 2px;">GYMS</div>
+          </div>
+          <div class="gb-card-dark" style="text-align: center; padding: 8px;">
+            <div style="font-size: 16px; color: var(--l2);" data-run-management-target="caughtCount"><%= active_run&.caught_groups&.count || 0 %></div>
+            <div style="font-size: 9px; color: var(--l1); margin-top: 2px;">CAUGHT</div>
+          </div>
+          <div class="gb-card-dark" style="text-align: center; padding: 8px;">
+            <div style="font-size: 16px; color: var(--l2);" data-run-management-target="deadCount"><%= active_run&.dead_groups&.count || 0 %></div>
+            <div style="font-size: 9px; color: var(--l1); margin-top: 2px;">DEAD</div>
+          </div>
+          <div class="gb-card-dark" style="text-align: center; padding: 8px;">
+            <div style="font-size: 10px; color: var(--l2);" data-run-management-target="startedAt"><%= active_run&.created_at&.strftime("%b %-d, %Y") || "" %></div>
+            <div style="font-size: 9px; color: var(--l1); margin-top: 2px;">STARTED</div>
+          </div>
+        </div>
+
+        <div data-run-management-target="errorMessage"
+             class="hidden gb-flash gb-flash-alert" style="margin-bottom: 8px;">
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <% if active_run && active_run.id != @run.id %>
+            <a href="/?run_id=<%= active_run.id %>" class="gb-btn gb-btn-sm" style="text-decoration: none;">VIEW</a>
+          <% end %>
+          <button data-action="click->run-management#endRun"
+                  class="gb-btn-danger gb-btn-sm">
+            END RUN
+          </button>
+          <button data-action="click->run-management#setupDiscord"
+                  data-run-management-target="setupDiscordButton"
+                  class="gb-btn-primary gb-btn-sm <%= 'hidden' if active_run&.discord_channels_configured? %>">
+            SETUP DISCORD
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <%# ── No Active Run (shown when no active_run, hidden otherwise) ── %>
+    <div data-run-management-target="noRunPanel" class="<%= 'hidden' if active_run %>">
+      <div class="box-section-label">NO ACTIVE RUN</div>
+      <div class="gb-card" style="text-align: center; padding: 16px;">
+        <div style="font-size: 11px; color: var(--d2); margin-bottom: 10px;">No active run. Start a new one to begin tracking.</div>
+        <div data-run-management-target="errorMessage"
+             class="hidden gb-flash gb-flash-alert" style="margin-bottom: 8px;">
+        </div>
+        <button data-action="click->run-management#startRun"
+                class="gb-btn-primary">
+          START NEW RUN
+        </button>
+      </div>
+    </div>
+
+    <%# ── Run History ── %>
+    <div class="box-section-label" style="margin-top: 14px;">RUN HISTORY (<%= past_runs.size %>)</div>
+    <div data-run-management-target="historyList">
+      <% if past_runs.any? %>
+        <% past_runs.each do |run| %>
+          <a href="/?run_id=<%= run.id %>" style="text-decoration: none; color: inherit; display: block;">
+            <div class="gb-card" style="padding: 8px; cursor: pointer; <%= run.id == @run.id ? 'border-color: var(--d1); border-width: 3px;' : 'opacity: 0.7;' %>">
+              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
+                <div>
+                  <span>RUN #<%= run.run_number %></span>
+                  <% if run.id == @run.id %>
+                    <span class="type-text" style="border-color: var(--d1); background: var(--d2); color: var(--l2); margin-left: 4px; font-size: 9px;">VIEWING</span>
+                  <% end %>
+                  <span style="color: var(--d2); margin-left: 6px; font-size: 10px;">
+                    <%= run.created_at.strftime("%b %-d") %> &mdash; <%= run.updated_at.strftime("%b %-d, %Y") %>
+                  </span>
+                </div>
+                <div style="display: flex; gap: 8px; font-size: 10px; color: var(--d2);">
+                  <span><%= run.gyms_defeated %>/8</span>
+                  <span><%= run.caught_groups.count %> caught</span>
+                  <span><%= run.dead_groups.count %> dead</span>
+                </div>
+              </div>
+            </div>
+          </a>
+        <% end %>
+      <% else %>
+        <div class="gb-card" style="font-size: 11px; color: var(--d2); text-align: center; padding: 16px;">
+          No previous runs.
+        </div>
+      <% end %>
+    </div>
+
+  </div>
+</div>

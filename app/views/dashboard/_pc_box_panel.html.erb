@@ -1,0 +1,114 @@
+<%
+  total_count = @on_team_groups.size + @storage_groups.size + @fallen_groups.size
+%>
+<div class="panel">
+  <div class="panel-header">
+    <span>PC BOX - ALL POKEMON</span>
+    <span class="panel-header-sub"><%= total_count %> TOTAL</span>
+  </div>
+  <div class="panel-body">
+
+    <%# ON TEAM section %>
+    <div class="box-section-label">&#9733; ON TEAM (<%= @on_team_groups.size %>)</div>
+    <div class="box-grid">
+      <% @on_team_groups.each do |group| %>
+        <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
+        <div class="box-cell on-team">
+          <div class="box-cell-sprite">
+            <% if my_pokemon&.species.present? %>
+              <%= pokemon_sprite_tag(my_pokemon.species, size: 40) %>
+            <% else %>
+              ?
+            <% end %>
+          </div>
+          <div class="box-cell-name"><%= my_pokemon&.species&.upcase || "???" %></div>
+          <div class="box-cell-loc"><%= group.location %></div>
+        </div>
+      <% end %>
+      <%# Pad to multiple of 5 %>
+      <% ((5 - @on_team_groups.size % 5) % 5).times do %>
+        <div class="box-cell empty"></div>
+      <% end %>
+    </div>
+
+    <%# IN STORAGE section %>
+    <div class="box-section-label" style="margin-top: 14px;">IN STORAGE (<%= @storage_groups.size %>)</div>
+    <div class="box-grid">
+      <% @storage_groups.each do |group| %>
+        <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
+        <div class="box-cell">
+          <div class="box-cell-sprite">
+            <% if my_pokemon&.species.present? %>
+              <%= pokemon_sprite_tag(my_pokemon.species, size: 40) %>
+            <% else %>
+              ?
+            <% end %>
+          </div>
+          <div class="box-cell-name"><%= my_pokemon&.species&.upcase || "???" %></div>
+          <div class="box-cell-loc"><%= group.location %></div>
+        </div>
+      <% end %>
+      <% if @storage_groups.empty? %>
+        <% 5.times do %>
+          <div class="box-cell empty"></div>
+        <% end %>
+      <% else %>
+        <% ((5 - @storage_groups.size % 5) % 5).times do %>
+          <div class="box-cell empty"></div>
+        <% end %>
+      <% end %>
+    </div>
+
+    <%# FALLEN section %>
+    <div class="box-section-label" style="margin-top: 14px;">FALLEN (<%= @fallen_groups.size %>)</div>
+    <div class="box-grid">
+      <% @fallen_groups.each do |group| %>
+        <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
+        <div class="box-cell dead">
+          <div class="box-cell-sprite">&#9760;</div>
+          <div class="box-cell-name"><%= my_pokemon&.species&.upcase || group.nickname.upcase %></div>
+          <div class="box-cell-loc"><%= group.location %></div>
+        </div>
+      <% end %>
+      <% if @fallen_groups.empty? %>
+        <% 5.times do %>
+          <div class="box-cell empty"></div>
+        <% end %>
+      <% else %>
+        <% ((5 - @fallen_groups.size % 5) % 5).times do %>
+          <div class="box-cell empty"></div>
+        <% end %>
+      <% end %>
+    </div>
+
+    <%# Type coverage %>
+    <div style="margin-top: 16px; padding-top: 10px; border-top: var(--border-thin);">
+      <div class="box-section-label" style="margin-bottom: 6px;">TYPE COVERAGE</div>
+      <% coverage = pixeldex_type_coverage(@type_analysis) %>
+      <div style="font-size: 10px; line-height: 2.2;">
+        <% coverage[:covered].each do |abbr| %>
+          <span class="type-text"><%= abbr %></span>
+        <% end %>
+        <% if coverage[:covered].empty? %>
+          <span style="color: var(--d2); font-size: 10px;">No coverage yet</span>
+        <% end %>
+      </div>
+      <% if coverage[:gaps].any? %>
+        <div style="margin-top: 6px; font-size: 10px;">
+          <span class="type-coverage-gap">
+            NO COVERAGE:
+            <% coverage[:gaps].each do |abbr| %>
+              <span class="type-text" style="border-color: var(--l1);"><%= abbr %></span>
+            <% end %>
+          </span>
+        </div>
+      <% end %>
+      <% worst = (@type_analysis[:shared_weaknesses] || []).first %>
+      <% if worst %>
+        <div style="margin-top: 6px; font-size: 10px; color: var(--d2);">
+          WEAKNESS: <%= worst[:type].upcase %> x<%= worst[:count] %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
