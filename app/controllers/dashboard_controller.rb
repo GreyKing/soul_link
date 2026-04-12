@@ -61,7 +61,7 @@ class DashboardController < ApplicationController
     @gym_info = SoulLink::GameState.gym_info
     @next_gym = SoulLink::GameState.next_gym_info(@gyms_defeated)
     @gym_results = run.gym_results.index_by(&:gym_number)
-    @caught_groups_for_backfill = run.caught_groups.includes(:soul_link_pokemon)
+    @all_groups_for_backfill = run.soul_link_pokemon_groups.where(status: %w[caught dead]).includes(:soul_link_pokemon).order(position: :asc)
     @progression = SoulLink::GameState.progression
     @groups_by_location = @all_groups.group_by(&:location)
 

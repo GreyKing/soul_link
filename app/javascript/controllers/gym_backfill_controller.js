@@ -22,6 +22,7 @@ export default class extends Controller {
       card.className = "gb-card-dark"
       card.style.cssText = "padding: 6px; text-align: center; cursor: pointer; font-size: 9px;"
       card.dataset.groupId = g.id
+      card.dataset.status = g.status || "caught"
 
       const nick = document.createElement("div")
       nick.textContent = g.nickname
@@ -32,6 +33,14 @@ export default class extends Controller {
       spec.style.cssText = "color: var(--d2); font-size: 8px;"
 
       card.append(nick, spec)
+
+      if (g.status === "dead") {
+        card.style.opacity = "0.5"
+        const dead = document.createElement("div")
+        dead.textContent = "DEAD"
+        dead.style.cssText = "color: #a55; font-size: 7px; margin-top: 2px;"
+        card.appendChild(dead)
+      }
       card.addEventListener("click", () => this.toggleCard(card, g.id))
       grid.appendChild(card)
     })
@@ -56,15 +65,18 @@ export default class extends Controller {
   }
 
   toggleCard(card, groupId) {
+    const isDead = card.dataset.status === "dead"
     if (this.selected.has(groupId)) {
       this.selected.delete(groupId)
       card.style.borderColor = ""
       card.style.background = ""
+      if (isDead) card.style.opacity = "0.5"
     } else {
       if (this.selected.size >= 6) return
       this.selected.add(groupId)
       card.style.borderColor = "var(--d1)"
       card.style.background = "var(--d2)"
+      if (isDead) card.style.opacity = "1"
     }
   }
 

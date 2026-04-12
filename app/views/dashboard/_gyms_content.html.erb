@@ -76,9 +76,9 @@
                       data-gym-backfill-result-id-value="<%= result.id %>"
                       data-gym-backfill-update-url-value="<%= gym_result_path(result) %>"
                       data-gym-backfill-csrf-value="<%= form_authenticity_token %>"
-                      data-gym-backfill-groups-value="<%= @caught_groups_for_backfill.map { |g|
+                      data-gym-backfill-groups-value="<%= @all_groups_for_backfill.map { |g|
                         my = g.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id }
-                        { id: g.id, nickname: g.nickname, species: my&.species || '?' }
+                        { id: g.id, nickname: g.nickname, species: my&.species || '?', status: g.status }
                       }.to_json %>"
                       data-action="click->gym-backfill#openPicker">
                 + ADD TEAM
