@@ -70,6 +70,13 @@ class DashboardController < ApplicationController
     @current_segment_index = [@gyms_defeated, segments.size - 1].min
     @current_segment = segments[@current_segment_index]
 
+    # Calculator team quick-pick data
+    @calc_team_pokemon = @team_groups.flat_map do |group|
+      group.soul_link_pokemon.select { |p| p.discord_user_id == current_user_id }.map do |p|
+        { species: p.species, level: p.level || 50, nature: p.nature }
+      end
+    end
+
     # For the quick-catch modal and pokemon modal
     @locations = SoulLink::GameState.locations
     @pokedex_species = SoulLink::GameState.pokedex.keys.sort

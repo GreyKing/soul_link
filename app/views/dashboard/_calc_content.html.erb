@@ -1,0 +1,138 @@
+<div data-controller="full-calc"
+     data-full-calc-csrf-value="<%= form_authenticity_token %>"
+     data-full-calc-pokemon-url-value="/api/pokemon/"
+     data-full-calc-calc-url-value="/api/calculator"
+     data-full-calc-team-pokemon-value="<%= @calc_team_pokemon.to_json %>">
+
+  <div class="panel-header">
+    <span>DAMAGE CALCULATOR</span>
+    <span class="panel-header-sub">ATTACKER vs DEFENDER</span>
+  </div>
+  <div class="panel-body">
+
+    <%# Two-column layout: Attacker vs Defender %>
+    <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; margin-bottom: 12px;">
+
+      <%# ── Attacker (Left) ── %>
+      <div>
+        <div class="box-section-label">ATTACKER</div>
+
+        <%# Quick-pick buttons %>
+        <div data-full-calc-target="attackerQuickPick" style="display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px;"></div>
+
+        <%# Species input %>
+        <input type="text" list="full-calc-species"
+               data-full-calc-target="attackerSpecies"
+               data-action="change->full-calc#attackerChanged"
+               placeholder="Species..."
+               style="width: 100%; font-size: 10px; padding: 3px 6px; background: var(--bg2); color: var(--l1); border: var(--border-thin); margin-bottom: 4px;">
+
+        <%# Level + Nature row %>
+        <div style="display: flex; gap: 4px; margin-bottom: 6px;">
+          <input type="number" min="1" max="100" value="50"
+                 data-full-calc-target="attackerLevel"
+                 data-action="change->full-calc#attackerChanged"
+                 placeholder="Lv"
+                 style="width: 50px; font-size: 10px; padding: 3px 4px; background: var(--bg2); color: var(--l1); border: var(--border-thin);">
+          <select data-full-calc-target="attackerNature"
+                  data-action="change->full-calc#attackerChanged"
+                  style="flex: 1; font-size: 10px; padding: 3px 4px; background: var(--bg2); color: var(--l1); border: var(--border-thin);">
+            <option value="">Neutral</option>
+            <% PixeldexHelper::NATURES.keys.each do |nature| %>
+              <option value="<%= nature %>"><%= nature %> (<%= pixeldex_nature_label(nature) %>)</option>
+            <% end %>
+          </select>
+        </div>
+
+        <%# Sprite + Types + Stats display %>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          <div data-full-calc-target="attackerSprite" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: var(--bg2); border: var(--border-thin);"></div>
+          <div>
+            <div data-full-calc-target="attackerTypes" style="font-size: 10px; margin-bottom: 2px;"></div>
+            <div data-full-calc-target="attackerStats" style="font-size: 9px; color: var(--d2);"></div>
+          </div>
+        </div>
+      </div>
+
+      <%# ── Swap Button (Center) ── %>
+      <div style="display: flex; align-items: center; justify-content: center;">
+        <button type="button"
+                data-action="click->full-calc#swap"
+                style="font-size: 11px; padding: 6px 10px; background: var(--bg2); color: var(--l1); border: var(--border-thin); cursor: pointer; white-space: nowrap;">
+          &#8644; SWAP
+        </button>
+      </div>
+
+      <%# ── Defender (Right) ── %>
+      <div>
+        <div class="box-section-label">DEFENDER</div>
+
+        <%# Quick-pick buttons %>
+        <div data-full-calc-target="defenderQuickPick" style="display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px;"></div>
+
+        <%# Species input %>
+        <input type="text" list="full-calc-species"
+               data-full-calc-target="defenderSpecies"
+               data-action="change->full-calc#defenderChanged"
+               placeholder="Species..."
+               style="width: 100%; font-size: 10px; padding: 3px 6px; background: var(--bg2); color: var(--l1); border: var(--border-thin); margin-bottom: 4px;">
+
+        <%# Level + Nature row %>
+        <div style="display: flex; gap: 4px; margin-bottom: 6px;">
+          <input type="number" min="1" max="100" value="50"
+                 data-full-calc-target="defenderLevel"
+                 data-action="change->full-calc#defenderChanged"
+                 placeholder="Lv"
+                 style="width: 50px; font-size: 10px; padding: 3px 4px; background: var(--bg2); color: var(--l1); border: var(--border-thin);">
+          <select data-full-calc-target="defenderNature"
+                  data-action="change->full-calc#defenderChanged"
+                  style="flex: 1; font-size: 10px; padding: 3px 4px; background: var(--bg2); color: var(--l1); border: var(--border-thin);">
+            <option value="">Neutral</option>
+            <% PixeldexHelper::NATURES.keys.each do |nature| %>
+              <option value="<%= nature %>"><%= nature %> (<%= pixeldex_nature_label(nature) %>)</option>
+            <% end %>
+          </select>
+        </div>
+
+        <%# Sprite + Types + Stats display %>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          <div data-full-calc-target="defenderSprite" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: var(--bg2); border: var(--border-thin);"></div>
+          <div>
+            <div data-full-calc-target="defenderTypes" style="font-size: 10px; margin-bottom: 2px;"></div>
+            <div data-full-calc-target="defenderStats" style="font-size: 9px; color: var(--d2);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <%# ── Move Section ── %>
+    <div style="border: var(--border-thin); padding: 8px; margin-bottom: 8px;">
+      <div class="box-section-label">MOVE</div>
+      <select data-full-calc-target="moveSelect"
+              data-action="change->full-calc#moveChanged"
+              style="width: 100%; font-size: 10px; padding: 3px 6px; background: var(--bg2); color: var(--l1); border: var(--border-thin); margin-bottom: 4px;">
+        <option value="">Select a move...</option>
+      </select>
+      <div data-full-calc-target="moveInfo" style="font-size: 9px; color: var(--d2);"></div>
+    </div>
+
+    <%# ── Results Section ── %>
+    <div data-full-calc-target="resultSection" class="hidden"
+         style="border: var(--border-thin); padding: 8px; margin-bottom: 8px;">
+    </div>
+
+    <%# ── History Section ── %>
+    <div data-full-calc-target="historySection" class="hidden" style="margin-top: 8px;">
+      <div class="box-section-label">RECENT CALCULATIONS</div>
+      <div data-full-calc-target="historyList" style="font-size: 10px;"></div>
+    </div>
+
+  </div>
+
+  <%# Shared datalist for all 493 species %>
+  <datalist id="full-calc-species">
+    <% @pokedex_species.each do |species| %>
+      <option value="<%= species %>">
+    <% end %>
+  </datalist>
+</div>
