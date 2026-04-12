@@ -1,0 +1,1 @@
+/Users/gferm/.claude/three-man-team/ARCHITECT.md
