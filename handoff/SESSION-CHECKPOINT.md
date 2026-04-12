@@ -5,28 +5,33 @@
 
 ## Where We Stopped
 
-Step 2 (gym draft playability fixes) committed on main (abf9a53). Project Owner has requested a new feature: make Pokedex the default view for species selection/search. This will be Step 3.
-
-Known gaps KG-1 through KG-5 logged in BUILD-LOG for future steps (catch flow race condition, team slot ownership, fallen species display, group rollback UX, test coverage).
+All steps complete. No pending work. ARCHITECT-BRIEF cleared. Six commits on main ready to deploy.
 
 ---
 
 ## What Was Decided This Session
 
-- Discord snowflake IDs must be `String` not `Number` in all Stimulus value types
+- Discord snowflake IDs must be `String` not `Number` in all Stimulus controller value types
+- `spriteMapValue` contains full digested asset paths — never wrap in additional path segments
 - Gym draft nomination turn order enforced via pick_order + current_player_index
-- Skip-turn callable by any player (friends policing AFK)
-- User-supplied text rendered via textContent, never innerHTML
-- 30s client-side timer before skip button appears
-- Known gaps (race conditions, auth, tests) deprioritized — 4 trusted friends, no adversarial threat model
+- Skip-turn callable by any player (friends policing AFK), no server-side timers
+- User-supplied text always rendered via textContent, never innerHTML
+- Race conditions in species assignment + pokemon create fixed with unique DB index + transaction + RecordNotUnique rescue
+- Team slots filtered by current user's pokemon ownership
+- PokemonGroupsController#create: group always survives, per-player errors collected individually
+- GymResult model tracks per-gym victories with frozen team snapshots (full per-player breakdown)
+- Backfill mechanism for retroactively adding team snapshots to already-beaten gyms
+- Unmark restricted to highest-numbered gym to prevent counter desync
+- Known low-priority gaps deprioritized: Pokedex/location model validation, ActionCable channel tests
 
 ---
 
 ## Still Open
 
-- Step 3: Make Pokedex the default view for species selection
-- Known gaps KG-1 through KG-5 queued for future steps
-- Deploy is Project Owner's responsibility
+- Deploy (Project Owner's responsibility)
+- Low-priority: Pokedex species name validation at model level
+- Low-priority: Location validation at model level
+- Low-priority: GymDraftChannel ActionCable tests
 
 ---
 
