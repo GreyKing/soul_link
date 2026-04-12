@@ -15,6 +15,17 @@ export default class extends Controller {
     this._attackerData = null
     this._defenderData = null
     this._history = []
+    this._lastAttackerSpecies = null
+    this._lastDefenderSpecies = null
+
+    // Build valid species set from datalist for input validation
+    const datalist = document.getElementById("full-calc-species")
+    this._validSpecies = new Set()
+    if (datalist) {
+      for (const opt of datalist.options) {
+        this._validSpecies.add(opt.value)
+      }
+    }
 
     this._renderQuickPicks(this.attackerQuickPickTarget, "attacker")
     this._renderQuickPicks(this.defenderQuickPickTarget, "defender")
@@ -41,11 +52,13 @@ export default class extends Controller {
       this.attackerSpeciesTarget.value = pkmn.species
       this.attackerLevelTarget.value = pkmn.level
       this.attackerNatureTarget.value = pkmn.nature || ""
+      this._lastAttackerSpecies = null
       this.attackerChanged()
     } else {
       this.defenderSpeciesTarget.value = pkmn.species
       this.defenderLevelTarget.value = pkmn.level
       this.defenderNatureTarget.value = pkmn.nature || ""
+      this._lastDefenderSpecies = null
       this.defenderChanged()
     }
   }
@@ -54,7 +67,10 @@ export default class extends Controller {
 
   attackerChanged() {
     const species = this.attackerSpeciesTarget.value.trim()
-    if (!species) return
+    if (!species || species === this._lastAttackerSpecies) return
+    // Only fetch if species matches a datalist option (avoids partial-type fetches)
+    if (!this._isValidSpecies(species)) return
+    this._lastAttackerSpecies = species
 
     this._fetchPokemon(species).then(data => {
       if (!data) {
@@ -82,7 +98,9 @@ export default class extends Controller {
 
   defenderChanged() {
     const species = this.defenderSpeciesTarget.value.trim()
-    if (!species) return
+    if (!species || species === this._lastDefenderSpecies) return
+    if (!this._isValidSpecies(species)) return
+    this._lastDefenderSpecies = species
 
     this._fetchPokemon(species).then(data => {
       if (!data) {
@@ -239,6 +257,10 @@ export default class extends Controller {
       row.addEventListener("click", () => this._loadFromHistory(entry))
       this.historyListTarget.appendChild(row)
     })
+  }
+
+  _isValidSpecies(species) {
+    return this._validSpecies && this._validSpecies.has(species)
   }
 
   _loadFromHistory(entry) {

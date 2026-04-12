@@ -15,6 +15,15 @@ export default class extends Controller {
     this._defenderSpecies = null
     this._defenderLevel = 50
     this._defenderNature = null
+    this._lastAttackerSpecies = null
+
+    const datalist = document.getElementById("calc-species-list")
+    this._validSpecies = new Set()
+    if (datalist) {
+      for (const opt of datalist.options) {
+        this._validSpecies.add(opt.value)
+      }
+    }
   }
 
   // ── Open modal with defender pre-filled ──
@@ -61,7 +70,9 @@ export default class extends Controller {
 
   attackerChanged() {
     const species = this.attackerSpeciesTarget.value.trim()
-    if (!species) return
+    if (!species || species === this._lastAttackerSpecies) return
+    if (!(this._validSpecies && this._validSpecies.has(species))) return
+    this._lastAttackerSpecies = species
 
     this._fetchPokemon(species).then(data => {
       if (!data) {

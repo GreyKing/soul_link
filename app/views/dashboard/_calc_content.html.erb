@@ -23,7 +23,7 @@
         <%# Species input %>
         <input type="text" list="full-calc-species"
                data-full-calc-target="attackerSpecies"
-               data-action="change->full-calc#attackerChanged"
+               data-action="input->full-calc#attackerChanged change->full-calc#attackerChanged"
                placeholder="Species..."
                style="width: 100%; font-size: 10px; padding: 3px 6px; background: var(--d1); color: var(--l2); border: var(--border-thin); margin-bottom: 4px;">
 
@@ -73,7 +73,7 @@
         <%# Species input %>
         <input type="text" list="full-calc-species"
                data-full-calc-target="defenderSpecies"
-               data-action="change->full-calc#defenderChanged"
+               data-action="input->full-calc#defenderChanged change->full-calc#defenderChanged"
                placeholder="Species..."
                style="width: 100%; font-size: 10px; padding: 3px 6px; background: var(--d1); color: var(--l2); border: var(--border-thin); margin-bottom: 4px;">
 
