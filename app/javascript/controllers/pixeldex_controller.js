@@ -223,11 +223,20 @@ export default class extends Controller {
     this.modalNickLocTarget.textContent = `"${nickname}" @ ${location}`
     this.modalTypesTarget.innerHTML = this.#renderTypeBadges(cell.dataset.groupTypes)
 
+    this.modalSpriteTarget.replaceChildren()
     if (species && this.spriteMapValue[species]) {
-      this.modalSpriteTarget.innerHTML =
-        `<img src="${this.spriteMapValue[species]}" width="72" height="72" style="image-rendering: pixelated;">`
+      const img = document.createElement("img")
+      img.src = this.spriteMapValue[species]
+      img.width = 72
+      img.height = 72
+      img.style.imageRendering = "pixelated"
+      this.modalSpriteTarget.appendChild(img)
     } else {
-      this.modalSpriteTarget.innerHTML = '<span style="font-size: 24px; color: var(--d2);">?</span>'
+      const fallback = document.createElement("span")
+      fallback.style.fontSize = "24px"
+      fallback.style.color = "var(--d2)"
+      fallback.textContent = "?"
+      this.modalSpriteTarget.appendChild(fallback)
     }
 
     this.modalSpeciesInputTarget.value = species
@@ -268,8 +277,13 @@ export default class extends Controller {
       this.modalSpeciesNameTarget.textContent = input.toUpperCase()
 
       if (this.spriteMapValue[input]) {
-        this.modalSpriteTarget.innerHTML =
-          `<img src="${this.spriteMapValue[input]}" width="72" height="72" style="image-rendering: pixelated;">`
+        this.modalSpriteTarget.replaceChildren()
+        const img = document.createElement("img")
+        img.src = this.spriteMapValue[input]
+        img.width = 72
+        img.height = 72
+        img.style.imageRendering = "pixelated"
+        this.modalSpriteTarget.appendChild(img)
       }
     }
   }
@@ -364,69 +378,80 @@ export default class extends Controller {
     })
   }
 
-  #buildEvolutionChain(species) {
+  // Builds a tree structure from evolutions data.
+  // Returns { name, trigger: {level, method}, children: [], isSelected, onActivePath }
+  // or null if species is not in the data.
+  #buildEvolutionTree(species) {
     const data = this.evolutionsDataValue
-    if (!data[species]) return []
+    if (!data[species] && !this.#findParentOf(species)) return null
 
-    // Walk backward to find the base form (cap at 5 to prevent infinite loops)
-    const ancestors = []
-    let current = species
+    // Walk backward to find the root (base form)
+    let root = species
     for (let i = 0; i < 5; i++) {
-      let parent = null
-      for (const [name, entry] of Object.entries(data)) {
-        if (entry.evolves_to === current) {
-          parent = name
-          break
-        }
-      }
+      const parent = this.#findParentOf(root)
       if (!parent) break
-      ancestors.unshift(parent)
-      current = parent
+      root = parent
     }
 
-    // Build chain: ancestors + selected species + forward walk
-    const chain = []
+    // Build full tree from root forward
+    const tree = this.#buildNode(root, { level: null, method: null }, species)
 
-    // Add ancestors with trigger info from their entries
-    for (let i = 0; i < ancestors.length; i++) {
-      const entry = data[ancestors[i]]
-      if (i === 0) {
-        chain.push({ name: ancestors[i], level: null, method: null })
-      } else {
-        const prev = data[ancestors[i - 1]]
-        chain.push({ name: ancestors[i], level: prev.level || null, method: prev.method || null })
+    // Mark the active path (from root to selected species)
+    this.#markActivePath(tree, species)
+
+    return tree
+  }
+
+  #findParentOf(speciesName) {
+    const data = this.evolutionsDataValue
+    for (const [name, entry] of Object.entries(data)) {
+      if (!entry.evolves_to) continue
+      if (entry.evolves_to.some(e => e.species === speciesName)) return name
+    }
+    return null
+  }
+
+  #buildNode(name, trigger, selectedSpecies) {
+    const data = this.evolutionsDataValue
+    const entry = data[name]
+    const children = []
+    if (entry && entry.evolves_to) {
+      for (const branch of entry.evolves_to) {
+        children.push(this.#buildNode(
+          branch.species,
+          { level: branch.level || null, method: branch.method || null },
+          selectedSpecies
+        ))
       }
     }
-
-    // Add the selected species
-    const prevName = ancestors.length > 0 ? ancestors[ancestors.length - 1] : null
-    const prevEntry = prevName ? data[prevName] : null
-    chain.push({
-      name: species,
-      level: prevEntry ? (prevEntry.level || null) : null,
-      method: prevEntry ? (prevEntry.method || null) : null
-    })
-
-    // Walk forward from species (cap at 5 total chain length)
-    current = species
-    for (let i = chain.length; i < 5; i++) {
-      const entry = data[current]
-      if (!entry || !entry.evolves_to) break
-      chain.push({
-        name: entry.evolves_to,
-        level: entry.level || null,
-        method: entry.method || null
-      })
-      current = entry.evolves_to
+    return {
+      name,
+      trigger,
+      children,
+      isSelected: name === selectedSpecies,
+      onActivePath: false
     }
+  }
 
-    return chain
+  // Recursively mark all nodes on the path from root to selected species
+  #markActivePath(node, selectedSpecies) {
+    if (node.name === selectedSpecies) {
+      node.onActivePath = true
+      return true
+    }
+    for (const child of node.children) {
+      if (this.#markActivePath(child, selectedSpecies)) {
+        node.onActivePath = true
+        return true
+      }
+    }
+    return false
   }
 
   #populateEvolution(species) {
-    const chain = this.#buildEvolutionChain(species)
+    const tree = this.#buildEvolutionTree(species)
 
-    if (chain.length === 0) {
+    if (!tree) {
       this.modalEvoInfoTarget.classList.add("hidden")
       this.modalEvoTextTarget.replaceChildren()
       return
@@ -436,36 +461,62 @@ export default class extends Controller {
     const container = this.modalEvoTextTarget
     container.replaceChildren()
 
-    chain.forEach((entry, index) => {
-      // Add arrow separator between entries
-      if (index > 0) {
-        const sep = document.createElement("span")
-        sep.textContent = " → "
-        sep.style.color = "var(--d2)"
-        container.appendChild(sep)
-      }
+    this.#renderEvoNode(container, tree, species, true)
+  }
 
-      // Species name — bold + accent color if currently selected
-      const nameEl = document.createElement(entry.name === species ? "strong" : "span")
-      nameEl.textContent = entry.name
-      nameEl.style.color = entry.name === species ? "var(--a1)" : "var(--d2)"
-      container.appendChild(nameEl)
+  #renderEvoNode(container, node, selectedSpecies, isFirst) {
+    // Arrow before this node (unless first in its line)
+    if (!isFirst) {
+      const sep = document.createElement("span")
+      sep.textContent = " → "
+      sep.style.color = "var(--d2)"
+      container.appendChild(sep)
+    }
 
-      // Trigger info (level or method) for non-base entries
-      if (entry.level) {
-        const lvl = document.createElement("span")
-        lvl.textContent = ` Lv.${entry.level}`
-        lvl.style.fontSize = "9px"
-        lvl.style.color = "var(--d2)"
-        container.appendChild(lvl)
-      } else if (entry.method) {
-        const mth = document.createElement("span")
-        mth.textContent = ` (${entry.method})`
-        mth.style.fontSize = "9px"
-        mth.style.color = "var(--d2)"
-        container.appendChild(mth)
+    // Species name
+    const nameEl = document.createElement(node.isSelected ? "strong" : "span")
+    nameEl.textContent = node.name
+    nameEl.style.color = node.onActivePath ? "var(--a1)" : "var(--d3)"
+    if (!node.onActivePath) nameEl.style.opacity = "0.5"
+    container.appendChild(nameEl)
+
+    // Trigger info (level or method)
+    if (node.trigger.level) {
+      const lvl = document.createElement("span")
+      lvl.textContent = ` Lv.${node.trigger.level}`
+      lvl.style.fontSize = "9px"
+      lvl.style.color = node.onActivePath ? "var(--d2)" : "var(--d3)"
+      if (!node.onActivePath) lvl.style.opacity = "0.5"
+      container.appendChild(lvl)
+    } else if (node.trigger.method) {
+      const mth = document.createElement("span")
+      mth.textContent = ` (${node.trigger.method})`
+      mth.style.fontSize = "9px"
+      mth.style.color = node.onActivePath ? "var(--d2)" : "var(--d3)"
+      if (!node.onActivePath) mth.style.opacity = "0.5"
+      container.appendChild(mth)
+    }
+
+    // Children
+    if (node.children.length === 1) {
+      // Linear — continue on same line
+      this.#renderEvoNode(container, node.children[0], selectedSpecies, false)
+    } else if (node.children.length > 1) {
+      // Branching — stack vertically with indent
+      const branchContainer = document.createElement("div")
+      branchContainer.style.marginLeft = "12px"
+      branchContainer.style.borderLeft = "1px solid var(--d3)"
+      branchContainer.style.paddingLeft = "8px"
+      branchContainer.style.marginTop = "2px"
+
+      for (const child of node.children) {
+        const branchLine = document.createElement("div")
+        branchLine.style.margin = "1px 0"
+        this.#renderEvoNode(branchLine, child, selectedSpecies, false)
+        branchContainer.appendChild(branchLine)
       }
-    })
+      container.appendChild(branchContainer)
+    }
   }
 
   #populateLinked(pokemonData) {
@@ -506,7 +557,13 @@ export default class extends Controller {
         const speciesRow = document.createElement("div")
         speciesRow.style.cssText = "display: flex; align-items: center; gap: 4px; margin-bottom: 3px;"
         if (p.sprite_url) {
-          speciesRow.innerHTML = `<img src="${p.sprite_url}" width="20" height="20" style="image-rendering: pixelated;"> `
+          const img = document.createElement("img")
+          img.src = p.sprite_url
+          img.width = 20
+          img.height = 20
+          img.style.imageRendering = "pixelated"
+          speciesRow.appendChild(img)
+          speciesRow.appendChild(document.createTextNode(" "))
         }
         const specName = document.createElement("span")
         specName.textContent = p.species

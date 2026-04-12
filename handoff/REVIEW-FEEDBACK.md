@@ -1,37 +1,107 @@
-# Review Feedback — Step 3
-Date: 2026-04-12
-Ready for Builder: YES
+# Review Feedback -- Step 5: Damage Calculator Extensions (Multi-Hit + Crit)
+*Written by Reviewer (Richard). Read by Architect and Builder.*
+
+---
+
+## Verdict: PASS
+
+All 24 tests pass (83 assertions, 0 failures, 0 errors). The implementation matches the architect brief. No blocking issues found.
+
+---
 
 ## Must Fix
+
 None.
 
 ## Should Fix
 
-1. **damage_calculator.rb:18** — `calculate_stat` has optional parameters (iv: 31, ev: 0, level: 50, nature_modifier: 1.0) while the brief specifies all five as required: `calculate_stat(base:, iv:, ev:, level:, nature_modifier:)`. The defaults are convenient and the test on line 296 relies on them, but this is a signature drift from the spec. Recommendation: make all parameters required to match the brief, update the one test that relies on defaults.
-
-2. **damage_calculator_test.rb:175-176** — Comment says "The defense stat in the result is the pre-halving value" then immediately contradicts itself. The code actually returns the halved value (line 79 of the service reads `def_stat` after halving on line 54-55). The comment is misleading. Recommendation: fix the comment or add an assertion that `defender_stat` is the halved value.
-
-## Escalate to Architect
 None.
 
-## Cleared
+## Escalate to Architect
 
-Reviewed `app/services/pokemon/damage_calculator.rb` (190 lines) and `test/services/pokemon/damage_calculator_test.rb` (415 lines) against the Step 3 brief.
+None.
 
-**Spec compliance:** All three public methods present with correct return types. `calculate` returns the specified 6-key hash. `calculate_with_natures` returns `{ current:, best:, worst: }` with `:nature` keys on best/worst only. `calculate_stat` returns Integer.
+---
 
-**Gen IV formula:** Integer flooring at each step is correct. Ruby integer division handles the base damage computation. Float multiplies for STAB and effectiveness use explicit `.floor`. Random roll uses integer arithmetic (`damage * roll / 100`) which is equivalent to flooring.
+## Correctness Checks
 
-**STAB, effectiveness, Explosion:** All implemented per brief. STAB checks `attacker_types.include?(move_type)`. Effectiveness delegates to `SoulLink::TypeChart.combined_effectiveness`. Explosion/Self-Destruct halve defense with minimum 1.
+### Multi-hit math -- CORRECT
 
-**Nature modifier mapping:** NATURE_STAT_MAP correctly maps all five abbreviations to DB columns. `nature_modifier` method handles nil nature, neutral natures, boost (1.1), and lower (0.9).
+- `min_total = min_damage * hit_min` -- correct, worst case is min roll repeated min times.
+- `max_total = max_damage * hit_max` -- correct, best case is max roll repeated max times.
+- `avg_total = ((min_damage + max_damage) / 2.0 * avg_hits).round` where `avg_hits = (hit_min + hit_max) / 2.0` -- correct.
+- Non-multi-hit defaults to `hit_min=1, hit_max=1`, so totals collapse to per-hit values -- verified in test.
 
-**Best/worst nature:** Picks first nature (insertion order) that boosts/lowers the relevant attack stat. Functionally equivalent to the brief's "iterate all natures, compute stat, pick max/min" approach since all boosting natures give 1.1x and all lowering give 0.9x.
+### Crit calculation -- CORRECT
 
-**Edge cases:** Immunity short-circuits to zero. Status moves return zero. Default IVs (31) and EVs (0) applied via hash merge. Minimum damage clamped to 1 after modifiers (immunity handled separately).
+- Gen IV 2x multiplier applied to `base_damage` before `apply_modifiers` (line 93-94): `apply_modifiers(base_damage * 2, stab, effectiveness, roll)` -- matches the brief exactly.
+- `CRIT_CHANCES` constant correctly maps stages 0/1/2 to "6.25%"/"12.5%"/"25%", with fallback "33.3%" for stage 3+ -- correct per Gen IV.
+- `crit_stage` and `crit_chance` both use `respond_to?` guard with nil-coalescing to 0 -- correct.
 
-**Hand-calculated test values verified:**
-- Garchomp Earthquake vs Infernape: Atk=200, Def=91, base=98, after STAB=147, after 2x=294. Min=249, Max=294. Matches test assertions on lines 360-364.
-- Alakazam Psychic vs Machamp: SpA=205, SpD=105, base=79, after STAB=118, after 2x=236. Min=200, Max=236. Matches test assertions on lines 407-411.
+### zero_result helper -- CORRECT
 
-**Drift:** None beyond the optional parameters noted in Should Fix.
+- Contains all 16 keys matching the normal result hash.
+- Accepts keyword args for `stab`, `effectiveness`, `attacker_stat`, `defender_stat`.
+- Used in both early-return paths: status/zero-power (line 41) and immunity (lines 65-71).
+- Default `crit_chance: "6.25%"` for zero result is sensible (stage 0 default).
+
+### respond_to? guards -- CORRECT
+
+- All three fields (`min_hits`, `max_hits`, `crit_rate`) are guarded with `respond_to?` (lines 82-83, 91).
+- Each guard falls back through nil-coalescing: `respond_to?(:min_hits) ? (move_record.min_hits || 1) : 1`.
+- This handles both the case where the attribute is missing entirely AND where it is present but nil.
+
+### Test coverage -- GOOD
+
+- 6 new tests covering: fixed multi-hit (2/2), variable multi-hit (2/5), non-multi-hit backward compat, crit stage 0, crit stage 1, immunity with new fields.
+- Existing 18 tests unchanged and passing.
+- The immunity test (lines 534-562) checks all 16 keys explicitly -- thorough.
+
+---
+
+## Edge Case Analysis
+
+### min_hits=nil, max_hits=5
+
+The `respond_to?` guard handles this correctly: `move_record.min_hits || 1` yields 1 when `min_hits` is nil. So `hit_min=1, hit_max=5, is_multi_hit=true`. This is a reasonable interpretation -- a move with only `max_hits` set would be treated as 1-5 hits.
+
+### min_hits=1, max_hits=1
+
+`is_multi_hit = 1 > 1 || 1 > 1 = false`. Totals equal per-hit values. Correct -- a 1/1 hit move is NOT multi-hit.
+
+### crit_rate=nil (no guard test but covered by logic)
+
+`move_record.crit_rate || 0` yields 0 when nil. Correct default.
+
+### crit_stage >= 3
+
+`CRIT_CHANCES[3]` returns nil, so fallback `|| "33.3%"` catches it. Stage 4+ also falls through correctly.
+
+---
+
+## Nits (non-blocking)
+
+1. **No test for crit_rate >= 2 or 3.** There are tests for stage 0 and stage 1, but no test for stage 2 ("25%") or the fallback stage 3+ ("33.3%"). Low risk since the lookup is trivial, but worth adding if someone touches this code later.
+
+2. **Crit totals for multi-hit moves are not calculated.** The result has `crit_min`/`crit_max` for per-hit crit damage but no `crit_min_total`/`crit_max_total`. This matches the brief (which did not request it), but a future step may want multi-hit crit totals. Not a defect -- just noting for the architect.
+
+3. **avg_total for non-multi-hit.** When `hit_min=1, hit_max=1`, `avg_total = ((min + max) / 2.0 * 1.0).round` which equals the midpoint of the damage range. For a non-multi-hit move this is arguably more useful as just `avg_damage` but the naming is consistent with the multi-hit framing. Fine as-is.
+
+---
+
+## Definition of Done Checklist
+
+- [x] `min_total`, `max_total`, `avg_total` in result hash
+- [x] `min_hits`, `max_hits`, `is_multi_hit` in result hash
+- [x] `crit_min`, `crit_max`, `crit_stage`, `crit_chance` in result hash
+- [x] `zero_result` helper used for all early returns
+- [x] Multi-hit test (Bonemerang, 2 hits): totals = per-hit * hits
+- [x] Variable multi-hit test (2-5 hits): min_total = min*2, max_total = max*5
+- [x] Non-multi-hit backward compat: totals == single-hit
+- [x] Crit test: crit values > normal values, stage/chance correct
+- [x] High-crit move test: stage 1, chance "12.5%"
+- [x] Immunity test: all new fields present with zeros
+- [x] All 18 existing tests still pass
+- [x] No UI code
+
+All 12 items satisfied.

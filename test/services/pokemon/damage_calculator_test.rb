@@ -1,4 +1,5 @@
 require "test_helper"
+require "ostruct"
 
 class Pokemon::DamageCalculatorTest < ActiveSupport::TestCase
   # Helper to build a mock BaseStat record
@@ -11,10 +12,12 @@ class Pokemon::DamageCalculatorTest < ActiveSupport::TestCase
   end
 
   # Helper to build a mock Move record
-  def mock_move(name:, power:, move_type:, category:, accuracy: 100, pp: 10, priority: 0)
+  def mock_move(name:, power:, move_type:, category:, accuracy: 100, pp: 10,
+                priority: 0, min_hits: nil, max_hits: nil, crit_rate: 0)
     OpenStruct.new(
       name: name, power: power, move_type: move_type, category: category,
-      accuracy: accuracy, pp: pp, priority: priority
+      accuracy: accuracy, pp: pp, priority: priority,
+      min_hits: min_hits, max_hits: max_hits, crit_rate: crit_rate
     )
   end
 
@@ -410,6 +413,151 @@ class Pokemon::DamageCalculatorTest < ActiveSupport::TestCase
       assert_equal 236, result[:max]
       assert result[:stab]
       assert_equal 2.0, result[:effectiveness]
+    end
+  end
+
+  # --- Multi-hit moves ---
+
+  test "multi-hit move bonemerang reports correct totals" do
+    marowak = mock_base_stat(species: "Marowak", atk: 80, type1: "Ground")
+    pikachu = mock_base_stat(species: "Pikachu", def_stat: 40, type1: "Electric")
+    bonemerang = mock_move(name: "Bonemerang", power: 50, move_type: "Ground", category: "physical",
+                           min_hits: 2, max_hits: 2)
+
+    Pokemon::BaseStat.stub :find_by!, ->(args) {
+      args[:species] == "Marowak" ? marowak : pikachu
+    } do
+      result = Pokemon::DamageCalculator.calculate(
+        attacker: { species: "Marowak", level: 50 },
+        defender: { species: "Pikachu", level: 50 },
+        move: bonemerang
+      )
+
+      assert result[:is_multi_hit], "Bonemerang should be multi-hit"
+      assert_equal 2, result[:min_hits]
+      assert_equal 2, result[:max_hits]
+      assert_equal result[:min] * 2, result[:min_total]
+      assert_equal result[:max] * 2, result[:max_total]
+      assert_equal ((result[:min] + result[:max]) / 2.0 * 2.0).round, result[:avg_total]
+    end
+  end
+
+  test "variable multi-hit move reports correct totals for 2-5 hits" do
+    pinsir = mock_base_stat(species: "Pinsir", atk: 125, type1: "Bug")
+    caterpie = mock_base_stat(species: "Caterpie", def_stat: 35, type1: "Bug")
+    pin_missile = mock_move(name: "Pin Missile", power: 25, move_type: "Bug", category: "physical",
+                            min_hits: 2, max_hits: 5)
+
+    Pokemon::BaseStat.stub :find_by!, ->(args) {
+      args[:species] == "Pinsir" ? pinsir : caterpie
+    } do
+      result = Pokemon::DamageCalculator.calculate(
+        attacker: { species: "Pinsir", level: 50 },
+        defender: { species: "Caterpie", level: 50 },
+        move: pin_missile
+      )
+
+      assert result[:is_multi_hit]
+      assert_equal 2, result[:min_hits]
+      assert_equal 5, result[:max_hits]
+      assert_equal result[:min] * 2, result[:min_total]
+      assert_equal result[:max] * 5, result[:max_total]
+      assert_equal ((result[:min] + result[:max]) / 2.0 * 3.5).round, result[:avg_total]
+    end
+  end
+
+  test "non-multi-hit move has single-hit totals" do
+    garchomp = mock_base_stat(species: "Garchomp", atk: 130, type1: "Dragon", type2: "Ground")
+    infernape = mock_base_stat(species: "Infernape", def_stat: 71, type1: "Fire", type2: "Fighting")
+    earthquake = mock_move(name: "Earthquake", power: 100, move_type: "Ground", category: "physical")
+
+    Pokemon::BaseStat.stub :find_by!, ->(args) {
+      args[:species] == "Garchomp" ? garchomp : infernape
+    } do
+      result = Pokemon::DamageCalculator.calculate(
+        attacker: { species: "Garchomp", level: 50, nature: "Adamant", evs: { atk: 252 } },
+        defender: { species: "Infernape", level: 50 },
+        move: earthquake
+      )
+
+      refute result[:is_multi_hit]
+      assert_equal 1, result[:min_hits]
+      assert_equal 1, result[:max_hits]
+      assert_equal result[:min], result[:min_total]
+      assert_equal result[:max], result[:max_total]
+    end
+  end
+
+  # --- Critical hit ---
+
+  test "crit damage is calculated correctly with stage 0" do
+    garchomp = mock_base_stat(species: "Garchomp", atk: 130, type1: "Dragon", type2: "Ground")
+    infernape = mock_base_stat(species: "Infernape", def_stat: 71, type1: "Fire", type2: "Fighting")
+    earthquake = mock_move(name: "Earthquake", power: 100, move_type: "Ground", category: "physical", crit_rate: 0)
+
+    Pokemon::BaseStat.stub :find_by!, ->(args) {
+      args[:species] == "Garchomp" ? garchomp : infernape
+    } do
+      result = Pokemon::DamageCalculator.calculate(
+        attacker: { species: "Garchomp", level: 50, nature: "Adamant", evs: { atk: 252 } },
+        defender: { species: "Infernape", level: 50 },
+        move: earthquake
+      )
+
+      assert result[:crit_min] > 0
+      assert result[:crit_max] > 0
+      assert result[:crit_max] > result[:max], "Crit max should exceed normal max"
+      assert_equal 0, result[:crit_stage]
+      assert_equal "6.25%", result[:crit_chance]
+    end
+  end
+
+  test "high crit move has correct stage and chance" do
+    alakazam = mock_base_stat(species: "Alakazam", spa: 135, type1: "Psychic")
+    machamp = mock_base_stat(species: "Machamp", spd: 85, type1: "Fighting")
+    psychic = mock_move(name: "Psychic", power: 90, move_type: "Psychic", category: "special", crit_rate: 1)
+
+    Pokemon::BaseStat.stub :find_by!, ->(args) {
+      args[:species] == "Alakazam" ? alakazam : machamp
+    } do
+      result = Pokemon::DamageCalculator.calculate(
+        attacker: { species: "Alakazam", level: 50, nature: "Modest", evs: { spa: 252 } },
+        defender: { species: "Machamp", level: 50 },
+        move: psychic
+      )
+
+      assert_equal 1, result[:crit_stage]
+      assert_equal "12.5%", result[:crit_chance]
+    end
+  end
+
+  test "immunity includes all new fields with zeros" do
+    rattata = mock_base_stat(species: "Rattata", atk: 56, type1: "Normal")
+    gengar = mock_base_stat(species: "Gengar", def_stat: 60, type1: "Ghost", type2: "Poison")
+    tackle = mock_move(name: "Tackle", power: 35, move_type: "Normal", category: "physical")
+
+    Pokemon::BaseStat.stub :find_by!, ->(args) {
+      args[:species] == "Rattata" ? rattata : gengar
+    } do
+      result = Pokemon::DamageCalculator.calculate(
+        attacker: { species: "Rattata", level: 50 },
+        defender: { species: "Gengar", level: 50 },
+        move: tackle
+      )
+
+      assert_equal 0, result[:min]
+      assert_equal 0, result[:max]
+      assert_equal 0, result[:min_total]
+      assert_equal 0, result[:max_total]
+      assert_equal 0, result[:avg_total]
+      assert_equal 0, result[:crit_min]
+      assert_equal 0, result[:crit_max]
+      assert_equal 0, result[:crit_stage]
+      assert_equal "6.25%", result[:crit_chance]
+      refute result[:is_multi_hit]
+      assert_equal 1, result[:min_hits]
+      assert_equal 1, result[:max_hits]
+      assert_equal 0.0, result[:effectiveness]
     end
   end
 end

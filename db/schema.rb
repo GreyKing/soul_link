@@ -53,6 +53,72 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_12_180452) do
     t.index ["soul_link_run_id"], name: "index_gym_schedules_on_soul_link_run_id"
   end
 
+  create_table "pokemon_base_stats", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.json "abilities"
+    t.integer "atk", null: false
+    t.integer "base_experience"
+    t.integer "base_happiness"
+    t.integer "capture_rate"
+    t.datetime "created_at", null: false
+    t.integer "def_stat", null: false
+    t.json "egg_groups"
+    t.text "flavor_text"
+    t.integer "gender_rate"
+    t.string "genus"
+    t.string "growth_rate"
+    t.integer "hatch_counter"
+    t.integer "height"
+    t.integer "hp", null: false
+    t.boolean "is_legendary", default: false, null: false
+    t.boolean "is_mythical", default: false, null: false
+    t.integer "national_dex_number", null: false
+    t.integer "spa", null: false
+    t.integer "spd", null: false
+    t.integer "spe", null: false
+    t.string "species", null: false
+    t.string "type1", null: false
+    t.string "type2"
+    t.datetime "updated_at", null: false
+    t.integer "weight"
+    t.index ["national_dex_number"], name: "index_pokemon_base_stats_on_national_dex_number", unique: true
+    t.index ["species"], name: "index_pokemon_base_stats_on_species", unique: true
+  end
+
+  create_table "pokemon_learnsets", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "learn_method", null: false
+    t.integer "level_learned"
+    t.bigint "pokemon_base_stat_id", null: false
+    t.bigint "pokemon_move_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["pokemon_base_stat_id", "pokemon_move_id", "learn_method"], name: "idx_learnset_unique", unique: true
+    t.index ["pokemon_base_stat_id"], name: "index_pokemon_learnsets_on_pokemon_base_stat_id"
+    t.index ["pokemon_move_id"], name: "index_pokemon_learnsets_on_pokemon_move_id"
+  end
+
+  create_table "pokemon_moves", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.integer "accuracy"
+    t.string "ailment"
+    t.integer "ailment_chance", default: 0, null: false
+    t.string "category", null: false
+    t.datetime "created_at", null: false
+    t.integer "crit_rate", default: 0, null: false
+    t.integer "drain", default: 0, null: false
+    t.text "effect"
+    t.text "flavor_text"
+    t.integer "flinch_chance", default: 0, null: false
+    t.integer "healing", default: 0, null: false
+    t.integer "max_hits"
+    t.integer "min_hits"
+    t.string "move_type", null: false
+    t.string "name", null: false
+    t.integer "power"
+    t.integer "pp"
+    t.integer "priority", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_pokemon_moves_on_name", unique: true
+  end
+
   create_table "soul_link_pokemon", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.string "ability"
     t.datetime "caught_at"
@@ -137,6 +203,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_12_180452) do
   add_foreign_key "gym_results", "soul_link_runs"
   add_foreign_key "gym_schedules", "gym_drafts"
   add_foreign_key "gym_schedules", "soul_link_runs"
+  add_foreign_key "pokemon_learnsets", "pokemon_base_stats"
+  add_foreign_key "pokemon_learnsets", "pokemon_moves"
   add_foreign_key "soul_link_pokemon", "soul_link_pokemon_groups"
   add_foreign_key "soul_link_pokemon", "soul_link_runs"
   add_foreign_key "soul_link_pokemon_groups", "soul_link_runs"

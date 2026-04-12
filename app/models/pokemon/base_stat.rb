@@ -8,6 +8,9 @@ class Pokemon::BaseStat < ApplicationRecord
   validates :national_dex_number, presence: true, uniqueness: true
   validates :hp, :atk, :def_stat, :spa, :spd, :spe, presence: true
   validates :type1, presence: true
+  validates :national_dex_number, inclusion: { in: 1..493 }
+
+  scope :by_type, ->(t) { where(type1: t).or(where(type2: t)) }
 
   def base_stat_total
     hp + atk + def_stat + spa + spd + spe

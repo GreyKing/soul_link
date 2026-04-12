@@ -293,7 +293,12 @@ namespace :pokemon do
         record = Pokemon::BaseStat.find_or_initialize_by(species: species)
         is_new = record.new_record?
         record.assign_attributes(attrs.slice(
-          "national_dex_number", "hp", "atk", "def_stat", "spa", "spd", "spe", "type1", "type2"
+          "national_dex_number", "hp", "atk", "def_stat", "spa", "spd", "spe",
+          "type1", "type2",
+          "base_experience", "height", "weight", "abilities",
+          "base_happiness", "capture_rate", "gender_rate", "growth_rate",
+          "egg_groups", "genus", "flavor_text",
+          "is_legendary", "is_mythical", "hatch_counter"
         ))
         record.save!
         is_new ? stats_created += 1 : stats_existing += 1
@@ -309,9 +314,17 @@ namespace :pokemon do
       moves_data.each do |name, attrs|
         record = Pokemon::Move.find_or_initialize_by(name: name)
         is_new = record.new_record?
-        record.assign_attributes(attrs.slice(
-          "power", "move_type", "category", "accuracy", "pp", "priority"
-        ))
+        move_attrs = attrs.slice(
+          "power", "move_type", "category", "accuracy", "pp", "priority",
+          "effect", "flavor_text"
+        )
+        if attrs["meta"].is_a?(Hash)
+          move_attrs.merge!(attrs["meta"].slice(
+            "crit_rate", "drain", "healing", "flinch_chance",
+            "min_hits", "max_hits", "ailment", "ailment_chance"
+          ))
+        end
+        record.assign_attributes(move_attrs)
         record.save!
         is_new ? moves_created += 1 : moves_existing += 1
       end

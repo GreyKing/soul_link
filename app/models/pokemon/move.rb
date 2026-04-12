@@ -10,4 +10,6 @@ class Pokemon::Move < ApplicationRecord
 
   scope :damaging, -> { where(category: %w[physical special]) }
   scope :by_type, ->(type) { where(move_type: type) }
+  scope :with_priority, -> { where("priority > 0") }
+  scope :multi_hit, -> { where.not(min_hits: nil) }
 end
