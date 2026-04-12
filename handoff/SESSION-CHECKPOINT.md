@@ -5,66 +5,80 @@
 
 ## Where We Stopped
 
-Steps 1-3 merged to main branch. Migrations ran successfully. PokeAPI fetch completed (493 pokemon, 466 moves, 0 failures). YAML cache files written to `config/pokemon_data/`. Seed task (`rake pokemon:seed`) has NOT been run yet — needs to be run to populate the database tables.
+Steps 1-8 all committed and pushed to main. 100 tests passing (256 assertions). DB seeded with full extended data (493 base stats with abilities/flavor_text/etc., 466 moves with crit_rate/min_hits/etc., 29641 learnsets). Both calculator UIs functional.
 
 ---
 
 ## What Was Built
 
 ### Step 1 — Full Evolution Chain Display (COMPLETE)
-- `app/javascript/controllers/pixeldex_controller.js` — `#buildEvolutionChain()` walks backward/forward through evolutions data, `#populateEvolution()` renders full chain with selected species bolded.
+- `app/javascript/controllers/pixeldex_controller.js` — evolution chain rendering
 
-### Step 2 — Database Tables + Seed Data (COMPLETE, seed pending)
-- 3 migrations: `pokemon_base_stats`, `pokemon_moves`, `pokemon_learnsets` (all migrated)
-- 3 models: `Pokemon::BaseStat`, `Pokemon::Move`, `Pokemon::Learnset` (in `app/models/pokemon/`)
-- Rake tasks in `lib/tasks/pokemon_data.rake`:
-  - `rake pokemon:fetch` — DONE, YAML files in `config/pokemon_data/`
-  - `rake pokemon:seed` — NOT YET RUN, reads YAML → populates DB
+### Step 2 — Database Tables + Seed Data (COMPLETE)
+- 3 migrations, 3 models (`Pokemon::BaseStat`, `Pokemon::Move`, `Pokemon::Learnset`)
+- Rake tasks: `pokemon:fetch` + `pokemon:seed` (both run)
 
 ### Step 3 — Damage Calculator Service (COMPLETE)
-- `app/services/pokemon/damage_calculator.rb` — Gen IV damage formula with STAB, type effectiveness, nature modifiers, Explosion/Self-Destruct defense halving, best/worst nature comparison
-- `test/services/pokemon/damage_calculator_test.rb` — 16 tests (not yet run)
+- `app/services/pokemon/damage_calculator.rb` — Gen IV damage formula
 
----
+### Step 4 — Data Layer Hardening + Schema Extensions (COMPLETE)
+- XSS fix: 3 innerHTML sites → createElement in pixeldex_controller.js
+- 2 migrations: 14 new BaseStat columns, 10 new Move columns
+- Seed task updated to persist all YAML fields
+- Validation: national_dex_number 1..493
+- 5 query scopes: BaseStat.by_type, Move.with_priority, Move.multi_hit, Learnset.by_method, Learnset.by_level_range
 
-## Roadmap (remaining)
+### Step 5 — Calculator Extensions (COMPLETE)
+- Multi-hit: per-hit min/max, min_total, max_total, avg_total, is_multi_hit
+- Crit: Gen IV 2x multiplier, crit_min/crit_max, crit_stage/crit_chance
+- 24 tests, 83 assertions
 
-4. **Step 4** — Quick Calculator modal on party page (defender pre-filled from clicked pokemon, pick attacker + move)
-5. **Step 5** — Full Calculator tab in dashboard (attacker/defender sides, selectable/draggable pokemon)
+### Step 6 — Branched Evolution Display (COMPLETE)
+- evolutions.yml restructured to array format with all 11 branching pokemon
+- JS rewritten: recursive tree builder + renderer, active path highlighted
+
+### Step 7 — Quick Calculator Modal (COMPLETE)
+- API: `GET /api/pokemon/:species`, `POST /api/calculator` with `Api::BaseController` auth
+- Modal on party page: defender pre-filled, attacker/move selectable, Escape to close
+- Stimulus: `quick_calc_controller.js`
+
+### Step 8 — Full Calculator Tab (COMPLETE)
+- CALC tab in dashboard (7th tab)
+- Two-column attacker/defender with quick-pick team buttons
+- Swap button, move dropdown, results display, clickable history (last 5)
+- Stimulus: `full_calc_controller.js`
 
 ---
 
 ## What Was Decided This Session
 
-- Evolution chain walks backward + forward through evolutionsDataValue, all client-side
 - Calculator is database-backed: `pokemon_base_stats`, `pokemon_moves`, `pokemon_learnsets` tables
-- Models namespaced under `Pokemon::` (not `soul_link_` prefixed)
-- Two calculator UIs planned: Quick Calculator modal (party page) and Full Calculator tab (dashboard)
-- Per-pokemon learnsets, not a global move list
+- Models namespaced under `Pokemon::`
 - YAML cache files checked into git — PokeAPI is a one-time fetch
-- No rate limiting on PokeAPI calls
-- 7 species name edge cases mapped (Nidoran♀/♂, Farfetch'd, Mr. Mime, Mime Jr., Porygon-Z, Ho-Oh)
 - Gen IV damage formula with integer flooring at each step
-- Explosion/Self-Destruct halve target's defense in Gen IV
+- Gen IV crit = 2x multiplier (not 1.5x)
+- Explosion/Self-Destruct halve target's defense
 - No abilities/items/weather in calculator (base damage only, expandable later)
+- Multi-hit shows per-hit, total, and average damage
+- Branched evolutions: full tree with active path highlighted, inactive branches muted
+- evolves_to is array format (breaking change from old string format)
+- Two calculator UIs: Quick modal (party page, defender pre-filled) + Full tab (dashboard, both sides selectable)
+- API endpoints shared between both calculator UIs
+- Api::BaseController extracts shared auth for JSON endpoints
+- Server-side sprite URLs via asset_path (not client-constructed paths)
+- Calculator history is in-memory only (JS array, not persisted)
+- 5-entry cap on evolution chain depth is fine for Gen IV
 
 ---
 
-## Still Open
+## Known Gaps / Future Work
 
-- Run `rake pokemon:seed` to populate DB from YAML files
-- Run tests for damage calculator
-- Steps 4 and 5 (calculator UIs)
-- Commit YAML files and schema.rb changes to git
-
----
-
-## Next Actions
-
-1. Run `rake pokemon:seed` to populate the three tables
-2. Run `bin/rails test test/services/pokemon/damage_calculator_test.rb`
-3. Commit all pending changes (YAML files, schema.rb)
-4. Write Step 4 brief (Quick Calculator modal)
+- No test coverage for API endpoints (functional tests for /api/pokemon, /api/calculator)
+- No crit stage 2/3 test coverage
+- No crit totals for multi-hit moves (per-hit crit only)
+- Stat summary line in full calc shows raw integers without nature label (nit)
+- No abilities/items/weather modifiers in calculator
+- No HP calculation or percentage damage display
 
 ---
 

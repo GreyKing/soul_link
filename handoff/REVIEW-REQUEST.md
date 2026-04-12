@@ -5,59 +5,79 @@ Ready for Review: YES
 
 ---
 
-## Step 5 — Damage Calculator Extensions (Multi-Hit + Crit)
+## Step 8 — Full Calculator Tab in Dashboard
 
-### Files Changed
+### Files Created
 
-#### 1. `app/services/pokemon/damage_calculator.rb`
+#### 1. `app/views/dashboard/_calc_content.html.erb`
+- New partial for the CALC tab content
+- Wrapped in `full-calc` Stimulus controller div with values: `csrf`, `pokemonUrl`, `calcUrl`, `teamPokemon`
+- Two-column grid layout: Attacker (left) / Swap button (center) / Defender (right)
+- Each side has: quick-pick button container (rendered by JS), species input with `full-calc-species` datalist, level input (default 50), nature select (25 natures from `PixeldexHelper::NATURES` with stat labels), sprite + types + stats display area
+- Move section: full-width card with select dropdown and move info display
+- Results section: hidden by default, populated by JS after calculation
+- History section: hidden by default, shows last 5 calculations
+- Shared `<datalist id="full-calc-species">` rendered server-side from `@pokedex_species`
 
-- Added `CRIT_CHANCES` constant mapping Gen IV crit stages to human-readable percentages (0 -> "6.25%", 1 -> "12.5%", 2 -> "25%", 3+ -> "33.3%")
-- Extended `calculate` method with multi-hit support: `min_hits`, `max_hits`, `is_multi_hit`, `min_total`, `max_total`, `avg_total`
-- Extended `calculate` method with crit support: `crit_min`, `crit_max`, `crit_stage`, `crit_chance` (Gen IV 2x multiplier applied to base_damage before STAB/effectiveness/roll)
-- Updated `zero_result` helper to accept keyword args (`stab:`, `effectiveness:`, `attacker_stat:`, `defender_stat:`) and include all new fields with zero/default values
-- Updated immunity early-return to use `zero_result` with proper keyword args instead of raw hash
-- All field access on move records uses `respond_to?` guards for OpenStruct mock compatibility
+#### 2. `app/javascript/controllers/full_calc_controller.js`
+- Self-contained Stimulus controller (no shared code with `quick_calc_controller.js`)
+- Values: `csrf` (String), `pokemonUrl` (String), `calcUrl` (String), `teamPokemon` (Array)
+- 14 targets covering both sides, move section, results, and history
+- `connect()`: renders quick-pick buttons for both attacker and defender from `teamPokemonValue`
+- `attackerChanged()`: fetches attacker data, populates sprite/types/stats + move dropdown
+- `defenderChanged()`: fetches defender data, populates sprite/types/stats, auto-calculates if move selected
+- `moveChanged()`: displays move info line, triggers calculation
+- `calculate()`: POST to `/api/calculator`, displays results with per-hit/total/crit/effectiveness/STAB
+- `swap()`: exchanges all field values between sides, swaps cached data, clears and re-populates moves from new attacker
+- `_addToHistory()`: prepends to in-memory history (max 5), renders compact clickable rows
+- `_loadFromHistory()`: re-fetches both sides, sets move, re-calculates
+- All text rendered via `textContent` -- zero `innerHTML` with variables
+- Effectiveness color-coded: 4x red, 2x orange, 0.5x/0.25x blue, 0x gray
+- Quick-pick buttons styled as small pills with hover highlight
 
-#### 2. `test/services/pokemon/damage_calculator_test.rb`
+### Files Modified
 
-- Updated `mock_move` helper with new kwargs: `min_hits: nil`, `max_hits: nil`, `crit_rate: 0`
-- Added 6 new tests:
-  1. Multi-hit (Bonemerang, 2/2 hits): Marowak vs Pikachu -- verifies totals = per-hit * hits, is_multi_hit true
-  2. Variable multi-hit (Pin Missile, 2/5 hits): Pinsir vs Caterpie -- verifies min_total = min*2, max_total = max*5, avg uses 3.5
-  3. Non-multi-hit backward compat (Earthquake): verifies totals == single-hit, is_multi_hit false
-  4. Crit damage (stage 0): verifies crit_min > 0, crit_max > max, stage/chance correct
-  5. High-crit move (stage 1): verifies crit_stage == 1, crit_chance == "12.5%"
-  6. Immunity with new fields: Normal vs Ghost -- all new fields present with zeros/defaults
+#### 3. `app/views/dashboard/_tab_bar.html.erb`
+- Added CALC tab button after RUNS, wired to `pixeldex#switchTab` with `data-tab="calc"`
+
+#### 4. `app/views/dashboard/show.html.erb`
+- Added `calc` tab content div after `runs` div, rendering `_calc_content` partial
+- Uses `data-pixeldex-target="tabContent"` and `data-tab="calc"` for tab switching
+
+#### 5. `app/controllers/dashboard_controller.rb`
+- Added `@calc_team_pokemon` instance variable: flat-maps team groups to extract current player's pokemon with species, level, and nature
+- Filters by `current_user_id` to only show the logged-in player's team pokemon as quick-pick options
 
 ### Test Results
 
 ```
-24 runs, 83 assertions, 0 failures, 0 errors, 0 skips
+100 runs, 256 assertions, 0 failures, 0 errors, 0 skips
 ```
 
-All 18 existing tests pass unchanged. All 6 new tests pass.
+All existing tests pass unchanged.
 
 ### Definition of Done
 
-- [x] `min_total`, `max_total`, `avg_total` in result hash
-- [x] `min_hits`, `max_hits`, `is_multi_hit` in result hash
-- [x] `crit_min`, `crit_max`, `crit_stage`, `crit_chance` in result hash
-- [x] `zero_result` helper used for all early returns
-- [x] Multi-hit test (Bonemerang, 2 hits): totals = per-hit * hits
-- [x] Variable multi-hit test (2-5 hits): min_total = min*2, max_total = max*5
-- [x] Non-multi-hit backward compat: totals == single-hit
-- [x] Crit test: crit values > normal values, stage/chance correct
-- [x] High-crit move test: stage 1, chance "12.5%"
-- [x] Immunity test: all new fields present with zeros
-- [x] All 18 existing tests still pass
-- [x] No UI code
+- [x] CALC tab button in tab bar, switches correctly
+- [x] Two-column layout: attacker (left) + defender (right)
+- [x] Quick-pick buttons populate from team pokemon
+- [x] Species input with datalist autocomplete
+- [x] Level + nature inputs on both sides
+- [x] Sprite, types, stats display for both sides (using API sprite_url)
+- [x] Move dropdown populated from attacker's damaging moves
+- [x] Results display: per-hit, total (multi-hit), crit, effectiveness, STAB
+- [x] Swap button exchanges attacker <-> defender
+- [x] History shows last 5 calculations
+- [x] All text rendered via textContent (no innerHTML with variables)
+- [x] Existing 100 tests still pass
 
 ### Notes for Reviewer
 
-- Gen IV crit is 2x (not 1.5x). The 2x is applied to base_damage before STAB/effectiveness/roll via the existing `apply_modifiers` method.
-- `calculate_with_natures` was NOT modified -- it calls `calculate` internally so new keys propagate automatically.
-- No migrations were run or needed -- `min_hits`, `max_hits`, `crit_rate` columns already exist from Step 4.
-
-### Open Questions
-
-None.
+- No new API endpoints created -- reuses `GET /api/pokemon/:species` and `POST /api/calculator` from Step 7.
+- No new backend tests needed -- API endpoints already covered by existing test suite.
+- Stimulus auto-discovery handles controller registration -- no importmap pin needed.
+- Datalist ID is `full-calc-species` (distinct from quick calc's `calc-species-list`).
+- History is in-memory only (JS array), lost on page reload. This is intentional per the brief.
+- `@team_groups` was already loaded in `DashboardController` -- the new code just filters for the current player's pokemon.
+- Swap clears the move dropdown and re-populates with the new attacker's moves from cached data, avoiding an extra API call.
+- The controller caches fetched pokemon data (`_attackerData` / `_defenderData`) so swap and history reload can re-render sides without redundant fetches where possible.
