@@ -116,6 +116,7 @@ class GymDraft < ApplicationRecord
 
   def submit_nomination!(nominator_uid, group_id)
     raise "Not in nominating phase" unless nominating?
+    raise "Not your turn to nominate" unless pick_order[current_player_index % pick_order.size] == nominator_uid.to_i
     raise "Already have a pending nomination" if current_nomination.present?
     raise "That pokemon has already been picked" if picks.any? { |p| p["group_id"] == group_id.to_i }
 
@@ -125,6 +126,30 @@ class GymDraft < ApplicationRecord
       "votes" => { nominator_uid.to_s => true }
     }
     update_data!("current_nomination" => nomination)
+  end
+
+  def skip_turn!
+    raise "Can only skip during drafting or nominating" unless drafting? || nominating?
+
+    if drafting?
+      next_index = current_player_index + 1
+      if next_index >= pick_order.size
+        # All players had a turn this round (some skipped) — move to nominating
+        update!(
+          current_player_index: 0,
+          status: "nominating"
+        )
+      else
+        update!(current_player_index: next_index)
+      end
+    else
+      # Nominating phase
+      next_index = (current_player_index + 1) % pick_order.size
+      update!(
+        current_player_index: next_index,
+        state_data: data.merge("current_nomination" => nil).as_json
+      )
+    end
   end
 
   def vote_on_nomination!(voter_uid, approve)
@@ -213,17 +238,20 @@ class GymDraft < ApplicationRecord
         "group_id" => nom["group_id"],
         "picked_by" => nom["nominator_id"]
       }]
+      next_nominator_index = (current_player_index + 1) % pick_order.size
 
       if new_picks.size >= TOTAL_SLOTS
         # Draft complete
         update!(
           status: "complete",
           current_round: new_picks.size,
+          current_player_index: next_nominator_index,
           state_data: data.merge("picks" => new_picks, "current_nomination" => nil).as_json
         )
       else
         update!(
           current_round: new_picks.size,
+          current_player_index: next_nominator_index,
           state_data: data.merge("picks" => new_picks, "current_nomination" => nil).as_json
         )
       end

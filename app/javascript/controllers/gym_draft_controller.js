@@ -8,7 +8,8 @@ export default class extends Controller {
     "votingPanel", "voteGrid", "voteStatus",
     "draftingPanel", "teamSlots", "turnIndicator", "myPokemonGrid",
     "nominatingPanel", "nomTeamSlots", "nomStatus", "nomVoteArea", "nomVotePrompt", "nomPokemonGrid",
-    "completePanel", "finalTeamSlots"
+    "completePanel", "finalTeamSlots",
+    "skipButton"
   ]
   static values = {
     draftId: Number,
@@ -25,9 +26,11 @@ export default class extends Controller {
       }
     )
     this.state = null
+    this.skipTurnTimer = null
   }
 
   disconnect() {
+    this.clearSkipTimer()
     if (this.subscription) {
       this.subscription.unsubscribe()
     }
@@ -67,21 +70,30 @@ export default class extends Controller {
   pickPokemon(event) {
     const groupId = parseInt(event.currentTarget.dataset.groupId)
     this.subscription.perform("pick", { group_id: groupId })
+    this.disablePokemonCards(this.myPokemonGridTarget)
   }
 
   nominatePokemon(event) {
     const groupId = parseInt(event.currentTarget.dataset.groupId)
     this.subscription.perform("nominate", { group_id: groupId })
+    this.disablePokemonCards(this.nomPokemonGridTarget)
   }
 
   approveNomination() {
     this.subscription.perform("vote_nomination", { approve: true })
-    this.nomVoteAreaTarget.classList.add("opacity-50")
+    this.nomVoteAreaTarget.querySelectorAll("button").forEach(btn => { btn.disabled = true })
   }
 
   rejectNomination() {
     this.subscription.perform("vote_nomination", { approve: false })
-    this.nomVoteAreaTarget.classList.add("opacity-50")
+    this.nomVoteAreaTarget.querySelectorAll("button").forEach(btn => { btn.disabled = true })
+  }
+
+  disablePokemonCards(grid) {
+    grid.querySelectorAll("[data-group-id]").forEach(card => {
+      card.style.pointerEvents = "none"
+      card.classList.add("opacity-50")
+    })
   }
 
   // ── Rendering ──
@@ -91,6 +103,11 @@ export default class extends Controller {
 
     const { status } = this.state
     this.phaseLabelTarget.textContent = this.phaseDisplayName(status)
+
+    // Clear skip timer — drafting/nominating renderers will restart it
+    if (status !== "drafting" && status !== "nominating") {
+      this.clearSkipTimer()
+    }
 
     // Show/hide panels
     this.lobbyPanelTarget.classList.toggle("hidden", status !== "lobby")
@@ -169,6 +186,8 @@ export default class extends Controller {
 
     // Render my pokemon as pickable cards
     this.renderPokemonGrid(this.myPokemonGridTarget, isMyTurn, "pick")
+
+    this.startSkipTimer("drafting")
   }
 
   renderNominating() {
@@ -198,13 +217,26 @@ export default class extends Controller {
         this.nomVoteAreaTarget.classList.add("hidden")
       }
     } else {
-      this.nomStatusTarget.textContent = "Nominate a pokemon for the team!"
+      const currentNominatorId = this.state.pick_order
+        ? this.state.pick_order[this.state.current_player_index % this.state.pick_order.length]
+        : null
+      const isMyTurnToNominate = String(currentNominatorId) === this.userIdValue
+      const currentNominator = this.findPlayer(currentNominatorId)
+      this.nomStatusTarget.textContent = isMyTurnToNominate
+        ? "Your turn to nominate a pokemon!"
+        : `Waiting for ${currentNominator?.display_name || "..."} to nominate...`
       this.nomVoteAreaTarget.classList.add("hidden")
     }
 
     // Render pokemon grid for nomination
-    const canNominate = !nomination
+    const currentNominatorId = this.state.pick_order
+      ? this.state.pick_order[this.state.current_player_index % this.state.pick_order.length]
+      : null
+    const isMyTurnToNominate = String(currentNominatorId) === this.userIdValue
+    const canNominate = !nomination && isMyTurnToNominate
     this.renderPokemonGrid(this.nomPokemonGridTarget, canNominate, "nominate")
+
+    this.startSkipTimer("nominating")
   }
 
   renderComplete() {
@@ -218,19 +250,28 @@ export default class extends Controller {
     const slots = container.querySelectorAll("[data-slot-index]")
     slots.forEach((slot, idx) => {
       const pick = picks[idx]
+      slot.replaceChildren()
       if (pick) {
         const group = this.findGroupById(pick.group_id)
         const picker = this.findPlayer(pick.picked_by)
         if (group) {
-          slot.innerHTML = `
-            <div class="text-xs font-medium text-white">${group.nickname}</div>
-            <div class="text-[10px] text-gray-500">${picker?.display_name || ""}</div>
-          `
+          const nameDiv = document.createElement("div")
+          nameDiv.className = "text-xs font-medium text-white"
+          nameDiv.textContent = group.nickname
+
+          const pickerDiv = document.createElement("div")
+          pickerDiv.className = "text-[10px] text-gray-500"
+          pickerDiv.textContent = picker?.display_name || ""
+
+          slot.append(nameDiv, pickerDiv)
           slot.classList.remove("border-dashed", "border-gray-600")
           slot.classList.add("border-solid", "border-indigo-600", "bg-indigo-950/30")
         }
       } else {
-        slot.innerHTML = `<span class="text-xs text-gray-600">#${idx + 1}</span>`
+        const numSpan = document.createElement("span")
+        numSpan.className = "text-xs text-gray-600"
+        numSpan.textContent = `#${idx + 1}`
+        slot.appendChild(numSpan)
         slot.classList.add("border-dashed", "border-gray-600")
         slot.classList.remove("border-solid", "border-indigo-600", "bg-indigo-950/30")
       }
@@ -241,37 +282,91 @@ export default class extends Controller {
     const myUid = this.userIdValue
     const allGroups = this.playerGroupsValue[myUid] || []
     const pickedGroupIds = (this.state.picks || []).map(p => p.group_id)
+    const action = actionType === "pick" ? "click->gym-draft#pickPokemon" : "click->gym-draft#nominatePokemon"
 
-    container.innerHTML = allGroups.map(group => {
+    container.replaceChildren()
+
+    allGroups.forEach(group => {
       const isPicked = pickedGroupIds.includes(group.id)
       const myPokemon = group.pokemon.find(p => String(p.discord_user_id) === myUid)
       const species = myPokemon ? myPokemon.species : "?"
-      const action = actionType === "pick" ? "click->gym-draft#pickPokemon" : "click->gym-draft#nominatePokemon"
+
+      const card = document.createElement("div")
+      card.className = isPicked
+        ? "bg-gray-900/30 rounded-lg border border-gray-700/30 p-3 text-center opacity-30"
+        : `bg-gray-900/50 rounded-lg border border-gray-700 p-3 text-center transition ${interactive ? "cursor-pointer hover:border-indigo-500 hover:bg-indigo-950/30" : "opacity-50"}`
 
       if (isPicked) {
-        return `
-          <div class="bg-gray-900/30 rounded-lg border border-gray-700/30 p-3 text-center opacity-30">
-            <div class="text-sm text-gray-500">${group.nickname}</div>
-            <div class="text-xs text-gray-600">${species}</div>
-            <div class="text-[10px] text-gray-600">Picked</div>
-          </div>
-        `
+        const nameDiv = document.createElement("div")
+        nameDiv.className = "text-sm text-gray-500"
+        nameDiv.textContent = group.nickname
+
+        const speciesDiv = document.createElement("div")
+        speciesDiv.className = "text-xs text-gray-600"
+        speciesDiv.textContent = species
+
+        const pickedDiv = document.createElement("div")
+        pickedDiv.className = "text-[10px] text-gray-600"
+        pickedDiv.textContent = "Picked"
+
+        card.append(nameDiv, speciesDiv, pickedDiv)
+      } else {
+        card.dataset.groupId = group.id
+        if (interactive) {
+          card.dataset.action = action
+        }
+
+        const nameDiv = document.createElement("div")
+        nameDiv.className = "text-sm font-medium text-white"
+        nameDiv.textContent = group.nickname
+
+        const speciesDiv = document.createElement("div")
+        speciesDiv.className = "text-xs text-indigo-300"
+        speciesDiv.textContent = species
+
+        const locationDiv = document.createElement("div")
+        locationDiv.className = "text-[10px] text-gray-500"
+        locationDiv.textContent = group.location
+
+        card.append(nameDiv, speciesDiv, locationDiv)
       }
 
-      const interactiveClass = interactive
-        ? "cursor-pointer hover:border-indigo-500 hover:bg-indigo-950/30"
-        : "opacity-50"
+      container.appendChild(card)
+    })
+  }
 
-      return `
-        <div class="bg-gray-900/50 rounded-lg border border-gray-700 p-3 text-center transition ${interactiveClass}"
-             data-group-id="${group.id}"
-             ${interactive ? `data-action="${action}"` : ""}>
-          <div class="text-sm font-medium text-white">${group.nickname}</div>
-          <div class="text-xs text-indigo-300">${species}</div>
-          <div class="text-[10px] text-gray-500">${group.location}</div>
-        </div>
-      `
-    }).join("")
+  clearSkipTimer() {
+    if (this.skipTurnTimer) {
+      clearTimeout(this.skipTurnTimer)
+      this.skipTurnTimer = null
+    }
+    this.skipButtonTargets.forEach(el => {
+      el.classList.add("hidden")
+      el.replaceChildren()
+    })
+  }
+
+  startSkipTimer(phase) {
+    this.clearSkipTimer()
+    const targetEl = phase === "drafting"
+      ? this.skipButtonTargets.find(el => this.draftingPanelTarget.contains(el))
+      : this.skipButtonTargets.find(el => this.nominatingPanelTarget.contains(el))
+
+    if (!targetEl) return
+
+    this.skipTurnTimer = setTimeout(() => {
+      const btn = document.createElement("button")
+      btn.type = "button"
+      btn.className = "gb-btn-danger gb-btn-sm"
+      btn.textContent = "SKIP TURN"
+      btn.addEventListener("click", () => {
+        this.subscription.perform("skip")
+        btn.disabled = true
+        btn.textContent = "Skipping..."
+      })
+      targetEl.replaceChildren(btn)
+      targetEl.classList.remove("hidden")
+    }, 30000)
   }
 
   findPlayer(id) {

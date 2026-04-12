@@ -41,6 +41,14 @@ class GymDraftChannel < ApplicationCable::Channel
     transmit({ error: e.message })
   end
 
+  def skip(_data)
+    @draft.reload
+    @draft.skip_turn!
+    broadcast_state
+  rescue => e
+    transmit({ error: e.message })
+  end
+
   def vote_nomination(data)
     @draft.reload
     @draft.vote_on_nomination!(current_user_id, data["approve"])
