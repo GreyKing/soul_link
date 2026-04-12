@@ -1,25 +1,25 @@
-# Review Feedback -- Step 2
+# Review Feedback -- Step 5
 Date: 2026-04-12
 Ready for Builder: NO
 
 ## Must Fix
 
-- `app/models/gym_draft.rb:131` -- `skip_turn!(uid)` accepts `uid` but never validates it against the current turn holder. Any connected player can skip anyone else's turn by calling `subscription.perform("skip")`. Add a guard: in drafting, raise unless `pick_order[current_player_index] == uid.to_i`; in nominating, raise unless `pick_order[current_player_index % pick_order.size] == uid.to_i`. This matches the pattern already used in `make_pick!` (line 94) and `submit_nomination!` (line 119).
+- **app/models/gym_draft.rb** -- GymDraft has no `has_many :gym_results` with `dependent: :nullify`. The migration creates a FK from `gym_results.gym_draft_id` to `gym_drafts.id`. If a GymDraft record is ever destroyed, the FK constraint will raise a database error because the referencing GymResult rows still point to it. Add `has_many :gym_results, dependent: :nullify` to GymDraft so that destroying a draft sets the FK to NULL on associated results rather than blowing up.
 
-- `app/javascript/controllers/gym_draft_controller.js:225` -- `canNominate` is set to `!nomination` with no check on whose turn it is. Every player sees interactive clickable cards during the nominating phase when no nomination is pending. The server guard catches it, but the UI should only enable cards for the current nominator. Compare `pick_order[current_player_index % pick_order.length]` against `userIdValue` and AND that with `!nomination`.
-
-- `app/javascript/controllers/gym_draft_controller.js:220` -- When no nomination is pending, `nomStatusTarget` says "Nominate a pokemon for the team!" with no indication of whose turn it is. This is the nominating equivalent of the `turnIndicator` in drafting. Show the current nominator name: "Your turn to nominate!" or "Waiting for [name] to nominate...".
+- **app/controllers/gym_progress_controller.rb:19** -- Unmark logic uses `run.gym_results.maximum(:gym_number)` to derive the new `gyms_defeated` counter. This creates an inconsistent state when non-sequential gyms exist. Example: gyms 1, 2, 3 are marked, then gym 2 is unmarked via a crafted request. `gyms_defeated` stays at 3. The dashboard renders gym 2 as defeated (because `2 <= 3`) but no GymResult record exists for it -- no snapshot, no backfill button, no way to fix from the UI. Fix: only allow unmarking the highest-numbered gym. If `gym_number != run.gym_results.maximum(:gym_number)`, reject the request. This matches the UI constraint (dashboard only shows MARK BEATEN on the next gym) and prevents gaps.
 
 ## Should Fix
 
-- `app/javascript/controllers/gym_draft_controller.js:338-358` -- `startSkipTimer` shows the SKIP TURN button to all connected clients after 30 seconds, not just the player whose turn it is. Any player can click it and (once the Must Fix auth guard is added) the server will reject non-current-player skips. The timer should only start if it is the current user's turn, or at minimum gate the timer: in drafting, only if `currentId === this.userIdValue`; in nominating, only if the current nominator matches the user.
+- **app/controllers/gym_drafts_controller.rb:92-98** -- `mark_beaten` calls `create!` without rescuing `ActiveRecord::RecordNotUnique`. The unique index on `[soul_link_run_id, gym_number]` will raise this if two requests race past the `exists?` guard at line 86. Wrap in a `rescue ActiveRecord::RecordNotUnique` that redirects with a notice instead of producing a 500.
 
-- `app/models/gym_draft.rb:150` -- `skip_turn!` in the nominating branch clears `current_nomination` unconditionally. If a nomination is in progress with votes partially collected, skipping wipes it. This may be intentional for the 30s timeout case, but confirm the intended behavior. If a nomination is pending, the skip should probably be blocked or the brief should clarify.
+- **app/controllers/gym_drafts_controller.rb:63** -- `@next_gym_number` is `run.gyms_defeated + 1`, which is 9 when all 8 gyms are beaten. The view guards with `@next_gym_number.between?(1, 8)` so the button hides correctly and `@next_gym_info` ends up nil harmlessly. No bug, but assigning `@next_gym_info` only when `@next_gym_number <= 8` avoids the unnecessary nil lookup and makes intent clearer.
+
+- **app/views/dashboard/_gyms_content.html.erb:55-89** -- The view assumes every defeated gym has a GymResult record. If a defeated gym somehow lacks a result (e.g., the gap scenario from the Must Fix above, or a manually deleted record), nothing renders for that gym's detail row -- no snapshot, no backfill, no error. After the Must Fix for GymProgressController is resolved this edge case becomes unreachable from the UI, but a defensive `else` clause rendering a simple dash or "no data" would be more robust.
 
 ## Escalate to Architect
 
-None.
+- None.
 
 ## Cleared
 
-Channel action (`gym_draft_channel.rb:44-50`) follows existing pattern correctly. Model turn advancement in `resolve_nomination!` (lines 241-256) correctly computes `next_nominator_index` with modular wrap and advances before the complete check. `fillTeamSlots` and `renderPokemonGrid` DOM construction produces equivalent output to the original innerHTML approach. View template skip button target containers are placed correctly in both drafting and nominating panels. Double-click prevention on pick, nominate, and vote actions works correctly. `skip_turn!` drafting-to-nominating transition at `pick_order.size` is consistent with `make_pick!` logic.
+Migration (correct schema, unique composite index, nullable gym_draft FK). GymResult model (snapshot builders properly scope to run, include pokemon, use `to_s` on discord_user_id for JSON safety). GymResultsController (auth via require_login, scoped to current_run, group_ids capped at 6, snapshot scoped to run's own groups). gym_backfill_controller.js (all user data rendered via textContent, no innerHTML, max 6 selection enforced, CSRF token passed). SoulLinkRun `has_many :gym_results, dependent: :destroy` (correct). DashboardController (gym_results indexed by gym_number, caught_groups loaded with includes). Routes (member post for mark_beaten, resources for gym_results update-only). Gym draft complete panel view (ERB auto-escapes, button conditional correct, button_to generates proper form). GameState `gym_info_by_number` (3-line helper using existing GYM_KEYS, bounds-checked).
