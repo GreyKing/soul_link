@@ -5,33 +5,31 @@
 
 ## Where We Stopped
 
-All steps complete. No pending work. ARCHITECT-BRIEF cleared. Six commits on main ready to deploy.
+Step 1 brief written and ready for Builder. Evolution chain display in the pokemon edit modal.
+
+## Roadmap
+
+1. **Step 1** — Full evolution chain in edit modal (JS-only) ← CURRENT
+2. **Step 2** — Database tables + seed data (base stats, moves, learnsets)
+3. **Step 3** — Damage calculator service (Ruby)
+4. **Step 4** — Quick Calculator modal on party page (defender pre-filled, pick attacker + move)
+5. **Step 5** — Full Calculator tab in dashboard (attacker/defender sides, draggable pokemon)
 
 ---
 
 ## What Was Decided This Session
 
-- Discord snowflake IDs must be `String` not `Number` in all Stimulus controller value types
-- `spriteMapValue` contains full digested asset paths — never wrap in additional path segments
-- Gym draft nomination turn order enforced via pick_order + current_player_index
-- Skip-turn callable by any player (friends policing AFK), no server-side timers
-- User-supplied text always rendered via textContent, never innerHTML
-- Race conditions in species assignment + pokemon create fixed with unique DB index + transaction + RecordNotUnique rescue
-- Team slots filtered by current user's pokemon ownership
-- PokemonGroupsController#create: group always survives, per-player errors collected individually
-- GymResult model tracks per-gym victories with frozen team snapshots (full per-player breakdown)
-- Backfill mechanism for retroactively adding team snapshots to already-beaten gyms
-- Unmark restricted to highest-numbered gym to prevent counter desync
-- Known low-priority gaps deprioritized: Pokedex/location model validation, ActionCable channel tests
+- Evolution chain walks backward + forward through evolutionsDataValue, all client-side
+- Calculator will be database-backed (base stats, moves, learnsets tables)
+- Two calculator UIs: Quick Calculator modal (party page, pre-fills defender) and Full Calculator tab (dashboard, both sides configurable)
+- Per-pokemon learnsets, not a global move list
 
 ---
 
 ## Still Open
 
-- Deploy (Project Owner's responsibility)
-- Low-priority: Pokedex species name validation at model level
-- Low-priority: Location validation at model level
-- Low-priority: GymDraftChannel ActionCable tests
+- Steps 2-5 queued
+- Data source for base stats / moves / learnsets seed (PokeAPI or data dump) — decide in Step 2
 
 ---
 
@@ -42,7 +40,7 @@ Copy and paste this to resume:
 ---
 
 You are Ava on Soul Link.
-Read SESSION-CHECKPOINT.md, then ARCHITECT.md.
+Read SESSION-CHECKPOINT.md, then ARCHITECT-BRIEF.md.
 Confirm where we stopped and what the next action is. Then wait.
 
 ---

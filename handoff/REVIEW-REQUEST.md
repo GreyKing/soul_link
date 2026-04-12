@@ -1,54 +1,44 @@
-# Review Request — Step 4: Test Suite (KG-5)
+# Review Request
 *Written by Builder. Read by Reviewer.*
 
 Ready for Review: YES
 
 ---
 
-## Files Changed
+## Step 3 — Damage Calculator Service
 
-### New Fixture Files
+### New file: `app/services/pokemon/damage_calculator.rb`
 
-| File | Lines | Description |
-|------|-------|-------------|
-| `test/fixtures/soul_link_teams.yml` | 1-3 | Grey's team fixture linked to active_run |
-| `test/fixtures/soul_link_team_slots.yml` | 1-9 | Two team slots for Grey (groups route201, route202) |
-| `test/fixtures/gym_results.yml` | 1 | Empty -- tests create results inline |
+**Constants (lines 3-15):** `DEFAULT_IVS`, `DEFAULT_EVS`, `NATURE_STAT_MAP`. IVs default to 31, EVs to 0. Nature stat map translates PixeldexHelper abbreviations to DB column symbols.
 
-### New Test Files
+**`calculate_stat` (lines 19-22):** Public non-HP stat formula. Takes base/iv/ev/level/nature_modifier, returns Integer. Used internally by `compute_stat` and exposed for UI stat displays.
 
-| File | Tests | Description |
-|------|-------|-------------|
-| `test/models/soul_link_pokemon_test.rb` | 7 | Validation, uniqueness, assign_to_group!, mark_as_dead!, status helpers |
-| `test/models/soul_link_pokemon_group_test.rb` | 7 | Validation, species_for, complete?, mark_as_dead! cascade, set_position |
-| `test/models/gym_result_test.rb` | 4 | Validation, gym_number range, uniqueness, snapshot_from_groups structure |
-| `test/controllers/pokemon_groups_controller_test.rb` | 6 | Auth gate, create (valid/invalid/species), update cascade, destroy |
-| `test/controllers/pokemon_controller_test.rb` | 5 | Auth gate, create (valid/duplicate/missing), ownership guard |
-| `test/controllers/species_assignments_controller_test.rb` | 5 | Auth gate, show, assign_from_pokedex (valid/duplicate), unassign |
-| `test/controllers/teams_controller_test.rb` | 5 | Auth gate, show auto-create, update_slots (valid/overflow/filter), index |
+**`calculate` (lines 32-80):** Main damage method. Looks up BaseStat/Move records, computes attack/defense stats with IVs/EVs/nature, applies Explosion halving, computes type effectiveness, short-circuits on immunity, runs damage formula with roll 85 (min) and 100 (max), returns result hash.
 
-### Modified Files (bug fixes discovered during testing)
+**`calculate_with_natures` (lines 84-99):** Runs calculate three times with current/best/worst natures. Best/worst found via `best_nature_for`/`worst_nature_for`.
 
-| File | Lines | Description |
-|------|-------|-------------|
-| `test/fixtures/soul_link_pokemon.yml` | 9-28 | Fixed ERB template: fixture names and group references used `route_201` (with underscore) but group fixtures are named `route201` (without). Pokemon were orphaned from their groups. |
-| `app/controllers/teams_controller.rb` | 29-32 | Added `.reorder(nil)` before `.distinct.pluck(:id)` -- MySQL rejects DISTINCT with ORDER BY when the ordered column is not in the SELECT list. The `caught_groups` scope adds `order(position: :asc)` which caused the query to fail. |
+**`apply_modifiers` (lines 148-163):** Applies STAB, effectiveness, roll in order with floor after each. Clamps to min 1.
 
----
+**Private helpers (lines 101-170):** `resolve_move`, `stat_keys_for`, `compute_stat`, `nature_modifier`, `best_nature_for`, `worst_nature_for`, `stab?`, `explosion_move?`, `apply_modifiers`, `zero_result`.
 
-## Test Results
+### New file: `test/services/pokemon/damage_calculator_test.rb`
 
-76 runs, 173 assertions, 0 failures, 0 errors, 0 skips (27 existing + 49 new).
+16 test methods covering:
+- `calculate_stat` with known values (3 tests: boosted, neutral, lowered nature)
+- Min/max damage range (1 test)
+- STAB applied / not applied (2 tests)
+- Type effectiveness super effective (1 test)
+- Immunity returns zero (1 test)
+- Explosion and Self-Destruct halve defense (2 tests)
+- `calculate_with_natures` returns three keyed results (1 test)
+- Best nature maximizes damage (1 test)
+- Worst nature minimizes damage (1 test)
+- Default IVs/EVs (2 tests)
+- Status moves return zero (1 test)
+- Hand-calculated spot checks: Garchomp EQ vs Infernape and Alakazam Psychic vs Machamp with exact expected min/max (2 tests, already counted above in damage range / special moves)
 
----
+All tests use `OpenStruct` mocks and `stub :find_by!` to avoid DB dependency.
 
-## Key Decisions
+### Open Questions
 
-1. **Route name correction**: Brief specified `team_update_slots_path` but `rails routes` outputs `update_slots_team_path`. Used the actual route name.
-2. **Fixture name correction**: Brief specified `pkmn_route201_araty` but the fixture template generates `pkmn_route201_aratypuss` (full display_name downcased). Used the actual generated name.
-3. **Pokemon fixture fix**: The ERB template interpolated `route_201` into both the fixture key name and group reference, producing `pkmn_route_201_grey` and `group_route_201`. But group fixtures are `group_route201`. Fixed by introducing a `loc_key` mapping that strips the underscore, so references resolve correctly. This was a pre-existing bug: pokemon fixtures had `soul_link_pokemon_group_id` pointing to non-existent groups.
-4. **Controller bug fix**: `TeamsController#update_slots` had a MySQL-incompatible query. The `caught_groups` scope adds `ORDER BY position`, and combining that with `.distinct.pluck(:id)` fails on MySQL 8 strict mode. Added `.reorder(nil)` to clear the ordering before the DISTINCT pluck.
-
-## Open Questions
-
-- The pokemon fixture bug was pre-existing (existing GymDraft tests never exposed it because they access groups directly, not through pokemon). The fix changes fixture-generated IDs, which should have no impact since nothing external references them.
+None.
