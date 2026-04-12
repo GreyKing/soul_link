@@ -12,13 +12,21 @@
   { id: 189518174125817856, name: "Scythe461" },
   { id: 182742127061630976, name: "Zealous" }
 ] %>
-<% %w[route_201 route_202 route_203 route_204 route_205 route_206].each do |loc|
+<% locations = {
+  "route_201" => "route201",
+  "route_202" => "route202",
+  "route_203" => "route203",
+  "route_204" => "route204",
+  "route_205" => "route205",
+  "route_206" => "route206"
+} %>
+<% locations.each do |loc, loc_key|
   players.each_with_index do |player, idx|
     species = species_map[loc][idx]
 %>
-pkmn_<%= loc %>_<%= player[:name].downcase %>:
+pkmn_<%= loc_key %>_<%= player[:name].downcase %>:
   soul_link_run: active_run
-  soul_link_pokemon_group: group_<%= loc %>
+  soul_link_pokemon_group: group_<%= loc_key %>
   discord_user_id: <%= player[:id] %>
   species: "<%= species %>"
   name: "<%= species %>"

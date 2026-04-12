@@ -29,7 +29,7 @@ class TeamsController < ApplicationController
     allowed_ids = run.caught_groups.where(id: group_ids)
       .joins(:soul_link_pokemon)
       .where(soul_link_pokemon: { discord_user_id: current_user_id })
-      .distinct.pluck(:id).to_set
+      .reorder(nil).distinct.pluck(:id).to_set
     ordered_valid_ids = group_ids.select { |id| allowed_ids.include?(id.to_i) }
 
     if ordered_valid_ids.length > SoulLinkTeam::MAX_SLOTS

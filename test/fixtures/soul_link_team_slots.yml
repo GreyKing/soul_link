@@ -1,0 +1,9 @@
+grey_slot_1:
+  soul_link_team: grey_team
+  soul_link_pokemon_group: group_route201
+  position: 1
+
+grey_slot_2:
+  soul_link_team: grey_team
+  soul_link_pokemon_group: group_route202
+  position: 2
