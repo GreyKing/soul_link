@@ -30,12 +30,18 @@
       <% is_next = num == @gyms_defeated + 1 %>
 
       <% if is_next %>
-        <div class="gym-next-highlight" style="padding: 8px 10px;">
-          &#9654; <%= gym["leader"]&.upcase %>
-          <span class="type-text" style="border-color: var(--l1);"><%= PixeldexHelper::TYPE_ABBREVIATIONS[gym["type"]] || gym["type"] %></span>
-          &lt;NEXT
+        <div class="gym-next-highlight" style="padding: 8px 10px; display: flex; align-items: center; flex-wrap: wrap;">
+          <span>
+            &#9654; <%= gym["leader"]&.upcase %>
+            <span class="type-text" style="border-color: var(--l1);"><%= PixeldexHelper::TYPE_ABBREVIATIONS[gym["type"]] || gym["type"] %></span>
+            &lt;NEXT
+          </span>
+          <%= button_to "MARK BEATEN", gym_progress_path(gym_number: num),
+              method: :patch, class: "gb-btn-primary gb-btn-sm",
+              style: "font-size: 9px; padding: 3px 8px; margin-left: auto;",
+              data: { turbo: false } %>
           <% loc_data = @locations[gym["location"]] %>
-          <div style="font-size: 9px; color: var(--l1); margin-top: 4px;">
+          <div style="font-size: 9px; color: var(--l1); margin-top: 4px; width: 100%;">
             <%= loc_data&.[]("name") || gym["location"] %> &mdash; Level Cap: <%= gym["max_level"] %>
           </div>
         </div>
@@ -46,6 +52,41 @@
           <span class="type-text"><%= PixeldexHelper::TYPE_ABBREVIATIONS[gym["type"]] || gym["type"] %></span>
           <span style="margin-left: auto; font-size: 9px; color: var(--d2);">Lv. <%= gym["max_level"] %></span>
         </div>
+        <% result = @gym_results[num] %>
+        <% if result %>
+          <% if result.team_snapshot.present? %>
+            <div class="gb-card-dark" style="margin: 4px 0 8px 20px; padding: 8px; font-size: 9px;">
+              <% result.team_snapshot["groups"]&.each do |group_data| %>
+                <div style="margin-bottom: 6px;">
+                  <div style="font-weight: bold;"><%= group_data["nickname"] %></div>
+                  <% group_data["pokemon"]&.each do |p| %>
+                    <div style="margin-left: 8px; color: var(--d2);">
+                      <%= p["player_name"] %>: <%= p["species"] %>
+                      <% stats = [p["level"] ? "Lv.#{p["level"]}" : nil, p["ability"], p["nature"]].compact %>
+                      <% if stats.any? %><span style="color: var(--d2);"> &mdash; <%= stats.join(" / ") %></span><% end %>
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          <% else %>
+            <div style="margin: 4px 0 8px 20px;">
+              <button type="button" class="gb-btn gb-btn-sm" style="font-size: 9px;"
+                      data-controller="gym-backfill"
+                      data-gym-backfill-result-id-value="<%= result.id %>"
+                      data-gym-backfill-update-url-value="<%= gym_result_path(result) %>"
+                      data-gym-backfill-csrf-value="<%= form_authenticity_token %>"
+                      data-gym-backfill-groups-value="<%= @caught_groups_for_backfill.map { |g|
+                        my = g.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id }
+                        { id: g.id, nickname: g.nickname, species: my&.species || '?' }
+                      }.to_json %>"
+                      data-action="click->gym-backfill#openPicker">
+                + ADD TEAM
+              </button>
+              <div data-gym-backfill-target="picker" class="hidden"></div>
+            </div>
+          <% end %>
+        <% end %>
       <% else %>
         <div class="gym-list-item" style="opacity: 0.35;">
           <span class="gym-check">.</span>

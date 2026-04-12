@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_12_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_12_180452) do
   create_table "gym_drafts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "current_player_index", default: 0, null: false
@@ -22,6 +22,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_12_120000) do
     t.datetime "updated_at", null: false
     t.index ["soul_link_run_id", "status"], name: "index_gym_drafts_on_soul_link_run_id_and_status"
     t.index ["soul_link_run_id"], name: "index_gym_drafts_on_soul_link_run_id"
+  end
+
+  create_table "gym_results", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.datetime "beaten_at", null: false
+    t.datetime "created_at", null: false
+    t.bigint "gym_draft_id"
+    t.integer "gym_number", null: false
+    t.bigint "soul_link_run_id", null: false
+    t.json "team_snapshot"
+    t.datetime "updated_at", null: false
+    t.index ["gym_draft_id"], name: "index_gym_results_on_gym_draft_id"
+    t.index ["soul_link_run_id", "gym_number"], name: "index_gym_results_on_soul_link_run_id_and_gym_number", unique: true
+    t.index ["soul_link_run_id"], name: "index_gym_results_on_soul_link_run_id"
   end
 
   create_table "gym_schedules", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -120,6 +133,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_12_120000) do
   end
 
   add_foreign_key "gym_drafts", "soul_link_runs"
+  add_foreign_key "gym_results", "gym_drafts"
+  add_foreign_key "gym_results", "soul_link_runs"
   add_foreign_key "gym_schedules", "gym_drafts"
   add_foreign_key "gym_schedules", "soul_link_runs"
   add_foreign_key "soul_link_pokemon", "soul_link_pokemon_groups"

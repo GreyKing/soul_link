@@ -45,6 +45,11 @@ module SoulLink
         gym_info[key]
       end
 
+      def gym_info_by_number(n)
+        return nil unless n.between?(1, 8)
+        gym_info[GYM_KEYS[n - 1]]
+      end
+
       def first_gym_info
         gym_info['first_gym'] || {}
       end

@@ -4,6 +4,7 @@ class SoulLinkRun < ApplicationRecord
   has_many :soul_link_teams, dependent: :destroy
   has_many :gym_drafts, dependent: :destroy
   has_many :gym_schedules, dependent: :destroy
+  has_many :gym_results, dependent: :destroy
 
   validates :run_number, presence: true, uniqueness: { scope: :guild_id }
   validates :guild_id, presence: true

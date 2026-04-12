@@ -11,12 +11,25 @@ class GymProgressController < ApplicationController
       return
     end
 
-    # Toggle: if this gym is already beaten, un-beat it (set to one less)
-    # If not yet beaten, beat it (set to this gym number)
-    if run.gyms_defeated >= gym_number
-      run.update!(gyms_defeated: gym_number - 1)
+    existing = run.gym_results.find_by(gym_number: gym_number)
+
+    if existing
+      # Only allow unmark of the highest completed gym
+      highest = run.gym_results.maximum(:gym_number)
+      if gym_number < highest
+        render json: { error: "Can only unmark the most recent gym" }, status: :unprocessable_entity
+        return
+      end
+      existing.destroy!
+      new_max = run.gym_results.maximum(:gym_number) || 0
+      run.update!(gyms_defeated: new_max)
     else
-      run.update!(gyms_defeated: gym_number)
+      # Mark beaten: create result (no snapshot from this path)
+      run.gym_results.create!(
+        gym_number: gym_number,
+        beaten_at: Time.current
+      )
+      run.update!(gyms_defeated: [run.gyms_defeated, gym_number].max)
     end
 
     render json: { gyms_defeated: run.gyms_defeated }

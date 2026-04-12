@@ -151,6 +151,15 @@
         <% end %>
       </div>
 
+      <% if @draft.complete? && !@gym_already_marked && @next_gym_number.between?(1, 8) %>
+        <div style="text-align: center; margin-top: 12px;">
+          <%= button_to "MARK GYM #{@next_gym_number} — #{@next_gym_info&.[]('leader')&.upcase} AS BEATEN",
+              mark_beaten_gym_draft_path(@draft),
+              method: :post,
+              class: "gb-btn-primary" %>
+        </div>
+      <% end %>
+
       <div style="text-align: center;">
         <%= link_to "BACK TO GYM READY", gym_ready_path, class: "gb-btn-primary" %>
       </div>

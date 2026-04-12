@@ -1,5 +1,6 @@
 class GymDraft < ApplicationRecord
   belongs_to :soul_link_run
+  has_many :gym_results, dependent: :nullify
 
   validates :status, inclusion: { in: %w[lobby voting drafting nominating complete] }
 

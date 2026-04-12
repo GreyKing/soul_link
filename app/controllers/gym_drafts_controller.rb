@@ -58,7 +58,48 @@ class GymDraftsController < ApplicationController
       @drafted_pokemon_by_player.each do |uid, pokemon|
         @type_analysis_by_player[uid] = SoulLink::TypeChart.analyze_team(pokemon)
       end
+
+      # Mark beaten button data
+      @next_gym_number = run.gyms_defeated + 1
+      @gym_already_marked = run.gym_results.exists?(gym_number: @next_gym_number)
+      @next_gym_info = SoulLink::GameState.gym_info_by_number(@next_gym_number)
     end
+  end
+
+  def mark_beaten
+    run = current_run
+    redirect_to login_path, alert: "No active run found." and return unless run
+
+    draft = run.gym_drafts.find_by(id: params[:id])
+    unless draft&.complete?
+      redirect_to gym_drafts_path, alert: "Draft is not complete."
+      return
+    end
+
+    gym_number = run.gyms_defeated + 1
+    unless gym_number.between?(1, 8)
+      redirect_to gym_draft_path(draft), alert: "All gyms already defeated!"
+      return
+    end
+
+    # Check if this gym already has a result
+    if run.gym_results.exists?(gym_number: gym_number)
+      redirect_to gym_draft_path(draft), alert: "Gym #{gym_number} already marked as beaten."
+      return
+    end
+
+    snapshot = GymResult.snapshot_from_draft(draft)
+    run.gym_results.create!(
+      gym_number: gym_number,
+      beaten_at: Time.current,
+      gym_draft: draft,
+      team_snapshot: snapshot
+    )
+    run.update!(gyms_defeated: gym_number)
+
+    redirect_to root_path, notice: "Gym #{gym_number} marked as beaten!"
+  rescue ActiveRecord::RecordNotUnique
+    redirect_to gym_draft_path(draft), alert: "Gym #{gym_number} already marked as beaten."
   end
 
   private
