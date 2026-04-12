@@ -70,24 +70,24 @@
 
     <%# Tab Buttons %>
     <div class="tab-bar" style="margin-bottom: 0;" role="tablist">
-      <button type="button" role="tab" aria-selected="true"
-              data-species-assignment-target="tabButton"
-              data-action="click->species-assignment#switchTab"
-              data-tab="pool"
-              class="tab-item active" style="font-size: 10px; padding: 6px;">
-        YOUR POOL
-      </button>
       <button type="button" role="tab" aria-selected="false"
               data-species-assignment-target="tabButton"
               data-action="click->species-assignment#switchTab"
-              data-tab="pokedex"
+              data-tab="pool"
               class="tab-item" style="font-size: 10px; padding: 6px;">
+        YOUR POOL
+      </button>
+      <button type="button" role="tab" aria-selected="true"
+              data-species-assignment-target="tabButton"
+              data-action="click->species-assignment#switchTab"
+              data-tab="pokedex"
+              class="tab-item active" style="font-size: 10px; padding: 6px;">
         POKEDEX
       </button>
     </div>
 
     <%# Pool Tab %>
-    <div data-species-assignment-target="tabPanel" data-tab="pool">
+    <div data-species-assignment-target="tabPanel" data-tab="pool" class="hidden">
       <div data-species-assignment-target="poolList"
            class="gb-drag-zone" style="min-height: 200px; max-height: 75vh; overflow-y: auto; border-top: none;">
         <% @pool.each do |pokemon| %>
@@ -102,7 +102,7 @@
     </div>
 
     <%# Pokedex Tab %>
-    <div data-species-assignment-target="tabPanel" data-tab="pokedex" class="hidden">
+    <div data-species-assignment-target="tabPanel" data-tab="pokedex">
       <div style="border: var(--border-thin); border-top: none; background: var(--l2);">
         <div style="padding: 8px; border-bottom: var(--border-thin);">
           <input type="text"
