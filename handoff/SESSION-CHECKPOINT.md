@@ -5,28 +5,31 @@
 
 ## Where We Stopped
 
-Step 2 (gym draft playability fixes) committed on main (abf9a53). Project Owner has requested a new feature: make Pokedex the default view for species selection/search. This will be Step 3.
+Step 1 brief written and ready for Builder. Evolution chain display in the pokemon edit modal.
 
-Known gaps KG-1 through KG-5 logged in BUILD-LOG for future steps (catch flow race condition, team slot ownership, fallen species display, group rollback UX, test coverage).
+## Roadmap
+
+1. **Step 1** — Full evolution chain in edit modal (JS-only) ← CURRENT
+2. **Step 2** — Database tables + seed data (base stats, moves, learnsets)
+3. **Step 3** — Damage calculator service (Ruby)
+4. **Step 4** — Quick Calculator modal on party page (defender pre-filled, pick attacker + move)
+5. **Step 5** — Full Calculator tab in dashboard (attacker/defender sides, draggable pokemon)
 
 ---
 
 ## What Was Decided This Session
 
-- Discord snowflake IDs must be `String` not `Number` in all Stimulus value types
-- Gym draft nomination turn order enforced via pick_order + current_player_index
-- Skip-turn callable by any player (friends policing AFK)
-- User-supplied text rendered via textContent, never innerHTML
-- 30s client-side timer before skip button appears
-- Known gaps (race conditions, auth, tests) deprioritized — 4 trusted friends, no adversarial threat model
+- Evolution chain walks backward + forward through evolutionsDataValue, all client-side
+- Calculator will be database-backed (base stats, moves, learnsets tables)
+- Two calculator UIs: Quick Calculator modal (party page, pre-fills defender) and Full Calculator tab (dashboard, both sides configurable)
+- Per-pokemon learnsets, not a global move list
 
 ---
 
 ## Still Open
 
-- Step 3: Make Pokedex the default view for species selection
-- Known gaps KG-1 through KG-5 queued for future steps
-- Deploy is Project Owner's responsibility
+- Steps 2-5 queued
+- Data source for base stats / moves / learnsets seed (PokeAPI or data dump) — decide in Step 2
 
 ---
 
@@ -37,7 +40,7 @@ Copy and paste this to resume:
 ---
 
 You are Ava on Soul Link.
-Read SESSION-CHECKPOINT.md, then ARCHITECT.md.
+Read SESSION-CHECKPOINT.md, then ARCHITECT-BRIEF.md.
 Confirm where we stopped and what the next action is. Then wait.
 
 ---

@@ -364,21 +364,108 @@ export default class extends Controller {
     })
   }
 
-  #populateEvolution(species) {
-    const evo = this.evolutionsDataValue[species]
-    if (evo && evo.evolves_to) {
-      this.modalEvoInfoTarget.classList.remove("hidden")
-      let text = `${species} → ${evo.evolves_to}`
-      if (evo.level) {
-        text += ` @ Lv.${evo.level}`
-      } else if (evo.method) {
-        text += ` (${evo.method})`
+  #buildEvolutionChain(species) {
+    const data = this.evolutionsDataValue
+    if (!data[species]) return []
+
+    // Walk backward to find the base form (cap at 5 to prevent infinite loops)
+    const ancestors = []
+    let current = species
+    for (let i = 0; i < 5; i++) {
+      let parent = null
+      for (const [name, entry] of Object.entries(data)) {
+        if (entry.evolves_to === current) {
+          parent = name
+          break
+        }
       }
-      this.modalEvoTextTarget.textContent = text
-    } else {
-      this.modalEvoInfoTarget.classList.add("hidden")
-      this.modalEvoTextTarget.textContent = ""
+      if (!parent) break
+      ancestors.unshift(parent)
+      current = parent
     }
+
+    // Build chain: ancestors + selected species + forward walk
+    const chain = []
+
+    // Add ancestors with trigger info from their entries
+    for (let i = 0; i < ancestors.length; i++) {
+      const entry = data[ancestors[i]]
+      if (i === 0) {
+        chain.push({ name: ancestors[i], level: null, method: null })
+      } else {
+        const prev = data[ancestors[i - 1]]
+        chain.push({ name: ancestors[i], level: prev.level || null, method: prev.method || null })
+      }
+    }
+
+    // Add the selected species
+    const prevName = ancestors.length > 0 ? ancestors[ancestors.length - 1] : null
+    const prevEntry = prevName ? data[prevName] : null
+    chain.push({
+      name: species,
+      level: prevEntry ? (prevEntry.level || null) : null,
+      method: prevEntry ? (prevEntry.method || null) : null
+    })
+
+    // Walk forward from species (cap at 5 total chain length)
+    current = species
+    for (let i = chain.length; i < 5; i++) {
+      const entry = data[current]
+      if (!entry || !entry.evolves_to) break
+      chain.push({
+        name: entry.evolves_to,
+        level: entry.level || null,
+        method: entry.method || null
+      })
+      current = entry.evolves_to
+    }
+
+    return chain
+  }
+
+  #populateEvolution(species) {
+    const chain = this.#buildEvolutionChain(species)
+
+    if (chain.length === 0) {
+      this.modalEvoInfoTarget.classList.add("hidden")
+      this.modalEvoTextTarget.replaceChildren()
+      return
+    }
+
+    this.modalEvoInfoTarget.classList.remove("hidden")
+    const container = this.modalEvoTextTarget
+    container.replaceChildren()
+
+    chain.forEach((entry, index) => {
+      // Add arrow separator between entries
+      if (index > 0) {
+        const sep = document.createElement("span")
+        sep.textContent = " → "
+        sep.style.color = "var(--d2)"
+        container.appendChild(sep)
+      }
+
+      // Species name — bold + accent color if currently selected
+      const nameEl = document.createElement(entry.name === species ? "strong" : "span")
+      nameEl.textContent = entry.name
+      nameEl.style.color = entry.name === species ? "var(--a1)" : "var(--d2)"
+      container.appendChild(nameEl)
+
+      // Trigger info (level or method) for non-base entries
+      if (entry.level) {
+        const lvl = document.createElement("span")
+        lvl.textContent = ` Lv.${entry.level}`
+        lvl.style.fontSize = "9px"
+        lvl.style.color = "var(--d2)"
+        container.appendChild(lvl)
+      } else if (entry.method) {
+        const mth = document.createElement("span")
+        mth.textContent = ` (${entry.method})`
+        mth.style.fontSize = "9px"
+        mth.style.color = "var(--d2)"
+        container.appendChild(mth)
+      }
+    })
   }
 
   #populateLinked(pokemonData) {

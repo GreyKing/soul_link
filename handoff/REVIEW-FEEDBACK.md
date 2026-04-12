@@ -1,25 +1,37 @@
-# Review Feedback -- Step 2
+# Review Feedback — Step 3
 Date: 2026-04-12
-Ready for Builder: NO
+Ready for Builder: YES
 
 ## Must Fix
-
-- `app/models/gym_draft.rb:131` -- `skip_turn!(uid)` accepts `uid` but never validates it against the current turn holder. Any connected player can skip anyone else's turn by calling `subscription.perform("skip")`. Add a guard: in drafting, raise unless `pick_order[current_player_index] == uid.to_i`; in nominating, raise unless `pick_order[current_player_index % pick_order.size] == uid.to_i`. This matches the pattern already used in `make_pick!` (line 94) and `submit_nomination!` (line 119).
-
-- `app/javascript/controllers/gym_draft_controller.js:225` -- `canNominate` is set to `!nomination` with no check on whose turn it is. Every player sees interactive clickable cards during the nominating phase when no nomination is pending. The server guard catches it, but the UI should only enable cards for the current nominator. Compare `pick_order[current_player_index % pick_order.length]` against `userIdValue` and AND that with `!nomination`.
-
-- `app/javascript/controllers/gym_draft_controller.js:220` -- When no nomination is pending, `nomStatusTarget` says "Nominate a pokemon for the team!" with no indication of whose turn it is. This is the nominating equivalent of the `turnIndicator` in drafting. Show the current nominator name: "Your turn to nominate!" or "Waiting for [name] to nominate...".
+None.
 
 ## Should Fix
 
-- `app/javascript/controllers/gym_draft_controller.js:338-358` -- `startSkipTimer` shows the SKIP TURN button to all connected clients after 30 seconds, not just the player whose turn it is. Any player can click it and (once the Must Fix auth guard is added) the server will reject non-current-player skips. The timer should only start if it is the current user's turn, or at minimum gate the timer: in drafting, only if `currentId === this.userIdValue`; in nominating, only if the current nominator matches the user.
+1. **damage_calculator.rb:18** — `calculate_stat` has optional parameters (iv: 31, ev: 0, level: 50, nature_modifier: 1.0) while the brief specifies all five as required: `calculate_stat(base:, iv:, ev:, level:, nature_modifier:)`. The defaults are convenient and the test on line 296 relies on them, but this is a signature drift from the spec. Recommendation: make all parameters required to match the brief, update the one test that relies on defaults.
 
-- `app/models/gym_draft.rb:150` -- `skip_turn!` in the nominating branch clears `current_nomination` unconditionally. If a nomination is in progress with votes partially collected, skipping wipes it. This may be intentional for the 30s timeout case, but confirm the intended behavior. If a nomination is pending, the skip should probably be blocked or the brief should clarify.
+2. **damage_calculator_test.rb:175-176** — Comment says "The defense stat in the result is the pre-halving value" then immediately contradicts itself. The code actually returns the halved value (line 79 of the service reads `def_stat` after halving on line 54-55). The comment is misleading. Recommendation: fix the comment or add an assertion that `defender_stat` is the halved value.
 
 ## Escalate to Architect
-
 None.
 
 ## Cleared
 
-Channel action (`gym_draft_channel.rb:44-50`) follows existing pattern correctly. Model turn advancement in `resolve_nomination!` (lines 241-256) correctly computes `next_nominator_index` with modular wrap and advances before the complete check. `fillTeamSlots` and `renderPokemonGrid` DOM construction produces equivalent output to the original innerHTML approach. View template skip button target containers are placed correctly in both drafting and nominating panels. Double-click prevention on pick, nominate, and vote actions works correctly. `skip_turn!` drafting-to-nominating transition at `pick_order.size` is consistent with `make_pick!` logic.
+Reviewed `app/services/pokemon/damage_calculator.rb` (190 lines) and `test/services/pokemon/damage_calculator_test.rb` (415 lines) against the Step 3 brief.
+
+**Spec compliance:** All three public methods present with correct return types. `calculate` returns the specified 6-key hash. `calculate_with_natures` returns `{ current:, best:, worst: }` with `:nature` keys on best/worst only. `calculate_stat` returns Integer.
+
+**Gen IV formula:** Integer flooring at each step is correct. Ruby integer division handles the base damage computation. Float multiplies for STAB and effectiveness use explicit `.floor`. Random roll uses integer arithmetic (`damage * roll / 100`) which is equivalent to flooring.
+
+**STAB, effectiveness, Explosion:** All implemented per brief. STAB checks `attacker_types.include?(move_type)`. Effectiveness delegates to `SoulLink::TypeChart.combined_effectiveness`. Explosion/Self-Destruct halve defense with minimum 1.
+
+**Nature modifier mapping:** NATURE_STAT_MAP correctly maps all five abbreviations to DB columns. `nature_modifier` method handles nil nature, neutral natures, boost (1.1), and lower (0.9).
+
+**Best/worst nature:** Picks first nature (insertion order) that boosts/lowers the relevant attack stat. Functionally equivalent to the brief's "iterate all natures, compute stat, pick max/min" approach since all boosting natures give 1.1x and all lowering give 0.9x.
+
+**Edge cases:** Immunity short-circuits to zero. Status moves return zero. Default IVs (31) and EVs (0) applied via hash merge. Minimum damage clamped to 1 after modifiers (immunity handled separately).
+
+**Hand-calculated test values verified:**
+- Garchomp Earthquake vs Infernape: Atk=200, Def=91, base=98, after STAB=147, after 2x=294. Min=249, Max=294. Matches test assertions on lines 360-364.
+- Alakazam Psychic vs Machamp: SpA=205, SpD=105, base=79, after STAB=118, after 2x=236. Min=200, Max=236. Matches test assertions on lines 407-411.
+
+**Drift:** None beyond the optional parameters noted in Should Fix.
