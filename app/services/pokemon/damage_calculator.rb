@@ -3,6 +3,9 @@ module Pokemon
     DEFAULT_IVS = { hp: 31, atk: 31, def_stat: 31, spa: 31, spd: 31, spe: 31 }.freeze
     DEFAULT_EVS = { hp: 0, atk: 0, def_stat: 0, spa: 0, spd: 0, spe: 0 }.freeze
 
+    # Average IVs (midpoint of 0-31 range) for level-scaled calculations
+    AVERAGE_IVS = { hp: 15, atk: 15, def_stat: 15, spa: 15, spd: 15, spe: 15 }.freeze
+
     # Gen IV crit stage → chance mapping
     CRIT_CHANCES = { 0 => "6.25%", 1 => "12.5%", 2 => "25%" }.freeze
 
@@ -42,12 +45,21 @@ module Pokemon
         end
 
         level = attacker[:level] || 50
+        def_level = defender[:level] || 50
         atk_key, def_key = stat_keys_for(move_record.category)
 
-        attacker_ivs = DEFAULT_IVS.merge(attacker[:ivs] || {})
-        attacker_evs = DEFAULT_EVS.merge(attacker[:evs] || {})
-        defender_ivs = DEFAULT_IVS.merge(defender[:ivs] || {})
-        defender_evs = DEFAULT_EVS.merge(defender[:evs] || {})
+        # When neither IVs nor EVs are specified, use level-scaled defaults:
+        # average IVs (15) and level-proportional EVs. This models a typical
+        # in-game pokemon at that level (like Showdown's auto-level).
+        # When any IVs or EVs are explicitly passed, use the standard defaults
+        # (31 IVs, 0 EVs) merged with the provided values.
+        atk_scaled = attacker[:ivs].nil? && attacker[:evs].nil?
+        def_scaled = defender[:ivs].nil? && defender[:evs].nil?
+
+        attacker_ivs = atk_scaled ? AVERAGE_IVS : DEFAULT_IVS.merge(attacker[:ivs] || {})
+        attacker_evs = atk_scaled ? level_scaled_evs(level) : DEFAULT_EVS.merge(attacker[:evs] || {})
+        defender_ivs = def_scaled ? AVERAGE_IVS : DEFAULT_IVS.merge(defender[:ivs] || {})
+        defender_evs = def_scaled ? level_scaled_evs(def_level) : DEFAULT_EVS.merge(defender[:evs] || {})
 
         atk_stat = compute_stat(attacker_base, atk_key, attacker_ivs[atk_key], attacker_evs[atk_key], level, attacker[:nature])
         def_stat = compute_stat(defender_base, def_key, defender_ivs[def_key], defender_evs[def_key], defender[:level] || 50, defender[:nature])
@@ -193,6 +205,14 @@ module Pokemon
 
       def explosion_move?(move_record)
         move_record.name.in?(%w[Explosion Self-Destruct])
+      end
+
+      # Estimate EVs proportional to level.
+      # At Lv.1: ~0 EVs. At Lv.50: ~126 EVs. At Lv.100: 252 EVs (max).
+      # Applied uniformly across all stats (no specialization assumed).
+      def level_scaled_evs(level)
+        ev = [(level * 252 / 100).floor, 252].min
+        { hp: ev, atk: ev, def_stat: ev, spa: ev, spd: ev, spe: ev }
       end
 
       # Apply modifiers in order: STAB, effectiveness, random roll. Floor after each.

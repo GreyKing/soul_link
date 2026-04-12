@@ -356,12 +356,12 @@ class Pokemon::DamageCalculatorTest < ActiveSupport::TestCase
     } do
       result = Pokemon::DamageCalculator.calculate(
         attacker: { species: "Garchomp", level: 50, nature: "Adamant", evs: { atk: 252 } },
-        defender: { species: "Infernape", level: 50, nature: "Jolly" },
+        defender: { species: "Infernape", level: 50, nature: "Jolly", evs: {} },
         move: earthquake
       )
 
       assert_equal 200, result[:attacker_stat], "Garchomp Adamant 252 Atk EVs should have 200 Atk"
-      assert_equal 91, result[:defender_stat], "Infernape Jolly 0 Def EVs should have 91 Def"
+      assert_equal 91, result[:defender_stat], "Infernape Jolly 31 IVs 0 Def EVs should have 91 Def"
       assert_equal 249, result[:min], "Min damage should be 249"
       assert_equal 294, result[:max], "Max damage should be 294"
       assert result[:stab]
@@ -403,12 +403,12 @@ class Pokemon::DamageCalculatorTest < ActiveSupport::TestCase
     } do
       result = Pokemon::DamageCalculator.calculate(
         attacker: { species: "Alakazam", level: 50, nature: "Modest", evs: { spa: 252 } },
-        defender: { species: "Machamp", level: 50, nature: "Adamant" },
+        defender: { species: "Machamp", level: 50, nature: "Adamant", evs: {} },
         move: psychic
       )
 
       assert_equal 205, result[:attacker_stat], "Alakazam Modest 252 SpA should have 205 SpA"
-      assert_equal 105, result[:defender_stat], "Machamp Adamant 0 SpD should have 105 SpD"
+      assert_equal 105, result[:defender_stat], "Machamp Adamant 31 IVs 0 SpD should have 105 SpD"
       assert_equal 200, result[:min]
       assert_equal 236, result[:max]
       assert result[:stab]

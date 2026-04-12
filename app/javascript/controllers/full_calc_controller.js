@@ -28,9 +28,9 @@ export default class extends Controller {
       const btn = document.createElement("button")
       btn.type = "button"
       btn.textContent = `${pkmn.species} Lv.${pkmn.level}`
-      btn.style.cssText = "font-size: 9px; padding: 2px 6px; border: var(--border-thin); cursor: pointer; background: var(--bg2); color: var(--l1);"
-      btn.addEventListener("mouseenter", () => { btn.style.background = "var(--d1)" })
-      btn.addEventListener("mouseleave", () => { btn.style.background = "var(--bg2)" })
+      btn.style.cssText = "font-size: 9px; padding: 2px 6px; border: var(--border-thin); cursor: pointer; background: var(--d1); color: var(--l2);"
+      btn.addEventListener("mouseenter", () => { btn.style.background = "var(--d2)" })
+      btn.addEventListener("mouseleave", () => { btn.style.background = "var(--d1)" })
       btn.addEventListener("click", () => this._quickPick(side, pkmn))
       container.appendChild(btn)
     })
@@ -234,7 +234,7 @@ export default class extends Controller {
       const row = document.createElement("div")
       row.style.cssText = "padding: 3px 6px; border: var(--border-thin); margin-bottom: 2px; cursor: pointer; font-size: 10px; color: var(--l1);"
       row.textContent = `${entry.attacker} \u2192 ${entry.defender}: ${entry.moveName} (${entry.result.min}-${entry.result.max})`
-      row.addEventListener("mouseenter", () => { row.style.background = "var(--d1)" })
+      row.addEventListener("mouseenter", () => { row.style.background = "var(--d2)" })
       row.addEventListener("mouseleave", () => { row.style.background = "" })
       row.addEventListener("click", () => this._loadFromHistory(entry))
       this.historyListTarget.appendChild(row)

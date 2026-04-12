@@ -9,14 +9,12 @@ module Api
         attacker: {
           species: params[:attacker_species],
           level: params[:attacker_level].to_i,
-          nature: params[:attacker_nature].presence,
-          evs: {}
+          nature: params[:attacker_nature].presence
         },
         defender: {
           species: params[:defender_species],
           level: params[:defender_level].to_i,
-          nature: params[:defender_nature].presence,
-          evs: {}
+          nature: params[:defender_nature].presence
         },
         move: { name: params[:move_name] }
       )

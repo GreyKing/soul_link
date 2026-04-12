@@ -25,7 +25,7 @@
                data-full-calc-target="attackerSpecies"
                data-action="change->full-calc#attackerChanged"
                placeholder="Species..."
-               style="width: 100%; font-size: 10px; padding: 3px 6px; background: var(--bg2); color: var(--l1); border: var(--border-thin); margin-bottom: 4px;">
+               style="width: 100%; font-size: 10px; padding: 3px 6px; background: var(--d1); color: var(--l2); border: var(--border-thin); margin-bottom: 4px;">
 
         <%# Level + Nature row %>
         <div style="display: flex; gap: 4px; margin-bottom: 6px;">
@@ -33,10 +33,10 @@
                  data-full-calc-target="attackerLevel"
                  data-action="change->full-calc#attackerChanged"
                  placeholder="Lv"
-                 style="width: 50px; font-size: 10px; padding: 3px 4px; background: var(--bg2); color: var(--l1); border: var(--border-thin);">
+                 style="width: 50px; font-size: 10px; padding: 3px 4px; background: var(--d1); color: var(--l2); border: var(--border-thin);">
           <select data-full-calc-target="attackerNature"
                   data-action="change->full-calc#attackerChanged"
-                  style="flex: 1; font-size: 10px; padding: 3px 4px; background: var(--bg2); color: var(--l1); border: var(--border-thin);">
+                  style="flex: 1; font-size: 10px; padding: 3px 4px; background: var(--d1); color: var(--l2); border: var(--border-thin);">
             <option value="">Neutral</option>
             <% PixeldexHelper::NATURES.keys.each do |nature| %>
               <option value="<%= nature %>"><%= nature %> (<%= pixeldex_nature_label(nature) %>)</option>
@@ -46,7 +46,7 @@
 
         <%# Sprite + Types + Stats display %>
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-          <div data-full-calc-target="attackerSprite" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: var(--bg2); border: var(--border-thin);"></div>
+          <div data-full-calc-target="attackerSprite" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: var(--d1); border: var(--border-thin);"></div>
           <div>
             <div data-full-calc-target="attackerTypes" style="font-size: 10px; margin-bottom: 2px;"></div>
             <div data-full-calc-target="attackerStats" style="font-size: 9px; color: var(--d2);"></div>
@@ -58,7 +58,7 @@
       <div style="display: flex; align-items: center; justify-content: center;">
         <button type="button"
                 data-action="click->full-calc#swap"
-                style="font-size: 11px; padding: 6px 10px; background: var(--bg2); color: var(--l1); border: var(--border-thin); cursor: pointer; white-space: nowrap;">
+                style="font-size: 11px; padding: 6px 10px; background: var(--d1); color: var(--l2); border: var(--border-thin); cursor: pointer; white-space: nowrap;">
           &#8644; SWAP
         </button>
       </div>
@@ -75,7 +75,7 @@
                data-full-calc-target="defenderSpecies"
                data-action="change->full-calc#defenderChanged"
                placeholder="Species..."
-               style="width: 100%; font-size: 10px; padding: 3px 6px; background: var(--bg2); color: var(--l1); border: var(--border-thin); margin-bottom: 4px;">
+               style="width: 100%; font-size: 10px; padding: 3px 6px; background: var(--d1); color: var(--l2); border: var(--border-thin); margin-bottom: 4px;">
 
         <%# Level + Nature row %>
         <div style="display: flex; gap: 4px; margin-bottom: 6px;">
@@ -83,10 +83,10 @@
                  data-full-calc-target="defenderLevel"
                  data-action="change->full-calc#defenderChanged"
                  placeholder="Lv"
-                 style="width: 50px; font-size: 10px; padding: 3px 4px; background: var(--bg2); color: var(--l1); border: var(--border-thin);">
+                 style="width: 50px; font-size: 10px; padding: 3px 4px; background: var(--d1); color: var(--l2); border: var(--border-thin);">
           <select data-full-calc-target="defenderNature"
                   data-action="change->full-calc#defenderChanged"
-                  style="flex: 1; font-size: 10px; padding: 3px 4px; background: var(--bg2); color: var(--l1); border: var(--border-thin);">
+                  style="flex: 1; font-size: 10px; padding: 3px 4px; background: var(--d1); color: var(--l2); border: var(--border-thin);">
             <option value="">Neutral</option>
             <% PixeldexHelper::NATURES.keys.each do |nature| %>
               <option value="<%= nature %>"><%= nature %> (<%= pixeldex_nature_label(nature) %>)</option>
@@ -96,7 +96,7 @@
 
         <%# Sprite + Types + Stats display %>
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-          <div data-full-calc-target="defenderSprite" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: var(--bg2); border: var(--border-thin);"></div>
+          <div data-full-calc-target="defenderSprite" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: var(--d1); border: var(--border-thin);"></div>
           <div>
             <div data-full-calc-target="defenderTypes" style="font-size: 10px; margin-bottom: 2px;"></div>
             <div data-full-calc-target="defenderStats" style="font-size: 9px; color: var(--d2);"></div>
@@ -110,7 +110,7 @@
       <div class="box-section-label">MOVE</div>
       <select data-full-calc-target="moveSelect"
               data-action="change->full-calc#moveChanged"
-              style="width: 100%; font-size: 10px; padding: 3px 6px; background: var(--bg2); color: var(--l1); border: var(--border-thin); margin-bottom: 4px;">
+              style="width: 100%; font-size: 10px; padding: 3px 6px; background: var(--d1); color: var(--l2); border: var(--border-thin); margin-bottom: 4px;">
         <option value="">Select a move...</option>
       </select>
       <div data-full-calc-target="moveInfo" style="font-size: 9px; color: var(--d2);"></div>
