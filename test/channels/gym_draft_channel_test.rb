@@ -74,7 +74,8 @@ class GymDraftChannelTest < ActionCable::Channel::TestCase
 
   test "vote_nomination action records vote" do
     move_to_nominating!
-    @draft.submit_nomination!(ARATY, @groups[4].id)
+    first_nominator = @draft.pick_order[@draft.current_player_index]
+    @draft.submit_nomination!(first_nominator, @groups[4].id)
     @draft.reload
     subscribe(draft_id: @draft.id)
     perform :vote_nomination, { "approve" => true }
