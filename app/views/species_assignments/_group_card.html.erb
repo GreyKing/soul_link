@@ -9,7 +9,7 @@
       <span style="font-size: 12px; <%= group.dead? ? 'color: #e8a0a0;' : '' %>">
         <%= group.dead? ? "\u{1F480} " : '' %><%= group.nickname %>
       </span>
-      <span style="font-size: 9px; color: var(--d2); margin-left: 6px;"><%= group.location %></span>
+      <span style="font-size: 11px; font-weight: bold; color: var(--d2); margin-left: 6px;"><%= group.location %></span>
     </div>
     <div style="display: flex; align-items: center; gap: 6px; font-size: 10px;">
       <% if group.dead? %>

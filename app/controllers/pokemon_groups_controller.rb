@@ -13,21 +13,20 @@ class PokemonGroupsController < ApplicationController
       return
     end
 
-    group = nil
-    ActiveRecord::Base.transaction do
-      group = run.soul_link_pokemon_groups.create!(
-        nickname: nickname,
-        location: location,
-        status: "caught"
-      )
+    group = run.soul_link_pokemon_groups.create!(
+      nickname: nickname,
+      location: location,
+      status: "caught"
+    )
 
-      # Create a SoulLinkPokemon for each player's species selection (if provided)
-      species_params = params[:species] || {}
-      SoulLink::GameState.players.each do |player|
-        uid = player['discord_user_id']
-        species = species_params[uid.to_s]&.strip
-        next if species.blank?
+    errors = []
+    species_params = params[:species] || {}
+    SoulLink::GameState.players.each do |player|
+      uid = player['discord_user_id']
+      species = species_params[uid.to_s]&.strip
+      next if species.blank?
 
+      begin
         run.soul_link_pokemon.create!(
           soul_link_pokemon_group: group,
           discord_user_id: uid,
@@ -36,10 +35,18 @@ class PokemonGroupsController < ApplicationController
           location: location,
           status: "caught"
         )
+      rescue ActiveRecord::RecordInvalid => e
+        errors << "#{player['display_name'] || uid}: #{e.record.errors.full_messages.join(', ')}"
+      rescue ActiveRecord::RecordNotUnique
+        errors << "#{player['display_name'] || uid}: already has a pokemon in this group"
       end
     end
 
-    render json: { status: "saved", group_id: group.id, nickname: group.nickname }
+    if errors.any?
+      render json: { status: "partial", group_id: group.id, nickname: group.nickname, errors: errors }, status: :multi_status
+    else
+      render json: { status: "saved", group_id: group.id, nickname: group.nickname }
+    end
   rescue ActiveRecord::RecordInvalid => e
     render json: { error: e.message }, status: :unprocessable_entity
   end

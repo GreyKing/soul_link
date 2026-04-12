@@ -39,9 +39,14 @@ class SpeciesAssignmentsController < ApplicationController
       return
     end
 
-    pokemon.assign_to_group!(group)
+    ActiveRecord::Base.transaction do
+      pokemon.assign_to_group!(group)
+    end
+
     render json: { status: "assigned", pokemon_id: pokemon.id, group_id: group.id }
-  rescue => e
+  rescue ActiveRecord::RecordNotUnique
+    render json: { error: "You already have a species in this group" }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
@@ -67,17 +72,22 @@ class SpeciesAssignmentsController < ApplicationController
       return
     end
 
-    pokemon = run.soul_link_pokemon.create!(
-      soul_link_pokemon_group: group,
-      discord_user_id: current_user_id,
-      species: species_name,
-      name: group.nickname,
-      location: group.location,
-      status: "caught"
-    )
+    pokemon = nil
+    ActiveRecord::Base.transaction do
+      pokemon = run.soul_link_pokemon.create!(
+        soul_link_pokemon_group: group,
+        discord_user_id: current_user_id,
+        species: species_name,
+        name: group.nickname,
+        location: group.location,
+        status: "caught"
+      )
+    end
 
     render json: { status: "assigned", pokemon_id: pokemon.id, group_id: group.id, species: species_name }
-  rescue => e
+  rescue ActiveRecord::RecordNotUnique
+    render json: { error: "You already have a species in this group" }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
 

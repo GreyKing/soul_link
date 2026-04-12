@@ -26,7 +26,10 @@ class TeamsController < ApplicationController
 
     # Validate: all group_ids must be caught groups in this run
     # Use a Set for fast lookup while preserving the JS-sent order
-    allowed_ids = run.caught_groups.where(id: group_ids).pluck(:id).to_set
+    allowed_ids = run.caught_groups.where(id: group_ids)
+      .joins(:soul_link_pokemon)
+      .where(soul_link_pokemon: { discord_user_id: current_user_id })
+      .distinct.pluck(:id).to_set
     ordered_valid_ids = group_ids.select { |id| allowed_ids.include?(id.to_i) }
 
     if ordered_valid_ids.length > SoulLinkTeam::MAX_SLOTS

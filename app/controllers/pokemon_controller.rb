@@ -45,19 +45,24 @@ class PokemonController < ApplicationController
       return
     end
 
-    pokemon = run.soul_link_pokemon.create!(
-      soul_link_pokemon_group: group,
-      discord_user_id: current_user_id,
-      species: species,
-      name: group.nickname,
-      location: group.location,
-      status: group.status,
-      level: params[:level],
-      ability: params[:ability],
-      nature: params[:nature]
-    )
+    pokemon = nil
+    ActiveRecord::Base.transaction do
+      pokemon = run.soul_link_pokemon.create!(
+        soul_link_pokemon_group: group,
+        discord_user_id: current_user_id,
+        species: species,
+        name: group.nickname,
+        location: group.location,
+        status: group.status,
+        level: params[:level],
+        ability: params[:ability],
+        nature: params[:nature]
+      )
+    end
 
     render json: { status: "created", pokemon_id: pokemon.id }
+  rescue ActiveRecord::RecordNotUnique
+    render json: { error: "You already have a pokemon in this group" }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
