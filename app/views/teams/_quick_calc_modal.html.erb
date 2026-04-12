@@ -1,0 +1,82 @@
+<%# Quick Damage Calculator Modal %>
+<div data-quick-calc-target="modal"
+     class="hidden"
+     tabindex="-1"
+     data-action="keydown->quick-calc#keydown"
+     style="position: fixed; inset: 0; z-index: 50;">
+  <div data-action="click->quick-calc#close"
+       style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.75);"></div>
+
+  <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
+    <div class="gb-modal" style="max-width: 480px;">
+      <div class="gb-modal-title">
+        DAMAGE CALCULATOR
+        <button data-action="click->quick-calc#close"
+                class="gb-modal-close">&times;</button>
+      </div>
+
+      <%# -- Defender Section -- %>
+      <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: var(--border-thin);">
+        <div style="font-size: 10px; color: var(--d2); margin-bottom: 4px;">DEFENDER</div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <div data-quick-calc-target="defenderSprite"
+               style="width: 48px; height: 48px; background: var(--l2); border: var(--border-thin); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden;"></div>
+          <div>
+            <div data-quick-calc-target="defenderName" style="font-size: 13px;"></div>
+            <div data-quick-calc-target="defenderTypes" style="margin-top: 2px;"></div>
+            <div data-quick-calc-target="defenderStats" style="font-size: 9px; color: var(--d2); margin-top: 2px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <%# -- Attacker Section -- %>
+      <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: var(--border-thin);">
+        <div style="font-size: 10px; color: var(--d2); margin-bottom: 4px;">ATTACKER</div>
+        <div style="display: grid; grid-template-columns: 1fr 80px; gap: 8px;">
+          <input list="calc-species-list"
+                 data-quick-calc-target="attackerSpecies"
+                 data-action="change->quick-calc#attackerChanged"
+                 placeholder="Select Pokemon..."
+                 class="gb-input"
+                 autocomplete="off">
+          <input type="number" value="50" min="1" max="100"
+                 data-quick-calc-target="attackerLevel"
+                 data-action="change->quick-calc#calculate"
+                 class="gb-input"
+                 placeholder="Lv">
+        </div>
+        <select data-quick-calc-target="attackerNature"
+                data-action="change->quick-calc#calculate"
+                class="gb-input" style="margin-top: 4px;">
+          <option value="">Neutral Nature</option>
+          <% PixeldexHelper::NATURES.each do |name, info| %>
+            <% label = info[:up] ? "#{name} (+#{info[:up]} -#{info[:down]})" : "#{name}" %>
+            <option value="<%= name %>"><%= label %></option>
+          <% end %>
+        </select>
+      </div>
+
+      <%# -- Move Section -- %>
+      <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: var(--border-thin);">
+        <div style="font-size: 10px; color: var(--d2); margin-bottom: 4px;">MOVE</div>
+        <select data-quick-calc-target="moveSelect"
+                data-action="change->quick-calc#moveChanged"
+                class="gb-input">
+          <option value="">Select a move...</option>
+        </select>
+        <div data-quick-calc-target="moveInfo" style="font-size: 9px; color: var(--d2); margin-top: 2px;"></div>
+      </div>
+
+      <%# -- Results Section -- %>
+      <div data-quick-calc-target="resultSection" class="hidden" style="padding: 8px; background: var(--l2); border: var(--border-thin);">
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Species datalist for autocomplete %>
+<datalist id="calc-species-list">
+  <% Pokemon::BaseStat.order(:species).pluck(:species).each do |s| %>
+    <option value="<%= s %>">
+  <% end %>
+</datalist>

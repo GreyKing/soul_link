@@ -9,6 +9,12 @@ Rails.application.routes.draw do
   get    "/auth/failure",           to: "sessions#failure"
   delete "/logout",                 to: "sessions#destroy",  as: :logout
 
+  # API endpoints (JSON)
+  namespace :api do
+    resources :pokemon, only: [ :show ], param: :species
+    post "calculator", to: "calculator#calculate"
+  end
+
   # Team builder
   resource :team, only: [ :show ] do
     patch :update_slots, on: :member

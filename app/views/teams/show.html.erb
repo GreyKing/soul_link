@@ -1,3 +1,8 @@
+<div data-controller="quick-calc"
+     data-quick-calc-csrf-value="<%= form_authenticity_token %>"
+     data-quick-calc-pokemon-url-value="/api/pokemon/"
+     data-quick-calc-calc-url-value="/api/calculator">
+
 <div style="margin-bottom: 16px;">
   <div class="gb-page-title"><%= @player_name&.upcase || "TRAINER" %>'S TEAM</div>
   <div class="gb-page-subtitle">Drag Pokemon between your team and the pool. Max 6 per team.</div>
@@ -62,4 +67,7 @@
       <% end %>
     </div>
   </div>
+</div>
+
+<%= render "quick_calc_modal" %>
 </div>

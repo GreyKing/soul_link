@@ -19,6 +19,12 @@
         <span style="<%= is_mine ? 'color: var(--l2);' : 'color: var(--d2);' %>"><%= SoulLink::GameState.player_name(pokemon.discord_user_id) %></span>
         <span style="<%= is_mine ? 'color: var(--l1);' : 'color: var(--d2);' %>"><%= pokemon.species %></span>
         <%= pixeldex_type_badges(pokemon.species) %>
+        <button data-action="click->quick-calc#open"
+                data-species="<%= pokemon.species %>"
+                data-level="<%= pokemon.level || 50 %>"
+                data-nature="<%= pokemon.nature %>"
+                title="Calculate damage"
+                style="background: none; border: var(--border-thin); cursor: pointer; font-size: 10px; padding: 1px 4px; color: inherit; line-height: 1;">&#9876;</button>
       </span>
     <% end %>
   </div>
