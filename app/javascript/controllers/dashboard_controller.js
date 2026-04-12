@@ -7,7 +7,7 @@ export default class extends Controller {
   static values = {
     groupsUrl: String,
     csrf: String,
-    userId: Number
+    userId: String
   }
 
   // ── Quick-Catch Modal ──

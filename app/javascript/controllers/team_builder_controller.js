@@ -3,7 +3,7 @@ import Sortable from "sortablejs"
 
 export default class extends Controller {
   static targets = ["teamList", "poolList", "saveStatus", "teamCount", "teamEmpty", "poolEmpty", "poolSearch"]
-  static values = { updateUrl: String, csrf: String, userId: Number }
+  static values = { updateUrl: String, csrf: String, userId: String }
 
   connect() {
     this.maxSlots = 6

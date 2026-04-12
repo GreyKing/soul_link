@@ -269,7 +269,7 @@ export default class extends Controller {
 
       if (this.spriteMapValue[input]) {
         this.modalSpriteTarget.innerHTML =
-          `<img src="/assets/sprites/${this.spriteMapValue[input]}.png" width="56" height="56" style="image-rendering: pixelated;">`
+          `<img src="${this.spriteMapValue[input]}" width="72" height="72" style="image-rendering: pixelated;">`
       }
     }
   }
