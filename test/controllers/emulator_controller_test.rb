@@ -141,6 +141,65 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_match(/data-emulator-save-data-url-value=/, response.body)
     assert_match(/data-emulator-core-value="melonds"/, response.body)
     assert_match(/data-emulator-pathtodata-value="\/emulatorjs\/data\/"/, response.body)
+    assert_match(/data-emulator-cheats-value=/, response.body)
+  end
+
+  # --- show: cheats payload ----------------------------------------------
+
+  test "show renders empty cheats data attribute when no cheats configured" do
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    SoulLink::GameState.stub(:cheats, {}) do
+      login_as(GREY)
+      get emulator_path
+    end
+    assert_response :success
+    # `[].to_json` HTML-escapes to `[]` inside the attribute.
+    assert_match(/data-emulator-cheats-value="\[\]"/, response.body)
+  end
+
+  test "show renders populated cheats data attribute when cheats are configured" do
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    payload = [
+      { "name" => "Walk Through Walls", "enabled" => true, "code" => "02000000 12345678" }
+    ]
+    SoulLink::GameState.stub(:cheats, { "action_replay" => payload }) do
+      login_as(GREY)
+      get emulator_path
+    end
+    assert_response :success
+    assert_match(/data-emulator-cheats-value=/, response.body)
+    assert_match(/Walk Through Walls/, response.body)
+    # AR codes contain spaces; ERB JSON escaping leaves them as-is. Probe the
+    # opcode prefix so we know the code body landed in the attribute.
+    assert_match(/02000000/, response.body)
+  end
+
+  test "show does NOT render cheats data attribute when state is not ready (no active run)" do
+    @run.update!(active: false)
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+    assert_no_match(/data-emulator-cheats-value=/, response.body)
+  end
+
+  test "show does NOT render cheats data attribute when session is generating" do
+    create(:soul_link_emulator_session, soul_link_run: @run, discord_user_id: GREY, status: "generating")
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+    assert_no_match(/data-emulator-cheats-value=/, response.body)
+  end
+
+  test "show does NOT render cheats data attribute when session has failed" do
+    create(:soul_link_emulator_session,
+           soul_link_run: @run,
+           discord_user_id: GREY,
+           status: "failed",
+           error_message: "boom")
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+    assert_no_match(/data-emulator-cheats-value=/, response.body)
   end
 
   # --- show: claim race ---------------------------------------------------

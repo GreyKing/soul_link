@@ -1,0 +1,15 @@
+# Action Replay codes for Pokemon Platinum (Gen IV NDS).
+# Each entry has a name, the AR code (multi-line string), and an enabled flag.
+# When enabled: true, the cheat is preloaded in EmulatorJS and toggleable in
+# the in-game cheat menu. When false, it doesn't appear at all.
+#
+# Real cheat codes go here — currently empty placeholder so the loader works.
+#
+# Example entry shape (DO NOT enable without a real code):
+#   - name: "Walk Through Walls"
+#     enabled: true
+#     code: |
+#       02000000 12345678
+#       02000004 ABCDEF01
+
+action_replay: []

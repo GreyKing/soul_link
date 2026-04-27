@@ -164,4 +164,38 @@ class SoulLinkEmulatorSessionTest < ActiveSupport::TestCase
     @unclaimed.rom_path = ""
     assert_nil @unclaimed.rom_full_path
   end
+
+  # --- cheats --------------------------------------------------------------
+  #
+  # `#cheats` reads `SoulLink::GameState.cheats` and pulls the
+  # `action_replay` array. Stub the GameState class method per case so the
+  # tests don't depend on the on-disk YAML.
+
+  test "cheats returns [] when GameState has no cheats configured" do
+    SoulLink::GameState.stub(:cheats, {}) do
+      assert_equal [], @unclaimed.cheats
+    end
+  end
+
+  test "cheats returns [] when GameState has no action_replay key" do
+    SoulLink::GameState.stub(:cheats, { "something_else" => [] }) do
+      assert_equal [], @unclaimed.cheats
+    end
+  end
+
+  test "cheats returns [] when action_replay is not an Array (e.g. nil)" do
+    SoulLink::GameState.stub(:cheats, { "action_replay" => nil }) do
+      assert_equal [], @unclaimed.cheats
+    end
+  end
+
+  test "cheats returns the action_replay array when present" do
+    payload = [
+      { "name" => "Walk Through Walls", "enabled" => true, "code" => "02000000 12345678" },
+      { "name" => "Shiny Encounter",    "enabled" => false, "code" => "94000130 FCFF0000" }
+    ]
+    SoulLink::GameState.stub(:cheats, { "action_replay" => payload }) do
+      assert_equal payload, @unclaimed.cheats
+    end
+  end
 end

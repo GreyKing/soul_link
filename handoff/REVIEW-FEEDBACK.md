@@ -1,4 +1,4 @@
-# Review Feedback — Step 5
+# Review Feedback — Step 6: Cheat Config + EmulatorJS Cheat Integration
 Date: 2026-04-26
 Ready for Builder: YES
 
@@ -16,47 +16,94 @@ None.
 
 ## Cleared
 
-Reviewed Step 5 (player-facing emulator) end to end. All twelve scrutiny items pass; full suite confirmed locally at `169 runs, 504 assertions, 0 failures, 0 errors, 0 skips`; the emulator-controller test file confirmed in isolation at `23 runs, 67 assertions, 0 failures`.
+Reviewed all eight changed files (1 created YAML, 1 created loader test, 6 modified) plus the
+two cited EmulatorJS source locations. Re-ran the full suite (`mise exec -- ruby -S bundle exec
+rails test`) — 184 runs, 544 assertions, 0 failures, 0 errors, 0 skips — and rubocop on all
+six Ruby files (no offenses). All twelve scrutiny points clear:
 
-Detail by scrutiny item:
+1. **Memoization shape** matches the existing class-level `@x ||= File.exist?(PATH) ? ...`
+   pattern used by `pokedex`, `map_coordinates`, `progression`, `pokemon_types`,
+   `pokemon_abilities`, and `evolutions` (`app/services/soul_link/game_state.rb:133-135`).
+   Bob added `(YAML.load_file(PATH) || {})` to defend against an empty file parsing to `nil` —
+   a minor and correct hardening over the older loaders, justified because `#cheats` consumers
+   immediately call `.fetch` on the result. `reload!` resets `@cheats = nil` on line 147, in
+   the same block as the other ivars.
 
-1. **Auto-claim race-retry is bounded** (`app/controllers/emulator_controller.rb:56-84`). First `claim!` is on line 66; on `AlreadyClaimedError` we issue a *new* `unclaimed.ready.first` query on line 72 (not the stale `unclaimed` reference) and try once more on line 75. The inner rescue on line 77 swallows the second error and sets `@session = nil`. No path can call `claim!` more than twice. Verified by the `assert_equal 2, call_count` assertion on `test/controllers/emulator_controller_test.rb:185`.
+2. **Memoization test pollution** is defended on three layers: `setup` nils `@cheats`,
+   `teardown` nils `@cheats` AND restores the original `CHEATS_PATH` constant, and
+   `with_cheats_path` nils `@cheats` and restores `CHEATS_PATH` in its `ensure` block. Hermetic
+   regardless of test order.
 
-2. **CSRF bypass is properly scoped** (`app/controllers/emulator_controller.rb:19`). `protect_from_forgery with: :null_session, only: [:save_data], if: -> { request.patch? }` — both the action filter and the method filter are present. GET `save_data` does not get the bypass. The `with_forgery_protection` test (`test/controllers/emulator_controller_test.rb:302`) flips `ActionController::Base.allow_forgery_protection = true` and confirms PATCH still succeeds without an `X-CSRF-Token`. No blanket disable.
+3. **`#cheats` model nil-safety** has all four cases covered:
+   `test/models/soul_link_emulator_session_test.rb:174` (empty hash → `[]`),
+   `:180` (no `action_replay` key → `[]`),
+   `:186` (`action_replay: nil` → `[]` via `is_a?(Array)` guard),
+   `:192` (array passthrough). The file-absent → `{}` chain is covered separately by the
+   GameState loader test at `test/services/soul_link/game_state_cheats_test.rb:43`.
 
-3. **`current_user_id` bigint flow is preserved end-to-end.** `app/controllers/sessions_controller.rb:16` stores `auth.uid.to_i` (Integer) in `session[:discord_user_id]`; `DiscordAuthentication#current_user_id` returns it raw; `EmulatorController#set_session` passes it to `find_by(discord_user_id: current_user_id)` (line 59) and `claim!(current_user_id)` (lines 66, 75). No `.to_i` / `.to_s` wrapping anywhere in the emulator controller.
+4. **Controller ivar scoping** is correct: `@cheats = @session.cheats if @session&.ready?`
+   (`app/controllers/emulator_controller.rb:25`). Non-ready branches leave `@cheats` nil and
+   the view never references it on those branches.
 
-4. **`rom` action covers all four branches** (`app/controllers/emulator_controller.rb:25-31`). `nil` session and not-ready collapse into the first guard (`@session&.ready?`), missing file is the second guard, happy path is `send_file`. Tests at lines 190, 200, 211, 222 cover each branch; the happy-path test uses a `Tempfile` and asserts byte equality.
+5. **View renders the data attribute on ready ONLY**: the attribute lives inside the
+   `<% else %>` branch of the six-state ERB (`app/views/emulator/show.html.erb:62`), guarded
+   by every preceding `elsif` for the non-ready states. Three tests confirm absence on
+   non-ready paths (`test/controllers/emulator_controller_test.rb:177`, `:185`, `:193`).
 
-5. **`save_data` GET 204 vs 200 is correct** (`app/controllers/emulator_controller.rb:40-42`). 204 for nil and empty (both via `data.blank?`) and 200 with the body otherwise. Tests at lines 246, 257, 268.
+6. **JSON serialization escapes correctly**: `<%= @cheats.to_json %>` runs through ERB's
+   default HTML-safe escaping. Confirmed via Rails runner that `&`, `<`, `>` get JSON-escaped
+   to `&`/`<`/`>` and `"` gets HTML-escaped to `&quot;`. Stimulus's `Array`
+   value type decodes the attribute back through the HTML and JSON layers cleanly. No
+   injection risk on future multi-line AR codes containing shell or HTML metacharacters.
 
-6. **`save_data` PATCH writes correctly** (`app/controllers/emulator_controller.rb:34-38`). Reads `request.body.read`, persists via `update!`, returns 204. Test at line 284 sends `"NEW_SAVE_BYTES_\x00\x01\x02".b` and asserts round-trip via `sess.reload.save_data.to_s.b`. Bob added a defensive `return head :not_found if @session.nil?` on line 35; the brief did not ask for it but it prevents a NoMethodError when a fifth player attempts to PATCH while all four ROMs are claimed elsewhere. Sensible defense, not drift.
+7. **Stimulus filter logic** (`app/javascript/controllers/emulator_controller.js:45-50`):
+   `cheatsValue` is declared `Array` with `default: []` (line 21); `connect` filters
+   `c && c.enabled !== false && c.name && c.code` (so missing `enabled` passes through, only
+   explicit `false` is filtered, plus null-safety on `name`/`code`); maps to `[c.name, c.code]`
+   tuples; assigns `window.EJS_cheats = tuples` only when the filtered list is non-empty.
+   Empty cheats array is a no-op — matches `Array.isArray` precondition at
+   `public/emulatorjs/data/src/emulator.js:311`. `disconnect` clears `EJS_cheats = undefined`
+   on line 85.
 
-7. **Six-state view, no silent fall-through** (`app/views/emulator/show.html.erb:9-64`). Branches in order: `@run.nil?` → NO ACTIVE RUN; `emulator_status == :none` → ROMS NOT GENERATED YET; `@session.nil?` → NO ROM AVAILABLE; `pending || generating` → ROM GENERATING; `failed` → ROM GENERATION FAILED with `error_message`; else → emulator stage with `data-controller="emulator"`. Each branch has distinct copy. Status validations in the model bound the else to "ready".
+8. **Tuple format** verified against EmulatorJS source: `loader.js:102` assigns
+   `config.cheats = window.EJS_cheats`; `emulator.js:311-323` reads `cheat[0]` as `desc` and
+   `cheat[1]` as `code`, pushing `{desc, checked:false, code, is_permanent:true}`. Bob's
+   `[c.name, c.code]` mapping matches.
 
-8. **Stimulus controller** (`app/javascript/controllers/emulator_controller.js`):
-   - Globals set on lines 30-50, loader script injected on lines 52-55 — globals first, script second. Order correct.
-   - Existing save fetched on line 28 *before* globals are set; injected on `EJS_ready` (line 49) via `_injectExistingSave` (lines 95-117) which writes into `gameManager.FS` and calls `loadSaveFiles()`.
-   - `EJS_onSaveSave` registered on line 42 (the verified-correct callback for SRAM, per Architect ruling).
-   - `_uploadSave` sends `"X-CSRF-Token": this.csrfValue` on line 128.
-   - Both `_fetchSave` (line 80) and `_uploadSave` (line 130) use `credentials: "same-origin"`.
+9. **Multi-line YAML block strings** are exercised by the loader test at
+   `test/services/soul_link/game_state_cheats_test.rb:72-90`, which writes a `code: |` block,
+   reads it back, and asserts both lines survive. Real Tempfile + real Psych parser, so this
+   is a true integration check rather than a stub round-trip.
 
-9. **"Play" nav link is well-placed** (`app/views/layouts/application.html.erb:42`). Sibling of the existing "Runs" link, same `class="gb-nav-link"`, lives inside the `<% if logged_in? %>` wrapper on line 29. No layout disturbance.
+10. **No memoization leakage across test ordering.** The loader test brackets the ivar on
+    setup/teardown; the model and controller tests use `SoulLink::GameState.stub(:cheats, ...)`
+    which replaces the class method directly rather than touching `@cheats`, so the original
+    method (memoized or not) is fully restored on block exit. The Bootsnap-prepend issue that
+    defeats `YAML.load_file` stubs does not affect class-method stubs at the GameState level.
 
-10. **Test coverage matches DoD.** 23 named tests; every brief-listed scenario has a corresponding test:
-    - Auth (4): `show`, `rom`, `save_data` GET, `save_data` PATCH each redirect when not signed in.
-    - Six show-states (4 message + generating + ready + idempotent revisit): no active run, emulator_status :none, all claimed, auto-claim happy path, idempotent re-visit, pending, generating, failed (with error_message), ready.
-    - Claim race: monkey-patched `claim!` raises once, succeeds on retry, asserts `call_count == 2`.
-    - `rom` four branches: not ready, no session, file missing, file present (Tempfile).
-    - `save_data` GET three: nil, empty, present.
-    - `save_data` PATCH two: writes bytes, succeeds without CSRF under enforced forgery protection.
+11. **No scope creep.** The `cheat_overrides` column is not re-added; no per-player override
+    UI; no work in Step 7 cleanup territory. Empty `action_replay: []` placeholder ships as
+    instructed — no invented codes.
 
-11. **No scope creep.** No presence multiplayer, no cheat config, no cleanup polish. The only addition beyond the brief is the defensive PATCH nil-session guard mentioned in (6), which is a strict safety improvement.
+12. **Definition of Done** — every box independently verified:
+    - `config/soul_link/cheats.yml` exists with `action_replay: []` placeholder ✓
+    - `SoulLink::GameState.cheats` exists, memoized, returns `{}` if file absent ✓
+    - `SoulLinkEmulatorSession#cheats` returns the array (or `[]`) ✓
+    - `EmulatorController#show` sets `@cheats` only on `:ready` ✓
+    - View renders `data-emulator-cheats-value` only on ready ✓
+    - Stimulus has `cheats: Array` value and injects into `EJS_cheats` with verified format ✓
+    - GameState loader: 6 tests; model: 4 new tests; controller: 5 new + 1 extended ✓
+    - Full suite: 184 runs (169 baseline + 15 new), 0 failures ✓
+    - EJS_cheats global + tuple format verified against `loader.js:102` and
+      `emulator.js:311-323`, cited in REVIEW-REQUEST ✓
 
-12. **Hermetic tests.** `Tempfile` for ROM bytes; FactoryBot for `save_data`. No real EmulatorJS invocation, no fixtures on disk, no network. Race test's `class_eval` monkey-patch is restored in `ensure`; Rails forked-process parallelization isolates it from other workers.
+One observation worth recording but not blocking: Bob's "memoization" test counts
+`File.exist?` calls (1 across three `cheats` invocations) rather than `YAML.load_file` calls,
+because Bootsnap's `Psych4::Patch` defeats the `Module.prepend`-vs-singleton-stub priority
+used by `Minitest::Mock`. That's a tight equivalent — `||=` short-circuits the entire ternary
+on subsequent calls, so "existence checked once" implies "file loaded at most once" — and
+is documented in the test file header. The architect explicitly cleared this approach.
 
-The Architect-cleared deviations (`EMULATOR_CORE = "melonds"`, `EJS_onSaveSave` instead of `EJS_onSaveState`, no in-browser verification by Bob) are not re-litigated.
-
-Step 5 is clear.
+Step 6 is clear.
 
 VERDICT: PASS

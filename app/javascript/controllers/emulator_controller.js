@@ -17,7 +17,8 @@ export default class extends Controller {
     saveDataUrl: String,
     csrf: String,
     core: String,
-    pathtodata: String
+    pathtodata: String,
+    cheats: { type: Array, default: [] }
   }
 
   static targets = ["game"]
@@ -33,6 +34,20 @@ export default class extends Controller {
     window.EJS_pathtodata = this.pathtodataValue
     window.EJS_startOnLoaded = true
     window.EJS_Buttons = {}
+
+    // EmulatorJS reads window.EJS_cheats in loader.js (assigned to
+    // config.cheats), which emulator.js consumes as an array of [desc, code]
+    // tuples — see public/emulatorjs/data/loader.js:102 and
+    // public/emulatorjs/data/src/emulator.js:311-323. Each cheat is loaded
+    // disabled (`checked: false`) and toggleable via the in-game cheat
+    // menu. We honor the YAML's `enabled` flag by filtering disabled
+    // entries out so they don't appear in the menu at all.
+    if (this.cheatsValue.length > 0) {
+      const tuples = this.cheatsValue
+        .filter(c => c && c.enabled !== false && c.name && c.code)
+        .map(c => [c.name, c.code])
+      if (tuples.length > 0) window.EJS_cheats = tuples
+    }
 
     // EmulatorJS fires "saveSave" with { screenshot, format, save }
     // whenever the player triggers an SRAM save (the in-game Save menu
@@ -67,6 +82,7 @@ export default class extends Controller {
     window.EJS_Buttons = undefined
     window.EJS_onSaveSave = undefined
     window.EJS_ready = undefined
+    window.EJS_cheats = undefined
     if (this._loaderScript && this._loaderScript.parentNode) {
       this._loaderScript.parentNode.removeChild(this._loaderScript)
     }

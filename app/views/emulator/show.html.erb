@@ -58,7 +58,8 @@
        data-emulator-save-data-url-value="<%= save_data_emulator_path %>"
        data-emulator-csrf-value="<%= form_authenticity_token %>"
        data-emulator-core-value="<%= EmulatorController::EMULATOR_CORE %>"
-       data-emulator-pathtodata-value="/emulatorjs/data/">
+       data-emulator-pathtodata-value="/emulatorjs/data/"
+       data-emulator-cheats-value="<%= @cheats.to_json %>">
     <div id="emulator-game" data-emulator-target="game" style="width: 100%; min-height: 480px;"></div>
   </div>
 <% end %>

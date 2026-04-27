@@ -1,136 +1,138 @@
-# Review Request — Step 5
+# Review Request — Step 6: Cheat Config + EmulatorJS Cheat Integration
 
+**Author:** Bob (Builder)
+**Date:** 2026-04-26
 **Ready for Review:** YES
+
+---
 
 ## Summary
 
-Step 5 ships the player-facing emulator: a single `/emulator` page that auto-claims one of the run's four randomized ROMs, streams it to EmulatorJS in the browser, and round-trips SRAM via `GET`/`PATCH /emulator/save_data`. Six render states cover the lifecycle (no run → no ROMs generated → all claimed → generating → failed → ready). The controller's `set_session` carries a SQL-atomic claim with a single retry on `AlreadyClaimedError` for the page-reload-vs-Stimulus-connect race. Stimulus configures EmulatorJS via `window.EJS_*` globals and injects `loader.js`.
+Adds Action Replay cheat support to the player-facing emulator. New YAML config is loaded once per app boot via `SoulLink::GameState`, surfaced through `SoulLinkEmulatorSession#cheats`, threaded through `EmulatorController#show` only on the `:ready` branch, rendered as a `data-emulator-cheats-value` attribute on the emulator stage div, and injected into EmulatorJS via `window.EJS_cheats` by the Stimulus controller. Cheats are global (no per-player override) — the dropped `cheat_overrides` column stays dropped.
+
+The shipped `config/soul_link/cheats.yml` is `action_replay: []` (empty placeholder). User populates real codes manually after this step ships. **No example codes invented.**
+
+Full suite: **184 runs, 544 assertions, 0 failures, 0 errors, 0 skips** (15 new — 6 GameState loader + 4 model + 5 controller). Rubocop clean on all touched files.
+
+---
+
+## EmulatorJS Cheat-API Verification
+
+The brief flagged `window.EJS_cheats` and the tuple format as guesses. Verified against the bundled EmulatorJS v4.2.3 source:
+
+- **Global name:** `window.EJS_cheats` is read by loader.js and assigned to `config.cheats` — see `public/emulatorjs/data/loader.js:102`:
+  ```js
+  config.cheats = window.EJS_cheats;
+  ```
+- **Format:** Array of `[desc, code]` tuples. Each tuple is consumed in `public/emulatorjs/data/src/emulator.js:311-323`:
+  ```js
+  if (Array.isArray(this.config.cheats)) {
+      for (let i = 0; i < this.config.cheats.length; i++) {
+          const cheat = this.config.cheats[i];
+          if (Array.isArray(cheat) && cheat[0] && cheat[1]) {
+              this.cheats.push({
+                  desc: cheat[0],
+                  checked: false,
+                  code: cheat[1],
+                  is_permanent: true
+              })
+          }
+      }
+  }
+  ```
+- **Default-enabled behavior:** EmulatorJS always loads cheats with `checked: false` (disabled). The player toggles them via the in-game cheat menu. The YAML's `enabled` flag is therefore informational at the EmulatorJS layer — it cannot pre-check a cheat. We honor it at the Stimulus layer by **filtering out** entries with `enabled: false` before passing the tuple list, so disabled cheats don't appear in the menu at all. Entries with no explicit `enabled` (or `enabled: true`) are passed through.
+
+The brief's tuple-format guess was correct. Conclusion: ship `[name, code]` tuples to `window.EJS_cheats`.
+
+---
 
 ## Files Changed
 
-### Production
+### Created
+
+| File | Purpose |
+|------|---------|
+| `config/soul_link/cheats.yml` | Empty `action_replay: []` placeholder + comment describing entry shape |
+| `test/services/soul_link/game_state_cheats_test.rb` | 6 tests for the loader (file absent, parse, multi-line code, memoization, empty file → `{}`, `reload!`) |
+
+### Modified
 
 | File | Lines | Change |
 |------|-------|--------|
-| `config/routes.rb` | 47–53 | New `resource :emulator, only: [:show], controller: "emulator"` block with member `get :rom`, `get :save_data`, `patch :save_data`. Explicit `controller:` so the singular file `emulator_controller.rb` is used (default would be plural `EmulatorsController`). |
-| `app/controllers/emulator_controller.rb` | 1–84 (new) | Full controller. `EMULATOR_CORE = "melonds"`. `before_action :require_login, :set_run, :set_session`. `protect_from_forgery with: :null_session, only: [:save_data], if: -> { request.patch? }`. Auto-claim race-retry: stale `unclaimed.first` → `claim!` → on `AlreadyClaimedError`, re-query and retry once; second `AlreadyClaimedError` falls through to nil. |
-| `app/views/emulator/show.html.erb` | 1–63 (new) | Six-state ERB. GB aesthetic via `.gb-card` + raw CSS vars (`var(--l2)`, `var(--d2)`) — matches `runs/index.html.erb`. The `ready` state renders `data-controller="emulator"` with all 5 Stimulus values + `id="emulator-game"` mount target. |
-| `app/javascript/controllers/emulator_controller.js` | 1–127 (new) | Stimulus bridge. `connect()`: fetch existing save → set EJS_* globals → register `EJS_onSaveSave` handler → register `EJS_ready` to inject existing save into emulator FS via `gameManager.FS.writeFile(getSaveFilePath(), bytes)` + `loadSaveFiles()` → inject `loader.js`. `disconnect()` clears globals + removes loader script. |
-| `app/views/layouts/application.html.erb` | 42 | One new line: `<%= link_to "Play", emulator_path, class: "gb-nav-link" %>` immediately after the existing "Runs" link. Same gating as the rest of the nav (only renders when `logged_in?`). |
+| `app/services/soul_link/game_state.rb` | 13 (new const), 131-135 (new `cheats` method), 137-148 (`reload!` includes `@cheats = nil`) | Added `CHEATS_PATH` constant, `cheats` class method matching the existing inline `@x ||= ...` style, and `@cheats = nil` reset in `reload!` |
+| `app/models/soul_link_emulator_session.rb` | 28-37 | Added `#cheats` instance method that returns `SoulLink::GameState.cheats.fetch("action_replay", [])`, with `[]` fallback when the key is absent or non-Array |
+| `app/controllers/emulator_controller.rb` | 21-26 | `@cheats = @session.cheats if @session&.ready?` — populated only on the `:ready` branch |
+| `app/views/emulator/show.html.erb` | 61 | `data-emulator-cheats-value="<%= @cheats.to_json %>"` on the existing `:ready` emulator-stage div |
+| `app/javascript/controllers/emulator_controller.js` | 21 (values), 38-50 (EJS injection), 85 (disconnect cleanup) | Added `cheats: { type: Array, default: [] }` static value, EJS_cheats global injection (filtered by `enabled !== false`, mapped to `[name, code]` tuples, only set when the resulting list is non-empty), and `window.EJS_cheats = undefined` in disconnect |
+| `test/models/soul_link_emulator_session_test.rb` | 168-204 | 4 new tests covering empty GameState, missing `action_replay` key, non-Array `action_replay`, and array passthrough |
+| `test/controllers/emulator_controller_test.rb` | 144 (assertion added to existing test), 148-200 (5 new tests) | Existing ready-state test now asserts the data attribute is present; new tests cover empty cheats, populated cheats payload, and three non-ready states (no active run, generating, failed) — each asserting the data attribute is absent |
 
-### Tests
+### Deleted
 
-| File | Lines | Change |
-|------|-------|--------|
-| `test/controllers/emulator_controller_test.rb` | 1–308 (new) | 23 controller tests. See breakdown below. |
+None.
+
+---
+
+## Key Decisions
+
+1. **`enabled: false` filtered in Stimulus, not in the model.** EmulatorJS hard-codes `checked: false` regardless of input, so the YAML's `enabled` flag has no power at the EmulatorJS layer. Filtering at the JS boundary keeps the model dumb (passes everything through) and lets the user disable a cheat by editing one YAML line — the entry simply doesn't make it to the in-game menu. Documented inline above the filter logic.
+2. **`@cheats` populated only on `:ready` branch in the controller.** Other branches don't render the emulator stage, so the ivar isn't needed. This matches the brief and avoids a needless `nil.to_json` on the unused branches (which would render as `"null"` in the data attribute).
+3. **Test isolation: real Tempfiles, not stubs, for the loader test.** Bootsnap monkeypatches Psych via `Module.prepend` (`Bootsnap::CompileCache::YAML::Psych4::Patch`), which sits ahead of `Minitest::Mock.stub`'s singleton-class override — `YAML.stub(:load_file, ...)` does not actually replace the call path. Worked around by writing real YAML to a Tempfile, redefining `SoulLink::GameState::CHEATS_PATH` to point at it via `remove_const` + `const_set`, and restoring on teardown. This is **hermetic** (no shared state, no real-cheats.yml dependency) and exercises the actual YAML parser, which catches multi-line block-string handling for free. The discovery is captured as a comment at the top of the test file.
+4. **`File.exist?`-call counting for the memoization test.** Since we can't stub `YAML.load_file` cleanly through Bootsnap, the memoization test stubs `File.exist?` (which is unpatched) and asserts the existence check fires exactly once across three `cheats` calls. The `||=` operator short-circuits the entire ternary on subsequent calls, so this is a tight equivalent of "the file was loaded once."
+5. **`reload!` test added** — the brief didn't explicitly require it, but the `cheats` line was added to `reload!` and a regression there would silently break dev workflows that rely on `reload!` to pick up YAML edits. Cheap to cover.
+
+---
 
 ## Test Results
 
 ```
-mise exec -- ruby -S bundle exec rails test
-169 runs, 504 assertions, 0 failures, 0 errors, 0 skips
+$ mise exec -- ruby -S bundle exec rails test
+Running 184 tests in parallel using 10 processes
+184 runs, 544 assertions, 0 failures, 0 errors, 0 skips
 ```
 
-Baseline 146 + **23 new** = 169.
+Targeted breakdown:
+- `test/services/soul_link/game_state_cheats_test.rb` — 6 runs / 15 assertions / 0 failures
+- `test/models/soul_link_emulator_session_test.rb` — 19 runs (4 new) / 35 assertions / 0 failures
+- `test/controllers/emulator_controller_test.rb` — 29 runs (5 new + 1 extended) / 112 assertions / 0 failures
 
+Rubocop:
 ```
-mise exec -- ruby -S bundle exec rails test test/controllers/emulator_controller_test.rb
-23 runs, 67 assertions, 0 failures, 0 errors, 0 skips
-```
-
-Rubocop clean on all changed Ruby files.
-
-### Test breakdown (23)
-
-- **Auth (4):** `show`, `rom`, `save_data` GET, `save_data` PATCH each redirect to login when not signed in.
-- **show: no active run (1):** Deactivates fixture run; expects "NO ACTIVE RUN".
-- **show: emulator_status :none (1):** Active run, no sessions; expects "ROMS NOT GENERATED YET".
-- **show: all claimed (1):** 4 sessions all owned by other players; expects "NO ROM AVAILABLE".
-- **show: auto-claim happy path (1):** 4 unclaimed; verifies exactly one is claimed by the visiting player after the request and total count is unchanged.
-- **show: idempotent on re-visit (1):** Already-claimed session is not re-claimed; sibling unclaimed stays unclaimed.
-- **show: pending (1)** + **show: generating (1)** + **show: failed (1):** Each renders the correct lifecycle banner; failed includes `error_message` text.
-- **show: ready (1):** Renders the emulator stage with all five `data-emulator-*-value` attributes including `data-emulator-core-value="melonds"`.
-- **show: claim race (1):** Monkey-patches `claim!` to raise `AlreadyClaimedError` on the first call, succeed on the second; verifies the retry path executes and exactly one session ends up claimed by the player. Restores the original method via `ensure`.
-- **rom (4):** 404 when not ready, 404 when no session, 404 when `rom_full_path` doesn't exist on disk, 200 + correct body bytes when present (uses `Tempfile`).
-- **save_data GET (3):** 204 when nil, 204 when empty bytes, 200 with correct body bytes when present.
-- **save_data PATCH (2):** Writes the request body bytes into `session.save_data`. Second test flips `ActionController::Base.allow_forgery_protection = true` and confirms PATCH still succeeds *without* an `X-CSRF-Token` header — exercising the `null_session` bypass for real.
-
-## EmulatorJS API verification
-
-Both findings deviated from the brief slightly. Both are documented and intentional.
-
-**Core name: `melonds`.** I confirmed the DS core name by reading the source, since `public/emulatorjs/data/cores/` only ships README placeholders (cores are downloaded dynamically by the loader at runtime). Source of truth: `public/emulatorjs/data/src/GameManager.js` line 26:
-
-```js
-"nds": ["melonds", "desmume", "desmume2015"],
+$ bundle exec rubocop app/services/soul_link/game_state.rb \
+                     app/models/soul_link_emulator_session.rb \
+                     app/controllers/emulator_controller.rb \
+                     test/services/soul_link/game_state_cheats_test.rb \
+                     test/models/soul_link_emulator_session_test.rb \
+                     test/controllers/emulator_controller_test.rb
+6 files inspected, no offenses detected
 ```
 
-The first entry is the preferred default. `EMULATOR_CORE = "melonds"`.
-
-**Save callback: `EJS_onSaveSave`, not `EJS_onSaveState`.** The brief assumed `EJS_onSaveState` and noted I should verify. I did, in two places:
-
-- `public/emulatorjs/data/loader.js` lines 156–167 — the loader wires both `EJS_onSaveState` (event "saveState") and `EJS_onSaveSave` (event "saveSave"); they're different events.
-- `public/emulatorjs/data/src/emulator.js` line 1903 fires `saveState` with payload `{ screenshot, format, state }` — this is the *RetroArch-style snapshot* (in-memory state). Line 1954 fires `saveSave` with payload `{ screenshot, format, save }` — this is the *SRAM file* (the actual cartridge save).
-
-For Pokemon Platinum, the player saves via the in-game Save menu, which writes SRAM. That's `onSaveSave`. `onSaveState` would persist a snapshot of working RAM at the moment the user clicked the EmulatorJS save-state button, which is unrelated to Pokemon's save system. Using `onSaveSave` is the correct choice. Documented in the Builder Plan and the controller's source comment.
-
-There is no public "preload SRAM URL" config. To restore an existing save on boot I use `EJS_ready` to write the bytes directly into the emulator's virtual FS at `gameManager.getSaveFilePath()`, then call `gameManager.loadSaveFiles()` — same pattern that `loadSavFiles` button uses internally (`emulator.js` lines 1967–1983).
-
-## DoD Checklist
-
-- [x] Routes added; `rake routes | grep emulator` shows all 4 endpoints (`/emulator`, `/emulator/rom`, `GET /emulator/save_data`, `PATCH /emulator/save_data`)
-- [x] `EmulatorController` exists with all required actions, before-actions, the `null_session` PATCH bypass, and the auto-claim race-retry logic
-- [x] `app/views/emulator/show.html.erb` renders all six states correctly (4 message states + generating + ready)
-- [x] "Play" link added to layout nav, gated on `logged_in?` via the existing wrapping `<% if logged_in? %>`
-- [x] `app/javascript/controllers/emulator_controller.js` configures EmulatorJS, handles save round-trip with CSRF header, writes existing save into FS on `EJS_ready`
-- [x] Controller tests cover: auth (4), all six show-states, auto-claim happy path + race retry, rom 404s + 200, save_data GET 204 + 200, save_data PATCH writes correctly, CSRF bypass works under enforced forgery protection
-- [x] Full suite: 146 baseline + 23 new = 169, 0 failures
-- [x] EmulatorJS core name + save callback verified against `public/emulatorjs/data/src/`
-- [x] "What to verify locally" checklist for the user (below)
-
-## What To Verify Locally
-
-I cannot drive a browser. After `git pull && rake emulatorjs:install && bin/rails server` (and `rake soul_link:bot` if you want the Discord bot), please run through this checklist as the run-creator account first, then as a second player account:
-
-**Without an active run:**
-1. Sign in with Discord. Confirm the new "Play" link appears in the top nav between "Runs" and the avatar.
-2. Click "Play". Expect the **NO ACTIVE RUN** card with a "GO TO RUNS" button.
-
-**With an active run, before generating ROMs:**
-3. Start a new run from `/runs`. Click "Play". Expect the **ROMS NOT GENERATED YET** card.
-
-**Generating:**
-4. Back to `/runs`. Click "Generate Emulator ROMs". Quickly switch to `/emulator`. Expect **ROM GENERATING…** for the duration the job runs (a few seconds for the randomizer per ROM × 4).
-5. Refresh `/emulator` after ~30–60 seconds. Expect either **ROM GENERATING…** still, or transition into the ready state.
-
-**Ready, single player:**
-6. Once one of the four sessions is `ready`, the page should render an EmulatorJS canvas inside a `gb-card` panel. The melonDS core will download from the EmulatorJS CDN on first load (~10 MB) — this is normal v4.2.3 behavior.
-7. Wait for the boot screen and the Pokemon Platinum title screen. **Things to confirm:**
-   - The DS dual-screen layout renders.
-   - Audio plays.
-   - Keyboard / gamepad input registers (default mappings — not customized this step).
-   - Reload the page. The same player should land on the same ROM (no re-claim), and the page should re-render the emulator with the same state of the world (auto-claim should be idempotent).
-
-**Save round-trip:**
-8. In the running game, walk into the menu and trigger an in-game save (write to the journal). This writes SRAM inside the emulator's virtual FS but does *not* yet round-trip to the server.
-9. Click the "Save SRAM" / "Export Save File" button in the EmulatorJS UI footer (the floppy-disk icon for SRAM, not the camera-roll icon for save states). The Stimulus controller should intercept the default download and `PATCH /emulator/save_data` instead. Open DevTools Network tab to confirm a `204` response.
-10. Refresh the page. The page should refetch the SRAM via `GET /emulator/save_data`, EmulatorJS boots, the FS is repopulated in `EJS_ready`, and loading the save in-game should return you to where you were.
-
-**Multi-player auto-claim:**
-11. Sign in as a second player. Visit `/emulator`. Expect a different ROM to be auto-claimed — verify by inspecting the response (the `data-emulator-rom-url-value` and `data-emulator-save-data-url-value` are session-scoped via the Discord session, but the underlying ROM bytes will differ; you can confirm by hashing the downloaded ROM, or by simply checking that two players don't see the *same* save state when they both have saves).
-12. Continue with players 3 and 4. Player 5 (if you create one) should see **NO ROM AVAILABLE**.
-
-**Failure path:**
-13. (Optional) Inject a session failure manually via console: `SoulLinkEmulatorSession.last.update!(status: "failed", error_message: "test")`. Visit `/emulator` as that player. Expect **ROM GENERATION FAILED** with the error text.
-
-If any of those steps misbehave, please paste the relevant DevTools Console + Network output into REVIEW-FEEDBACK.md and I'll iterate.
+---
 
 ## Open Questions
 
-1. **EmulatorJS download caching.** The first visit downloads the melonDS core (~10 MB) from the EmulatorJS CDN. EmulatorJS caches this in IndexedDB by default. If the project owner is hosting offline / behind a firewall, we may need to set `EJS_CacheLimit` or self-host cores from `/public/emulatorjs/data/cores/`. Out of scope for Step 5 — flagging only.
-2. **No `disconnect()`-side teardown of the Module/canvas.** EmulatorJS v4 doesn't expose a clean shutdown API; turbo-frame nav between Stimulus mounts could theoretically leave the previous Module running in the background. The current implementation clears globals + removes the loader script, which is the documented "best effort" pattern. Real navigation away (full page reload) cleans up everything. Acceptable for Step 5.
-3. **Multi-tab.** If a player opens `/emulator` in two tabs simultaneously, both will boot and both will compete for save uploads on the next save. The server-side `claim!` prevents double-claim, but inside one player's session there's no inter-tab lock. Out of scope; mention if you want a "this session is open in another tab" warning later.
+None blocking. One observation worth noting:
 
-## Known Gaps
+- **No automated browser test for the EJS_cheats handoff.** Same constraint as Steps 4 and 5 — Bob can't drive a real browser. The Stimulus side is exercised by the controller/view assertions (data attribute present + value contents), and the EmulatorJS side has been traced through loader.js → emulator.js. Recommend the user spot-check by populating one real AR code in `config/soul_link/cheats.yml`, hitting `/emulator`, and confirming the cheat appears (toggleable, defaulting to off) in the EmulatorJS in-game cheat menu.
 
-None. Build is in scope.
+---
+
+## Smoke Test Checklist (for User after merge)
+
+1. Add a real AR code to `config/soul_link/cheats.yml`, e.g.:
+   ```yaml
+   action_replay:
+     - name: "Walk Through Walls"
+       enabled: true
+       code: |
+         02000000 12345678
+         02000004 ABCDEF01
+   ```
+2. Restart the Rails server (loader memoizes — `bin/dev` reload won't pick up YAML changes).
+3. Visit `/emulator`. Open browser devtools console. Run `window.EJS_cheats` — should print the tuple array.
+4. In the EmulatorJS UI, open the cheat menu (gear icon → Cheats). The cheat should appear, default unchecked. Toggle it on; the cheat should activate in-game.
+5. Set `enabled: false` on the cheat in YAML, restart the server, refresh `/emulator`. The cheat should no longer appear in the cheat menu.
+
+---
+
+**Ready for Review: YES**

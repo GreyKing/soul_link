@@ -25,6 +25,16 @@ class SoulLinkEmulatorSession < ApplicationRecord
     Rails.root.join(rom_path) if rom_path.present?
   end
 
+  # Global Action Replay cheats for this run. Sourced from
+  # `config/soul_link/cheats.yml` via `SoulLink::GameState.cheats`. Returns
+  # an Array of cheat hashes (`{name:, code:, enabled:}`); an empty Array
+  # when no cheats are configured. Cheats are global, not per-player.
+  def cheats
+    list = SoulLink::GameState.cheats.fetch("action_replay", [])
+    return [] unless list.is_a?(Array)
+    list
+  end
+
   # SQL-atomic claim. The `discord_user_id: nil` guard in the WHERE clause
   # ensures concurrent claims race at the database level — exactly one
   # UPDATE will affect a row; the rest see zero affected rows and raise.

@@ -20,6 +20,9 @@ class EmulatorController < ApplicationController
 
   def show
     # The view renders one of six states based on @run / @session.
+    # Only the :ready branch renders the emulator stage, so only that branch
+    # needs the cheats payload — populate the ivar accordingly.
+    @cheats = @session.cheats if @session&.ready?
   end
 
   def rom

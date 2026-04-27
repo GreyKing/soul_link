@@ -10,6 +10,7 @@ module SoulLink
     TYPES_PATH = Rails.root.join('config', 'soul_link', 'types.yml')
     ABILITIES_PATH = Rails.root.join('config', 'soul_link', 'abilities.yml')
     EVOLUTIONS_PATH = Rails.root.join('config', 'soul_link', 'evolutions.yml')
+    CHEATS_PATH = Rails.root.join('config', 'soul_link', 'cheats.yml')
 
     class << self
       def gym_info
@@ -127,6 +128,12 @@ module SoulLink
         data
       end
 
+      # Action Replay cheats. Returns the parsed YAML hash (e.g.
+      # { "action_replay" => [...] }) or {} if the file is absent.
+      def cheats
+        @cheats ||= File.exist?(CHEATS_PATH) ? (YAML.load_file(CHEATS_PATH) || {}) : {}
+      end
+
       def reload!
         @gym_info = nil
         @locations = nil
@@ -137,6 +144,7 @@ module SoulLink
         @pokemon_types = nil
         @pokemon_abilities = nil
         @evolutions = nil
+        @cheats = nil
       end
     end
   end
