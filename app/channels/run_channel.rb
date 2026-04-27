@@ -58,6 +58,26 @@ class RunChannel < ApplicationCable::Channel
     transmit({ error: e.message })
   end
 
+  def generate_emulator_roms(_data)
+    run = SoulLinkRun.current(@guild_id)
+    unless run
+      transmit({ error: "No active run found" })
+      return
+    end
+
+    # Idempotent: if anything other than :none, do nothing — just re-broadcast
+    # so the client lands on the current truth.
+    if run.emulator_status != :none
+      broadcast_state
+      return
+    end
+
+    SoulLink::GenerateRunRomsJob.perform_later(run)
+    broadcast_state
+  rescue => e
+    transmit({ error: e.message })
+  end
+
   def self.broadcast_run_state(guild_id)
     current_run = SoulLinkRun.current(guild_id)
     past_runs = SoulLinkRun.history(guild_id).limit(20)

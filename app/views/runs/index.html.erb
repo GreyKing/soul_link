@@ -50,6 +50,11 @@
                 class="gb-btn-primary gb-btn-sm <%= 'hidden' if @current_run&.discord_channels_configured? %>">
           Setup Discord
         </button>
+        <button data-action="click->run-management#generateEmulatorRoms"
+                data-run-management-target="generateRomsButton"
+                class="gb-btn-primary gb-btn-sm <%= 'hidden' if @current_run&.emulator_status != :none %>">
+          Generate Emulator ROMs
+        </button>
       </div>
     </div>
   </div>

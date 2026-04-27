@@ -2,6 +2,8 @@ require "test_helper"
 
 module SoulLink
   class GenerateRunRomsJobTest < ActiveJob::TestCase
+    include ActionCable::TestHelper
+
     setup do
       @run = create(:soul_link_run)
     end
@@ -110,6 +112,26 @@ module SoulLink
       assert_equal 3, sessions.where(status: "ready").count
       assert_equal 1, sessions.where(status: "failed").count
       assert_equal "synthetic boom", sessions.where(status: "failed").first.error_message
+    end
+
+    # ---- post-completion broadcast ----------------------------------------
+
+    test "broadcasts run state on completion" do
+      with_randomizer_stub(succeed_quietly) do
+        assert_broadcasts(RunChannel.broadcasting_for(@run.guild_id.to_s), 1) do
+          SoulLink::GenerateRunRomsJob.perform_now(@run)
+        end
+      end
+    end
+
+    test "broadcasts run state even when randomizer raises" do
+      behavior = ->(_session, _counter) { raise "boom" }
+
+      with_randomizer_stub(behavior) do
+        assert_broadcasts(RunChannel.broadcasting_for(@run.guild_id.to_s), 1) do
+          SoulLink::GenerateRunRomsJob.perform_now(@run)
+        end
+      end
     end
 
     # An UNHANDLED exception inside the service must also not abort the loop —

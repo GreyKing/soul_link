@@ -27,6 +27,10 @@ module SoulLink
         # not abort generation of the others.
         Rails.logger.error("[GenerateRunRomsJob] session #{session.id} crashed: #{e.class}: #{e.message}")
       end
+    ensure
+      # Always notify the runs page so the button transitions out of
+      # :generating regardless of success / partial failure / hard crash.
+      RunChannel.broadcast_run_state(soul_link_run.guild_id) if soul_link_run&.persisted?
     end
 
     private

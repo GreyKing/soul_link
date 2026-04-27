@@ -1,146 +1,134 @@
-# Review Feedback — Step 3
-
+# Review Feedback — Step 4
 Date: 2026-04-26
 Ready for Builder: YES
-
----
 
 ## Must Fix
 
 None.
 
----
-
 ## Should Fix
 
-- `lib/tasks/emulatorjs.rake:67` — The non-success branch in `download_to_file`
-  raises `"HTTP #{response.code} downloading #{url}"` without including the
-  response body, while the equivalent branch in `http_get_body` (line 43)
-  includes `response.body.to_s[0, 200]`. Minor inconsistency; if GitHub ever
-  returns a meaningful error payload during the tarball fetch (rate-limit
-  JSON, etc.), it'd be useful to surface it the same way. One-liner: append
-  `: #{response.body.to_s[0, 200]}` to match. Not blocking.
-
-- `lib/tasks/emulatorjs.rake:144-152` — `task :clean` uses `File.exist?(dest)`
-  where `dest` is a `Pathname`. Works correctly, but `dest.exist?` would be
-  marginally more idiomatic. Not blocking.
-
----
+None.
 
 ## Escalate to Architect
 
-None. The full-tarball-vs-`data/`-only question Bob raised in Open Question
-\#1 was already ruled by Architect (ship everything, GPL LICENSE must
-accompany redistributed code). Not re-litigated.
+None.
 
----
+## Observations
+
+These are not blocking. Logged here so Bob and the Project Owner see what
+I noticed but did not require a fix for.
+
+- **Channel-layer race is real but small (per Architect ruling — do not block).**
+  `RunChannel#generate_emulator_roms` reads `run.emulator_status` (a DB
+  query) and *then* `perform_later`s the job. Two channel actions arriving
+  in rapid succession — e.g. two browser tabs, or a network blip causing
+  the client to retry — could both observe `:none` before either has
+  enqueued. The result is two enqueued jobs, not two creation runs: the
+  job's own count guard at line 15 of `generate_run_roms_job.rb`
+  (`return if ... count >= SESSIONS_PER_RUN`) catches it on the worker
+  side, so the user-visible behavior is still correct. Defense in depth
+  held, but at the job layer, not the channel layer. The button hiding
+  on first click already eliminates the common case (single-user double-
+  click), and there are only four users on this server. Acceptable as-is.
+  If we ever go multi-process or higher-traffic, the proper fix is a
+  unique DB constraint or an advisory lock around session creation —
+  not in scope for Step 4.
+
+- **`emulator_status` does N+1 work.** `soul_link_emulator_sessions` (no
+  preload) loads all sessions, then iterates with `.any?` up to twice. For
+  four rows per run this is fine; if `broadcast_state` ever runs over
+  the past-runs list (currently capped at 20 in `build_state_payload` /
+  `broadcast_run_state`), that's up to 20 extra SELECTs per broadcast.
+  Not a Step 4 problem — those past-run payloads already do `caught_count`
+  and `dead_count` queries — but worth keeping in mind if broadcast
+  latency ever shows up in profiling.
 
 ## Cleared
 
-Reviewed `lib/tasks/emulatorjs.rake`, `.gitignore`, `handoff/REVIEW-REQUEST.md`,
-and cross-checked against `lib/tasks/pokemon_data.rake` for convention.
+Read each of the eleven scrutiny points end-to-end. Findings, in order:
 
-Verified each scrutiny point:
+1. **`generate_emulator_roms` mirrors `setup_discord` correctly.**
+   Same `unless run; transmit({ error: "No active run found" }); return; end`
+   guard. Same trailing `rescue => e; transmit({ error: e.message })`.
+   Same `broadcast_state` on success. The added idempotency block
+   (lines 70–73) is the only structural difference, and the brief
+   explicitly required it. No drift in error shape.
 
-**1. HTTP redirect handling.** Both `http_get_body` (rake:25-46) and
-`download_to_file` (rake:48-71) implement bounded recursive redirect loops.
-`MAX_REDIRECTS = 5`. Counter decrements on every hop; raises
-`"Too many redirects ..."` when `redirects_left.negative?`. `Location`
-header is read; raises clearly when missing or empty. No infinite-loop
-risk. `URI.join(url, location).to_s` correctly handles relative redirect
-targets.
+2. **Channel-layer idempotency is "true no-op," not "exactly-once."**
+   `test/channels/run_channel_test.rb:41` uses
+   `assert_no_enqueued_jobs(only: SoulLink::GenerateRunRomsJob)` —
+   that asserts zero, not one. Same on line 52 (`:generating` case)
+   and line 61 (no-active-run case). All three idempotency paths
+   assert NO job was enqueued. Correct.
 
-**2. Wrapper-directory strip.** `locate_wrapper_dir` (rake:80-88) requires
-exactly one non-dotfile top-level entry, asserts it's a directory, and
-returns its full path. `move_contents` (rake:90-95) iterates
-`Dir.children(wrapper)` and `FileUtils.mv`s each child into `dest` — so the
-wrapper directory itself is discarded and its contents land at
-`public/emulatorjs/data/loader.js` (matching DoD), not nested under
-`public/emulatorjs/EmulatorJS-EmulatorJS-<sha>/`. Bob's directory listing in
-REVIEW-REQUEST corroborates this — 16 top-level entries, no
-`EmulatorJS-EmulatorJS-e150dc0/`.
+3. **Job's `ensure` block fires on every path.** Line 30 of
+   `generate_run_roms_job.rb` is a true Ruby `ensure` (not
+   `rescue StandardError`) attached to the `perform` method — fires on
+   success, on per-session errors that the inner `rescue` swallows,
+   and on hard crashes that bubble out of `perform`. Tests at line 119
+   (success) and line 127 (randomizer-raises causing the whole job
+   to raise) both assert the broadcast fires. The
+   unrescued-StandardError test at line 139 separately confirms the
+   per-session rescue works while still allowing `ensure` to fire.
+   Three angles of coverage.
 
-**3. Stdlib-only constraint.** `require`s are `net/http`, `json`,
-`fileutils`, `tmpdir`, `open3`, `uri` — all stdlib. No new gems. Bob's
-`git status` shows only `.gitignore`, `handoff/ARCHITECT-BRIEF.md`, and
-`lib/tasks/emulatorjs.rake` modified — Gemfile and Gemfile.lock are not
-in the changed-files list.
+4. **Stimulus uses string comparisons.** Lines 128–133 of
+   `run_management_controller.js`:
+   `const status = current_run.emulator_status` followed by
+   `if (status === "none" || status === "failed")`. Plain string
+   literals. No symbol leakage, no template-string comparison, no
+   truthy checks that would wrongly accept `null`/`undefined`.
 
-**4. Errors are loud.** Every failure path names the URL or path:
+5. **`emulator_status` priority is correct.** Lines 53–59 of
+   `soul_link_run.rb`: empty → `:none`, then any `failed` → `:failed`,
+   then any `pending`/`generating` → `:generating`, else `:ready`.
+   Pending is correctly bucketed with generating per the brief
+   (`%w[pending generating]`). Default-pending exercised by
+   `test/models/soul_link_run_test.rb:29`.
 
-- Non-200 from GitHub API: `"HTTP <code> fetching <url>: <body[0..200]>"`.
-- Non-200 during download: `"HTTP <code> downloading <url>"` (see Should
-  Fix — body not included; not blocking).
-- Redirect with no Location header: names the URL.
-- `tar` non-zero exit: includes path, exit code, stderr, and stdout.
-- Unexpected wrapper layout: lists actual entries (`#{entries.inspect}`).
-- Missing `tag_name` / `tarball_url`: explicit raise before downstream
-  use.
-- JSON parse failure on release lookup: includes URL and underlying error.
+6. **`has_many :soul_link_emulator_sessions, dependent: :destroy`
+   present** at line 8 of `soul_link_run.rb`. Inverse
+   `belongs_to :soul_link_run` confirmed at line 6 of
+   `soul_link_emulator_session.rb`.
 
-No silent rescues. The two `rescue` blocks (one for `JSON::ParserError` at
-rake:20, none in the rake bodies themselves) re-raise with context.
+7. **No HTTP route, no controller, no view drift.**
+   `grep -i emulator config/routes.rb` returns nothing.
+   `ls app/controllers/ | grep emulator` returns nothing. The only
+   view change is the new sibling button in
+   `app/views/runs/index.html.erb` lines 53–57. `git diff 9ce4114`
+   confirms only the five production files Bob listed are modified.
 
-**5. Idempotency.** `FileUtils.rm_rf(dest)` then `FileUtils.mkdir_p(dest)`
-then `move_contents(wrapper, dest)` (rake:128-130). Full destruction-and-
-replace, no diff/merge logic. Also covers partial-failure recovery: a
-half-extracted directory from a previous failed run gets blown away on the
-next attempt. Bob's verification run \#5 confirms re-install after clean
-produces the same 16 entries.
+8. **`broadcast_state` extension is additive.** New key
+   `emulator_status` added at line 72 of `soul_link_run.rb`. The
+   Stimulus `render()` only reads `current_run.emulator_status`
+   inside `if (this.hasGenerateRomsButtonTarget)` (line 127); no
+   destructuring elsewhere requires the previous key set. Existing
+   consumers read individual properties off `current_run`, none of
+   which were touched.
 
-**6. `Dir.mktmpdir` block form.** `Dir.mktmpdir("emulatorjs-install-") do
-|tmpdir| ... end` (rake:113). Tarball + extraction sandbox auto-cleaned on
-success and on exception.
+9. **No `setup_discord` regression.** `git diff 9ce4114
+   app/channels/run_channel.rb` shows pure addition: 20 lines added
+   at line 60, zero lines deleted. `setup_discord` at lines 43–59 is
+   byte-for-byte unchanged.
 
-**7. Project convention match.** Mirrors `lib/tasks/pokemon_data.rake`
-shape: top-level `require`s, helper module, `namespace :name do ... end`
-with `desc` + `task` blocks. The helper module uses `module_function`
-where `pokemon_data.rake` uses explicit `self.method`s — minor stylistic
-difference, both valid Ruby idioms; neither breaks the convention. Bob
-deliberately omitted `task install: :environment` because the task touches
-no DB/models — explicitly called out in the brief and the implementation
-note. Reasonable.
+10. **Definition of Done — independent verification.**
+    - has_many present (line 8) — checked
+    - emulator_status returns each symbol (6 model tests, pass) — checked
+    - broadcast_state includes emulator_status (2 model tests, pass) — checked
+    - generate_emulator_roms enqueues / idempotent / broadcasts (3 channel tests, pass) — checked
+    - Job ensure-block broadcast (2 job tests, pass — success + raise) — checked
+    - Stimulus method, target, broadcast toggle (lines 9, 89–91, 124–134) — checked
+    - View button next to Setup Discord with `'hidden' if != :none` (lines 53–57) — checked
+    - No-active-run error broadcast (channel test line 57) — checked
+    - Full suite: I ran the three changed test files myself —
+      20 runs, 67 assertions, 0 failures, 0 errors. Bob's 146/146
+      full-suite figure stands.
 
-**8. Verification claims.**
+11. **Race / concurrency** — covered above in Observations. Not a blocker.
 
-- Full test suite passing 131/131 is plausible — the rake task touches no
-  app code, no autoload, no DB. Step 2 baseline preserved (no new tests
-  added, none broken).
-- `.gitignore` line 46 is `/public/emulatorjs/` with the leading slash
-  (root-anchored). Correct semantics — won't accidentally match a nested
-  `public/emulatorjs/` somewhere else in the tree. Placed appropriately
-  beneath `/public/assets` (line 43) with a one-line header comment
-  (line 45) explaining provenance.
-- Bob's `git status` output confirms no entries from inside
-  `public/emulatorjs/` leak as untracked.
-
-**9. Definition of Done.** All 9 boxes verifiable from REVIEW-REQUEST and
-the actual files:
-
-- [x] Rake file exists with `install` and `clean` under `emulatorjs:`
-      namespace (rake:98-153).
-- [x] `.gitignore` includes `/public/emulatorjs/` (line 46).
-- [x] `rake emulatorjs:install` runs successfully against live GitHub API
-      (resolved to `v4.2.3`).
-- [x] Populated correctly — `data/loader.js`, `data/emulator.css`,
-      `data/cores/`, `data/version.json` all confirmed present.
-- [x] Fully gitignored — `git status` shows no inside entries.
-- [x] `rake emulatorjs:clean` removes the directory (verified twice — once
-      with directory present, once already absent).
-- [x] Idempotency — re-install after clean produces the same 16 entries.
-- [x] Full suite passes (131/131).
-- [x] REVIEW-REQUEST contains the directory listing + `tag_name: v4.2.3`.
-
-**10. No scope creep.** Modified set is exactly `lib/tasks/emulatorjs.rake`
-(new), `.gitignore` (one block added), and `handoff/ARCHITECT-BRIEF.md`
-(Builder Plan section appended per directive). No app code, no controllers,
-no routes, no views, no migrations, no Step 5 wiring leaked in.
-
-**Architect ruling honored.** Full-tarball install (16 top-level entries
-including LICENSE, .github/, docs/, etc.) accepted per the standing GPL-
-attribution ruling. Bob's Open Question \#1 raises the question politely;
-the decision stands and is not flagged as an issue.
-
-Step 3 is clear.
+**Smoke test gap.** Bob explicitly stated he could not drive a real
+browser. Architect ruled that the user will smoke-test locally.
+Not a review issue.
 
 VERDICT: PASS_WITH_OBSERVATIONS

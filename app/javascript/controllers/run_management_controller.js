@@ -6,6 +6,7 @@ export default class extends Controller {
     "currentRunPanel", "noRunPanel", "historyList",
     "runNumber", "gymsDefeated", "caughtCount", "deadCount", "startedAt",
     "setupDiscordButton",
+    "generateRomsButton",
     "errorMessage"
   ]
   static values = {
@@ -85,6 +86,10 @@ export default class extends Controller {
     this.subscription.perform("setup_discord")
   }
 
+  generateEmulatorRoms() {
+    this.subscription.perform("generate_emulator_roms")
+  }
+
   // ── Rendering ──
 
   render() {
@@ -114,6 +119,18 @@ export default class extends Controller {
         this.setupDiscordButtonTarget.classList.remove("hidden")
         this.setupDiscordButtonTarget.disabled = false
         this.setupDiscordButtonTarget.textContent = "Setup Discord Channels"
+      }
+
+      // Generate Emulator ROMs button — visible only in :none and :failed
+      // (failed acts as retry; refined UX is Step 7). Symbols arrive as
+      // Strings over the wire.
+      if (this.hasGenerateRomsButtonTarget) {
+        const status = current_run.emulator_status
+        if (status === "none" || status === "failed") {
+          this.generateRomsButtonTarget.classList.remove("hidden")
+        } else {
+          this.generateRomsButtonTarget.classList.add("hidden")
+        }
       }
     } else {
       this.currentRunPanelTarget.classList.add("hidden")

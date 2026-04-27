@@ -5,6 +5,7 @@ class SoulLinkRun < ApplicationRecord
   has_many :gym_drafts, dependent: :destroy
   has_many :gym_schedules, dependent: :destroy
   has_many :gym_results, dependent: :destroy
+  has_many :soul_link_emulator_sessions, dependent: :destroy
 
   validates :run_number, presence: true, uniqueness: { scope: :guild_id }
   validates :guild_id, presence: true
@@ -44,6 +45,19 @@ class SoulLinkRun < ApplicationRecord
       catches_channel_id.present? && deaths_channel_id.present?
   end
 
+  # Aggregate state of the run's 4 emulator-ROM sessions.
+  #   :none       — no sessions yet (not generated)
+  #   :failed     — at least one session is in failed state (priority over :generating)
+  #   :generating — at least one session is pending or generating, none failed
+  #   :ready      — all sessions are ready
+  def emulator_status
+    sessions = soul_link_emulator_sessions
+    return :none if sessions.empty?
+    return :failed if sessions.any? { |s| s.status == "failed" }
+    return :generating if sessions.any? { |s| %w[pending generating].include?(s.status) }
+    :ready
+  end
+
   def broadcast_state
     {
       id: id,
@@ -54,7 +68,8 @@ class SoulLinkRun < ApplicationRecord
       dead_count: dead_groups.count,
       started_at: created_at&.iso8601,
       ended_at: active? ? nil : updated_at&.iso8601,
-      has_discord_channels: discord_channels_configured?
+      has_discord_channels: discord_channels_configured?,
+      emulator_status: emulator_status
     }
   end
 end
