@@ -42,6 +42,9 @@
 
 /public/assets
 
+# EmulatorJS assets — provisioned via `rake emulatorjs:install`, never committed.
+/public/emulatorjs/
+
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 

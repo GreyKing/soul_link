@@ -1,4 +1,4 @@
-# Review Feedback — Step 2
+# Review Feedback — Step 3
 
 Date: 2026-04-26
 Ready for Builder: YES
@@ -13,187 +13,134 @@ None.
 
 ## Should Fix
 
-None blocking. See Observations.
+- `lib/tasks/emulatorjs.rake:67` — The non-success branch in `download_to_file`
+  raises `"HTTP #{response.code} downloading #{url}"` without including the
+  response body, while the equivalent branch in `http_get_body` (line 43)
+  includes `response.body.to_s[0, 200]`. Minor inconsistency; if GitHub ever
+  returns a meaningful error payload during the tarball fetch (rate-limit
+  JSON, etc.), it'd be useful to surface it the same way. One-liner: append
+  `: #{response.body.to_s[0, 200]}` to match. Not blocking.
+
+- `lib/tasks/emulatorjs.rake:144-152` — `task :clean` uses `File.exist?(dest)`
+  where `dest` is a `Pathname`. Works correctly, but `dest.exist?` would be
+  marginally more idiomatic. Not blocking.
 
 ---
 
 ## Escalate to Architect
 
-None. The one open question Bob flagged (`error_message` 255 vs 500) was
-already ruled by Architect — keep at 255 to match column width. No further
-escalations.
-
----
-
-## Observations (non-blocking)
-
-### O1. Job idempotency check is not lock-protected (theoretical race)
-
-`app/jobs/soul_link/generate_run_roms_job.rb:15` reads
-`SoulLinkEmulatorSession.where(...).count >= SESSIONS_PER_RUN` without a lock.
-Two simultaneous enqueues for the same run could both see `count == 0` and
-each create 4 sessions → 8 total. There is no DB-level unique constraint on
-`(soul_link_run_id, slot)` or similar to catch this; `discord_user_id`
-uniqueness allows multiple NULLs.
-
-In practice, Step 4 will gate this on a single button click and the Rails 8
-`:async` adapter is single-process, so the race is unlikely in the deployed
-shape. Worth revisiting in Step 4 (controller-level guard, or a `with_lock`
-on the run row, or a unique slot column). Not blocking Step 2.
-
-### O2. `discord_user_id: nil` in `create!` is redundant but documenting
-
-`generate_run_roms_job.rb:41` — Bob flagged this himself. The column is
-nullable and the factory default is nil. Reads as intentional documentation
-of "these are deliberately unclaimed." Keep it; harmless.
-
-### O3. Service-test stubbing routes through one helper
-
-All 10 service tests funnel through the `with_preconditions` helper before
-calling `@service.call`, which is what guarantees the Java/File seams are
-stubbed. If a future test forgets to wrap, the real
-`system("command -v java …")` would run. Low-risk today (current tests are
-correct); a future-proofing improvement would be to seed the predicate stub
-in `setup do … end`. Not blocking.
+None. The full-tarball-vs-`data/`-only question Bob raised in Open Question
+\#1 was already ruled by Architect (ship everything, GPL LICENSE must
+accompany redistributed code). Not re-litigated.
 
 ---
 
 ## Cleared
 
-Reviewed `app/services/soul_link/rom_randomizer.rb`,
-`app/jobs/soul_link/generate_run_roms_job.rb`, the two new test files,
-`.gitignore`, and the three `.keep` placeholders.
+Reviewed `lib/tasks/emulatorjs.rake`, `.gitignore`, `handoff/REVIEW-REQUEST.md`,
+and cross-checked against `lib/tasks/pokemon_data.rake` for convention.
 
-**Spec compliance.** Service contract met:
+Verified each scrutiny point:
 
-- Returns `false` on handled failure (no raise) — `fail!` returns false at
-  every failure path.
-- Sets `status="failed"` + `error_message` on every failure path
-  (preconditions, non-zero exit, timeout).
-- Stores `rom_path` relative to `Rails.root` via `relative_path_from(Rails.root)`
-  — never absolute, never starts with a slash, always under `storage/`.
-- Defensive Java check (`java_available?`) is re-evaluated on every `call`
-  (not memoized) — correct per brief.
-- Stderr truncated at `STDERR_LIMIT = 255` (Architect ruling). Inline comment
-  in the service explains the deviation from the brief's 500.
-- `Timeout::Error` is rescued and produces the expected
-  `"Generation timed out after 30s"` message.
-- Only persistence bugs surface as `GenerationError`; normal failure paths
-  return `false`.
+**1. HTTP redirect handling.** Both `http_get_body` (rake:25-46) and
+`download_to_file` (rake:48-71) implement bounded recursive redirect loops.
+`MAX_REDIRECTS = 5`. Counter decrements on every hop; raises
+`"Too many redirects ..."` when `redirects_left.negative?`. `Location`
+header is read; raises clearly when missing or empty. No infinite-loop
+risk. `URI.join(url, location).to_s` correctly handles relative redirect
+targets.
 
-CLI shape uses `-i / -o / -s / -seed` exactly as the brief specified, with
-`JAR_PATH`, `BASE_ROM_PATH`, `SETTINGS_PATH`, and the session seed as
-positional arguments — verified against the test's argument assertions
-(lines 156–165 of the service test).
+**2. Wrapper-directory strip.** `locate_wrapper_dir` (rake:80-88) requires
+exactly one non-dotfile top-level entry, asserts it's a directory, and
+returns its full path. `move_contents` (rake:90-95) iterates
+`Dir.children(wrapper)` and `FileUtils.mv`s each child into `dest` — so the
+wrapper directory itself is discarded and its contents land at
+`public/emulatorjs/data/loader.js` (matching DoD), not nested under
+`public/emulatorjs/EmulatorJS-EmulatorJS-<sha>/`. Bob's directory listing in
+REVIEW-REQUEST corroborates this — 16 top-level entries, no
+`EmulatorJS-EmulatorJS-e150dc0/`.
 
-**Job contract.** Idempotency on `count >= SESSIONS_PER_RUN` works for both
-`count == 4` and `count > 4` (covered by named tests). Session creation is
-wrapped in a transaction; the subprocess loop runs outside it. Per-session
-failures are tolerated two ways:
+**3. Stdlib-only constraint.** `require`s are `net/http`, `json`,
+`fileutils`, `tmpdir`, `open3`, `uri` — all stdlib. No new gems. Bob's
+`git status` shows only `.gitignore`, `handoff/ARCHITECT-BRIEF.md`, and
+`lib/tasks/emulatorjs.rake` modified — Gemfile and Gemfile.lock are not
+in the changed-files list.
 
-- The service returns `false` on handled failure — the loop continues.
-- The job's own `rescue StandardError` catches unhandled crashes — the loop
-  still continues, the crash is logged.
+**4. Errors are loud.** Every failure path names the URL or path:
 
-Both paths covered by named tests (lines 87 and 117 of the job test).
+- Non-200 from GitHub API: `"HTTP <code> fetching <url>: <body[0..200]>"`.
+- Non-200 during download: `"HTTP <code> downloading <url>"` (see Should
+  Fix — body not included; not blocking).
+- Redirect with no Location header: names the URL.
+- `tar` non-zero exit: includes path, exit code, stderr, and stdout.
+- Unexpected wrapper layout: lists actual entries (`#{entries.inspect}`).
+- Missing `tag_name` / `tarball_url`: explicit raise before downstream
+  use.
+- JSON parse failure on release lookup: includes URL and underlying error.
 
-Seed format is `SecureRandom.random_number(2**63).to_s` — positive 63-bit
-integer as a String, asserted by the happy-path test (lines 51–54).
+No silent rescues. The two `rescue` blocks (one for `JSON::ParserError` at
+rake:20, none in the rake bodies themselves) re-raise with context.
 
-**Hermeticity.** Confirmed by reading the test file and re-running the suite:
+**5. Idempotency.** `FileUtils.rm_rf(dest)` then `FileUtils.mkdir_p(dest)`
+then `move_contents(wrapper, dest)` (rake:128-130). Full destruction-and-
+replace, no diff/merge logic. Also covers partial-failure recovery: a
+half-extracted directory from a previous failed run gets blown away on the
+next attempt. Bob's verification run \#5 confirms re-install after clean
+produces the same 16 entries.
 
-- `system("command -v java …")` is never invoked because the
-  `java_available?` predicate is stubbed at the instance level. Bob's
-  rationale for not stubbing `Kernel.system` (Ruby resolves `system` via the
-  Kernel mixin on the receiver, not through `Kernel.system`) is correct.
-- `File.exist?` is wrapped in a pass-through stub that intercepts only the
-  four guarded paths (BASE_ROM_PATH, JAR_PATH, SETTINGS_PATH; Java is the
-  predicate) and delegates everything else to the real implementation —
-  necessary because Rails internals call `File.exist?` constantly.
-- `FileUtils.mkdir_p` is stubbed to a no-op (or to a recording spy in the
-  happy-path test, which asserts the expected directory was passed).
-- `Open3.capture3` is stubbed per scenario — happy path returns
-  `["randomized ok", "", fake_status(true)]`, non-zero exit returns
-  `["", "boom: bad rom", fake_status(false)]`, timeout raises
-  `Timeout::Error`. The `Process::Status` substitute is a
-  `Struct.new(:success?)`, which works because the service only calls
-  `#success?` on it.
+**6. `Dir.mktmpdir` block form.** `Dir.mktmpdir("emulatorjs-install-") do
+|tmpdir| ... end` (rake:113). Tarball + extraction sandbox auto-cleaned on
+success and on exception.
 
-Independently re-ran:
+**7. Project convention match.** Mirrors `lib/tasks/pokemon_data.rake`
+shape: top-level `require`s, helper module, `namespace :name do ... end`
+with `desc` + `task` blocks. The helper module uses `module_function`
+where `pokemon_data.rake` uses explicit `self.method`s — minor stylistic
+difference, both valid Ruby idioms; neither breaks the convention. Bob
+deliberately omitted `task install: :environment` because the task touches
+no DB/models — explicitly called out in the brief and the implementation
+note. Reasonable.
 
-```
-mise exec -- ruby -S bundle exec rails test \
-  test/services/soul_link/rom_randomizer_test.rb \
-  test/jobs/soul_link/generate_run_roms_job_test.rb
-15 runs, 97 assertions, 0 failures, 0 errors, 0 skips
+**8. Verification claims.**
 
-mise exec -- ruby -S bundle exec rails test
-131 runs, 408 assertions, 0 failures, 0 errors, 0 skips
-```
+- Full test suite passing 131/131 is plausible — the rake task touches no
+  app code, no autoload, no DB. Step 2 baseline preserved (no new tests
+  added, none broken).
+- `.gitignore` line 46 is `/public/emulatorjs/` with the leading slash
+  (root-anchored). Correct semantics — won't accidentally match a nested
+  `public/emulatorjs/` somewhere else in the tree. Placed appropriately
+  beneath `/public/assets` (line 43) with a one-line header comment
+  (line 45) explaining provenance.
+- Bob's `git status` output confirms no entries from inside
+  `public/emulatorjs/` leak as untracked.
 
-No subprocess warnings. No real Java, no real ROM writes.
+**9. Definition of Done.** All 9 boxes verifiable from REVIEW-REQUEST and
+the actual files:
 
-**Test coverage vs brief.** Every "Cover" bullet is asserted by a named test:
+- [x] Rake file exists with `install` and `clean` under `emulatorjs:`
+      namespace (rake:98-153).
+- [x] `.gitignore` includes `/public/emulatorjs/` (line 46).
+- [x] `rake emulatorjs:install` runs successfully against live GitHub API
+      (resolved to `v4.2.3`).
+- [x] Populated correctly — `data/loader.js`, `data/emulator.css`,
+      `data/cores/`, `data/version.json` all confirmed present.
+- [x] Fully gitignored — `git status` shows no inside entries.
+- [x] `rake emulatorjs:clean` removes the directory (verified twice — once
+      with directory present, once already absent).
+- [x] Idempotency — re-install after clean produces the same 16 entries.
+- [x] Full suite passes (131/131).
+- [x] REVIEW-REQUEST contains the directory listing + `tag_name: v4.2.3`.
 
-Service:
-- "Java missing fails the session with a friendly message"
-- "Base ROM missing fails the session"
-- "Randomizer JAR missing fails the session"
-- "settings file missing fails the session"
-- "successful generation marks the session ready and stores a relative
-  rom_path" (also asserts `mkdir_p` was called with the expected directory
-  and that the CLI shape contains all required flags + the session seed)
-- "session is in 'generating' status while the subprocess runs" (the strong
-  hermetic check — observes status from inside the Open3 stub)
-- "non-zero exit fails the session with truncated stderr"
-- "non-zero exit truncates very long stderr to the column limit"
-- "timeout fails the session with a timeout message"
-- "precondition failure does not call Open3" (defensive extra; valuable)
+**10. No scope creep.** Modified set is exactly `lib/tasks/emulatorjs.rake`
+(new), `.gitignore` (one block added), and `handoff/ARCHITECT-BRIEF.md`
+(Builder Plan section appended per directive). No app code, no controllers,
+no routes, no views, no migrations, no Step 5 wiring leaked in.
 
-Job:
-- "creates 4 unclaimed pending sessions when run has none" — asserts seed
-  uniqueness, `discord_user_id: nil`, positive 63-bit integer format, and
-  randomizer called 4 times (covers the "calls randomizer for each session"
-  bullet).
-- "is a no-op when 4 sessions already exist for the run"
-- "is a no-op when more than 4 sessions exist (defensive)"
-- "handled per-session failure does not halt remaining ROM generation"
-- "unrescued StandardError in one session does not stop the others"
+**Architect ruling honored.** Full-tarball install (16 top-level entries
+including LICENSE, .github/, docs/, etc.) accepted per the standing GPL-
+attribution ruling. Bob's Open Question \#1 raises the question politely;
+the decision stands and is not flagged as an issue.
 
-No tests-by-implication. Every brief bullet maps to a named test.
-
-**Flags honored.**
-
-- No CLI flags invented — `-i / -o / -s / -seed` exactly as the brief
-  specified.
-- No controllers, routes, views, services, jobs, or buttons added beyond
-  the two listed files. `git status` shows only the listed paths.
-- All test data via FactoryBot (`create(:soul_link_run)`,
-  `create(:soul_link_emulator_session, ...)`) — no fixture references in
-  new tests.
-- `.gitignore` correctly whitelists `storage/roms/{base,randomized}/.keep`
-  and `lib/randomizer/.keep` while ignoring everything else under those
-  paths. Verified two ways:
-  - `git ls-files --others --exclude-standard` shows the three `.keep`
-    files as trackable.
-  - `git check-ignore -v` confirms the run-output directories
-    (`storage/roms/randomized/run_*`) created during local test runs are
-    ignored as intended (matched by `/storage/roms/randomized/*` at line
-    33 of `.gitignore`).
-- No SolidQueue config introduced; service is sync, job runs on the Rails 8
-  `:async` adapter as specified.
-
-**Definition of Done.** All eight DoD boxes pass independent verification:
-
-- Service file exists and matches contract.
-- Job file exists and matches contract.
-- Service tests cover all listed scenarios; all green.
-- Job tests cover all listed scenarios; all green.
-- Full suite passes (131 = 116 + 10 service + 5 job).
-- `.gitignore` updated; `.keep` files trackable.
-- No real Java or filesystem writes in tests.
-- All test data via FactoryBot — no fixture references in new tests.
-
-Step 2 is clear.
+Step 3 is clear.
 
 VERDICT: PASS_WITH_OBSERVATIONS
