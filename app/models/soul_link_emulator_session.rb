@@ -9,6 +9,8 @@ class SoulLinkEmulatorSession < ApplicationRecord
   validates :seed, presence: true
   validates :discord_user_id, uniqueness: { scope: :soul_link_run_id, allow_nil: true }
 
+  after_destroy :delete_rom_file
+
   scope :ready, -> { where(status: "ready") }
   scope :unclaimed, -> { where(discord_user_id: nil) }
   scope :claimed, -> { where.not(discord_user_id: nil) }
@@ -42,5 +44,17 @@ class SoulLinkEmulatorSession < ApplicationRecord
     rows = self.class.where(id: id, discord_user_id: nil).update_all(discord_user_id: uid)
     raise AlreadyClaimedError, "session #{id} already claimed" if rows.zero?
     reload
+  end
+
+  private
+
+  # Removes the on-disk ROM when the session is destroyed. Defensive against
+  # double-deletion / TOCTOU — `exist?` + `delete` is not atomic, so we still
+  # rescue ENOENT in case the file vanishes between the two calls.
+  def delete_rom_file
+    path = rom_full_path
+    path.delete if path&.exist?
+  rescue Errno::ENOENT
+    # Already gone — nothing to do.
   end
 end

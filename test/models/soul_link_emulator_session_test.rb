@@ -198,4 +198,48 @@ class SoulLinkEmulatorSessionTest < ActiveSupport::TestCase
       assert_equal payload, @unclaimed.cheats
     end
   end
+
+  # --- after_destroy :delete_rom_file --------------------------------------
+  #
+  # The callback removes the on-disk ROM when the row is destroyed (it's how
+  # the regenerate channel action reclaims disk via `destroy_all`). It must
+  # be defensive against missing files and nil rom_path — both happen in
+  # practice (cleanup rake task already nilled the path; or manual cleanup).
+  #
+  # Tempfiles are created under `Rails.root.join("tmp")` so the relative
+  # `rom_path` round-trips through the model's `Rails.root.join(rom_path)`
+  # back to the real on-disk file. No writes to `storage/roms/`.
+
+  test "after_destroy deletes the on-disk rom file" do
+    tmp_dir = Rails.root.join("tmp", "test_emu_session_destroy")
+    FileUtils.mkdir_p(tmp_dir)
+    file = Tempfile.create(["rom", ".nds"], tmp_dir)
+    file.close
+    rel_path = Pathname.new(file.path).relative_path_from(Rails.root).to_s
+
+    session = create(:soul_link_emulator_session, soul_link_run: @run, rom_path: rel_path)
+    assert File.exist?(file.path), "precondition: tempfile should exist"
+
+    session.destroy
+
+    assert_not File.exist?(file.path), "after_destroy should remove the rom file"
+  ensure
+    File.delete(file.path) if file && File.exist?(file.path)
+    FileUtils.rm_rf(tmp_dir) if tmp_dir
+  end
+
+  test "after_destroy is safe when rom file is missing" do
+    rel_path = "tmp/test_emu_session_missing/never_existed.nds"
+    session = create(:soul_link_emulator_session, soul_link_run: @run, rom_path: rel_path)
+    assert_not File.exist?(Rails.root.join(rel_path)), "precondition: file must not exist"
+
+    assert_nothing_raised { session.destroy }
+  end
+
+  test "after_destroy is safe when rom_path is nil" do
+    session = create(:soul_link_emulator_session, soul_link_run: @run, rom_path: nil)
+    assert_nil session.rom_full_path
+
+    assert_nothing_raised { session.destroy }
+  end
 end

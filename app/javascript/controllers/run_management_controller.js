@@ -7,6 +7,7 @@ export default class extends Controller {
     "runNumber", "gymsDefeated", "caughtCount", "deadCount", "startedAt",
     "setupDiscordButton",
     "generateRomsButton",
+    "regenerateRomsButton",
     "errorMessage"
   ]
   static values = {
@@ -90,6 +91,11 @@ export default class extends Controller {
     this.subscription.perform("generate_emulator_roms")
   }
 
+  regenerateEmulatorRoms() {
+    if (!confirm("Regenerate ROMs? This will destroy all current ROMs and any progress players have made.")) return
+    this.subscription.perform("regenerate_emulator_roms")
+  }
+
   // ── Rendering ──
 
   render() {
@@ -121,15 +127,24 @@ export default class extends Controller {
         this.setupDiscordButtonTarget.textContent = "Setup Discord Channels"
       }
 
-      // Generate Emulator ROMs button — visible only in :none and :failed
-      // (failed acts as retry; refined UX is Step 7). Symbols arrive as
-      // Strings over the wire.
+      // Emulator ROM buttons are mutually exclusive:
+      //   :none    → "Generate Emulator ROMs" only
+      //   :failed  → "Regenerate ROMs" only (destructive retry)
+      //   :generating / :ready → neither
+      // Symbols arrive as Strings over the wire.
+      const status = current_run.emulator_status
       if (this.hasGenerateRomsButtonTarget) {
-        const status = current_run.emulator_status
-        if (status === "none" || status === "failed") {
+        if (status === "none") {
           this.generateRomsButtonTarget.classList.remove("hidden")
         } else {
           this.generateRomsButtonTarget.classList.add("hidden")
+        }
+      }
+      if (this.hasRegenerateRomsButtonTarget) {
+        if (status === "failed") {
+          this.regenerateRomsButtonTarget.classList.remove("hidden")
+        } else {
+          this.regenerateRomsButtonTarget.classList.add("hidden")
         }
       }
     } else {
