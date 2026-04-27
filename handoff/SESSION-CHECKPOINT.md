@@ -33,6 +33,15 @@ JRE 21 installed on the Vultr VPS. Pending: 40 Ubuntu updates + system restart (
 - Verified install: v4.2.3 from upstream, `data/loader.js` lands at expected path
 - `.gitignore` excludes `/public/emulatorjs/`
 
+### Step 4 — Run-Creator ROM-Generation Trigger (`f8d1662`)
+- ActionCable trigger only — no HTTP route, mirrors existing `setup_discord` pattern
+- `SoulLinkRun#emulator_status` (`:none` / `:generating` / `:ready` / `:failed`) included in broadcasts
+- `RunChannel#generate_emulator_roms` enqueues `GenerateRunRomsJob`; idempotent at channel + worker layers
+- Job broadcasts run state in `ensure` block so UI reconciles after completion
+- Stimulus toggle uses string literals (`"none"`, `"failed"`) — symbols become strings over the wire
+- "Generate Emulator ROMs" button on runs page next to "Setup Discord"
+- 15 new tests, 146/146 full suite
+
 ---
 
 ## What Was Decided This Session

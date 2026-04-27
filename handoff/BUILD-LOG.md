@@ -11,14 +11,45 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 4 — Run-creator ROM-generation trigger (RunChannel + button)
-**Last committed:** `9ce4114` — 2026-04-26 (Step 3)
+**Active step:** Step 5 — Player-facing emulator (routes + controller + view + Stimulus)
+**Last committed:** `f8d1662` — 2026-04-26 (Step 4)
 **Pending deploy:** NO
 
 ---
 
 ## Step History
 *Session-scoped.*
+
+### Step 4 — Run-Creator ROM-Generation Trigger — 2026-04-26
+**Status:** Complete, committed `f8d1662`
+
+**Files modified:**
+- `app/models/soul_link_run.rb` — added `has_many :soul_link_emulator_sessions, dependent: :destroy`, `#emulator_status`, extended `#broadcast_state`
+- `app/channels/run_channel.rb` — new `generate_emulator_roms` action, mirrors `setup_discord` shape
+- `app/jobs/soul_link/generate_run_roms_job.rb` — `ensure`-block broadcast for post-completion UI reconciliation
+- `app/javascript/controllers/run_management_controller.js` — `generateRomsButton` target + `generateEmulatorRoms()` action + visibility toggle
+- `app/views/runs/index.html.erb` — sibling button next to "Setup Discord"
+
+**Files created:**
+- `test/channels/run_channel_test.rb` (5 tests)
+- `test/models/soul_link_run_test.rb` (8 tests)
+- 2 new tests added to `test/jobs/soul_link/generate_run_roms_job_test.rb`
+
+**Key decisions:**
+- Pure ActionCable, no HTTP route or controller (matched existing `setup_discord` pattern)
+- `emulator_status` returns `:none` / `:generating` / `:ready` / `:failed` (failed-priority)
+- Channel-layer idempotency: enqueue only when `emulator_status == :none`
+- Symbols become Strings over the wire — Stimulus compares against `"none"` / `"failed"` literals
+- `ensure` block broadcasts on every job exit path (success, partial fail, raise)
+- `setup_discord` byte-for-byte unchanged
+
+**Tests:** 15 new (8 model + 5 channel + 2 job), 146/146 full suite, 0 failures.
+
+**Review:** Richard — PASS_WITH_OBSERVATIONS (channel-layer race caught by worker count guard; `emulator_status` does N+1 SELECTs in broadcasts of past runs — both flagged below).
+
+**Smoke test:** Bob could not run a browser session — code-trace only. User should verify locally before considering Step 4 fully validated.
+
+---
 
 ### Step 3 — EmulatorJS Asset Rake Task — 2026-04-26
 **Status:** Complete, committed `9ce4114`
@@ -115,6 +146,11 @@ reset until the gap is addressed or the decision is replaced.
 - `error_message` column is varchar(255) — widen if real-world stack traces prove limiting
 - Service-test stubbing duplicates `Open3.capture3` mocks across cases — refactor into a helper if a third randomizer test ever exists
 - Step 2's randomizer service was synchronous-by-design; replace with background-job orchestration if generation moves off the request path
+- Channel-layer race in `RunChannel#generate_emulator_roms` (two concurrent calls could both observe `:none` before either enqueues — caught by job's worker-side count guard, but theoretically duplicate work)
+- `emulator_status` does N+1 SELECTs over past runs when included in broadcasts (~20 extra queries per broadcast). Profile + add eager-load if it bites
+- Browser smoke test for Step 4 button flow not performed — Bob couldn't drive Chrome in sandbox; user verification pending
+- No "Generating..." inline status label on the runs page during ROM generation (deliberately omitted per Step 4 brief — revisit if confusing)
+- No retry-on-failure UI for emulator session generation — Step 7 cleanup territory
 - ROM versioning when randomizer settings change mid-run
 - Co-op multiplayer watch page for emulator (Option A from plan review — status grid via ActionCable)
 - EmulatorJS save endpoint may need server-side debounce if save cadence is high
