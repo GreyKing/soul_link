@@ -11,14 +11,41 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** None — Step 1 complete
-**Last committed:** `574fa7f` — 2026-04-26
+**Active step:** Step 3 — EmulatorJS asset rake task
+**Last committed:** `71f1dcf` — 2026-04-26 (Step 2)
 **Pending deploy:** NO
 
 ---
 
 ## Step History
 *Session-scoped.*
+
+### Step 2 — `SoulLink::RomRandomizer` Service + `GenerateRunRomsJob` — 2026-04-26
+**Status:** Complete, committed `71f1dcf`
+
+**Files created:**
+- `app/services/soul_link/rom_randomizer.rb`
+- `app/jobs/soul_link/generate_run_roms_job.rb`
+- `test/services/soul_link/rom_randomizer_test.rb`
+- `test/jobs/soul_link/generate_run_roms_job_test.rb`
+- `storage/roms/base/.keep`, `storage/roms/randomized/.keep`, `lib/randomizer/.keep`
+
+**Files modified:**
+- `.gitignore` — exclude ROM/JAR binaries, keep `.keep` files trackable
+
+**Key decisions:**
+- `error_message` truncated at 255 chars (matches column width — Architect ruling overriding original 500-char brief)
+- Service is sync, returns `false` on handled failure (no raise), mutates session
+- `rom_path` stored relative to Rails.root
+- Job is idempotent on session count (4 sessions exist → no-op)
+- Defensive Java check on every `call` (not memoized — server state can change)
+- ROM CLI flags: `-i / -o / -s / -seed` per the original plan; verified by the brief
+
+**Tests:** 15 new (10 service + 5 job), 131/131 full suite, all hermetic — no real Java or filesystem writes.
+
+**Review:** Richard — PASS_WITH_OBSERVATIONS (3 non-blocking; concurrent-enqueue race captured as Known Gap below).
+
+---
 
 ### Step 1 — `SoulLinkEmulatorSession` Migration + Model — 2026-04-26
 **Status:** Complete, committed `574fa7f`
@@ -61,7 +88,10 @@ reset until the gap is addressed or the decision is replaced.
 - No HP calculation or percentage damage display
 - 5-entry cap on evolution chain depth (fine for Gen IV)
 - Convert legacy fixture-based tests to FactoryBot (deferred — do not bundle into feature work)
-- Background job for ROM generation in emulator feature (synchronous accepted for v1)
+- Concurrent enqueue of `GenerateRunRomsJob` could create duplicate sessions if button isn't disabled — Step 4 will add button-disable + DB-level guard if needed
+- `error_message` column is varchar(255) — widen if real-world stack traces prove limiting
+- Service-test stubbing duplicates `Open3.capture3` mocks across cases — refactor into a helper if a third randomizer test ever exists
+- Step 2's randomizer service was synchronous-by-design; replace with background-job orchestration if generation moves off the request path
 - ROM versioning when randomizer settings change mid-run
 - Co-op multiplayer watch page for emulator (Option A from plan review — status grid via ActionCable)
 - EmulatorJS save endpoint may need server-side debounce if save cadence is high
