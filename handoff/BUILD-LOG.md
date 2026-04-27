@@ -11,14 +11,42 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 6 — Cheat config + EmulatorJS cheat integration
-**Last committed:** `a2699a7` — 2026-04-26 (Step 5)
+**Active step:** Step 7 — Cleanup + polish (ROM cleanup rake task, deployment doc, failed-state regen UX)
+**Last committed:** `d38ae04` — 2026-04-26 (Step 6)
 **Pending deploy:** NO
 
 ---
 
 ## Step History
 *Session-scoped.*
+
+### Step 6 — Cheat Config + EmulatorJS Injection — 2026-04-26
+**Status:** Complete, committed `d38ae04`
+
+**Files created:**
+- `config/soul_link/cheats.yml` (empty `action_replay: []` placeholder)
+- `test/services/soul_link/game_state_cheats_test.rb`
+
+**Files modified:**
+- `app/services/soul_link/game_state.rb` — `cheats` class method (memoized YAML loader)
+- `app/models/soul_link_emulator_session.rb` — `#cheats` accessor
+- `app/controllers/emulator_controller.rb` — `@cheats` ivar (ready state only)
+- `app/views/emulator/show.html.erb` — `data-emulator-cheats-value` on ready branch
+- `app/javascript/controllers/emulator_controller.js` — Stimulus filter + `EJS_cheats = [[name, code], ...]`
+- `test/models/soul_link_emulator_session_test.rb`, `test/controllers/emulator_controller_test.rb` — extensions
+
+**Key decisions:**
+- `EJS_cheats` format is `[desc, code]` tuples — verified at `public/emulatorjs/data/loader.js:102` and `data/src/emulator.js:311-323`
+- EmulatorJS has no native `enabled` flag — Stimulus filters disabled entries client-side before injecting
+- Cheats are global, not per-player (the dropped `cheat_overrides` column stays dropped)
+- Bootsnap's Psych4 patch defeats `Module.prepend` mocks — Bob worked around with Tempfile-based tests that exercise the real YAML parser
+- Project Owner populates real codes manually after Step 6 ships
+
+**Tests:** 15 new, 184/184 full suite, 0 failures.
+
+**Review:** Richard — PASS (no Must Fix, no Should Fix, no Escalate).
+
+---
 
 ### Step 5 — Player-Facing Emulator — 2026-04-26
 **Status:** Complete, committed `a2699a7`

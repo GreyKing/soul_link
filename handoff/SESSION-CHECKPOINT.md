@@ -50,6 +50,13 @@ JRE 21 installed on the Vultr VPS. Pending: 40 Ubuntu updates + system restart (
 - "Play" link added to layout nav
 - 23 new tests, 169/169 full suite
 
+### Step 6 — Cheat Config + EmulatorJS Injection (`d38ae04`)
+- `config/soul_link/cheats.yml` placeholder; user populates real AR codes manually
+- `SoulLink::GameState.cheats` (memoized YAML loader); `SoulLinkEmulatorSession#cheats`
+- `EJS_cheats` format verified in EmulatorJS source: `[desc, code]` tuples
+- Stimulus filters `enabled: false` entries client-side
+- 15 new tests, 184/184 full suite
+
 ---
 
 ## What Was Decided This Session
