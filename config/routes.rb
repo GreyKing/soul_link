@@ -42,6 +42,13 @@ Rails.application.routes.draw do
   # Run management
   resources :runs, only: [ :index ]
 
+  # Player-facing emulator (auto-claims one of the run's randomized ROMs)
+  resource :emulator, only: [ :show ], controller: "emulator" do
+    get   :rom
+    get   :save_data
+    patch :save_data
+  end
+
   # Interactive region map
   resource :map, only: [ :show ], controller: "map"
   resources :pokemon_groups, only: [ :create, :update, :destroy ] do

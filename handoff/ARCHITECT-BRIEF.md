@@ -4,196 +4,340 @@
 
 ---
 
-## Step 4 — Run-Creator ROM-Generation Trigger
+## Step 5 — Player-Facing Emulator (Routes + Controller + View + Stimulus)
 
-Context: Steps 1–3 built the data layer, the randomizer service+job, and the EmulatorJS asset task. This step adds the **run-creator-facing** trigger on the runs page — a button that enqueues `SoulLink::GenerateRunRomsJob` for the current run. Player-facing emulator routes/controller/view come in Step 5.
+Context: Steps 1–4 built the data layer, ROM generation, the asset task, and the run-creator trigger. Now players need a page where they visit `/emulator`, get auto-assigned an unclaimed ROM, and play it in the browser. This step is the consumer side — three-state UI, ROM streaming, save round-trip via PATCH.
 
-**Pattern match:** Soul Link does run-level actions through `RunChannel` (ActionCable), not HTTP. Read `app/channels/run_channel.rb` and look at the existing `setup_discord` action — yours mirrors it exactly. The button on the runs page is just a Stimulus action that calls `subscription.perform("generate_emulator_roms")`. No HTTP route, no controller.
+This is a **larger step** than the previous ones. Brief is detailed to compensate.
+
+### Files to Create
+
+- `app/controllers/emulator_controller.rb`
+- `app/views/emulator/show.html.erb`
+- `app/javascript/controllers/emulator_controller.js`
+- `test/controllers/emulator_controller_test.rb`
 
 ### Files to Modify
 
-- `app/channels/run_channel.rb` — add `generate_emulator_roms` action (mirror `setup_discord` shape)
-- `app/models/soul_link_run.rb` — add `emulator_status` method; extend `broadcast_state` to include the new field
-- `app/jobs/soul_link/generate_run_roms_job.rb` — add a post-completion broadcast so the UI updates when ROMs are ready
-- `app/javascript/controllers/run_management_controller.js` — add `generateEmulatorRoms()` method, add `generateRomsButton` target, update the broadcast-received handler to toggle the new button by `emulator_status`
-- `app/views/runs/index.html.erb` — add the new button right next to "Setup Discord" (line 48-ish, inside the current-run panel)
-- `test/channels/run_channel_test.rb` — extend with tests for `generate_emulator_roms`
-- `test/models/soul_link_run_test.rb` — extend (or create if missing) with tests for `emulator_status`
-- `test/jobs/soul_link/generate_run_roms_job_test.rb` — extend with an assertion that the post-completion broadcast fires
+- `config/routes.rb` — add `resource :emulator do ... end`
+- `app/views/layouts/application.html.erb` — add "Play" link to the existing nav (find the nav, match the link style)
 
-### `SoulLinkRun#emulator_status` Spec
-
-Returns one of: `:none`, `:generating`, `:ready`, `:failed`.
+### Routes
 
 ```ruby
-def emulator_status
-  sessions = soul_link_emulator_sessions  # add has_many :soul_link_emulator_sessions association
-  return :none if sessions.empty?
-  return :failed if sessions.any? { |s| s.status == "failed" }
-  return :generating if sessions.any? { |s| %w[pending generating].include?(s.status) }
-  :ready
+resource :emulator, only: [:show] do
+  get   :rom
+  get   :save_data
+  patch :save_data
 end
 ```
 
-`:failed` takes priority over `:generating` so a partial failure is visible to the user. `:ready` requires ALL sessions to be ready.
+Generates:
+- `GET /emulator` — `EmulatorController#show`
+- `GET /emulator/rom` — `EmulatorController#rom`
+- `GET /emulator/save_data` — `EmulatorController#save_data` (split via HTTP method)
+- `PATCH /emulator/save_data` — `EmulatorController#save_data`
 
-**Required association:** `has_many :soul_link_emulator_sessions, dependent: :destroy` on `SoulLinkRun`. Verify the inverse `belongs_to :soul_link_run` on `SoulLinkEmulatorSession` (Step 1 added it — confirm).
-
-### `SoulLinkRun#broadcast_state` Extension
-
-Add to the returned hash:
-```ruby
-emulator_status: emulator_status
-```
-
-Don't change the existing fields. Don't add anything else this step doesn't need.
-
-### `RunChannel#generate_emulator_roms` Spec
+### Controller — `app/controllers/emulator_controller.rb`
 
 ```ruby
-def generate_emulator_roms(_data)
-  run = SoulLinkRun.current(@guild_id)
-  return broadcast_error("No active run") if run.nil?
-  return broadcast_state if run.emulator_status != :none  # idempotent — silent no-op if already triggered
+class EmulatorController < ApplicationController
+  include DiscordAuthentication
+  before_action :require_login
+  before_action :set_run
+  before_action :set_session, only: [:show, :rom, :save_data]
+  protect_from_forgery with: :null_session, only: [:save_data], if: -> { request.patch? }
 
-  SoulLink::GenerateRunRomsJob.perform_later(run)
-  broadcast_state
+  def show
+    # Renders three states:
+    #   - @run.nil? -> "No active run" message
+    #   - @run.emulator_status == :none -> "ROMs haven't been generated yet" message
+    #   - @session.nil? -> "All ROMs claimed by other players" (no unclaimed available)
+    #   - @session.status == "generating" || "pending" -> "Your ROM is being generated, refresh shortly"
+    #   - @session.status == "failed" -> "ROM generation failed: <error>"
+    #   - @session.status == "ready" -> full emulator UI
+  end
+
+  def rom
+    return head :not_found unless @session&.ready? && @session.rom_full_path&.exist?
+    send_file @session.rom_full_path, type: "application/octet-stream", disposition: "attachment", filename: "rom.nds"
+  end
+
+  def save_data
+    if request.patch?
+      blob = request.body.read
+      @session.update!(save_data: blob)
+      head :no_content
+    else  # GET
+      data = @session&.save_data
+      return head :no_content if data.blank?
+      send_data data, type: "application/octet-stream", disposition: "attachment", filename: "save.dat"
+    end
+  end
+
+  private
+
+  def set_run
+    @run = SoulLinkRun.current(session[:guild_id])
+  end
+
+  def set_session
+    return @session = nil if @run.nil? || @run.emulator_status == :none
+
+    # Find player's claimed session, or auto-claim the first unclaimed one.
+    @session = @run.soul_link_emulator_sessions.find_by(discord_user_id: current_user_id)
+    return if @session
+
+    unclaimed = @run.soul_link_emulator_sessions.unclaimed.ready.first
+    return @session = nil if unclaimed.nil?  # all claimed, none left
+
+    begin
+      unclaimed.claim!(current_user_id)
+      @session = unclaimed
+    rescue SoulLinkEmulatorSession::AlreadyClaimedError
+      # Race: another request claimed this one between our SELECT and UPDATE.
+      # Retry once with a fresh query.
+      retry_unclaimed = @run.soul_link_emulator_sessions.unclaimed.ready.first
+      if retry_unclaimed
+        retry_unclaimed.claim!(current_user_id)
+        @session = retry_unclaimed
+      else
+        @session = nil
+      end
+    end
+  end
 end
 ```
 
-**Idempotency:** if `emulator_status` is anything other than `:none`, do nothing (just re-broadcast state so the client sees current state). The job itself is also idempotent on count, but the channel layer should not even enqueue redundantly.
+**Auth notes:**
+- `require_login` is for HTML; if save_data PATCH ever goes off the page (it won't here), you'd need `require_login_json`. For this step, the user is authenticated via the same session cookie that loaded `/emulator`, so `require_login` is fine.
+- `protect_from_forgery with: :null_session, only: [:save_data], if: -> { request.patch? }` is the standard Rails escape for binary-body API endpoints. The Stimulus controller sends the CSRF token in a header anyway — both should be belt-and-suspenders.
 
-**Error handling:** `broadcast_error` (or whatever the existing pattern is — check `setup_discord`). Don't invent a new error mechanism.
+**Auto-claim race:** If two requests for the same player hit at the same instant (unlikely but possible — page reload + Stimulus connect), the SQL-level `claim!` ensures only one wins; the loser retries. After retry, if all are claimed, `@session = nil` and the view shows "All ROMs claimed."
 
-### `GenerateRunRomsJob` — Post-Completion Broadcast
+### View — `app/views/emulator/show.html.erb`
 
-Add at the end of `perform` (and also on rescue if applicable):
-
-```ruby
-ensure
-  RunChannel.broadcast_run_state(soul_link_run.guild_id) if soul_link_run.persisted?
-end
-```
-
-Verify `RunChannel.broadcast_run_state` exists and accepts a guild_id (the explore confirmed this; Bob: read the file to confirm signature).
-
-This means: after generation finishes (success, partial-failure, total failure), the UI gets a state broadcast and updates the button accordingly. Without this, the button stays in `:generating` state until the user refreshes.
-
-### Stimulus: `run_management_controller.js`
-
-Read the existing controller. Add:
-1. New target: `generateRomsButton`.
-2. New method: `generateEmulatorRoms()` — calls `this.subscription.perform("generate_emulator_roms")`. Match `setupDiscord()` shape.
-3. In the `received(data)` callback (or wherever broadcast state is consumed), toggle `generateRomsButtonTarget` visibility based on `data.emulator_status`:
-   - `:none` → button visible
-   - `:generating` → button hidden, optionally show "ROMs generating..." text (small inline label)
-   - `:ready` → button hidden, optionally show "✓ ROMs ready" (small inline label)
-   - `:failed` → button visible (acts as retry — user can click again to retrigger). For now, no special "retry" UX — just same button, same text.
-
-If the existing controller doesn't have a clear pattern for inline status text, just toggle the button visibility for now and skip the labels. Don't invent UI patterns the project doesn't already have.
-
-### View: `app/views/runs/index.html.erb`
-
-Insert the button next to "Setup Discord" in the current-run panel. The existing button shape is:
+Three-state ERB. Use raw CSS vars (`--d1`, `--d2`, `--border-thin`, etc.) — no Tailwind utilities. Match the GB aesthetic of `app/views/runs/index.html.erb`.
 
 ```erb
-<button data-action="click->run-management#setupDiscord"
-        data-run-management-target="setupDiscordButton"
-        class="gb-btn-primary gb-btn-sm <%= 'hidden' if @current_run&.discord_channels_configured? %>">
-  Setup Discord
-</button>
+<% if @run.nil? %>
+  <div class="emulator-message panel">
+    <h2>No active run</h2>
+    <p>Start a new run from the runs page to play.</p>
+    <%= link_to "Go to runs", runs_path, class: "gb-btn-primary" %>
+  </div>
+
+<% elsif @run.emulator_status == :none %>
+  <div class="emulator-message panel">
+    <h2>ROMs not generated yet</h2>
+    <p>The run creator needs to click "Generate Emulator ROMs" on the runs page first.</p>
+    <%= link_to "Go to runs", runs_path, class: "gb-btn-primary" %>
+  </div>
+
+<% elsif @session.nil? %>
+  <div class="emulator-message panel">
+    <h2>No ROM available</h2>
+    <p>All four ROMs have been claimed by other players. Contact the run creator if this looks wrong.</p>
+  </div>
+
+<% elsif @session.status == "pending" || @session.status == "generating" %>
+  <div class="emulator-message panel" data-controller="emulator-pending">
+    <h2>ROM generating…</h2>
+    <p>Your randomized Pokemon Platinum ROM is being prepared. Refresh in a moment.</p>
+  </div>
+
+<% elsif @session.status == "failed" %>
+  <div class="emulator-message panel">
+    <h2>ROM generation failed</h2>
+    <p>The randomizer reported: <%= @session.error_message.presence || "(no details)" %></p>
+    <p>Tell the run creator to regenerate the ROMs.</p>
+  </div>
+
+<% else  # ready %>
+  <div class="emulator-stage"
+       data-controller="emulator"
+       data-emulator-rom-url-value="<%= rom_emulator_path %>"
+       data-emulator-save-data-url-value="<%= save_data_emulator_path %>"
+       data-emulator-csrf-value="<%= form_authenticity_token %>"
+       data-emulator-core-value="<%= EmulatorController::EMULATOR_CORE %>"
+       data-emulator-pathtodata-value="/emulatorjs/data/">
+    <div id="game" data-emulator-target="game"></div>
+  </div>
+<% end %>
 ```
 
-Add a sibling:
-```erb
-<button data-action="click->run-management#generateEmulatorRoms"
-        data-run-management-target="generateRomsButton"
-        class="gb-btn-primary gb-btn-sm <%= 'hidden' if @current_run&.emulator_status != :none %>">
-  Generate Emulator ROMs
-</button>
+**Required constants:** put `EMULATOR_CORE = "melonds"` (or `"desmume"`) at the top of `EmulatorController`. **Bob: read `public/emulatorjs/data/cores/` to confirm which DS core ships in v4.2.3 and use the actual core name.** If both ship, prefer melonDS (more accurate). If neither, stop and report.
+
+### Stimulus — `app/javascript/controllers/emulator_controller.js`
+
+EmulatorJS uses `window.EJS_*` globals + a `<script>` tag pointing at `loader.js`. The Stimulus controller's job is to (a) set those globals, (b) inject the loader script, (c) wire up save round-trip.
+
+```js
+import { Controller } from "@hotwired/stimulus"
+
+export default class extends Controller {
+  static values = {
+    romUrl: String,
+    saveDataUrl: String,
+    csrf: String,
+    core: String,
+    pathtodata: String
+  }
+
+  static targets = ["game"]
+
+  async connect() {
+    // 1. Fetch existing save (if any) so EmulatorJS can boot with state.
+    const save = await this._fetchSave()
+
+    // 2. Configure EmulatorJS globals BEFORE injecting the loader.
+    window.EJS_player = "#" + this.gameTarget.id
+    window.EJS_gameUrl = this.romUrlValue
+    window.EJS_core = this.coreValue
+    window.EJS_pathtodata = this.pathtodataValue
+    window.EJS_startOnLoaded = true
+    window.EJS_Buttons = { /* keep defaults — don't customize until we need to */ }
+
+    if (save) {
+      // EmulatorJS expects a Uint8Array via EJS_loadStateURL or similar.
+      // Bob: check EmulatorJS v4.2.3 docs in public/emulatorjs/ for the exact hook.
+      // The currently expected API is window.EJS_loadStateURL = this.saveDataUrlValue
+      // OR providing the bytes directly. Verify and pick whichever is more reliable.
+      window.EJS_loadStateURL = this.saveDataUrlValue
+    }
+
+    // 3. Wire save callback. EmulatorJS fires window.EJS_onSaveState (or similar) with bytes.
+    window.EJS_onSaveState = ({ screenshot, state }) => this._uploadSave(state)
+
+    // 4. Inject loader script.
+    const script = document.createElement("script")
+    script.src = this.pathtodataValue + "loader.js"
+    document.body.appendChild(script)
+  }
+
+  disconnect() {
+    // Best-effort cleanup. EmulatorJS doesn't have a clean teardown API in v4 —
+    // a full page nav handles it.
+    window.EJS_player = undefined
+    window.EJS_gameUrl = undefined
+    window.EJS_onSaveState = undefined
+  }
+
+  async _fetchSave() {
+    const res = await fetch(this.saveDataUrlValue, {
+      method: "GET",
+      headers: { "Accept": "application/octet-stream" },
+      credentials: "same-origin"
+    })
+    if (res.status === 204) return null
+    if (!res.ok) {
+      console.error("Failed to load save:", res.status)
+      return null
+    }
+    const buf = await res.arrayBuffer()
+    return buf.byteLength > 0 ? new Uint8Array(buf) : null
+  }
+
+  async _uploadSave(stateBytes) {
+    const blob = stateBytes instanceof Uint8Array ? stateBytes : new Uint8Array(stateBytes)
+    const res = await fetch(this.saveDataUrlValue, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "X-CSRF-Token": this.csrfValue
+      },
+      credentials: "same-origin",
+      body: blob
+    })
+    if (!res.ok) {
+      console.error("Failed to save:", res.status)
+    }
+  }
+}
 ```
 
-Server-side initial visibility uses `emulator_status != :none` to hide. The Stimulus controller takes over after the first broadcast.
+**Bob: the EmulatorJS save-callback name is uncertain across versions.** v4.2.3's docs are in `public/emulatorjs/docs/` (Step 3 installed them). Read those before settling on `EJS_onSaveState`. If the actual hook differs, use the real one and document the choice in REVIEW-REQUEST.
 
-### Tests
+### Layout — Add "Play" Link
 
-#### `test/channels/run_channel_test.rb` — extend (or create if absent)
+Find the nav bar in `app/views/layouts/application.html.erb`. There's an existing nav with links to runs/dashboard/etc. Add a sibling link to `/emulator` matching the existing style. Don't reformat anything else.
+
+If the nav uses `Current.user`-style helpers or session checks, gate the Play link the same way (only show when logged in).
+
+### Tests — `test/controllers/emulator_controller_test.rb`
 
 Use FactoryBot.
 
-- `subscribes and streams for guild`
-- `generate_emulator_roms enqueues GenerateRunRomsJob and broadcasts state` — given a run with no sessions, perform the action; assert the job is enqueued for `run`, assert state is broadcast
-- `generate_emulator_roms is no-op when sessions already exist` — given a run with 4 sessions, perform; assert NO job enqueued, but state IS broadcast (so the client gets current truth)
-- `generate_emulator_roms broadcasts error if no active run` — guild has no active run; perform; no job enqueued; error broadcast (whatever the existing `broadcast_error` pattern is)
+Cover:
 
-Use `assert_enqueued_with(job: SoulLink::GenerateRunRomsJob, args: [run])` and ActionCable test helpers (`stub_connection(current_user_id: ...)` then `subscribe(...)` then `perform(...)`). Look at `test/channels/gym_draft_channel_test.rb` for the pattern.
+- **Auth** — unauthenticated → redirect to login (or 401, whatever existing controllers do; check `dashboard_controller_test.rb` for the convention).
+- **show: no active run** — guild has no active run; renders the "No active run" view; status 200.
+- **show: emulator_status == :none** — active run exists, no sessions yet; renders "ROMs not generated yet"; status 200.
+- **show: all claimed, none unclaimed** — 4 sessions all claimed by other players; renders "No ROM available"; status 200.
+- **show: auto-claims first unclaimed** — visiting player has no claimed session, 4 unclaimed exist; after request, exactly one session has `discord_user_id == current_user_id`. Verify session count unchanged.
+- **show: already claimed, status pending** — renders "ROM generating…"; status 200.
+- **show: already claimed, status failed** — renders "ROM generation failed"; status 200; error_message visible.
+- **show: already claimed, status ready** — renders the emulator stage; status 200; response body contains `data-controller="emulator"`.
+- **show: claim race** — simulate `AlreadyClaimedError` on first attempt (stub or use a real race), confirm retry path picks up another unclaimed session.
+- **rom: not ready** — session.status != "ready" → 404.
+- **rom: ready, file missing** — rom_full_path doesn't exist on disk → 404 (defensive).
+- **rom: ready, file present** — returns 200, `Content-Type: application/octet-stream`, body matches the file bytes. Use `Tempfile` or stub `send_file` to avoid real fs writes.
+- **save_data GET: empty** — session.save_data nil → 204 No Content.
+- **save_data GET: present** — returns 200, body matches the bytes.
+- **save_data PATCH: writes the body** — POST a Uint8Array-equivalent String, assert `session.reload.save_data == sent_bytes`.
+- **save_data PATCH: csrf bypass works** — without the CSRF token but with valid session, PATCH still succeeds (because of `protect_from_forgery with: :null_session`). Verify.
 
-#### `test/models/soul_link_run_test.rb`
-
-- Cover `emulator_status` returning each of `:none`, `:generating`, `:ready`, `:failed` with appropriate session combinations
-- `broadcast_state` includes `emulator_status` key
-
-If `test/models/soul_link_run_test.rb` doesn't exist yet, create it with just these tests. Don't backfill other coverage.
-
-#### `test/jobs/soul_link/generate_run_roms_job_test.rb` — extend
-
-Add:
-- `broadcasts run state on completion` — stub randomizer, call `perform_now`, assert `RunChannel.broadcast_run_state` was called once with the run's guild_id
-
-Keep existing tests intact.
+Don't add Stimulus tests — JS unit testing isn't set up in this project.
 
 ### Build Order
 
-1. Add `has_many :soul_link_emulator_sessions, dependent: :destroy` to `SoulLinkRun`. Verify inverse on `SoulLinkEmulatorSession`.
-2. Add `emulator_status` method to `SoulLinkRun`.
-3. Extend `broadcast_state` with the new field.
-4. Add `generate_emulator_roms` action to `RunChannel`. Match the `setup_discord` shape exactly — same error patterns, same broadcast pattern.
-5. Add post-completion broadcast to `GenerateRunRomsJob#perform`.
-6. Update `run_management_controller.js` — new target, new method, broadcast handler.
-7. Update `app/views/runs/index.html.erb` — new button next to Setup Discord.
-8. Tests (channel + model + job extensions).
-9. Run targeted test files. Iterate.
-10. `mise exec -- ruby -S bundle exec rails test` — full suite. 131 + new tests, 0 failures.
-11. **Manual smoke test:** start dev server (`bin/dev`) in another terminal, log in, click "Generate Emulator ROMs", confirm: button hides, sessions are created in DB, button stays hidden after refresh while job runs, button reappears (or stays hidden if ready) once broadcast comes through. Report observed behavior in REVIEW-REQUEST.
+1. Read `public/emulatorjs/data/cores/` to confirm DS core name (`melonds` vs `desmume`). Read `public/emulatorjs/docs/` to confirm the save-callback API.
+2. Add the route block to `config/routes.rb`.
+3. Create `EmulatorController` skeleton with all 5 actions and the `set_run` / `set_session` before_actions.
+4. Create the view with all six rendered states.
+5. Add the "Play" link to the layout nav.
+6. Create the Stimulus controller. Read existing controllers (`run_management_controller.js`, `quick_calc_controller.js`) for style.
+7. Write controller tests. Run them: `mise exec -- ruby -S bundle exec rails test test/controllers/emulator_controller_test.rb`. Iterate to green.
+8. Run full suite: `mise exec -- ruby -S bundle exec rails test`. Confirm 146 + new tests, 0 failures.
+9. **Browser verification (best effort):** if you can't run a real browser, write a code-trace describing what would happen end-to-end. Be explicit about what the user will need to verify locally:
+   - `/emulator` shows the right state for each user × run combination
+   - The actual EmulatorJS canvas loads and the game runs
+   - Save game persists across refresh
 
 ### Flags
 
-- Flag: **No HTTP route or controller** — this is pure ActionCable. Match the `setup_discord` pattern exactly. If you find yourself adding a route, you've drifted.
-- Flag: **Idempotency at the channel layer** — don't re-enqueue if sessions already exist. The job is also idempotent (Step 2 contract), but defense in depth is cheap here.
+- Flag: **No real ROM file writes in tests.** Stub `send_file` or use `Tempfile`. CI doesn't have ROMs.
+- Flag: **No real save_data fetches in tests.** Use FactoryBot to set `save_data` directly on the session.
+- Flag: **CSRF: `null_session` bypass for PATCH only**, scoped via `if: -> { request.patch? }`. Don't blanket-disable CSRF.
+- Flag: **`current_user_id` is bigint** (locked architecture decision). Pass it directly to `claim!` — no String coercion.
 - Flag: **Use FactoryBot** for all test data.
-- Flag: **`emulator_status` is a method on the model**, not a column. No migration.
-- Flag: **`has_many` association is required** before `emulator_status` works. Add it first.
-- Flag: **Do NOT touch `setup_discord`** — it works, leave it alone. You're adding a sibling, not refactoring.
-- Flag: **Do NOT add the player-facing emulator route, controller, or view.** That's Step 5.
-- Flag: **Do NOT add a "retry" or "regenerate" UI for `:failed` status.** For now, the same button serves as both initial and retry. Refining the failed-state UX is Step 7.
-- Flag: **`run_management_controller.js` may have an existing broadcast handler.** Read it carefully — don't introduce a parallel handler. Extend the existing one.
-- Flag: **The Stimulus button-toggle logic must match what the broadcast carries.** If `emulator_status` is sent as a String from the channel (Ruby symbols become Strings over the wire in JSON), compare against `"none"` / `"ready"` / etc, not Symbols.
+- Flag: **`emulator_path` and `rom_emulator_path` / `save_data_emulator_path`** — Rails generates these from the `resource :emulator` block. Use them via the `_path` helpers in views.
+- Flag: **Don't add a controller for the "playing" presence broadcast.** That was the multiplayer step we dropped. Keep the player UI single-player.
+- Flag: **Bob can't drive a browser.** That's expected. Provide the code-trace + write the user a clear "what to verify locally" checklist in REVIEW-REQUEST.
+- Flag: **EmulatorJS API may differ from the brief's assumptions.** If the save callback isn't `EJS_onSaveState` or the core isn't `melonds`, use what's actually documented in `public/emulatorjs/docs/`. Don't guess. If the docs are unhelpful, stop and flag.
 - Flag: All Rails commands prefixed `mise exec -- ruby -S bundle exec`.
 - Flag: Do NOT commit. Architect commits.
 
 ### Definition of Done
 
-- [ ] `SoulLinkRun has_many :soul_link_emulator_sessions, dependent: :destroy`
-- [ ] `SoulLinkRun#emulator_status` returns the right symbol for each session combination
-- [ ] `SoulLinkRun#broadcast_state` includes `emulator_status`
-- [ ] `RunChannel#generate_emulator_roms` enqueues the job, idempotent, broadcasts state
-- [ ] `GenerateRunRomsJob` broadcasts `RunChannel.broadcast_run_state(guild_id)` after `perform`
-- [ ] Stimulus controller has `generateEmulatorRoms()` method + `generateRomsButton` target + broadcast-driven visibility toggle
-- [ ] View has the new button next to Setup Discord, with correct initial visibility based on `emulator_status`
-- [ ] Channel tests cover: enqueue happy path, idempotent no-op, no-active-run error
-- [ ] Model tests cover: each `emulator_status` outcome + broadcast_state inclusion
-- [ ] Job test asserts post-completion broadcast
-- [ ] Full suite: previous 131 tests + new tests, all passing
-- [ ] Manual smoke test reported in REVIEW-REQUEST: button visibility transitions through `:none` → `:generating` → `:ready` (with stubbed/successful job)
+- [ ] Routes added; `rake routes | grep emulator` shows all 4 endpoints
+- [ ] `EmulatorController` exists with all 5 actions, before-actions, and the auto-claim race-retry logic
+- [ ] `app/views/emulator/show.html.erb` renders all six states correctly
+- [ ] "Play" link added to layout nav
+- [ ] `app/javascript/controllers/emulator_controller.js` configures EmulatorJS, handles save round-trip, uses CSRF correctly
+- [ ] Controller tests cover: auth, all six show-states, auto-claim happy path + race retry, rom 404 + 200, save_data GET 204 + 200, save_data PATCH writes correctly, CSRF bypass works
+- [ ] Full suite: 146 baseline + new tests, 0 failures
+- [ ] EmulatorJS core name + save callback verified against `public/emulatorjs/data/` and `public/emulatorjs/docs/`
+- [ ] REVIEW-REQUEST includes a "What to verify in browser" checklist for the user
 
 ---
 
 ## Builder Plan
 *Builder adds their plan here before building. Architect reviews and approves.*
 
-1. Model: add `has_many :soul_link_emulator_sessions, dependent: :destroy` + `emulator_status` method to `SoulLinkRun`; add `emulator_status: emulator_status` to `broadcast_state`. Inverse `belongs_to :soul_link_run` already present on `SoulLinkEmulatorSession`.
-2. Channel: append `generate_emulator_roms(_data)` to `RunChannel` mirroring `setup_discord` shape (`transmit({ error: ... })` for nil run; idempotent `broadcast_state` if status != `:none`; else `GenerateRunRomsJob.perform_later(run)` then `broadcast_state`). Existing `RunChannel.broadcast_run_state(guild_id)` already used by `broadcast_state` private method — reuse it from the job.
-3. Job: wrap `perform` body in `ensure` that calls `RunChannel.broadcast_run_state(soul_link_run.guild_id) if soul_link_run.persisted?`.
-4. Stimulus: add `generateRomsButton` target + `generateEmulatorRoms()` calling `subscription.perform("generate_emulator_roms")`; in `render()` toggle `generateRomsButtonTarget.classList` based on `current_run.emulator_status === "none"` (visible) vs anything else (hidden). Skip inline status text — controller has no existing inline-text pattern.
-5. View: add sibling button next to Setup Discord with `'hidden' if @current_run&.emulator_status != :none`. Tests: `test/channels/run_channel_test.rb` (new), `test/models/soul_link_run_test.rb` (new), `test/jobs/soul_link/generate_run_roms_job_test.rb` (extend with broadcast assertion).
+1. **Core**: `EMULATOR_CORE = "melonds"`. Source: `data/src/GameManager.js` line 26 maps system `"nds"` → `["melonds", "desmume", "desmume2015"]` (first = preferred). Cores download dynamically at runtime; `data/cores/` ships empty templates only.
+2. **Save callback**: deviating from brief — using `EJS_onSaveSave` (event payload `{screenshot, format, save}`) instead of `EJS_onSaveState`. The brief's hook captures *save states* (RetroArch snapshots); `onSaveSave` captures the actual SRAM the player writes via in-game "Save". Confirmed in `data/loader.js` lines 162-167 and `data/src/emulator.js` line 1954. For preload, no `loadSaveURL` config exists — instead I'll fetch save bytes on `connect()`, then inject into the emulator FS inside the `EJS_ready` hook via `gameManager.FS.writeFile(getSaveFilePath(), bytes)` + `loadSaveFiles()`.
+3. **Controller** matches brief verbatim including race-retry. CSRF: `null_session` only on PATCH.
+4. **Tests**: 16 cases per the brief's list, FactoryBot, stub `send_file` / use Tempfile. Race test uses Minitest::Mock to throw `AlreadyClaimedError` on the first `claim!`.
+5. **Stimulus**: configures globals → `EJS_onSaveSave` → injects loader script. JS not unit tested. Browser verification = code-trace + checklist for user.
 

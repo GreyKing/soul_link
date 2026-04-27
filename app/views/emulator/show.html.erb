@@ -1,0 +1,64 @@
+<%# Six-state ERB. The emulator UI itself only renders when there is a
+    claimed, ready session for the current player. %>
+
+<div style="margin-bottom: 16px;">
+  <div class="gb-page-title">EMULATOR</div>
+  <div class="gb-page-subtitle">Play your randomized Pokemon Platinum ROM in the browser.</div>
+</div>
+
+<% if @run.nil? %>
+  <div class="gb-card" style="text-align: center; padding: 20px;">
+    <div style="font-size: 14px; color: var(--l2); margin-bottom: 8px;">NO ACTIVE RUN</div>
+    <div style="font-size: 11px; color: var(--d2); margin-bottom: 12px;">
+      Start a new run from the runs page to play.
+    </div>
+    <%= link_to "GO TO RUNS", runs_path, class: "gb-btn-primary" %>
+  </div>
+
+<% elsif @run.emulator_status == :none %>
+  <div class="gb-card" style="text-align: center; padding: 20px;">
+    <div style="font-size: 14px; color: var(--l2); margin-bottom: 8px;">ROMS NOT GENERATED YET</div>
+    <div style="font-size: 11px; color: var(--d2); margin-bottom: 12px;">
+      The run creator needs to click "Generate Emulator ROMs" on the runs page first.
+    </div>
+    <%= link_to "GO TO RUNS", runs_path, class: "gb-btn-primary" %>
+  </div>
+
+<% elsif @session.nil? %>
+  <div class="gb-card" style="text-align: center; padding: 20px;">
+    <div style="font-size: 14px; color: var(--l2); margin-bottom: 8px;">NO ROM AVAILABLE</div>
+    <div style="font-size: 11px; color: var(--d2);">
+      All ROMs have been claimed by other players. Contact the run creator if this looks wrong.
+    </div>
+  </div>
+
+<% elsif @session.status == "pending" || @session.status == "generating" %>
+  <div class="gb-card" style="text-align: center; padding: 20px;">
+    <div style="font-size: 14px; color: var(--l2); margin-bottom: 8px;">ROM GENERATING&hellip;</div>
+    <div style="font-size: 11px; color: var(--d2);">
+      Your randomized Pokemon Platinum ROM is being prepared. Refresh in a moment.
+    </div>
+  </div>
+
+<% elsif @session.status == "failed" %>
+  <div class="gb-card" style="text-align: center; padding: 20px;">
+    <div style="font-size: 14px; color: var(--l2); margin-bottom: 8px;">ROM GENERATION FAILED</div>
+    <div style="font-size: 11px; color: var(--d2); margin-bottom: 8px;">
+      The randomizer reported: <%= @session.error_message.presence || "(no details)" %>
+    </div>
+    <div style="font-size: 11px; color: var(--d2);">
+      Tell the run creator to regenerate the ROMs.
+    </div>
+  </div>
+
+<% else %>
+  <div class="gb-card" style="padding: 12px;"
+       data-controller="emulator"
+       data-emulator-rom-url-value="<%= rom_emulator_path %>"
+       data-emulator-save-data-url-value="<%= save_data_emulator_path %>"
+       data-emulator-csrf-value="<%= form_authenticity_token %>"
+       data-emulator-core-value="<%= EmulatorController::EMULATOR_CORE %>"
+       data-emulator-pathtodata-value="/emulatorjs/data/">
+    <div id="emulator-game" data-emulator-target="game" style="width: 100%; min-height: 480px;"></div>
+  </div>
+<% end %>

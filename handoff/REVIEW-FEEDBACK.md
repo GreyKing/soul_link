@@ -1,4 +1,4 @@
-# Review Feedback — Step 4
+# Review Feedback — Step 5
 Date: 2026-04-26
 Ready for Builder: YES
 
@@ -14,121 +14,49 @@ None.
 
 None.
 
-## Observations
-
-These are not blocking. Logged here so Bob and the Project Owner see what
-I noticed but did not require a fix for.
-
-- **Channel-layer race is real but small (per Architect ruling — do not block).**
-  `RunChannel#generate_emulator_roms` reads `run.emulator_status` (a DB
-  query) and *then* `perform_later`s the job. Two channel actions arriving
-  in rapid succession — e.g. two browser tabs, or a network blip causing
-  the client to retry — could both observe `:none` before either has
-  enqueued. The result is two enqueued jobs, not two creation runs: the
-  job's own count guard at line 15 of `generate_run_roms_job.rb`
-  (`return if ... count >= SESSIONS_PER_RUN`) catches it on the worker
-  side, so the user-visible behavior is still correct. Defense in depth
-  held, but at the job layer, not the channel layer. The button hiding
-  on first click already eliminates the common case (single-user double-
-  click), and there are only four users on this server. Acceptable as-is.
-  If we ever go multi-process or higher-traffic, the proper fix is a
-  unique DB constraint or an advisory lock around session creation —
-  not in scope for Step 4.
-
-- **`emulator_status` does N+1 work.** `soul_link_emulator_sessions` (no
-  preload) loads all sessions, then iterates with `.any?` up to twice. For
-  four rows per run this is fine; if `broadcast_state` ever runs over
-  the past-runs list (currently capped at 20 in `build_state_payload` /
-  `broadcast_run_state`), that's up to 20 extra SELECTs per broadcast.
-  Not a Step 4 problem — those past-run payloads already do `caught_count`
-  and `dead_count` queries — but worth keeping in mind if broadcast
-  latency ever shows up in profiling.
-
 ## Cleared
 
-Read each of the eleven scrutiny points end-to-end. Findings, in order:
+Reviewed Step 5 (player-facing emulator) end to end. All twelve scrutiny items pass; full suite confirmed locally at `169 runs, 504 assertions, 0 failures, 0 errors, 0 skips`; the emulator-controller test file confirmed in isolation at `23 runs, 67 assertions, 0 failures`.
 
-1. **`generate_emulator_roms` mirrors `setup_discord` correctly.**
-   Same `unless run; transmit({ error: "No active run found" }); return; end`
-   guard. Same trailing `rescue => e; transmit({ error: e.message })`.
-   Same `broadcast_state` on success. The added idempotency block
-   (lines 70–73) is the only structural difference, and the brief
-   explicitly required it. No drift in error shape.
+Detail by scrutiny item:
 
-2. **Channel-layer idempotency is "true no-op," not "exactly-once."**
-   `test/channels/run_channel_test.rb:41` uses
-   `assert_no_enqueued_jobs(only: SoulLink::GenerateRunRomsJob)` —
-   that asserts zero, not one. Same on line 52 (`:generating` case)
-   and line 61 (no-active-run case). All three idempotency paths
-   assert NO job was enqueued. Correct.
+1. **Auto-claim race-retry is bounded** (`app/controllers/emulator_controller.rb:56-84`). First `claim!` is on line 66; on `AlreadyClaimedError` we issue a *new* `unclaimed.ready.first` query on line 72 (not the stale `unclaimed` reference) and try once more on line 75. The inner rescue on line 77 swallows the second error and sets `@session = nil`. No path can call `claim!` more than twice. Verified by the `assert_equal 2, call_count` assertion on `test/controllers/emulator_controller_test.rb:185`.
 
-3. **Job's `ensure` block fires on every path.** Line 30 of
-   `generate_run_roms_job.rb` is a true Ruby `ensure` (not
-   `rescue StandardError`) attached to the `perform` method — fires on
-   success, on per-session errors that the inner `rescue` swallows,
-   and on hard crashes that bubble out of `perform`. Tests at line 119
-   (success) and line 127 (randomizer-raises causing the whole job
-   to raise) both assert the broadcast fires. The
-   unrescued-StandardError test at line 139 separately confirms the
-   per-session rescue works while still allowing `ensure` to fire.
-   Three angles of coverage.
+2. **CSRF bypass is properly scoped** (`app/controllers/emulator_controller.rb:19`). `protect_from_forgery with: :null_session, only: [:save_data], if: -> { request.patch? }` — both the action filter and the method filter are present. GET `save_data` does not get the bypass. The `with_forgery_protection` test (`test/controllers/emulator_controller_test.rb:302`) flips `ActionController::Base.allow_forgery_protection = true` and confirms PATCH still succeeds without an `X-CSRF-Token`. No blanket disable.
 
-4. **Stimulus uses string comparisons.** Lines 128–133 of
-   `run_management_controller.js`:
-   `const status = current_run.emulator_status` followed by
-   `if (status === "none" || status === "failed")`. Plain string
-   literals. No symbol leakage, no template-string comparison, no
-   truthy checks that would wrongly accept `null`/`undefined`.
+3. **`current_user_id` bigint flow is preserved end-to-end.** `app/controllers/sessions_controller.rb:16` stores `auth.uid.to_i` (Integer) in `session[:discord_user_id]`; `DiscordAuthentication#current_user_id` returns it raw; `EmulatorController#set_session` passes it to `find_by(discord_user_id: current_user_id)` (line 59) and `claim!(current_user_id)` (lines 66, 75). No `.to_i` / `.to_s` wrapping anywhere in the emulator controller.
 
-5. **`emulator_status` priority is correct.** Lines 53–59 of
-   `soul_link_run.rb`: empty → `:none`, then any `failed` → `:failed`,
-   then any `pending`/`generating` → `:generating`, else `:ready`.
-   Pending is correctly bucketed with generating per the brief
-   (`%w[pending generating]`). Default-pending exercised by
-   `test/models/soul_link_run_test.rb:29`.
+4. **`rom` action covers all four branches** (`app/controllers/emulator_controller.rb:25-31`). `nil` session and not-ready collapse into the first guard (`@session&.ready?`), missing file is the second guard, happy path is `send_file`. Tests at lines 190, 200, 211, 222 cover each branch; the happy-path test uses a `Tempfile` and asserts byte equality.
 
-6. **`has_many :soul_link_emulator_sessions, dependent: :destroy`
-   present** at line 8 of `soul_link_run.rb`. Inverse
-   `belongs_to :soul_link_run` confirmed at line 6 of
-   `soul_link_emulator_session.rb`.
+5. **`save_data` GET 204 vs 200 is correct** (`app/controllers/emulator_controller.rb:40-42`). 204 for nil and empty (both via `data.blank?`) and 200 with the body otherwise. Tests at lines 246, 257, 268.
 
-7. **No HTTP route, no controller, no view drift.**
-   `grep -i emulator config/routes.rb` returns nothing.
-   `ls app/controllers/ | grep emulator` returns nothing. The only
-   view change is the new sibling button in
-   `app/views/runs/index.html.erb` lines 53–57. `git diff 9ce4114`
-   confirms only the five production files Bob listed are modified.
+6. **`save_data` PATCH writes correctly** (`app/controllers/emulator_controller.rb:34-38`). Reads `request.body.read`, persists via `update!`, returns 204. Test at line 284 sends `"NEW_SAVE_BYTES_\x00\x01\x02".b` and asserts round-trip via `sess.reload.save_data.to_s.b`. Bob added a defensive `return head :not_found if @session.nil?` on line 35; the brief did not ask for it but it prevents a NoMethodError when a fifth player attempts to PATCH while all four ROMs are claimed elsewhere. Sensible defense, not drift.
 
-8. **`broadcast_state` extension is additive.** New key
-   `emulator_status` added at line 72 of `soul_link_run.rb`. The
-   Stimulus `render()` only reads `current_run.emulator_status`
-   inside `if (this.hasGenerateRomsButtonTarget)` (line 127); no
-   destructuring elsewhere requires the previous key set. Existing
-   consumers read individual properties off `current_run`, none of
-   which were touched.
+7. **Six-state view, no silent fall-through** (`app/views/emulator/show.html.erb:9-64`). Branches in order: `@run.nil?` → NO ACTIVE RUN; `emulator_status == :none` → ROMS NOT GENERATED YET; `@session.nil?` → NO ROM AVAILABLE; `pending || generating` → ROM GENERATING; `failed` → ROM GENERATION FAILED with `error_message`; else → emulator stage with `data-controller="emulator"`. Each branch has distinct copy. Status validations in the model bound the else to "ready".
 
-9. **No `setup_discord` regression.** `git diff 9ce4114
-   app/channels/run_channel.rb` shows pure addition: 20 lines added
-   at line 60, zero lines deleted. `setup_discord` at lines 43–59 is
-   byte-for-byte unchanged.
+8. **Stimulus controller** (`app/javascript/controllers/emulator_controller.js`):
+   - Globals set on lines 30-50, loader script injected on lines 52-55 — globals first, script second. Order correct.
+   - Existing save fetched on line 28 *before* globals are set; injected on `EJS_ready` (line 49) via `_injectExistingSave` (lines 95-117) which writes into `gameManager.FS` and calls `loadSaveFiles()`.
+   - `EJS_onSaveSave` registered on line 42 (the verified-correct callback for SRAM, per Architect ruling).
+   - `_uploadSave` sends `"X-CSRF-Token": this.csrfValue` on line 128.
+   - Both `_fetchSave` (line 80) and `_uploadSave` (line 130) use `credentials: "same-origin"`.
 
-10. **Definition of Done — independent verification.**
-    - has_many present (line 8) — checked
-    - emulator_status returns each symbol (6 model tests, pass) — checked
-    - broadcast_state includes emulator_status (2 model tests, pass) — checked
-    - generate_emulator_roms enqueues / idempotent / broadcasts (3 channel tests, pass) — checked
-    - Job ensure-block broadcast (2 job tests, pass — success + raise) — checked
-    - Stimulus method, target, broadcast toggle (lines 9, 89–91, 124–134) — checked
-    - View button next to Setup Discord with `'hidden' if != :none` (lines 53–57) — checked
-    - No-active-run error broadcast (channel test line 57) — checked
-    - Full suite: I ran the three changed test files myself —
-      20 runs, 67 assertions, 0 failures, 0 errors. Bob's 146/146
-      full-suite figure stands.
+9. **"Play" nav link is well-placed** (`app/views/layouts/application.html.erb:42`). Sibling of the existing "Runs" link, same `class="gb-nav-link"`, lives inside the `<% if logged_in? %>` wrapper on line 29. No layout disturbance.
 
-11. **Race / concurrency** — covered above in Observations. Not a blocker.
+10. **Test coverage matches DoD.** 23 named tests; every brief-listed scenario has a corresponding test:
+    - Auth (4): `show`, `rom`, `save_data` GET, `save_data` PATCH each redirect when not signed in.
+    - Six show-states (4 message + generating + ready + idempotent revisit): no active run, emulator_status :none, all claimed, auto-claim happy path, idempotent re-visit, pending, generating, failed (with error_message), ready.
+    - Claim race: monkey-patched `claim!` raises once, succeeds on retry, asserts `call_count == 2`.
+    - `rom` four branches: not ready, no session, file missing, file present (Tempfile).
+    - `save_data` GET three: nil, empty, present.
+    - `save_data` PATCH two: writes bytes, succeeds without CSRF under enforced forgery protection.
 
-**Smoke test gap.** Bob explicitly stated he could not drive a real
-browser. Architect ruled that the user will smoke-test locally.
-Not a review issue.
+11. **No scope creep.** No presence multiplayer, no cheat config, no cleanup polish. The only addition beyond the brief is the defensive PATCH nil-session guard mentioned in (6), which is a strict safety improvement.
 
-VERDICT: PASS_WITH_OBSERVATIONS
+12. **Hermetic tests.** `Tempfile` for ROM bytes; FactoryBot for `save_data`. No real EmulatorJS invocation, no fixtures on disk, no network. Race test's `class_eval` monkey-patch is restored in `ensure`; Rails forked-process parallelization isolates it from other workers.
+
+The Architect-cleared deviations (`EMULATOR_CORE = "melonds"`, `EJS_onSaveSave` instead of `EJS_onSaveState`, no in-browser verification by Bob) are not re-litigated.
+
+Step 5 is clear.
+
+VERDICT: PASS
