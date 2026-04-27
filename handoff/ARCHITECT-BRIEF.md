@@ -4,164 +4,223 @@
 
 ---
 
-## Step 8 — Full Calculator Tab in Dashboard
+## Step 1 — `SoulLinkEmulatorSession` Migration + Model
 
-Context: Step 7 added a Quick Calculator modal on the party page with API endpoints (`GET /api/pokemon/:species`, `POST /api/calculator`). This step adds a full-featured CALC tab to the dashboard with both attacker and defender sides fully selectable, your team pokemon as quick-pick buttons, and a history of recent calculations.
+Context: first step in the in-browser DS emulator feature. Creates the per-run, per-player ROM session record. Lifecycle: 4 sessions are created per run (Step 2/4 work) with seeds + ROMs but no `discord_user_id`; players claim one on first emulator visit. This step is **data layer only** — no service, no controller, no view.
 
-### What the User Sees
+### Migration
 
-A new "CALC" tab in the dashboard tab bar (7th tab, after RUNS). The tab content has:
+File: `db/migrate/<timestamp>_create_soul_link_emulator_sessions.rb`
 
-1. **Two-column layout** — Attacker (left) vs Defender (right)
-2. **Each side has:**
-   - Species input with datalist autocomplete (493 pokemon)
-   - Quick-pick buttons for your current team pokemon (pre-fills species + level + nature)
-   - Level input (default 50)
-   - Nature select (25 natures)
-   - Base stats display (filled on species select)
-   - Sprite + type badges
-3. **Move section** (below columns) — dropdown of attacker's damaging moves, move info display
-4. **Results section** — damage range, total, crit, effectiveness, STAB, all the fields from Step 5
-5. **Swap button** — swaps attacker and defender (useful for "what if they attack back?")
-6. **Calculation history** — last 5 calculations shown as compact rows below results, clickable to re-load
-
-### Architecture Decisions
-
-- **Reuse Step 7 API endpoints.** No new backend code needed (except the tab + partial + controller data).
-- **New Stimulus controller:** `full_calc_controller.js` — manages both sides, swap, history
-- **Tab added to existing pixeldex tab system** — button in `_tab_bar.html.erb`, content div in `show.html.erb`
-- **Team quick-pick data** passed via Stimulus values from `@team_groups` already loaded in `DashboardController`
-
-### Tab Integration
-
-**_tab_bar.html.erb** — add after RUNS button:
-```erb
-<button class="tab-item" data-action="click->pixeldex#switchTab" data-pixeldex-target="tabButton" data-tab="calc">CALC</button>
-```
-
-**show.html.erb** — add after runs tab content div (before closing `</div>` of `.panel`):
-```erb
-<div data-pixeldex-target="tabContent" data-tab="calc" class="hidden">
-  <%= render "calc_content" %>
-</div>
-```
-
-### Controller Data
-
-In `DashboardController#show`, add:
 ```ruby
-@calc_team_pokemon = @team_groups.flat_map do |group|
-  group.soul_link_pokemon.select { |p| p.discord_user_id == current_user_id }.map do |p|
-    { species: p.species, level: p.level || 50, nature: p.nature }
-  end
+create_table :soul_link_emulator_sessions do |t|
+  t.references :soul_link_run, null: false, foreign_key: true
+  t.string  :discord_user_id                         # nullable until claimed
+  t.string  :status, default: "pending", null: false # pending | generating | ready | failed
+  t.string  :seed, null: false
+  t.string  :rom_path                                # nullable until generation succeeds
+  t.binary  :save_data, limit: 16.megabytes          # MEDIUMBLOB on MySQL 8
+  t.string  :error_message
+  t.timestamps
 end
+
+add_index :soul_link_emulator_sessions,
+          [:soul_link_run_id, :discord_user_id],
+          unique: true,
+          name: "idx_emu_session_run_user"
+
+add_index :soul_link_emulator_sessions,
+          [:soul_link_run_id, :status],
+          name: "idx_emu_session_run_status"
 ```
 
-### New Partial: dashboard/_calc_content.html.erb
+### Model — `app/models/soul_link_emulator_session.rb`
 
-Wrap in `full-calc` controller div with values: `csrf`, `pokemonUrl` (`/api/pokemon/`), `calcUrl` (`/api/calculator`), `teamPokemon` (JSON array from `@calc_team_pokemon`).
+- `belongs_to :soul_link_run`
+- `STATUSES = %w[pending generating ready failed].freeze`
+- `class AlreadyClaimedError < StandardError; end` (nested inside model)
 
-**Layout:**
-- Two-column grid: Attacker (left) / Defender (right)
-- Each side: quick-pick buttons, species input with datalist, level + nature row, sprite + types + stats display
-- Center swap button (⇄ SWAP)
-- Move section (full-width card below)
-- Results section (full-width card, hidden until calc)
-- History section (last 5 calcs, compact rows)
-- Shared datalist `id="full-calc-species"` with all 493 species
+Validations:
+- `validates :status, inclusion: { in: STATUSES }`
+- `validates :seed, presence: true`
+- `validates :discord_user_id, uniqueness: { scope: :soul_link_run_id, allow_nil: true }`
 
-Nature `<select>` options rendered server-side from `PixeldexHelper::NATURES.keys`. Include empty "Neutral" option.
+Scopes:
+- `scope :ready, -> { where(status: "ready") }`
+- `scope :unclaimed, -> { where(discord_user_id: nil) }`
+- `scope :claimed, -> { where.not(discord_user_id: nil) }`
 
-### Stimulus Controller: full_calc_controller.js
+Instance methods:
+- `ready?` → `status == "ready"`
+- `claimed?` → `discord_user_id.present?`
+- `rom_full_path` → `Rails.root.join(rom_path) if rom_path.present?` (returns `Pathname` or `nil`)
+- `claim!(uid)` — atomic SQL-level claim:
+  ```ruby
+  rows = self.class.where(id: id, discord_user_id: nil).update_all(discord_user_id: uid)
+  raise AlreadyClaimedError, "session #{id} already claimed" if rows.zero?
+  reload
+  ```
 
-**Values:** `csrf` (String), `pokemonUrl` (String), `calcUrl` (String), `teamPokemon` (Array)
+### Tests — `test/models/soul_link_emulator_session_test.rb`
 
-**Targets:**
-- `attackerSpecies`, `attackerLevel`, `attackerNature`, `attackerSprite`, `attackerTypes`, `attackerStats`, `attackerQuickPick`
-- `defenderSpecies`, `defenderLevel`, `defenderNature`, `defenderSprite`, `defenderTypes`, `defenderStats`, `defenderQuickPick`
-- `moveSelect`, `moveInfo`
-- `resultSection`
-- `historySection`, `historyList`
+Fixture: `test/fixtures/soul_link_emulator_sessions.yml` — at least 3 entries:
+- `unclaimed_one` — status: ready, discord_user_id: nil, rom_path set
+- `unclaimed_two` — status: ready, discord_user_id: nil, rom_path set
+- `claimed` — status: ready, discord_user_id: a real fixture user id, save_data may be nil
+- (Optional) `generating` — status: generating, rom_path nil
 
-**Methods:**
+Reference an existing `soul_link_runs` fixture; check `test/fixtures/soul_link_runs.yml` for keys.
 
-`connect()` — render quick-pick buttons for both sides from `teamPokemonValue`. Each button: species name + level, styled as small pill. Click fills that side + triggers fetch.
-
-`attackerChanged()` — fetch attacker data → populate sprite/types/stats + move dropdown.
-
-`defenderChanged()` — fetch defender data → populate sprite/types/stats. Auto-calculate if move selected.
-
-`moveChanged()` — display move info, trigger calculate.
-
-`calculate()` — POST to calc API, display results, add to history.
-
-`swap()` — swap all field values between sides. Re-fetch both sides. Clear move dropdown and re-fetch new attacker's moves.
-
-`_addToHistory(attacker, defender, moveName, result)` — prepend to history list (max 5). Each entry: compact div "Attacker → Defender: Move (min-max)". Clickable to re-load all fields.
-
-**Keep self-contained.** Do NOT extract shared code with quick_calc_controller. Duplication is fine.
-
-### Results Display
-
-```
-Per Hit:  124 - 147
-Total:    248 - 294  (2 hits)     ← only if multi-hit
-Average:  271                      ← only if multi-hit
-Crit:     248 - 294
-
-STAB ✓  |  Super Effective (2x)  |  Crit Chance: 6.25%
-
-Attacker: 200 Atk (Adamant)  |  Defender: 91 Def
-```
-
-Color-code effectiveness: 4x red, 2x orange, 1x neutral, 0.5x/0.25x blue, 0x gray.
-
-### Quick-Pick Buttons
-
-Rendered in `connect()` from `teamPokemonValue`:
-```
-[Garchomp Lv.48] [Lucario Lv.45] [Togekiss Lv.42] ...
-```
-
-Style: `font-size: 9px; padding: 2px 6px; border: var(--border-thin); cursor: pointer;`
-On hover: subtle highlight. On click: fill species/level/nature → trigger changed.
+Cover:
+- Status inclusion: 4 valid pass, 1 invalid fails
+- Seed presence required
+- Two unclaimed sessions in the same run are valid (NULL doesn't conflict in unique index)
+- Two claimed sessions for same `(run, discord_user_id)` are invalid
+- Scopes: `ready`, `unclaimed`, `claimed`
+- `claim!` happy path: sets discord_user_id, returns reloaded record
+- `claim!` raises `AlreadyClaimedError` if already claimed
+- `claim!` is race-safe (concurrent claim → exactly one succeeds; can verify with two threads or just assert the SQL guard exists)
+- `ready?` and `claimed?` predicates
+- `rom_full_path` returns Pathname when rom_path set, nil otherwise
 
 ### Build Order
 
-1. Add CALC tab button to `_tab_bar.html.erb`
-2. Add `@calc_team_pokemon` to `DashboardController#show`
-3. Create `dashboard/_calc_content.html.erb`
-4. Add tab content div to `show.html.erb`
-5. Create `full_calc_controller.js`
+1. Generate migration: `mise exec -- ruby -S bundle exec rails g migration create_soul_link_emulator_sessions`
+2. Fill the migration body, then run: `mise exec -- ruby -S bundle exec rails db:migrate`
+3. Verify `db/schema.rb` shows the table + both indexes
+4. Create model file
+5. Create fixture file
+6. Create test file
+7. Run new tests: `mise exec -- ruby -S bundle exec rails test test/models/soul_link_emulator_session_test.rb`
+8. Run full suite for regressions: `mise exec -- ruby -S bundle exec rails test`
 
 ### Flags
-- Flag: No new API endpoints — reuse from Step 7.
-- Flag: No new backend tests — API endpoints covered.
-- Flag: `@team_groups` already loaded in DashboardController. Filter by `current_user_id`.
-- Flag: Datalist ID: `full-calc-species` (distinct from quick calc's `calc-species-list`).
-- Flag: History is in-memory only (JS array). Lost on reload. Fine.
-- Flag: Swap clears move dropdown and re-fetches new attacker's moves.
-- Flag: All text via textContent. Zero innerHTML with variables.
-- Flag: Read `_strategy_panel.html.erb` as reference for tab content structure.
-- Flag: `helpers.asset_path` provides digested sprite URLs via API.
-- Flag: `current_user_id` available in dashboard controller (from DiscordAuthentication concern).
-- Flag: Use `mise exec -- ruby -S bundle exec rails test` to run tests.
+
+- Flag: Discord user IDs are **String** in this project (locked architecture decision). All references must be String — never integer/bigint.
+- Flag: MySQL allows multiple NULLs in a composite unique index. Multiple unclaimed sessions per run is intended. The `allow_nil: true` on the AR validation matches.
+- Flag: Do NOT add `cheat_overrides` column — dropped from spec.
+- Flag: Do NOT add a `cheats` method — that arrives in Step 6 with the YAML.
+- Flag: Do NOT add any controller, route, service, or job in this step. Data layer only.
+- Flag: `claim!` must be SQL-atomic via `update_all` with `discord_user_id: nil` guard — not a Ruby-level `if claimed? then ...` check. Two players hitting `/emulator` at the same instant must produce exactly one successful claim.
+- Flag: Use the existing fixture/Minitest pattern (no factories). Look at `test/fixtures/soul_link_*.yml` for tone.
+- Flag: All Rails commands must be prefixed `mise exec -- ruby -S bundle exec`.
+- Flag: After migration, `db/schema.rb` will be updated automatically — commit it with the migration.
 
 ### Definition of Done
-- [ ] CALC tab button in tab bar, switches correctly
-- [ ] Two-column layout: attacker (left) + defender (right)
-- [ ] Quick-pick buttons populate from team pokemon
-- [ ] Species input with datalist autocomplete
-- [ ] Level + nature inputs on both sides
-- [ ] Sprite, types, stats display for both sides (using API sprite_url)
-- [ ] Move dropdown populated from attacker's damaging moves
-- [ ] Results display: per-hit, total (multi-hit), crit, effectiveness, STAB
-- [ ] Swap button exchanges attacker ↔ defender
-- [ ] History shows last 5 calculations
-- [ ] All text rendered via textContent (no innerHTML with variables)
-- [ ] Existing 100 tests still pass
+
+- [ ] Migration runs cleanly; `db/schema.rb` shows new table with both indexes
+- [ ] Model file exists with all validations, scopes, methods, and `AlreadyClaimedError`
+- [ ] Fixture file exists with at least 3 entries covering the relevant states
+- [ ] New model tests pass
+- [ ] Race-safety of `claim!` is asserted in tests (or verified by inspection)
+- [ ] Full existing test suite still passes (no regressions)
 
 ---
 
 ## Builder Plan
 *Builder adds their plan here before building. Architect reviews and approves.*
+
+1. Generate migration via `rails g migration` then fill body per brief (string discord_user_id, MEDIUMBLOB save_data via `limit: 16.megabytes`, both indexes).
+2. Run `db:migrate`, verify `db/schema.rb` shows table with `idx_emu_session_run_user` (unique) and `idx_emu_session_run_status`.
+3. Create model with belongs_to, STATUSES, AlreadyClaimedError, validations, scopes, predicates, `rom_full_path`, and SQL-atomic `claim!` using `update_all` guarded by `discord_user_id: nil`.
+4. Create fixture (`unclaimed_one`, `unclaimed_two`, `claimed`, `generating`) referencing `active_run`; use string Discord IDs (e.g. `"153665622641737728"`).
+5. Write Minitest covering all assertions in brief — including a race-safety test that pre-claims the row (simulating the SQL guard's contract) and asserts the second `claim!` raises.
+
+---
+
+## PATCH 2026-04-26 — `discord_user_id` column type
+
+The original brief specified `t.string :discord_user_id` based on Architect misreading the locked rule. That rule ("Discord user IDs stored as String in all Stimulus value types") applies to JavaScript values only — JS Number loses precision above 2^53. DB columns should use `bigint` to match existing tables (`soul_link_pokemon`, `soul_link_teams`). Bob followed the original brief correctly; this is an Architect correction.
+
+### Changes required
+
+1. **Migration:** change `t.string :discord_user_id` → `t.bigint :discord_user_id` (still nullable, no `null: false`).
+2. **Fixture:** unquote the ID — `discord_user_id: "153665622641737728"` → `discord_user_id: 153665622641737728`.
+3. **Tests:** re-run new file + full suite. Race-safety test should still pass (SQL guard is type-agnostic).
+
+### Build Order (patch)
+
+1. `mise exec -- ruby -S bundle exec rails db:rollback`
+2. Edit `db/migrate/20260426233223_create_soul_link_emulator_sessions.rb`: string → bigint
+3. `mise exec -- ruby -S bundle exec rails db:migrate`
+4. Verify `db/schema.rb` shows `t.bigint "discord_user_id"`
+5. Edit `test/fixtures/soul_link_emulator_sessions.yml`: unquote the ID on `claimed`
+6. `mise exec -- ruby -S bundle exec rails test test/models/soul_link_emulator_session_test.rb`
+7. `mise exec -- ruby -S bundle exec rails test`
+8. Append a "Patch Applied" section to `handoff/REVIEW-REQUEST.md` (don't rewrite — append).
+
+### Definition of Done (patch)
+
+- [ ] `db/schema.rb` shows `t.bigint "discord_user_id"`
+- [ ] Fixture uses unquoted integer ID
+- [ ] 16 new tests still pass
+- [ ] 116 full suite still passes
+- [ ] REVIEW-REQUEST.md has a "Patch Applied" section
+
+### Architect Decision (will be locked into BUILD-LOG)
+
+Discord user IDs cross a type boundary at the controller layer:
+- **DB columns:** `bigint` (matches Discord snowflake numeric format)
+- **Stimulus values:** `String` (JS Number loses precision above 2^53)
+- **Controllers:** receive String from HTTP/session, pass to AR which coerces; pass String to Stimulus.
+
+---
+
+## PATCH 2 2026-04-26 — Adopt FactoryBot for new test code
+
+Project Owner intended FactoryBot from project start but the gem was never added. Adopting it now for new test code only. **Legacy 116 tests stay on fixtures** — do not migrate them.
+
+### Changes
+
+1. **Gemfile** — add `gem "factory_bot_rails"` to the `:test` group (next to `capybara` / `selenium-webdriver`). Run `mise exec -- bundle install`.
+2. **`test/factories/soul_link_runs.rb`** — minimum-viable factory for `SoulLinkRun`. Read `app/models/soul_link_run.rb` to find required fields and uniqueness constraints (e.g., `run_number` scoped to `guild_id` — use `sequence`). Don't gold-plate — just enough to validate.
+3. **`test/factories/soul_link_emulator_sessions.rb`** — factory with traits:
+   - **Default:** status `"pending"`, seed via `sequence(:seed) { |n| "seed-#{n}" }`, `discord_user_id: nil`, no `rom_path`, `association :soul_link_run`
+   - **trait `:ready`** — status `"ready"`, rom_path `"storage/roms/randomized/test/seed.nds"`
+   - **trait `:claimed`** — `discord_user_id` set to a unique Integer (use `sequence`); claimable means there's already a player on it
+   - **trait `:generating`** — status `"generating"`, no `rom_path`
+   - Combine in tests like `create(:soul_link_emulator_session, :ready, :claimed)`
+4. **`test/models/soul_link_emulator_session_test.rb`** — rewrite to use factories. Replace `soul_link_runs(:active_run)` → `create(:soul_link_run)`, replace `soul_link_emulator_sessions(:unclaimed_one)` → `create(:soul_link_emulator_session, :ready)`, etc. Same 16 tests, same assertions, same coverage — only data construction changes.
+5. **Delete** `test/fixtures/soul_link_emulator_sessions.yml` (no longer used).
+6. **`test/test_helper.rb`** — confirm `FactoryBot::Syntax::Methods` is available so `create`/`build` work without prefix. `factory_bot_rails` includes it via Railtie automatically; if tests fail with `NoMethodError: create`, add the include to the test base class.
+7. **`CLAUDE.md`** — append a short "Testing conventions" subsection under "Architecture":
+   ```
+   ### Testing conventions
+
+   - **New tests** use FactoryBot factories from `test/factories/`.
+   - **Legacy tests** use fixtures from `test/fixtures/`. Do not convert without an explicit step.
+   - Factories should be minimum-viable — just enough to satisfy validations and associations. Don't add fields the test doesn't need.
+   ```
+
+### Build Order
+
+1. Edit Gemfile, run `mise exec -- bundle install`. Confirm Gemfile.lock updated.
+2. Create both factory files.
+3. Rewrite `test/models/soul_link_emulator_session_test.rb` to use factories. Keep the GREY/ARATYPUSS/SCYTHE/ZEALOUS Discord ID constants (they're still useful as named values), but the records they reference get built via `create(...)`.
+4. Delete `test/fixtures/soul_link_emulator_sessions.yml`.
+5. Run new tests: `mise exec -- ruby -S bundle exec rails test test/models/soul_link_emulator_session_test.rb` — must be 16/16.
+6. Run full suite: `mise exec -- ruby -S bundle exec rails test` — must be 116/116 (no regressions in legacy fixture-based tests).
+7. Append the Testing conventions subsection to CLAUDE.md.
+8. Append a "Patch 2 Applied" section to `handoff/REVIEW-REQUEST.md` listing every file change + test results.
+
+### Flags
+
+- Flag: do **NOT** convert any other test file to factories. Only `soul_link_emulator_session_test.rb`.
+- Flag: do **NOT** delete any other fixture file. Legacy tests rely on them.
+- Flag: factories are minimum-viable — just enough to validate. Future steps extend as needed.
+- Flag: `discord_user_id` in factories is **Integer** (bigint column). Use unquoted numeric literals.
+- Flag: legacy fixtures and FactoryBot coexist cleanly in Rails — fixtures load once per class, factories per test. No special config needed.
+- Flag: if `bundle install` fails without `mise exec`, that means mise governs Ruby — use `mise exec -- bundle install`. Try without first.
+- Flag: do not commit. Architect commits after Reviewer signoff.
+
+### Definition of Done
+
+- [ ] `Gemfile` + `Gemfile.lock` include `factory_bot_rails`
+- [ ] `test/factories/soul_link_runs.rb` exists with minimum-viable factory
+- [ ] `test/factories/soul_link_emulator_sessions.rb` exists with `:ready`, `:claimed`, `:generating` traits
+- [ ] `test/models/soul_link_emulator_session_test.rb` uses factories exclusively, no fixture references
+- [ ] `test/fixtures/soul_link_emulator_sessions.yml` deleted
+- [ ] New file: 16/16 tests pass
+- [ ] Full suite: 116/116 tests pass (no legacy regressions)
+- [ ] `CLAUDE.md` has the Testing conventions subsection
+- [ ] `handoff/REVIEW-REQUEST.md` has Patch 2 Applied section

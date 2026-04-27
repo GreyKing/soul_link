@@ -49,3 +49,9 @@ For detailed documentation, see `.claude/documents/`:
 - **Config:** YAML files in `config/soul_link/`, loaded via `SoulLink::GameState`.
 - **Bot:** Separate process (`rake soul_link:bot`), shares Rails models. Custom ID format: `soul_link:action:context:value`.
 - **Frontend:** Stimulus + Importmap + SortableJS + Tailwind (dark theme). No Node/npm.
+
+### Testing conventions
+
+- **New tests** use FactoryBot factories from `test/factories/`.
+- **Legacy tests** use fixtures from `test/fixtures/`. Do not convert without an explicit step.
+- Factories should be minimum-viable — just enough to satisfy validations and associations. Don't add fields the test doesn't need.

@@ -63,6 +63,8 @@ group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem "capybara"
   gem "selenium-webdriver"
+  # Test data factories — used by new test code; legacy tests stay on fixtures.
+  gem "factory_bot_rails"
 end
 
 gem 'discordrb', github: 'shardlab/discordrb', branch: 'main'

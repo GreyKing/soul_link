@@ -14,6 +14,10 @@ module ActiveSupport
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all
 
+    # FactoryBot short syntax (`create`, `build`) for new test code.
+    # Legacy fixture-based tests are unaffected — both styles coexist.
+    include FactoryBot::Syntax::Methods
+
     # Add more helper methods to be used by all tests here...
   end
 end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_12_180452) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_26_233223) do
   create_table "gym_drafts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "current_player_index", default: 0, null: false
@@ -119,6 +119,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_12_180452) do
     t.index ["name"], name: "index_pokemon_moves_on_name", unique: true
   end
 
+  create_table "soul_link_emulator_sessions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "discord_user_id"
+    t.string "error_message"
+    t.string "rom_path"
+    t.binary "save_data", size: :long
+    t.string "seed", null: false
+    t.bigint "soul_link_run_id", null: false
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.index ["soul_link_run_id", "discord_user_id"], name: "idx_emu_session_run_user", unique: true
+    t.index ["soul_link_run_id", "status"], name: "idx_emu_session_run_status"
+    t.index ["soul_link_run_id"], name: "index_soul_link_emulator_sessions_on_soul_link_run_id"
+  end
+
   create_table "soul_link_pokemon", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.string "ability"
     t.datetime "caught_at"
@@ -205,6 +220,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_12_180452) do
   add_foreign_key "gym_schedules", "soul_link_runs"
   add_foreign_key "pokemon_learnsets", "pokemon_base_stats"
   add_foreign_key "pokemon_learnsets", "pokemon_moves"
+  add_foreign_key "soul_link_emulator_sessions", "soul_link_runs"
   add_foreign_key "soul_link_pokemon", "soul_link_pokemon_groups"
   add_foreign_key "soul_link_pokemon", "soul_link_runs"
   add_foreign_key "soul_link_pokemon_groups", "soul_link_runs"
