@@ -6,7 +6,9 @@
 
 ## Where We Stopped
 
-Steps 1 and 2 of the in-browser DS emulator feature are complete and committed. Data layer + service/job for ROM randomization both done. 131 full-suite tests passing. Active step is Step 3 — EmulatorJS asset rake task.
+Steps 1, 2, 3 of the in-browser DS emulator feature are complete and committed. Data layer + service/job for ROM randomization + EmulatorJS asset rake task all done. 131 full-suite tests passing. Active step is Step 4 — Run-creator ROM-generation trigger.
+
+**Plan refinement** (discovered while scoping Step 4): the existing "Setup Discord" button on the runs page uses `RunChannel` ActionCable, not HTTP. New "Generate Emulator ROMs" button will follow the same pattern. Original locked Step 4 (routes + controller + button) is split: Step 4 = trigger only (channel + button), Step 5 = player consumer (routes + controller + view + Stimulus). Total step count unchanged (still 7).
 
 JRE 21 installed on the Vultr VPS. Pending: 40 Ubuntu updates + system restart (separate maintenance window).
 
@@ -25,6 +27,11 @@ JRE 21 installed on the Vultr VPS. Pending: 40 Ubuntu updates + system restart (
 - `SoulLink::GenerateRunRomsJob` — creates 4 sessions transactionally, runs randomizer 4× sequentially, idempotent on count
 - 15 new tests (10 service + 5 job), all hermetic
 - `.gitignore` excludes ROM/JAR binaries; `.keep` files placed for `storage/roms/base`, `storage/roms/randomized`, `lib/randomizer`
+
+### Step 3 — EmulatorJS Asset Rake Task (`9ce4114`)
+- `lib/tasks/emulatorjs.rake` — `emulatorjs:install` + `emulatorjs:clean`, stdlib only, manual redirect handling, idempotent
+- Verified install: v4.2.3 from upstream, `data/loader.js` lands at expected path
+- `.gitignore` excludes `/public/emulatorjs/`
 
 ---
 

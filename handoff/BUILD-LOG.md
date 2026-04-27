@@ -11,14 +11,37 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 3 — EmulatorJS asset rake task
-**Last committed:** `71f1dcf` — 2026-04-26 (Step 2)
+**Active step:** Step 4 — Run-creator ROM-generation trigger (RunChannel + button)
+**Last committed:** `9ce4114` — 2026-04-26 (Step 3)
 **Pending deploy:** NO
 
 ---
 
 ## Step History
 *Session-scoped.*
+
+### Step 3 — EmulatorJS Asset Rake Task — 2026-04-26
+**Status:** Complete, committed `9ce4114`
+
+**Files created:**
+- `lib/tasks/emulatorjs.rake`
+
+**Files modified:**
+- `.gitignore` — exclude `/public/emulatorjs/`
+
+**Key decisions:**
+- Stdlib only — `Net::HTTP` + `Open3` + system `tar`, no new gems
+- Manual HTTP redirect loop (capped at 5 hops) for GitHub's `tarball_url` 302
+- Idempotent via `rm_rf` + re-extract
+- Ship full upstream tarball contents (16 entries including LICENSE/README) — Architect ruling: GPL LICENSE must travel with redistributed code; footprint is negligible vs WASM cores
+- Verified install: tag v4.2.3, `data/loader.js` at expected path
+- No automated tests — matches `lib/tasks/pokemon_data.rake` convention
+
+**Tests:** 131/131 full suite (no regressions); rake task verified manually.
+
+**Review:** Richard — PASS_WITH_OBSERVATIONS (2 style nits: error message body inclusion, Pathname idiom; not worth a patch).
+
+---
 
 ### Step 2 — `SoulLink::RomRandomizer` Service + `GenerateRunRomsJob` — 2026-04-26
 **Status:** Complete, committed `71f1dcf`
