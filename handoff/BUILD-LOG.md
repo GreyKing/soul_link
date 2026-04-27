@@ -11,14 +11,44 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 5 — Player-facing emulator (routes + controller + view + Stimulus)
-**Last committed:** `f8d1662` — 2026-04-26 (Step 4)
+**Active step:** Step 6 — Cheat config + EmulatorJS cheat integration
+**Last committed:** `a2699a7` — 2026-04-26 (Step 5)
 **Pending deploy:** NO
 
 ---
 
 ## Step History
 *Session-scoped.*
+
+### Step 5 — Player-Facing Emulator — 2026-04-26
+**Status:** Complete, committed `a2699a7`
+
+**Files created:**
+- `app/controllers/emulator_controller.rb`
+- `app/views/emulator/show.html.erb` (six-state ERB)
+- `app/javascript/controllers/emulator_controller.js`
+- `test/controllers/emulator_controller_test.rb` (23 tests)
+
+**Files modified:**
+- `config/routes.rb` — `resource :emulator` block with show, rom, save_data (GET + PATCH)
+- `app/views/layouts/application.html.erb` — "Play" link in nav
+
+**Key decisions:**
+- Auto-claim with bounded race-retry (max 2 `claim!` calls); stale unclaimed → fresh query → claim
+- CSRF bypass via `null_session` scoped only to `save_data` AND `request.patch?`
+- `EMULATOR_CORE = "melonds"` — verified in `public/emulatorjs/data/src/GameManager.js:26`
+- Save callback is `EJS_onSaveSave` (SRAM where Pokemon writes), NOT `EJS_onSaveState` (snapshot states) — original brief was wrong, Bob corrected
+- `current_user_id` flows as bigint Integer end-to-end (no String coercion)
+- Six-state view: no-active-run / no-roms-yet / all-claimed / generating / failed / ready
+- Stimulus controller fetches save before connect, sets EJS globals before injecting loader, sends CSRF in PATCH header
+
+**Tests:** 23 new, 169/169 full suite, all hermetic (Tempfile + FactoryBot, no real binary I/O).
+
+**Review:** Richard — PASS (no Must Fix, no Should Fix, no Escalate).
+
+**Smoke test:** Bob couldn't drive a browser. User verification checklist included in REVIEW-REQUEST. **User must verify locally before considering Step 5 fully validated.**
+
+---
 
 ### Step 4 — Run-Creator ROM-Generation Trigger — 2026-04-26
 **Status:** Complete, committed `f8d1662`

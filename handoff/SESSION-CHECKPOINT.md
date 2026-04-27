@@ -42,6 +42,14 @@ JRE 21 installed on the Vultr VPS. Pending: 40 Ubuntu updates + system restart (
 - "Generate Emulator ROMs" button on runs page next to "Setup Discord"
 - 15 new tests, 146/146 full suite
 
+### Step 5 — Player-Facing Emulator (`a2699a7`)
+- `EmulatorController` with auto-claim race-retry, CSRF bypass scoped to PATCH save_data
+- 6-state view: no-run / no-roms / all-claimed / generating / failed / ready
+- Stimulus controller bridges to EmulatorJS via `EJS_*` globals, save round-trip via PATCH
+- `EMULATOR_CORE = "melonds"`; save callback is `EJS_onSaveSave` (SRAM)
+- "Play" link added to layout nav
+- 23 new tests, 169/169 full suite
+
 ---
 
 ## What Was Decided This Session
