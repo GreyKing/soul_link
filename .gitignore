@@ -24,9 +24,21 @@
 # Ignore storage (uploaded files in development and any SQLite databases).
 /storage/*
 !/storage/.keep
+!/storage/roms/
+/storage/roms/*
+!/storage/roms/base/
+!/storage/roms/randomized/
+/storage/roms/base/*
+!/storage/roms/base/.keep
+/storage/roms/randomized/*
+!/storage/roms/randomized/.keep
 /tmp/storage/*
 !/tmp/storage/
 !/tmp/storage/.keep
+
+# Pokemon Randomizer JAR — provisioned out-of-band, never committed.
+/lib/randomizer/*
+!/lib/randomizer/.keep
 
 /public/assets
 

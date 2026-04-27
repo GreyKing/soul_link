@@ -1,216 +1,199 @@
-# Review Feedback — Step 1
+# Review Feedback — Step 2
+
 Date: 2026-04-26
 Ready for Builder: YES
-
-## Must Fix
-
-None.
-
-## Should Fix
-
-None inline. The single substantive concern (column type inconsistency) is a
-brief-vs-existing-schema question, not a Bob defect — see Escalate below.
-
-## Escalate to Architect
-
-- **`discord_user_id` column type inconsistency.** Bob followed the Step 1
-  brief literally: `t.string :discord_user_id` on
-  `soul_link_emulator_sessions`. But every other table in the project that
-  carries `discord_user_id` declares it `bigint`:
-  - `db/schema.rb:142` — `soul_link_pokemon.discord_user_id` is `t.bigint`,
-    `null: false`
-  - `db/schema.rb:208` — `soul_link_teams.discord_user_id` is `t.bigint`,
-    `null: false`
-  - `test/fixtures/soul_link_pokemon.yml:10–13` — fixtures use unquoted
-    integer literals (`153665622641737728`)
-  - The new fixture `test/fixtures/soul_link_emulator_sessions.yml:15` uses
-    a quoted string (`"153665622641737728"`)
-
-  The session payload from Discord OAuth (`sessions_controller.rb:38`) is a
-  string, and existing controllers (e.g. `teams_controller.rb:11`) pass that
-  string into AR queries against bigint columns — Rails coerces transparently
-  for single-table queries today. The risk surfaces the moment Step 2+ joins
-  `soul_link_emulator_sessions` to `soul_link_pokemon` or `soul_link_teams`
-  on `discord_user_id`: MySQL will be comparing `VARCHAR` to `BIGINT` across
-  tables, which is silently lossy on out-of-range values and defeats index
-  use on at least one side.
-
-  Two valid resolutions, both architectural:
-  1. The brief is correct (String is the new standard), and the older
-     `bigint` columns are legacy that should be migrated. Step 1 is fine;
-     a follow-up step retypes the existing columns.
-  2. The brief is wrong (existing `bigint` is the standard), and Step 1
-     should use `t.bigint :discord_user_id` to match. The migration would
-     need amending.
-
-  Either is defensible. Bob explicitly flagged this in REVIEW-REQUEST so
-  it's surfaced for Architect, not slipped through. Per Project Owner
-  instruction, this does not block Step 1 — but it needs an Architect
-  ruling before any cross-table join on `discord_user_id` lands.
-
-## Cleared
-
-Reviewed migration, model, fixture, schema, and the 16 model tests against
-the brief.
-
-- **Migration** (`db/migrate/20260426233223_create_soul_link_emulator_sessions.rb`)
-  matches the brief verbatim. Schema (`db/schema.rb:122–135`) shows the
-  table with all three expected indexes: `idx_emu_session_run_user`
-  (unique composite on `run_id, discord_user_id`),
-  `idx_emu_session_run_status` (composite), and the FK-implied
-  `index_soul_link_emulator_sessions_on_soul_link_run_id`. `save_data` is
-  `size: :long` (MEDIUMBLOB), `seed` is `null: false`, status defaults to
-  `"pending"`. FK to `soul_link_runs` confirmed at `db/schema.rb:223`.
-- **Model** (`app/models/soul_link_emulator_session.rb`) has all required
-  validations, scopes, predicates, `rom_full_path`, `AlreadyClaimedError`,
-  and the SQL-atomic `claim!`. `update_all` runs through AR parameter
-  binding — no SQL injection surface. `rom_full_path` is nil-safe via
-  `.present?` (handles both nil and `""`, asserted in
-  `test/models/soul_link_emulator_session_test.rb:164–169`).
-- **Race-safety test**
-  (`test/models/soul_link_emulator_session_test.rb:116–134`) is genuine,
-  not theatrical. It loads two AR copies, claims with the first, then
-  attempts to claim with the stale-in-memory second. If `claim!` were
-  rewritten to use a Ruby-level `if claimed? then raise` pre-check, the
-  stale copy's in-memory `@discord_user_id` would still be `nil`, the
-  predicate would return `false`, and the second claim would silently
-  overwrite. The test would then fail because no error was raised. The
-  SQL `WHERE discord_user_id IS NULL` guard is what makes the test pass.
-  Real assertion of a real contract.
-- **Multiple NULLs in unique index** is exercised: `unclaimed_one` and
-  `unclaimed_two` both reference `active_run` with no `discord_user_id`,
-  and the full suite (116 runs) loads them without conflict — proving
-  MySQL's multiple-NULL behavior holds in practice and the
-  `allow_nil: true` validation matches.
-- **All Brief Flags honored** (subject to Architect ruling on String vs.
-  bigint above):
-  - No `cheat_overrides` column.
-  - No `cheats` method.
-  - No controllers / routes / services / jobs / views added.
-  - `claim!` is SQL-atomic via `update_all` with `discord_user_id: nil`
-    guard, not a Ruby pre-check.
-  - Fixture/Minitest pattern (no factories).
-  - Schema regenerated and committed alongside the migration.
-- **No scope creep.** Bob added exactly the four files specified plus the
-  auto-regenerated `db/schema.rb`. Nothing else touched.
-- **DoD** verified independently: migration ran, schema shows table with
-  both named indexes, model has all required surface area, fixture has
-  four states, 16 new tests pass, 116/116 full suite passes, race-safety
-  asserted in test (not just inspection).
-
-Step 1 is clear.
 
 ---
 
-## Patch Review (Patches 1 + 2)
-Date: 2026-04-26
-Ready for Builder: YES
-
 ## Must Fix
 
 None.
 
+---
+
 ## Should Fix
 
-None.
+None blocking. See Observations.
+
+---
 
 ## Escalate to Architect
 
-None. Patch 1's escalation (String vs. bigint) was resolved by Architect's
-ruling and Patch 2 was the follow-up cleanup. Both patches landed inside the
-brief.
+None. The one open question Bob flagged (`error_message` 255 vs 500) was
+already ruled by Architect — keep at 255 to match column width. No further
+escalations.
+
+---
+
+## Observations (non-blocking)
+
+### O1. Job idempotency check is not lock-protected (theoretical race)
+
+`app/jobs/soul_link/generate_run_roms_job.rb:15` reads
+`SoulLinkEmulatorSession.where(...).count >= SESSIONS_PER_RUN` without a lock.
+Two simultaneous enqueues for the same run could both see `count == 0` and
+each create 4 sessions → 8 total. There is no DB-level unique constraint on
+`(soul_link_run_id, slot)` or similar to catch this; `discord_user_id`
+uniqueness allows multiple NULLs.
+
+In practice, Step 4 will gate this on a single button click and the Rails 8
+`:async` adapter is single-process, so the race is unlikely in the deployed
+shape. Worth revisiting in Step 4 (controller-level guard, or a `with_lock`
+on the run row, or a unique slot column). Not blocking Step 2.
+
+### O2. `discord_user_id: nil` in `create!` is redundant but documenting
+
+`generate_run_roms_job.rb:41` — Bob flagged this himself. The column is
+nullable and the factory default is nil. Reads as intentional documentation
+of "these are deliberately unclaimed." Keep it; harmless.
+
+### O3. Service-test stubbing routes through one helper
+
+All 10 service tests funnel through the `with_preconditions` helper before
+calling `@service.call`, which is what guarantees the Java/File seams are
+stubbed. If a future test forgets to wrap, the real
+`system("command -v java …")` would run. Low-risk today (current tests are
+correct); a future-proofing improvement would be to seed the predicate stub
+in `setup do … end`. Not blocking.
+
+---
 
 ## Cleared
 
-Reviewed both patches end-to-end against their briefs. Independently re-ran:
+Reviewed `app/services/soul_link/rom_randomizer.rb`,
+`app/jobs/soul_link/generate_run_roms_job.rb`, the two new test files,
+`.gitignore`, and the three `.keep` placeholders.
+
+**Spec compliance.** Service contract met:
+
+- Returns `false` on handled failure (no raise) — `fail!` returns false at
+  every failure path.
+- Sets `status="failed"` + `error_message` on every failure path
+  (preconditions, non-zero exit, timeout).
+- Stores `rom_path` relative to `Rails.root` via `relative_path_from(Rails.root)`
+  — never absolute, never starts with a slash, always under `storage/`.
+- Defensive Java check (`java_available?`) is re-evaluated on every `call`
+  (not memoized) — correct per brief.
+- Stderr truncated at `STDERR_LIMIT = 255` (Architect ruling). Inline comment
+  in the service explains the deviation from the brief's 500.
+- `Timeout::Error` is rescued and produces the expected
+  `"Generation timed out after 30s"` message.
+- Only persistence bugs surface as `GenerationError`; normal failure paths
+  return `false`.
+
+CLI shape uses `-i / -o / -s / -seed` exactly as the brief specified, with
+`JAR_PATH`, `BASE_ROM_PATH`, `SETTINGS_PATH`, and the session seed as
+positional arguments — verified against the test's argument assertions
+(lines 156–165 of the service test).
+
+**Job contract.** Idempotency on `count >= SESSIONS_PER_RUN` works for both
+`count == 4` and `count > 4` (covered by named tests). Session creation is
+wrapped in a transaction; the subprocess loop runs outside it. Per-session
+failures are tolerated two ways:
+
+- The service returns `false` on handled failure — the loop continues.
+- The job's own `rescue StandardError` catches unhandled crashes — the loop
+  still continues, the crash is logged.
+
+Both paths covered by named tests (lines 87 and 117 of the job test).
+
+Seed format is `SecureRandom.random_number(2**63).to_s` — positive 63-bit
+integer as a String, asserted by the happy-path test (lines 51–54).
+
+**Hermeticity.** Confirmed by reading the test file and re-running the suite:
+
+- `system("command -v java …")` is never invoked because the
+  `java_available?` predicate is stubbed at the instance level. Bob's
+  rationale for not stubbing `Kernel.system` (Ruby resolves `system` via the
+  Kernel mixin on the receiver, not through `Kernel.system`) is correct.
+- `File.exist?` is wrapped in a pass-through stub that intercepts only the
+  four guarded paths (BASE_ROM_PATH, JAR_PATH, SETTINGS_PATH; Java is the
+  predicate) and delegates everything else to the real implementation —
+  necessary because Rails internals call `File.exist?` constantly.
+- `FileUtils.mkdir_p` is stubbed to a no-op (or to a recording spy in the
+  happy-path test, which asserts the expected directory was passed).
+- `Open3.capture3` is stubbed per scenario — happy path returns
+  `["randomized ok", "", fake_status(true)]`, non-zero exit returns
+  `["", "boom: bad rom", fake_status(false)]`, timeout raises
+  `Timeout::Error`. The `Process::Status` substitute is a
+  `Struct.new(:success?)`, which works because the service only calls
+  `#success?` on it.
+
+Independently re-ran:
 
 ```
-mise exec -- ruby -S bundle exec rails test test/models/soul_link_emulator_session_test.rb
-16 runs, 62 assertions, 0 failures, 0 errors, 0 skips
+mise exec -- ruby -S bundle exec rails test \
+  test/services/soul_link/rom_randomizer_test.rb \
+  test/jobs/soul_link/generate_run_roms_job_test.rb
+15 runs, 97 assertions, 0 failures, 0 errors, 0 skips
 
 mise exec -- ruby -S bundle exec rails test
-116 runs, 311 assertions, 0 failures, 0 errors, 0 skips
+131 runs, 408 assertions, 0 failures, 0 errors, 0 skips
 ```
 
-- **Column type flipped correctly.** `db/schema.rb:124` shows
-  `t.bigint "discord_user_id"`. Migration line 5 (`t.bigint :discord_user_id`)
-  matches. No stray `t.string :discord_user_id` anywhere. Index on
-  `(soul_link_run_id, discord_user_id)` re-built unchanged at schema:132.
-- **Factories are minimum-viable.** `test/factories/soul_link_runs.rb` has
-  exactly the fields needed to pass `SoulLinkRun`'s `presence` and uniqueness
-  validations (`guild_id`, `run_number` sequence, `active: true`). The 1000+n
-  run_number offset is a defensive choice against the legacy `active_run`
-  fixture (run_number 1) and is justified in the in-file comment — not
-  gold-plating. `test/factories/soul_link_emulator_sessions.rb` has only the
-  default fields needed (`status`, `seed`, `discord_user_id: nil`,
-  `rom_path: nil`, `association :soul_link_run`) plus the three traits
-  the brief named (`:ready`, `:claimed`, `:generating`). No speculative
-  attributes.
-- **Trait combinations work.** Line 14 of the rewritten test:
-  `create(:soul_link_emulator_session, :ready, :claimed, soul_link_run: @run)`
-  — matches the pattern Architect specified. The combined record gets
-  `status: "ready"`, a numeric `discord_user_id` from the sequence, and
-  `rom_path` set. Tests pass with that combination.
-- **`discord_user_id` is Integer in factories.** Factory line 15:
-  `sequence(:discord_user_id) { |n| 153665622641737728 + n }` — unquoted
-  numeric literal, sequence math produces Integer values, matches bigint
-  column. The base 153665622641737728 is the original GREY snowflake — it
-  is *only* used as the sequence offset, and the snowflake range it
-  generates (153665622641737729+) does not collide with `ARATYPUSS`,
-  `SCYTHE`, or `ZEALOUS` constants used as `claim!` targets. Verified by
-  the unique-index test at `soul_link_emulator_session_test.rb:54` not
-  tripping.
-- **Race-safety test still real.**
-  `test/models/soul_link_emulator_session_test.rb:113–131` is intact and
-  still genuinely asserts the SQL-level contract. Two AR copies are loaded
-  (`fresh_copy` and `stale_copy`), `fresh_copy` claims with `ARATYPUSS`,
-  the stale copy's in-memory `@discord_user_id` is asserted nil at line
-  124 — that assertion is the load-bearing one. If `claim!` were rewritten
-  to a Ruby-level `if claimed? then raise` check, the stale copy would
-  return `false` from `claimed?` (its in-memory value is still nil) and
-  the second `claim!` would silently succeed. Only the SQL
-  `WHERE discord_user_id IS NULL` guard makes the test raise.
-- **Trait composition contract.** `:ready` + `:claimed` together correctly
-  produce `status: "ready"` (later trait wins on overlapping fields, but
-  neither trait sets `status` to anything other than `ready` here, so the
-  combination is unambiguous). `:generating` overwrites `status` and
-  `rom_path` and is used standalone. No trait conflict surfaces in the
-  tests.
-- **`include FactoryBot::Syntax::Methods` placement is safe.** Added to
-  `ActiveSupport::TestCase` in `test_helper.rb:19`. The included methods
-  (`create`, `build`, `attributes_for`, `build_stubbed`, `create_list`,
-  `build_list`) do not collide with Rails test base method names. Fixtures
-  (`fixtures :all` line above it) and factories coexist — confirmed by the
-  full 116-suite run.
-- **Fixture file deleted.** `test/fixtures/soul_link_emulator_sessions.yml`
-  is gone. No code path references it (the only consumer was the test
-  Bob rewrote).
-- **Assertion count delta (313 → 311).** The two-line drop is in the
-  rewritten `test "two unclaimed sessions in the same run are valid"` test
-  (lines 39–52). New assertions: `assert_nil @unclaimed.discord_user_id`,
-  `assert_nil other.discord_user_id`,
-  `assert_equal @unclaimed.soul_link_run_id, other.soul_link_run_id`,
-  `assert extra.valid?`, `assert extra.save` — five assertions that
-  cover the actual contract (two NULL `discord_user_id`s in the same
-  run do not violate the unique index). The dropped assertions were
-  fixture-shape echoes (asserting on values that came from the YAML
-  literal). The contract under test is genuinely preserved. No real
-  coverage lost.
-- **No unintended scope.** Only the files Bob listed changed. No other
-  test was migrated to factories. No other fixture was deleted.
-  `CLAUDE.md` got exactly the testing-conventions block the brief asked
-  for, placed under "Architecture → Quick Reference" as specified.
-- **No legacy regressions.** Full suite at 116/116, 311 assertions. The
-  net assertion drop is fully accounted for by the rewritten test above —
-  no legacy fixture-based test lost coverage. The factory file's
-  `run_number` sequence offset of `1000 + n` defensively avoids any
-  collision with the `active_run` fixture (run_number 1) when both load
-  in the same test class.
-- **`active { true }` in the run factory** is technically redundant with
-  the column default, but it is documentation-style explicit and does
-  not constitute gold-plating in a harmful sense. Leaving it.
-- **Patch 2 brief flags honored.** `factory_bot_rails` resolved cleanly
-  (`Gemfile.lock:132,134,466`). Factories built. Test rewritten. Fixture
-  deleted. CLAUDE.md updated. No commit yet.
+No subprocess warnings. No real Java, no real ROM writes.
 
-Patches 1 and 2 are clear.
+**Test coverage vs brief.** Every "Cover" bullet is asserted by a named test:
+
+Service:
+- "Java missing fails the session with a friendly message"
+- "Base ROM missing fails the session"
+- "Randomizer JAR missing fails the session"
+- "settings file missing fails the session"
+- "successful generation marks the session ready and stores a relative
+  rom_path" (also asserts `mkdir_p` was called with the expected directory
+  and that the CLI shape contains all required flags + the session seed)
+- "session is in 'generating' status while the subprocess runs" (the strong
+  hermetic check — observes status from inside the Open3 stub)
+- "non-zero exit fails the session with truncated stderr"
+- "non-zero exit truncates very long stderr to the column limit"
+- "timeout fails the session with a timeout message"
+- "precondition failure does not call Open3" (defensive extra; valuable)
+
+Job:
+- "creates 4 unclaimed pending sessions when run has none" — asserts seed
+  uniqueness, `discord_user_id: nil`, positive 63-bit integer format, and
+  randomizer called 4 times (covers the "calls randomizer for each session"
+  bullet).
+- "is a no-op when 4 sessions already exist for the run"
+- "is a no-op when more than 4 sessions exist (defensive)"
+- "handled per-session failure does not halt remaining ROM generation"
+- "unrescued StandardError in one session does not stop the others"
+
+No tests-by-implication. Every brief bullet maps to a named test.
+
+**Flags honored.**
+
+- No CLI flags invented — `-i / -o / -s / -seed` exactly as the brief
+  specified.
+- No controllers, routes, views, services, jobs, or buttons added beyond
+  the two listed files. `git status` shows only the listed paths.
+- All test data via FactoryBot (`create(:soul_link_run)`,
+  `create(:soul_link_emulator_session, ...)`) — no fixture references in
+  new tests.
+- `.gitignore` correctly whitelists `storage/roms/{base,randomized}/.keep`
+  and `lib/randomizer/.keep` while ignoring everything else under those
+  paths. Verified two ways:
+  - `git ls-files --others --exclude-standard` shows the three `.keep`
+    files as trackable.
+  - `git check-ignore -v` confirms the run-output directories
+    (`storage/roms/randomized/run_*`) created during local test runs are
+    ignored as intended (matched by `/storage/roms/randomized/*` at line
+    33 of `.gitignore`).
+- No SolidQueue config introduced; service is sync, job runs on the Rails 8
+  `:async` adapter as specified.
+
+**Definition of Done.** All eight DoD boxes pass independent verification:
+
+- Service file exists and matches contract.
+- Job file exists and matches contract.
+- Service tests cover all listed scenarios; all green.
+- Job tests cover all listed scenarios; all green.
+- Full suite passes (131 = 116 + 10 service + 5 job).
+- `.gitignore` updated; `.keep` files trackable.
+- No real Java or filesystem writes in tests.
+- All test data via FactoryBot — no fixture references in new tests.
+
+Step 2 is clear.
+
+VERDICT: PASS_WITH_OBSERVATIONS
