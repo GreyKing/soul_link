@@ -242,6 +242,12 @@ export default class extends Controller {
     this.modalSpeciesInputTarget.value = species
     this.modalSpeciesHiddenTarget.value = species
     this.modalLevelTarget.value = myPokemon.level || ""
+
+    // Track whether the current modal pokemon is eligible to evolve.
+    // Mirrors the dead-btn gate so evolve buttons render only for live, owned pokemon.
+    // Must be set before #populateEvolution so the renderer can read it.
+    this.modalCanEvolve = status !== "dead" && Boolean(myPokemon.id)
+
     this.#populateAbilities(species, myPokemon.ability || "")
     this.#populateEvolution(species)
     this.modalNatureTarget.value = myPokemon.nature || ""
@@ -340,6 +346,34 @@ export default class extends Controller {
           this.modalStatusTarget.textContent = data.error || "SAVE FAILED"
           return
         }
+      }
+
+      window.location.reload()
+    } catch (error) {
+      this.modalStatusTarget.textContent = "NETWORK ERROR"
+    }
+  }
+
+  async evolvePokemon(event) {
+    const pokemonId = this.modalPokemonIdTarget.value
+    if (!pokemonId) return
+
+    const targetSpecies = event.currentTarget.dataset.targetSpecies
+    if (!targetSpecies) return
+
+    this.modalStatusTarget.textContent = "EVOLVING..."
+
+    try {
+      const res = await fetch(`${this.pokemonUpdateUrlValue}/${pokemonId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": this.csrfValue },
+        body: JSON.stringify({ species: targetSpecies })
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        this.modalStatusTarget.textContent = data.error || "EVOLVE FAILED"
+        return
       }
 
       window.location.reload()
@@ -461,10 +495,10 @@ export default class extends Controller {
     const container = this.modalEvoTextTarget
     container.replaceChildren()
 
-    this.#renderEvoNode(container, tree, species, true)
+    this.#renderEvoNode(container, tree, species, true, false)
   }
 
-  #renderEvoNode(container, node, selectedSpecies, isFirst) {
+  #renderEvoNode(container, node, selectedSpecies, isFirst, parentIsSelected = false) {
     // Arrow before this node (unless first in its line)
     if (!isFirst) {
       const sep = document.createElement("span")
@@ -497,10 +531,25 @@ export default class extends Controller {
       container.appendChild(mth)
     }
 
+    // Evolve button — only on direct evolution targets of the currently-selected species,
+    // and only when the modal pokemon is alive and owned by the current user.
+    if (parentIsSelected && this.modalCanEvolve && this.modalPokemonIdTarget.value) {
+      const evolveBtn = document.createElement("button")
+      evolveBtn.type = "button"
+      evolveBtn.className = "gb-btn-primary gb-btn-sm"
+      evolveBtn.dataset.action = "click->pixeldex#evolvePokemon"
+      evolveBtn.dataset.targetSpecies = node.name
+      evolveBtn.style.fontSize = "9px"
+      evolveBtn.style.padding = "2px 6px"
+      evolveBtn.style.marginLeft = "4px"
+      evolveBtn.textContent = "EVOLVE"
+      container.appendChild(evolveBtn)
+    }
+
     // Children
     if (node.children.length === 1) {
       // Linear — continue on same line
-      this.#renderEvoNode(container, node.children[0], selectedSpecies, false)
+      this.#renderEvoNode(container, node.children[0], selectedSpecies, false, node.isSelected)
     } else if (node.children.length > 1) {
       // Branching — stack vertically with indent
       const branchContainer = document.createElement("div")
@@ -512,7 +561,7 @@ export default class extends Controller {
       for (const child of node.children) {
         const branchLine = document.createElement("div")
         branchLine.style.margin = "1px 0"
-        this.#renderEvoNode(branchLine, child, selectedSpecies, false)
+        this.#renderEvoNode(branchLine, child, selectedSpecies, false, node.isSelected)
         branchContainer.appendChild(branchLine)
       }
       container.appendChild(branchContainer)

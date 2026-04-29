@@ -1,109 +1,90 @@
-# Review Feedback — Step 6: Cheat Config + EmulatorJS Cheat Integration
-Date: 2026-04-26
-Ready for Builder: YES
+# Review Feedback — Step 1
+*Written by Reviewer. Read by Builder and Architect.*
+
+---
+
+**Date:** 2026-04-27
+**Ready for Builder:** YES
 
 ## Must Fix
 
-None.
+*—*
 
 ## Should Fix
 
-None.
+*—*
 
 ## Escalate to Architect
 
-None.
+*—*
 
 ## Cleared
 
-Reviewed all eight changed files (1 created YAML, 1 created loader test, 6 modified) plus the
-two cited EmulatorJS source locations. Re-ran the full suite (`mise exec -- ruby -S bundle exec
-rails test`) — 184 runs, 544 assertions, 0 failures, 0 errors, 0 skips — and rubocop on all
-six Ruby files (no offenses). All twelve scrutiny points clear:
+Reviewed `app/javascript/controllers/pixeldex_controller.js` end-to-end for Step 1
+(Evolve button on Pokemon modal). Spec compliance, security architecture rules, and
+the six scrutiny points Bob raised all check out. Full test suite re-run confirms
+**184 runs, 0 failures, 0 errors, 0 skips.**
 
-1. **Memoization shape** matches the existing class-level `@x ||= File.exist?(PATH) ? ...`
-   pattern used by `pokedex`, `map_coordinates`, `progression`, `pokemon_types`,
-   `pokemon_abilities`, and `evolutions` (`app/services/soul_link/game_state.rb:133-135`).
-   Bob added `(YAML.load_file(PATH) || {})` to defend against an empty file parsing to `nil` —
-   a minor and correct hardening over the older loaders, justified because `#cheats` consumers
-   immediately call `.fetch` on the result. `reload!` resets `@cheats = nil` on line 147, in
-   the same block as the other ivars.
+### Verified
 
-2. **Memoization test pollution** is defended on three layers: `setup` nils `@cheats`,
-   `teardown` nils `@cheats` AND restores the original `CHEATS_PATH` constant, and
-   `with_cheats_path` nils `@cheats` and restores `CHEATS_PATH` in its `ensure` block. Hermetic
-   regardless of test order.
+- **textContent / no-innerHTML rule (line 541, 545):** Species name flows through
+  `evolveBtn.dataset.targetSpecies = node.name` and is read back via
+  `event.currentTarget.dataset.targetSpecies` (line 361). The button label "EVOLVE"
+  is set via `textContent`. No string interpolation into innerHTML anywhere in the
+  evolve path. Architecture rule honored.
+- **Per-player only (lines 357–383):** `evolvePokemon` PATCHes
+  `${this.pokemonUpdateUrlValue}/${pokemonId}` where `pokemonId` is sourced from
+  `modalPokemonIdTarget.value`. That target is populated at line 257 from
+  `myPokemon.id`, where `myPokemon = pokemonData.find(p => p.is_mine)` (line 220).
+  Confirmed: only the current discord user's pokemon row is mutated. Linked
+  partners untouched. Brief's per-player precedent preserved.
+- **`savePokemon` pattern parity:** Same URL shape, same headers
+  (`Content-Type: application/json` + `X-CSRF-Token: this.csrfValue`), same
+  non-OK error handling (parse `data.error`, write to `modalStatusTarget`,
+  `NETWORK ERROR` fallback in catch), same `window.location.reload()` on success.
+- **No backend / no migration / no view changes / no new tests** — confirmed by
+  scope of the diff and by green test suite. Existing `PokemonControllerTest`
+  already exercises the species PATCH path, as the brief asserted.
 
-3. **`#cheats` model nil-safety** has all four cases covered:
-   `test/models/soul_link_emulator_session_test.rb:174` (empty hash → `[]`),
-   `:180` (no `action_replay` key → `[]`),
-   `:186` (`action_replay: nil` → `[]` via `is_a?(Array)` guard),
-   `:192` (array passthrough). The file-absent → `{}` chain is covered separately by the
-   GameState loader test at `test/services/soul_link/game_state_cheats_test.rb:43`.
+### Scrutiny points evaluated (per Bob's REVIEW-REQUEST.md)
 
-4. **Controller ivar scoping** is correct: `@cheats = @session.cheats if @session&.ready?`
-   (`app/controllers/emulator_controller.rb:25`). Non-ready branches leave `@cheats` nil and
-   the view never references it on those branches.
+1. **`modalCanEvolve` instance flag (lines 246–249).** The brief offered a fallback
+   ("gate on group status === 'caught' only") because no reusable check existed.
+   Bob chose a slightly stronger gate that also requires `myPokemon.id` to be
+   present, set in `#openModal` before `#populateEvolution` runs. The
+   `searchSpecies` path correctly inherits the flag for the lifetime of a modal
+   session, which matches the desired UX (eligibility is per-modal-open, not
+   per-species-search). Acceptable. Threading it through `#populateEvolution` as
+   an explicit arg would be marginally cleaner but is not required.
+2. **`parentIsSelected` 5th arg (lines 498, 501, 552, 564).** Default `false` keeps
+   the public call site benign; recursive calls pass `node.isSelected`, which
+   `#buildNode` (line 465) sets only on the modal's current species. Net effect:
+   buttons render exclusively on direct children of the currently-selected node
+   in the tree — i.e., direct evolution targets — which is exactly what the brief
+   asked for. The selected species itself does not get a self-button (root call
+   passes `parentIsSelected=false`). Final-form species and species with no
+   evolution data render no buttons. Branching evolution lines (children > 1)
+   correctly thread `node.isSelected` into each branch line.
+3. **Status string vocabulary (`EVOLVING...` / `EVOLVE FAILED`).** Action-specific
+   strings are at least as clear as `SAVING...`/`SAVE FAILED` for this UI, and
+   the brief did not dictate exact text. No change required.
+4. **textContent rule on the button.** Verified above — see `Verified` block.
+5. **Out-of-scope items** — all match brief's deliberate scope decisions for this
+   step. No need to add to BUILD-LOG Known Gaps; brief already documents them.
+6. **Test coverage** — re-ran `bundle exec rails test`: 184 runs, 0 failures,
+   0 errors, 0 skips. Matches Bob's claim exactly.
 
-5. **View renders the data attribute on ready ONLY**: the attribute lives inside the
-   `<% else %>` branch of the six-state ERB (`app/views/emulator/show.html.erb:62`), guarded
-   by every preceding `elsif` for the non-ready states. Three tests confirm absence on
-   non-ready paths (`test/controllers/emulator_controller_test.rb:177`, `:185`, `:193`).
+### Notes / observations (informational only, NOT blockers)
 
-6. **JSON serialization escapes correctly**: `<%= @cheats.to_json %>` runs through ERB's
-   default HTML-safe escaping. Confirmed via Rails runner that `&`, `<`, `>` get JSON-escaped
-   to `&`/`<`/`>` and `"` gets HTML-escaped to `&quot;`. Stimulus's `Array`
-   value type decodes the attribute back through the HTML and JSON layers cleanly. No
-   injection risk on future multi-line AR codes containing shell or HTML metacharacters.
+- Inline styles on the EVOLVE button (`fontSize: "9px"`, `padding: "2px 6px"`,
+  `marginLeft: "4px"`) follow the brief's literal markup. Consistent with the
+  inline-style pattern already used elsewhere in `#renderEvoNode` (lvl/method
+  spans at lines 521–523, 528–530) and in `#populateLinked`. No drift.
+- `evolveBtn.dataset.action = "click->pixeldex#evolvePokemon"` is set
+  programmatically rather than via `setAttribute("data-action", ...)`. Both
+  approaches register Stimulus actions correctly — Stimulus reads from
+  `data-action` regardless of how it was placed. No issue.
+- `#findParentOf` cap of 5 backward-walk iterations (line 424) is pre-existing
+  code, not touched by this step. Out of scope.
 
-7. **Stimulus filter logic** (`app/javascript/controllers/emulator_controller.js:45-50`):
-   `cheatsValue` is declared `Array` with `default: []` (line 21); `connect` filters
-   `c && c.enabled !== false && c.name && c.code` (so missing `enabled` passes through, only
-   explicit `false` is filtered, plus null-safety on `name`/`code`); maps to `[c.name, c.code]`
-   tuples; assigns `window.EJS_cheats = tuples` only when the filtered list is non-empty.
-   Empty cheats array is a no-op — matches `Array.isArray` precondition at
-   `public/emulatorjs/data/src/emulator.js:311`. `disconnect` clears `EJS_cheats = undefined`
-   on line 85.
-
-8. **Tuple format** verified against EmulatorJS source: `loader.js:102` assigns
-   `config.cheats = window.EJS_cheats`; `emulator.js:311-323` reads `cheat[0]` as `desc` and
-   `cheat[1]` as `code`, pushing `{desc, checked:false, code, is_permanent:true}`. Bob's
-   `[c.name, c.code]` mapping matches.
-
-9. **Multi-line YAML block strings** are exercised by the loader test at
-   `test/services/soul_link/game_state_cheats_test.rb:72-90`, which writes a `code: |` block,
-   reads it back, and asserts both lines survive. Real Tempfile + real Psych parser, so this
-   is a true integration check rather than a stub round-trip.
-
-10. **No memoization leakage across test ordering.** The loader test brackets the ivar on
-    setup/teardown; the model and controller tests use `SoulLink::GameState.stub(:cheats, ...)`
-    which replaces the class method directly rather than touching `@cheats`, so the original
-    method (memoized or not) is fully restored on block exit. The Bootsnap-prepend issue that
-    defeats `YAML.load_file` stubs does not affect class-method stubs at the GameState level.
-
-11. **No scope creep.** The `cheat_overrides` column is not re-added; no per-player override
-    UI; no work in Step 7 cleanup territory. Empty `action_replay: []` placeholder ships as
-    instructed — no invented codes.
-
-12. **Definition of Done** — every box independently verified:
-    - `config/soul_link/cheats.yml` exists with `action_replay: []` placeholder ✓
-    - `SoulLink::GameState.cheats` exists, memoized, returns `{}` if file absent ✓
-    - `SoulLinkEmulatorSession#cheats` returns the array (or `[]`) ✓
-    - `EmulatorController#show` sets `@cheats` only on `:ready` ✓
-    - View renders `data-emulator-cheats-value` only on ready ✓
-    - Stimulus has `cheats: Array` value and injects into `EJS_cheats` with verified format ✓
-    - GameState loader: 6 tests; model: 4 new tests; controller: 5 new + 1 extended ✓
-    - Full suite: 184 runs (169 baseline + 15 new), 0 failures ✓
-    - EJS_cheats global + tuple format verified against `loader.js:102` and
-      `emulator.js:311-323`, cited in REVIEW-REQUEST ✓
-
-One observation worth recording but not blocking: Bob's "memoization" test counts
-`File.exist?` calls (1 across three `cheats` invocations) rather than `YAML.load_file` calls,
-because Bootsnap's `Psych4::Patch` defeats the `Module.prepend`-vs-singleton-stub priority
-used by `Minitest::Mock`. That's a tight equivalent — `||=` short-circuits the entire ternary
-on subsequent calls, so "existence checked once" implies "file loaded at most once" — and
-is documented in the test file header. The architect explicitly cleared this approach.
-
-Step 6 is clear.
-
-VERDICT: PASS
+Step 1 is clear. Bob is good to move on when Ava sends the next brief.
