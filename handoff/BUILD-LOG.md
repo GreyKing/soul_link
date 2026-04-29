@@ -11,26 +11,43 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 1 — SRAM Phase 1: Trainer Block Parsing — **AWAITING REVIEW**
-**Last committed:** `09b3a7e` — 2026-04-29 (sidebar grid layout fix, inline)
+**Active step:** *None — awaiting next brief.*
+**Last committed:** `62be21e` — 2026-04-29 (Step 1: SRAM Phase 1)
 **Pending deploy:** NO
 
-**Parked plan:** FactoryBot conversion. Inventory + ordering at `handoff/parked-plans/factorybot-conversion.md`. Resume after SRAM Phase 1 ships.
+**Parked plan:** FactoryBot conversion. Inventory + ordering at `handoff/parked-plans/factorybot-conversion.md`.
 
 ---
 
 ## Step History
 *Session-scoped.*
 
-### Step 1 — SRAM Phase 1: Trainer Block Parsing (Builder, 2026-04-29)
-- Migration `20260429215107_add_parsed_save_fields_to_soul_link_emulator_sessions.rb` (6 cols).
-- Service `SoulLink::SaveParser` — slot selection via CRC16-CCITT, Gen IV English char decode, returns nil on any error.
-- Job `SoulLink::ParseSaveDataJob` — `update_columns` writes (no callback recurse), parsed_at on both branches.
-- Model: `after_update_commit :enqueue_parse_if_save_changed`.
-- Helper: `EmulatorHelper#format_play_time`.
-- View: 4 new gated lines in `_run_sidebar.html.erb`.
-- Tests: 34 new (18 parser + 8 job + 6 callback + 3 controller). 221 → 255, 0 failures, 4 clean parallel runs.
-- **Open question for Architect**: real-save offset verification did not happen this session. Map-id specifically unverified.
+### Step 1 — SRAM Phase 1: Trainer Block Parsing — 2026-04-29
+**Status:** Complete, committed `62be21e`
+
+**Files created:**
+- `app/services/soul_link/save_parser.rb` — pure parser: slot selection (CRC16-CCITT poly 0x1021, init 0xFFFF, MSB-first), English Gen IV char decode (64 entries, 0xFFFF terminator, 0x0000 skip, U+FFFD fallback), returns nil on any error
+- `app/jobs/soul_link/parse_save_data_job.rb` — async parse + `update_columns` write (skips after_update_commit recurse); sets `parsed_at` on both success and failure paths
+- `app/helpers/emulator_helper.rb` — `format_play_time` helper
+- `db/migrate/20260429215107_*` — 6 new columns on `soul_link_emulator_sessions`
+
+**Files modified:**
+- `app/models/soul_link_emulator_session.rb` — `after_update_commit :enqueue_parse_if_save_changed` callback (gated on `saved_change_to_attribute?("save_data")` and non-blank)
+- `app/views/emulator/_run_sidebar.html.erb` — 4 new rendered fields gated on column presence; badges line gated on `parsed_trainer_name.present?` (not `parsed_at`) so failed parses don't render "Badges: 0/8"
+
+**Key decisions:**
+- Schema columns (Option A) for cached parsing; not on-demand
+- English-only char table; Phase 2-5 (party, PC boxes, multi-language, map names) deferred
+- Real-save offset verification NOT performed this session — offsets cited from Project Pokemon docs + pret/pokeplatinum + PKHeX (read-only). MAP_ID_OFFSET specifically is a placeholder; `safe_map_id` returns nil on zero so sidebar omits cleanly
+- Architect tightened the badges gate from `parsed_at` → `parsed_trainer_name.present?` post-Bob to honor the brief's :failed → "—" contract (parsed_badges defaults to 0, would otherwise render "0/8" on failed parse)
+
+**Tests:** 34 new (18 parser + 7 job + 6 callback + 3 controller); 221 → 255, 0 failures, 4 clean parallel runs.
+
+**Review:** Richard — PASS_WITH_OBSERVATIONS (3 minor: badges gate UX [resolved by Architect inline], off-by-one in Bob's count breakdown [cosmetic], pre-existing rubocop offenses in `delete_rom_file` tests [not introduced by this step]).
+
+**Open Architect rulings (escalated by Richard):**
+1. Real-save offset verification still outstanding — Architect ruled "ship as-is" since infra is correct + failure modes honest. Logged as Known Gap below.
+2. MAP_ID_OFFSET placeholder — same call.
 
 ---
 
@@ -53,6 +70,14 @@ reset until the gap is addressed or the decision is replaced.
 - **Convert legacy fixture-based tests to FactoryBot** — deferred; do not bundle into feature work
 - **No real-time updates on the run roster sidebar** — page-load refresh only. Could broadcast on save_data PATCH if live "X just saved" UX is wanted.
 - **Channel-layer guild authz cached at login** — if user joins a new guild mid-session without re-logging-in, they won't see it. Acceptable for current use.
+
+### From SRAM Phase 1 (2026-04-29)
+- **Real-save offset verification outstanding.** Trainer-block offsets in `SoulLink::SaveParser` cited from Project Pokemon docs + pret/pokeplatinum + read-only PKHeX. Adjust constants if first real save reveals divergence. `MAP_ID_OFFSET = 0x1234` is the least-confident placeholder; `safe_map_id` returns nil on zero so sidebar omits cleanly. When Project Owner has a real `.sav`, verify all 5 fields decode to known values.
+- **Pre-existing rubocop offenses** in `test/models/soul_link_emulator_session_test.rb:220, 258` (4 "Use space inside array brackets" inside `delete_rom_file` tests). Not introduced by SRAM work. Clean with `rubocop -a` in a dedicated cleanup step.
+- **Phase 2 deferred:** map_id → map name lookup (config/soul_link/maps.yml or similar) so sidebar shows "Eterna City" instead of `426`
+- **Phase 3 deferred:** multi-language char tables (Japanese, Korean, etc.); current parser is English-only
+- **Phase 4 deferred:** Pokemon party data (encrypted/PRNG-scrambled blocks A-D, requires Pokemon-internal descrambling — significant effort)
+- **Phase 5 deferred:** PC boxes (same scrambling as party + box-level layout)
 
 ---
 
