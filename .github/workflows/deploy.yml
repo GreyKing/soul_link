@@ -72,6 +72,15 @@ jobs:
             ~/.rbenv/shims/ruby bin/rails db:migrate
             ~/.rbenv/shims/ruby bin/rails assets:precompile
 
+            # Ensure p7zip is available — required by emulatorjs:install to
+            # extract the upstream .7z release asset. Idempotent (apt is a
+            # no-op if already installed). Suppress prompts.
+            command -v 7z >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y p7zip-full
+
+            # Install EmulatorJS if missing (idempotent — skips if already there).
+            # Downloads ~300MB on first install; no-op afterwards.
+            ~/.rbenv/shims/ruby bin/rails emulatorjs:ensure_installed
+
             # Write environment file from secrets (not stored in repo)
             mkdir -p /etc/soul_link
             printf '%s\n' "RAILS_ENV=production" "RAILS_MASTER_KEY=${RAILS_MASTER_KEY}" "DATABASE_USERNAME=${DATABASE_USERNAME}" "DATABASE_PASSWORD=${DATABASE_PASSWORD}" "SOUL_LINK_HOST=${SOUL_LINK_HOST}" > /etc/soul_link/env
