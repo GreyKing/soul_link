@@ -15,51 +15,41 @@ module SoulLink
 
     SLOT_SIZE = SoulLink::SaveParser::SLOT_SIZE
     GENERAL_BLOCK_SIZE = SoulLink::SaveParser::GENERAL_BLOCK_SIZE
-    FOOTER_SIZE = SoulLink::SaveParser::FOOTER_SIZE
 
     # Build a single 0x40000 slot with given trainer block fields, computing
     # and inserting a valid CRC16-CCITT into the footer. `save_counter`
     # determines which slot the parser will pick when both are valid.
+    #
+    # Footer is the LAST 20 bytes WITHIN the general block (slot offsets
+    # 0xCF18..0xCF2C). Save counter at +0x00, CRC16 at +0x12 (= block end - 2).
+    # CRC covers everything in the block before the CRC field (0..0xCF2A).
     def build_slot(name_indices: [], money: 0, badges_byte: 0,
                    play_hours: 0, play_minutes: 0, play_seconds: 0,
                    map_id: 0, save_counter: 1, valid_crc: true)
       slot = "\x00".b * SLOT_SIZE
 
       # Trainer name: 8 little-endian uint16 indices, padded with 0x0000.
-      # The parser reads NAME_BYTES (16) starting at NAME_OFFSET.
       name_bytes = name_indices.first(8).pack("v*")
       name_bytes += "\x00".b * (16 - name_bytes.bytesize)
       slot[SoulLink::SaveParser::NAME_OFFSET, 16] = name_bytes
 
-      # Money is 4 bytes LE at MONEY_OFFSET.
       slot[SoulLink::SaveParser::MONEY_OFFSET, 4] = [ money ].pack("V")
-
-      # Badges is one byte at BADGES_OFFSET.
       slot.setbyte(SoulLink::SaveParser::BADGES_OFFSET, badges_byte & 0xFF)
-
-      # Play time: hours (2 LE), minutes (1), seconds (1).
       slot[SoulLink::SaveParser::PLAY_HOURS_OFFSET, 2] = [ play_hours ].pack("v")
       slot.setbyte(SoulLink::SaveParser::PLAY_MINUTES_OFFSET, play_minutes & 0xFF)
       slot.setbyte(SoulLink::SaveParser::PLAY_SECONDS_OFFSET, play_seconds & 0xFF)
-
-      # Map id (2 bytes LE) at MAP_ID_OFFSET. May or may not be inside the
-      # general block payload depending on the offset constant — that's
-      # fine, we just write it where the parser will read it.
       slot[SoulLink::SaveParser::MAP_ID_OFFSET, 2] = [ map_id ].pack("v")
 
-      # Footer: 20 bytes immediately after the general block payload.
-      # Layout: [0..7] magic/zeros (we ignore), [8..11] block_size,
-      # [12..15] save_counter (FOOTER_COUNTER_OFFSET=0x0C),
-      # [16..17] zero, [18..19] crc16-ccitt of the block payload.
-      footer = "\x00".b * FOOTER_SIZE
-      footer[SoulLink::SaveParser::FOOTER_COUNTER_OFFSET, 4] = [ save_counter ].pack("V")
+      # Save counter at footer start (block-relative 0xCF18, = BLOCK_COUNTER_OFFSET).
+      slot[SoulLink::SaveParser::BLOCK_COUNTER_OFFSET, 4] = [ save_counter ].pack("V")
+
+      # CRC over body bytes 0..BLOCK_CRC_OFFSET, written at BLOCK_CRC_OFFSET.
       crc_value = if valid_crc
-        crc16_ccitt(slot.byteslice(0, GENERAL_BLOCK_SIZE))
+        crc16_ccitt(slot.byteslice(0, SoulLink::SaveParser::BLOCK_CRC_OFFSET))
       else
         0xDEAD
       end
-      footer[SoulLink::SaveParser::FOOTER_CRC_OFFSET, 2] = [ crc_value ].pack("v")
-      slot[GENERAL_BLOCK_SIZE, FOOTER_SIZE] = footer
+      slot[SoulLink::SaveParser::BLOCK_CRC_OFFSET, 2] = [ crc_value ].pack("v")
 
       slot
     end

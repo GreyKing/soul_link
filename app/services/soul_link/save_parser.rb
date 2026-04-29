@@ -29,15 +29,21 @@ module SoulLink
     SLOT_SIZE      = 0x40000      # 256KB per slot
     EXPECTED_TOTAL = 0x80000      # 512KB total file
 
-    # Pokemon Platinum general-block size (bytes). The block is followed by
-    # padding up to the next 4-byte boundary, then the 20-byte footer. The
-    # footer carries the save counter (used to pick the active slot) and a
-    # CRC16-CCITT over the block payload (used to verify integrity).
-    # Source: pret/pokeplatinum SAVEDATA_PT_GENERAL_BLOCK_SIZE.
-    GENERAL_BLOCK_SIZE = 0xCF2C
-    FOOTER_SIZE        = 20
-    FOOTER_CRC_OFFSET  = 18       # last 2 bytes of footer
-    FOOTER_COUNTER_OFFSET = 0x0C  # 4-byte save counter, near end of footer
+    # Pokemon Platinum general-block size (bytes). The footer is the LAST 20
+    # bytes WITHIN the block (NOT after it) — verified against a real Platinum
+    # save on 2026-04-29. Footer layout from block-relative offset 0xCF18:
+    #   +0x00 (4 bytes): save counter (used to pick the active slot)
+    #   +0x04 (4 bytes): reserved/duplicate counter
+    #   +0x08 (4 bytes): block size (0xCF2C)
+    #   +0x0C (4 bytes): magic 0x20060623 (DP/Pt version)
+    #   +0x10 (2 bytes): reserved (0x0000)
+    #   +0x12 (2 bytes): CRC16-CCITT over bytes 0..0xCF2A (everything before CRC)
+    # Source: pret/pokeplatinum SAVEDATA_PT_GENERAL_BLOCK_SIZE + dumped real save.
+    GENERAL_BLOCK_SIZE        = 0xCF2C
+    BLOCK_FOOTER_OFFSET       = 0xCF18           # footer starts here, within the block
+    BLOCK_COUNTER_OFFSET      = 0xCF18           # save counter at start of footer
+    BLOCK_CRC_OFFSET          = 0xCF2A           # 2 bytes before block end
+    CRC_RANGE_END             = BLOCK_CRC_OFFSET # CRC covers bytes 0..0xCF2A (exclusive)
 
     # Trainer ("general") block field offsets within the slot.
     # English Pokemon Platinum. Source: Project Pokemon save-file docs +
@@ -154,26 +160,28 @@ module SoulLink
         end
       end
 
-      # CRC verification over the general block. Footer sits at the end of
-      # the block (offset GENERAL_BLOCK_SIZE in our trimmed slot view).
+      # CRC verification over the general block. The footer is the last 20
+      # bytes WITHIN the block; the CRC field is the last 2 bytes of the block;
+      # the CRC covers everything in the block UP TO BUT NOT INCLUDING the
+      # CRC field itself.
       def slot_valid?(slot)
-        return false if slot.bytesize < GENERAL_BLOCK_SIZE + FOOTER_SIZE
+        return false if slot.bytesize < GENERAL_BLOCK_SIZE
 
-        body = slot.byteslice(0, GENERAL_BLOCK_SIZE)
-        footer = slot.byteslice(GENERAL_BLOCK_SIZE, FOOTER_SIZE)
-        return false if body.nil? || footer.nil? || footer.bytesize < FOOTER_SIZE
+        body_for_crc  = slot.byteslice(0, CRC_RANGE_END)
+        stored_crc_bs = slot.byteslice(BLOCK_CRC_OFFSET, 2)
+        return false if body_for_crc.nil? || stored_crc_bs.nil? || stored_crc_bs.bytesize < 2
 
-        stored_crc = footer.byteslice(FOOTER_CRC_OFFSET, 2).unpack1("v")
-        computed = crc16_ccitt(body)
+        stored_crc = stored_crc_bs.unpack1("v")
+        computed   = crc16_ccitt(body_for_crc)
         stored_crc == computed
       rescue StandardError
         false
       end
 
       def read_save_counter(slot)
-        footer = slot.byteslice(GENERAL_BLOCK_SIZE, FOOTER_SIZE)
-        return 0 if footer.nil? || footer.bytesize < FOOTER_COUNTER_OFFSET + 4
-        footer.byteslice(FOOTER_COUNTER_OFFSET, 4).unpack1("V")
+        chunk = slot.byteslice(BLOCK_COUNTER_OFFSET, 4)
+        return 0 if chunk.nil? || chunk.bytesize < 4
+        chunk.unpack1("V")
       end
 
       def crc16_ccitt(data)
