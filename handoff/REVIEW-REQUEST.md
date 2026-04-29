@@ -1,53 +1,118 @@
-# Review Request
-*Written by Builder. Read by Reviewer.*
-*Overwrite this file at the start of each review — it is not a log.*
+# Review Request — Step 2: Emulator Polish
+
+**Step:** 2 — Emulator Polish (deployment doc + N+1 fix + status label)
+**Builder:** Bob
+**Ready for Review:** YES
 
 ---
 
-**Author:** Bob
-**Date:** 2026-04-27
-**Ready for Review:** YES
-
 ## Summary
 
-Step 1 — Evolve Button on Pokemon Modal. Adds an `EVOLVE` button next to each direct evolution target of the currently-selected species in the Pokemon detail modal's evolution display. Clicking PATCHes the current user's pokemon `species` to the target and reloads. Per-player only — partner co-evolution intentionally out of scope. Frontend-only change in `app/javascript/controllers/pixeldex_controller.js`. No backend, no migration, no view changes, no new tests.
+Three independent follow-ups to close out the emulator feature shipped in
+`574fa7f`–`c33c8b8` (+ flake fix `c36ce69`):
+
+- **A.** Appended "In-Browser Emulator" section to existing
+  `.claude/documents/deployment.md` (existing content preserved).
+- **B.** Eager-loaded `:soul_link_emulator_sessions` in
+  `RunChannel.broadcast_run_state` and `build_state_payload` to kill an
+  N+1 over past runs' `emulator_status` checks. **Measured: 12 → 2 session
+  queries** with 5 past runs + 1 current run, each with one session.
+  Scales linearly — at the documented 20-run history cap, the win is
+  ~21 → 2.
+- **C.** Added inline `ROMs generating…` status label next to the existing
+  generate/regenerate buttons. Hidden unless `emulator_status` is
+  `:generating` (server-rendered) or `"generating"` (JS broadcast).
+  Toggle wired into the existing `render()` — no parallel handler.
+
+All three pieces shipped. No holdouts.
+
+---
 
 ## Files Changed
 
-- `app/javascript/controllers/pixeldex_controller.js`
-  - **Lines 246–249** — In `#openModal`, set `this.modalCanEvolve = status !== "dead" && Boolean(myPokemon.id)` BEFORE `#populateEvolution(species)` runs (line 252), so the renderer can read it. Mirrors the existing dead-btn gate used at line 260.
-  - **Line 498** — `#populateEvolution` now passes `false` as the 5th arg (`parentIsSelected`) to the root `#renderEvoNode` call.
-  - **Lines 501, 534–547, 552, 564** — `#renderEvoNode` signature gets new 5th arg `parentIsSelected = false`. After the existing trigger info (level/method) block, render an `EVOLVE` button when `parentIsSelected && this.modalCanEvolve && this.modalPokemonIdTarget.value`. Button: `gb-btn-primary gb-btn-sm`, inline styles for size/spacing per brief, `data-action="click->pixeldex#evolvePokemon"`, species in `dataset.targetSpecies`, "EVOLVE" via `textContent`. Recursive calls pass `node.isSelected` as `parentIsSelected` for both linear and branching child traversal.
-  - **Lines 357–383** — New `async evolvePokemon(event)` method. Mirrors `savePokemon`'s fetch shape: same URL pattern (`${this.pokemonUpdateUrlValue}/${pokemonId}`), same headers (Content-Type + X-CSRF-Token), PATCH with `{ species: targetSpecies }`. Same error handling pattern (modalStatusTarget shows server error or fallback string; NETWORK ERROR on throw; reload on success).
+| File | Lines | Change |
+|------|-------|--------|
+| `.claude/documents/deployment.md` | 105–155 | Append "In-Browser Emulator" section (Java, base ROM, randomizer JAR, settings file, EmulatorJS install, cleanup task, cheats). VPS uses `bin/rails`, not `mise exec` — intentional, matches existing doc convention. |
+| `app/channels/run_channel.rb` | 105–122, 130–146 | Add `.includes(:soul_link_emulator_sessions)` to both `broadcast_run_state` and `build_state_payload`. `current_run` query inlined (was `SoulLinkRun.current` → now `active.for_guild(...).includes(...).order(...).first`) so the same `.includes` chain applies. |
+| `app/views/runs/index.html.erb` | 62–66 | Add `generateRomsStatus` `<span>` target as a sibling of the existing buttons. Initial visibility uses `:generating` Ruby symbol comparison. Reused existing GB typography (`font-size: 11px; color: var(--l1);`) — no new CSS classes. |
+| `app/javascript/controllers/run_management_controller.js` | 10, 152–158 | Add `generateRomsStatus` to `static targets`. In existing `render()`, toggle visibility based on `status === "generating"` string comparison (matches the existing `none`/`failed` button toggles a few lines above). |
+| `test/channels/run_channel_test.rb` | 137–179 | Two new tests: (1) explicit count assertion that only **2** session queries fire after eager-load (would be 12 without — verified by stashing the channel change); (2) total query count snapshot via `assert_queries_count(16)` as a regression guard. |
 
-## Tests
+---
 
-Full suite: **184 runs, 0 failures, 0 errors, 0 skips.**
+## N+1 Measurements
 
-Run via `PATH=/Users/gferm/.local/share/mise/installs/ruby/3.4.5/bin:$PATH bundle exec rails test` (mise/zsh PATH had Ruby 3.0.6 ahead of the mise shim — explicit override needed; gemfile.lock pins Ruby 3.4.5 per `mise.toml`).
+Setup: 1 active run + 5 past runs, each with 1 emulator session.
 
-No new tests added — brief explicitly stated none required, existing `PokemonControllerTest` already covers `species` PATCH.
+| State | Total queries | Session queries |
+|-------|---------------|-----------------|
+| Before fix (`.includes` removed) | 26 | **12** (2 per run — `.empty?` and `.any?` in `emulator_status` each trigger a SELECT on the unloaded association) |
+| After fix (`.includes` in place) | 16 | **2** (one for current_run, one IN-clause batch for all past_runs) |
 
-## Notes for Reviewer
+The `assert_queries_count(16)` test is a snapshot guard. The
+`session_queries == 2` test is the explicit invariant — verified to fail
+with `N+1 detected: 12 queries fired` if the eager-load is removed
+(stashed the channel change locally and re-ran the targeted test).
 
-Things to scrutinize:
+There's a separate, larger N+1 on `soul_link_pokemon_groups`
+(`caught_count` + `dead_count` COUNT per run, ~2N queries) — **out of
+scope for this step, not addressed.** Flag for Arch if a future step
+wants to bundle it.
 
-1. **Dead-pokemon gate placement.** The brief said "if the gate doesn't exist as a clean reusable check, gate on group status === 'caught' only." There was no reusable function — the existing dead check is an inline `if (status === "dead")` in `#openModal`. I introduced `this.modalCanEvolve` as a shared instance flag set in `#openModal`, then read inside `#renderEvoNode`. This is a small new pattern, not a refactor of the existing dead-btn gate. Clean enough I think, but flagging in case you'd prefer threading it through `#populateEvolution` as an explicit arg instead. Also note: `#populateEvolution` is also called from `searchSpecies` (line 282) when the user types into the species input — that path doesn't reset `modalCanEvolve`, so it correctly inherits the value set by the most recent `#openModal`. That's the desired behavior (same modal session, same eligibility), but worth confirming you agree.
+---
 
-2. **Argument-order precedent on `parentIsSelected`.** I added it as the 5th positional arg with default `false` per the brief. Default keeps backward-compat at the call site in `#populateEvolution`, though I did update that call too to be explicit. The internal recursive calls pass `node.isSelected` (the parent of the next recursion level). This means the button shows on direct children of the *currently-selected species node* in the tree, not direct children of the modal pokemon's species per se — those are the same thing because the tree marks the modal's current species with `isSelected`.
+## Test Results
 
-3. **Status string vocabulary.** I used `"EVOLVING..."` and `"EVOLVE FAILED"` as the modal status text. Brief said "mirror `savePokemon` line ~310 error handling" but didn't dictate the exact string. Easy to change if Richard prefers `"SAVING..."`/`"SAVE FAILED"` for consistency, or wants something else.
+Targeted (channel only):
+```
+13 runs, 43 assertions, 0 failures, 0 errors, 0 skips
+```
 
-4. **Button text uses `textContent`.** "EVOLVE" is a hardcoded literal so this is moot, but I followed the architecture rule on the species name (which IS user-supplied / dynamic) by using `dataset.targetSpecies` and never touching innerHTML.
+Full suite, **4 consecutive runs** (1 confirmation + 3 flake-detection):
+```
+Run 1: 200 runs, 590 assertions, 0 failures, 0 errors, 0 skips
+Run 2: 200 runs, 590 assertions, 0 failures, 0 errors, 0 skips
+Run 3: 200 runs, 590 assertions, 0 failures, 0 errors, 0 skips
+Run 4: 200 runs, 590 assertions, 0 failures, 0 errors, 0 skips
+```
 
-5. **Out-of-scope items per brief** (logged in BUILD-LOG Known Gaps territory but brief already acknowledges them):
-   - Partner co-evolution
-   - Real-time broadcast to other players
-   - Level/method gating on the button
-   - Loading state on the button itself (status target only)
+Baseline was 198; we added 2 tests → 200. **No flakes across 4 runs.**
+`c36ce69`'s storage isolation fix held under repeated parallel runs.
 
-   Not adding these to Known Gaps unless Ava/Richard wants me to formally log them — brief already documents them as deliberate scope decisions for this step.
+Rubocop on changed `.rb` files: clean (the only offenses are pre-existing
+on `test/channels/run_channel_test.rb:184` — a line I didn't touch).
 
-6. **No view changes.** The EVOLVE button is appended into `modalEvoTextTarget` by the renderer; the existing modal markup needs no edits. Verified `gb-btn-primary` + `gb-btn-sm` classes exist by their use elsewhere in the codebase / brief reference.
+---
 
-Manual browser verification deferred to Project Owner per brief — I can't drive a browser.
+## Decisions / Notes
+
+- **`current_run` query inlined.** `SoulLinkRun.current(guild_id)` is a
+  class method that does `active.for_guild(...).order(...).first` — no
+  clean way to chain `.includes` without breaking the abstraction or
+  adding a parameter. Inlined the equivalent chain in both
+  `broadcast_run_state` and `build_state_payload`. If you'd prefer a
+  `SoulLinkRun.current_with_sessions(guild_id)` helper, I can refactor —
+  but two call sites for one semantic felt borderline.
+- **Status label test skipped.** Brief said "skip if view tests aren't
+  easy to add — Stimulus toggle is small enough to verify by inspection."
+  No existing rendering-test pattern for `runs#index`; the toggle is 4
+  lines mirroring the regenerate-button toggle directly above it.
+- **No documentation files created beyond `deployment.md`** (per
+  CLAUDE.md / system instructions).
+- **HTML entity used (`&hellip;`)** instead of literal `…` in the ERB —
+  matches the existing `&mdash;` style already in the same view.
+
+---
+
+## Open Questions
+
+None. Ship-ready.
+
+---
+
+## What I Did NOT Touch
+
+- `setup_discord`, `generate_emulator_roms`, `regenerate_emulator_roms`
+  channel actions (declared stable in brief).
+- `pokemon_group` N+1 on `caught_count` / `dead_count` (out of scope).
+- Existing tests / factories.

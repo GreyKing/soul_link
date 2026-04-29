@@ -1,9 +1,9 @@
-# Review Feedback — Step 1
+# Review Feedback — Step 2 (Emulator Polish)
 *Written by Reviewer. Read by Builder and Architect.*
 
 ---
 
-**Date:** 2026-04-27
+**Date:** 2026-04-28
 **Ready for Builder:** YES
 
 ## Must Fix
@@ -16,75 +16,102 @@
 
 ## Escalate to Architect
 
-*—*
+- **Pokemon-group COUNT N+1 on past runs.** Bob flagged it in REVIEW-REQUEST
+  and intentionally left it alone (out of scope for Step 2). Confirmed in
+  `app/models/soul_link_run.rb:67–68` — `caught_groups.count` and
+  `dead_groups.count` fire two COUNTs per past run, scaling 2N with the
+  20-run history cap. Not a Reviewer call to fold in; flagging here so Arch
+  can decide whether to bundle it into a future polish step.
 
 ## Cleared
 
-Reviewed `app/javascript/controllers/pixeldex_controller.js` end-to-end for Step 1
-(Evolve button on Pokemon modal). Spec compliance, security architecture rules, and
-the six scrutiny points Bob raised all check out. Full test suite re-run confirms
-**184 runs, 0 failures, 0 errors, 0 skips.**
+All three pieces of Step 2 verified end-to-end against the brief and Bob's
+report. Full suite **200 runs, 590 assertions, 0 failures, 0 errors, 0
+skips**; targeted channel suite **13 runs, 43 assertions, 0 failures**. The
+`c36ce69` `Rails.root` stub is intact at
+`test/lib/tasks/emulator_cleanup_test.rb:34`.
 
-### Verified
+### A — Deployment doc (`.claude/documents/deployment.md`)
 
-- **textContent / no-innerHTML rule (line 541, 545):** Species name flows through
-  `evolveBtn.dataset.targetSpecies = node.name` and is read back via
-  `event.currentTarget.dataset.targetSpecies` (line 361). The button label "EVOLVE"
-  is set via `textContent`. No string interpolation into innerHTML anywhere in the
-  evolve path. Architecture rule honored.
-- **Per-player only (lines 357–383):** `evolvePokemon` PATCHes
-  `${this.pokemonUpdateUrlValue}/${pokemonId}` where `pokemonId` is sourced from
-  `modalPokemonIdTarget.value`. That target is populated at line 257 from
-  `myPokemon.id`, where `myPokemon = pokemonData.find(p => p.is_mine)` (line 220).
-  Confirmed: only the current discord user's pokemon row is mutated. Linked
-  partners untouched. Brief's per-player precedent preserved.
-- **`savePokemon` pattern parity:** Same URL shape, same headers
-  (`Content-Type: application/json` + `X-CSRF-Token: this.csrfValue`), same
-  non-OK error handling (parse `data.error`, write to `modalStatusTarget`,
-  `NETWORK ERROR` fallback in catch), same `window.location.reload()` on success.
-- **No backend / no migration / no view changes / no new tests** — confirmed by
-  scope of the diff and by green test suite. Existing `PokemonControllerTest`
-  already exercises the species PATCH path, as the brief asserted.
+- Lines 1–104: original content preserved verbatim (CI/CD, systemd, nginx,
+  Puma, DB, ActionCable, Docker/Kamal, dev, env vars).
+- Lines 105–151: new "In-Browser Emulator" section appended. All five
+  prereqs present in the brief's order: Java JRE, base ROM, randomizer JAR,
+  randomizer settings file, EmulatorJS install. Cleanup task documented at
+  138–145. Cheats note at 147–151. `bin/rails` (system Ruby) used
+  throughout — correct for VPS.
+- File is gitignored (`.gitignore:56–57`), so it does not appear in
+  `git status`. Read directly to confirm contents.
 
-### Scrutiny points evaluated (per Bob's REVIEW-REQUEST.md)
+### B — N+1 fix (`app/channels/run_channel.rb`)
 
-1. **`modalCanEvolve` instance flag (lines 246–249).** The brief offered a fallback
-   ("gate on group status === 'caught' only") because no reusable check existed.
-   Bob chose a slightly stronger gate that also requires `myPokemon.id` to be
-   present, set in `#openModal` before `#populateEvolution` runs. The
-   `searchSpecies` path correctly inherits the flag for the lifetime of a modal
-   session, which matches the desired UX (eligibility is per-modal-open, not
-   per-species-search). Acceptable. Threading it through `#populateEvolution` as
-   an explicit arg would be marginally cleaner but is not required.
-2. **`parentIsSelected` 5th arg (lines 498, 501, 552, 564).** Default `false` keeps
-   the public call site benign; recursive calls pass `node.isSelected`, which
-   `#buildNode` (line 465) sets only on the modal's current species. Net effect:
-   buttons render exclusively on direct children of the currently-selected node
-   in the tree — i.e., direct evolution targets — which is exactly what the brief
-   asked for. The selected species itself does not get a self-button (root call
-   passes `parentIsSelected=false`). Final-form species and species with no
-   evolution data render no buttons. Branching evolution lines (children > 1)
-   correctly thread `node.isSelected` into each branch line.
-3. **Status string vocabulary (`EVOLVING...` / `EVOLVE FAILED`).** Action-specific
-   strings are at least as clear as `SAVING...`/`SAVE FAILED` for this UI, and
-   the brief did not dictate exact text. No change required.
-4. **textContent rule on the button.** Verified above — see `Verified` block.
-5. **Out-of-scope items** — all match brief's deliberate scope decisions for this
-   step. No need to add to BUILD-LOG Known Gaps; brief already documents them.
-6. **Test coverage** — re-ran `bundle exec rails test`: 184 runs, 0 failures,
-   0 errors, 0 skips. Matches Bob's claim exactly.
+- `broadcast_run_state` (lines 105–125): both `current_run` (lines 109–111)
+  and `past_runs` (112–114) now chain `.includes(:soul_link_emulator_sessions)`.
+- `build_state_payload` (lines 133–150): same eager-load applied to both
+  queries (136–138, 139–141) — the initial-subscribe path mirrors the
+  broadcast path, as Bob claimed.
+- The `current_run` query was inlined (`active.for_guild.order.first`)
+  rather than going through `SoulLinkRun.current(guild_id)`, because the
+  class method has no clean hook for `.includes`. Bob's choice; defensible
+  and noted in REVIEW-REQUEST. No pre-existing eager-loads (e.g., teams)
+  were destroyed — `SoulLinkRun.history` and `.active` scopes had none to
+  preserve.
 
-### Notes / observations (informational only, NOT blockers)
+### B — N+1 test correctness (`test/channels/run_channel_test.rb:137–179`)
 
-- Inline styles on the EVOLVE button (`fontSize: "9px"`, `padding: "2px 6px"`,
-  `marginLeft: "4px"`) follow the brief's literal markup. Consistent with the
-  inline-style pattern already used elsewhere in `#renderEvoNode` (lvl/method
-  spans at lines 521–523, 528–530) and in `#populateLinked`. No drift.
-- `evolveBtn.dataset.action = "click->pixeldex#evolvePokemon"` is set
-  programmatically rather than via `setAttribute("data-action", ...)`. Both
-  approaches register Stimulus actions correctly — Stimulus reads from
-  `data-action` regardless of how it was placed. No issue.
-- `#findParentOf` cap of 5 backward-walk iterations (line 424) is pre-existing
-  code, not touched by this step. Out of scope.
+- **Invariant test** (146–164): seeds 5 past runs + 1 current run, each
+  with one session. Subscribes to `sql.active_record` notifications and
+  asserts `session_queries == 2`. Confirmed by inspection of
+  `app/models/soul_link_run.rb:53–59` that `emulator_status` calls
+  `sessions.empty?` and `sessions.any?`, both of which fire a SELECT on an
+  unloaded association. Without `.includes`, this test would see 12 (or
+  similar) and fail with the descriptive message Bob wired in.
+- **Snapshot guard** (166–179): `assert_queries_count(16)` is brittle by
+  design (any added query, even a legitimate one, will trip it), but
+  acceptable as a regression alarm — and Bob's comment at 173–175 calls
+  out exactly that intent. Not a blocker.
 
-Step 1 is clear. Bob is good to move on when Ava sends the next brief.
+### C — Status label
+
+- **View** (`app/views/runs/index.html.erb:63–67`): `<span>` is a sibling
+  of the existing buttons in the same flex container. Initial visibility
+  uses `@current_run&.emulator_status != :generating` (Ruby symbol
+  comparison) — matches the symbol-keyed pattern at lines 55, 60.
+- **Typography:** `font-size: 11px; color: var(--l1);` — verified to match
+  the existing GB-aesthetic small-text pattern at lines 22–35 (the "GYMS",
+  "CAUGHT", "DEAD", "STARTED" labels all use `font-size: 9px–11px; color:
+  var(--l1);`). No new CSS class invented.
+- **Stimulus** (`app/javascript/controllers/run_management_controller.js`):
+  - Line 11: `generateRomsStatus` added to `static targets`.
+  - Lines 151–157: visibility toggle inside the existing `render()`,
+    immediately after the `regenerateRomsButton` toggle (144–150). String
+    comparison `status === "generating"`, `hasGenerateRomsStatusTarget`
+    guard. No parallel handler.
+- **HTML entity:** `&hellip;` matches the `&mdash;` already used in the
+  same view at line 97. Consistent.
+
+### Scope discipline
+
+Confirmed Bob did not touch:
+- `setup_discord` (`run_channel.rb:43–59`),
+- `generate_emulator_roms` (61–79),
+- `regenerate_emulator_roms` (81–103),
+- `app/models/soul_link_run.rb` (no diff),
+- `app/models/soul_link_emulator_session.rb` (no diff),
+- gem manifest (no `Gemfile`/`Gemfile.lock` changes).
+
+The N+1 fix is purely at the channel layer via `.includes`, as briefed.
+
+### Definition of Done
+
+- [x] `deployment.md` has "In-Browser Emulator" section, existing content preserved
+- [x] `RunChannel.broadcast_run_state` eager-loads `soul_link_emulator_sessions` (and so does `build_state_payload`)
+- [x] N+1 assertion test passes and would fail if `.includes` is removed (verified by reading `emulator_status` implementation)
+- [x] View has `generateRomsStatus` target with correct symbol-based initial visibility
+- [x] Stimulus toggles `generateRomsStatus` in `render()` with `status === "generating"`
+- [x] Full suite passes: 198 baseline + 2 new tests = 200, 0 failures
+- [x] `c36ce69` storage isolation fix held; no new flakes observed in this review run
+
+Step 2 is clear.
+
+VERDICT: PASS

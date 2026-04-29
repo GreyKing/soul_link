@@ -8,6 +8,7 @@ export default class extends Controller {
     "setupDiscordButton",
     "generateRomsButton",
     "regenerateRomsButton",
+    "generateRomsStatus",
     "errorMessage"
   ]
   static values = {
@@ -145,6 +146,13 @@ export default class extends Controller {
           this.regenerateRomsButtonTarget.classList.remove("hidden")
         } else {
           this.regenerateRomsButtonTarget.classList.add("hidden")
+        }
+      }
+      if (this.hasGenerateRomsStatusTarget) {
+        if (status === "generating") {
+          this.generateRomsStatusTarget.classList.remove("hidden")
+        } else {
+          this.generateRomsStatusTarget.classList.add("hidden")
         }
       }
     } else {

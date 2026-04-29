@@ -103,8 +103,15 @@ class RunChannel < ApplicationCable::Channel
   end
 
   def self.broadcast_run_state(guild_id)
-    current_run = SoulLinkRun.current(guild_id)
-    past_runs = SoulLinkRun.history(guild_id).limit(20)
+    # Eager-load `soul_link_emulator_sessions` so each run's `emulator_status`
+    # check (called inside `broadcast_state`) reuses the loaded collection
+    # instead of issuing a SELECT per row.
+    current_run = SoulLinkRun.active.for_guild(guild_id)
+                              .includes(:soul_link_emulator_sessions)
+                              .order(run_number: :desc).first
+    past_runs = SoulLinkRun.history(guild_id)
+                            .includes(:soul_link_emulator_sessions)
+                            .limit(20)
 
     payload = {
       type: "state_update",
@@ -124,8 +131,14 @@ class RunChannel < ApplicationCable::Channel
   end
 
   def build_state_payload
-    current_run = SoulLinkRun.current(@guild_id)
-    past_runs = SoulLinkRun.history(@guild_id).limit(20)
+    # Mirror the eager-load in `broadcast_run_state` — same N+1 risk applies
+    # on initial subscribe.
+    current_run = SoulLinkRun.active.for_guild(@guild_id)
+                              .includes(:soul_link_emulator_sessions)
+                              .order(run_number: :desc).first
+    past_runs = SoulLinkRun.history(@guild_id)
+                            .includes(:soul_link_emulator_sessions)
+                            .limit(20)
 
     {
       type: "state_update",
