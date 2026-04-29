@@ -840,6 +840,8 @@ body::after {
   max-width: 420px;
   margin: 16px;
   position: relative;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
 }
 
 .gb-modal-title {
