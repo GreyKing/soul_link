@@ -144,6 +144,83 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_match(/data-emulator-cheats-value=/, response.body)
   end
 
+  # --- show: run roster sidebar ------------------------------------------
+
+  test "show renders run roster with all 4 sessions in id order on ready state" do
+    s1 = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY,    seed: "seed-roster-1")
+    s2 = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: ARATY,   seed: "seed-roster-2")
+    s3 = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: SCYTHE,  seed: "seed-roster-3")
+    s4 = create(:soul_link_emulator_session, :ready, soul_link_run: @run,                            seed: "seed-roster-4")
+
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+
+    # All four sessions appear (verified via their unique seeds).
+    [ s1, s2, s3, s4 ].each do |s|
+      assert_match Regexp.new(Regexp.escape(s.seed)), response.body,
+        "expected seed #{s.seed} in roster body"
+    end
+
+    # Cards must render in id order — assert seeds appear in ascending-id order
+    # in the response body. Sort by id (creation order), then check positions.
+    ordered = [ s1, s2, s3, s4 ].sort_by(&:id)
+    positions = ordered.map { |s| response.body.index(s.seed) }
+    assert positions.all?, "all seeds must be present in the body"
+    assert_equal positions, positions.sort,
+      "roster cards must render in id-ascending order"
+  end
+
+  test "show roster does NOT render when there is no active run" do
+    @run.update!(active: false)
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+    assert_no_match(/RUN ROSTER/, response.body)
+  end
+
+  test "show roster does NOT render when session is generating" do
+    create(:soul_link_emulator_session, soul_link_run: @run, discord_user_id: GREY, status: "generating")
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+    assert_no_match(/RUN ROSTER/, response.body)
+  end
+
+  test "show roster does NOT render when session has failed" do
+    create(:soul_link_emulator_session,
+           soul_link_run: @run,
+           discord_user_id: GREY,
+           status: "failed",
+           error_message: "boom")
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+    assert_no_match(/RUN ROSTER/, response.body)
+    # Defensive: the YOU badge should not leak into non-ready states.
+    assert_no_match(/>YOU</, response.body)
+  end
+
+  test "show roster renders player names, YOU badge, and Unclaimed entries" do
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: ARATY)
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run) # unclaimed
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run) # unclaimed
+
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+
+    # Section header.
+    assert_match(/RUN ROSTER/, response.body)
+    # Current player's display name (from settings.yml: GREY → "Grey").
+    assert_match(/Grey/, response.body)
+    # YOU badge for the current player's card.
+    assert_match(/>YOU</, response.body)
+    # At least one Unclaimed entry (we created two unclaimed sessions).
+    assert_match(/Unclaimed/, response.body)
+  end
+
   # --- show: cheats payload ----------------------------------------------
 
   test "show renders empty cheats data attribute when no cheats configured" do

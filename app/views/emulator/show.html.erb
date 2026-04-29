@@ -52,21 +52,33 @@
   </div>
 
 <% else %>
-  <div class="gb-card" style="padding: 12px;"
-       data-controller="emulator"
-       data-emulator-rom-url-value="<%= rom_emulator_path %>"
-       data-emulator-save-data-url-value="<%= save_data_emulator_path %>"
-       data-emulator-csrf-value="<%= form_authenticity_token %>"
-       data-emulator-core-value="<%= EmulatorController::EMULATOR_CORE %>"
-       data-emulator-pathtodata-value="/emulatorjs/data/"
-       data-emulator-cheats-value="<%= @cheats.to_json %>">
-    <%# DS native is 256×384 stacked (top + bottom). Lock the container to that
-        2:3 aspect ratio, cap at 90vh so it fills the visible viewport without
-        scrolling, center horizontally. EmulatorJS scales the canvas to fill
-        this box, eliminating the wide-and-short black bars. Players can switch
-        to a side-by-side DS layout in the gear menu (Screen Layout: Horizontal)
-        if they prefer the wider aspect on a 16:9 monitor. %>
-    <div id="emulator-game" data-emulator-target="game"
-         style="aspect-ratio: 2 / 3; max-width: min(100%, 60vh); max-height: 90vh; margin: 0 auto;"></div>
+  <%# Ready state: emulator stage + run roster sidebar in a flex layout.
+      flex-wrap: wrap lets the sidebar drop below the canvas on narrow
+      viewports (no media queries needed). min-width: 0 on the canvas flex
+      item is the standard flexbox shrink unlock for `flex: 1 1 auto`. %>
+  <div style="display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
+    <div style="flex: 1 1 auto; min-width: 0;">
+      <div class="gb-card" style="padding: 12px;"
+           data-controller="emulator"
+           data-emulator-rom-url-value="<%= rom_emulator_path %>"
+           data-emulator-save-data-url-value="<%= save_data_emulator_path %>"
+           data-emulator-csrf-value="<%= form_authenticity_token %>"
+           data-emulator-core-value="<%= EmulatorController::EMULATOR_CORE %>"
+           data-emulator-pathtodata-value="/emulatorjs/data/"
+           data-emulator-cheats-value="<%= @cheats.to_json %>">
+        <%# DS native is 256×384 stacked (top + bottom). Lock the container to that
+            2:3 aspect ratio, cap at 90vh so it fills the visible viewport without
+            scrolling, center horizontally. EmulatorJS scales the canvas to fill
+            this box, eliminating the wide-and-short black bars. Players can switch
+            to a side-by-side DS layout in the gear menu (Screen Layout: Horizontal)
+            if they prefer the wider aspect on a 16:9 monitor. %>
+        <div id="emulator-game" data-emulator-target="game"
+             style="aspect-ratio: 2 / 3; max-width: min(100%, 60vh); max-height: 90vh; margin: 0 auto;"></div>
+      </div>
+    </div>
+
+    <aside style="width: 280px; flex-shrink: 0;">
+      <%= render "run_sidebar" %>
+    </aside>
   </div>
 <% end %>

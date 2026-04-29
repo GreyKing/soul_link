@@ -1,0 +1,68 @@
+<%# Run Roster sidebar — Tier 1 only. Renders one card per session in
+    @run_sessions (typically 4). Displays existing model data only: claim
+    state, ROM build status, last-saved timestamp (from updated_at when
+    save_data is present), compressed save size on disk, and the seed.
+    No SRAM parsing — that's Tier 2 and lives in a future step. %>
+
+<div class="gb-card" style="padding: 8px 10px; margin-bottom: 8px;">
+  <div style="font-size: 11px; color: var(--d1); letter-spacing: 0.1em;">RUN ROSTER</div>
+</div>
+
+<% @run_sessions.each do |s| %>
+  <% is_you = s.discord_user_id == current_user_id %>
+  <%# read_attribute_before_type_cast skips the gzip coder; the on-disk
+      compressed bytes are what we want for the "save size" stat. Decompressing
+      just to measure would be wasteful. %>
+  <% saved_bytes = s.read_attribute_before_type_cast("save_data")&.bytesize %>
+  <% player_label = if s.discord_user_id
+                     SoulLink::GameState.player_name(s.discord_user_id).presence || s.discord_user_id.to_s
+                   else
+                     "Unclaimed"
+                   end %>
+  <%# Status palette: ready → green-on-dark (var(--l2) on var(--d1) — matches
+      the existing "ACTIVE" badge in runs/index). pending/generating → amber.
+      failed → gb-flash-alert palette. No new CSS classes. %>
+  <% status_style = case s.status
+                    when "ready"
+                      "background: var(--d1); color: var(--l2); border: 2px solid var(--d1);"
+                    when "pending", "generating"
+                      "background: #d4b14a; color: var(--d1); border: 2px solid var(--d1);"
+                    when "failed"
+                      "background: #4a1c1c; color: #e8a0a0; border: 2px solid #6b2c2c;"
+                    else
+                      "background: var(--l2); color: var(--d1); border: 2px solid var(--d2);"
+                    end %>
+
+  <div class="gb-card" style="padding: 10px; margin-bottom: 8px;<%= ' border-width: 4px;' if is_you %>">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 6px;">
+      <div style="font-size: 12px; color: var(--d1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        <%= player_label %>
+      </div>
+      <% if is_you %>
+        <span class="type-text" style="border-color: var(--d1); background: var(--d1); color: var(--l2); font-size: 9px;">YOU</span>
+      <% end %>
+    </div>
+
+    <div style="margin-bottom: 6px;">
+      <span class="type-text" style="<%= status_style %> font-size: 9px; letter-spacing: 0.05em;">
+        <%= s.status.upcase %>
+      </span>
+    </div>
+
+    <% if saved_bytes && saved_bytes > 0 %>
+      <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
+        Played <%= time_ago_in_words(s.updated_at) %> ago
+      </div>
+      <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
+        Save: <%= number_to_human_size(saved_bytes) %>
+      </div>
+    <% else %>
+      <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">Not started</div>
+      <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">Save: &mdash;</div>
+    <% end %>
+
+    <div style="font-size: 9px; color: var(--d2); opacity: 0.7; margin-top: 4px; word-break: break-all;">
+      Seed: <%= s.seed %>
+    </div>
+  </div>
+<% end %>

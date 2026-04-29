@@ -1,9 +1,9 @@
-# Review Feedback — Step 3 (Emulator Hardening)
+# Review Feedback — Step 4: Run Roster Sidebar
 *Written by Reviewer. Read by Builder and Architect.*
 
 ---
 
-**Date:** 2026-04-26
+**Date:** 2026-04-29
 **Ready for Builder:** YES
 
 ## Must Fix
@@ -12,212 +12,112 @@
 
 ## Should Fix
 
-*—*
+- `app/views/emulator/_run_sidebar.html.erb:29` — `pending`/`generating` status uses an invented hex `#d4b14a` (amber). No amber/yellow token exists in `pixeldex.css` (verified via grep). The brief allowed picking the closest existing color when one didn't exist; the runs-page "ROMs generating…" precedent is plain `var(--l1)` text-only, which Bob's note acknowledges. The choice complies with the "no new CSS in `pixeldex.css`" flag literally — it's inline-only, no class added — but it is the one place a brand-new color literal got introduced. Recommendation: leave as-is for this step (the badge is visually distinct and contained). If status badges get touched again, prefer a `var(--l1)` background + dark text variant, or escalate to Arch for a proper `--accent` / `--warn` var so the color stops being orphaned inline. Not blocking.
+
+- `app/views/emulator/_run_sidebar.html.erb:27` — Bob's note describes the `ready` palette as "matches the ACTIVE label in runs/index", but `app/views/runs/index.html.erb:17` actually uses `background: var(--d2)` while the partial uses `background: var(--d1)`. Both are dark-on-light using existing vars — no invented colors — but the parity claim isn't quite literal. Cosmetic. Not blocking.
 
 ## Escalate to Architect
 
-- **Open Question from Bob: legacy-plaintext passthrough in `GzipCoder.load`.**
-  Bob's REVIEW-REQUEST flags the defensive plaintext-fallback branch
-  (`soul_link_emulator_session.rb:44`) as a "decision point, not a blocker."
-  My read: keep it. It is two lines, fully tested
-  (`soul_link_emulator_session_test.rb:341-351`), and protects against
-  rollback / partial-migration / `update_columns`-bypass scenarios that the
-  test suite cannot otherwise exercise. Removing it saves nothing material;
-  keeping it costs nothing. Arch's call.
+*—*
 
 ## Cleared
 
-All five Must Fix bugs and four smaller items from the brief verified
-end-to-end against the diff and Bob's report. Full suite **216 runs, 628
-assertions, 0 failures, 0 errors, 0 skips** on two consecutive parallel runs
-locally (Bob reports three; my two match). `git diff --stat HEAD` confirms
-the 13-file change set matches the brief's listed files exactly — no Gemfile,
-no fixtures, no out-of-scope tests touched. Debug-line sweep
-(`grep -rEn 'binding\.pry|byebug|debugger|warn "DEBUG|warn "EMPTY-DIR|warn "SUMMARY|puts "DEBUG'`)
-returns zero matches across `test/` and `app/`.
+Reviewed all four touched files plus the new partial against the architect brief and Bob's report. Verified item-by-item against the scrutinize list:
 
-### #1 — `delete_rom_file` rescue widening
+### #1 — Canvas style preserved byte-for-byte
 
-- `soul_link_emulator_session.rb:103-108`: rescue is `StandardError`, not
-  `Errno::ENOENT`. Logs class + message + `rom_path` as required. The "best
-  effort, never roll back the AR transaction" rationale comment at 96-102 is
-  on point.
-- `soul_link_emulator_session_test.rb:251-279`: stubs `Pathname#delete` to
-  raise `Errno::EACCES`, asserts no exception bubbles, the row is destroyed,
-  and the log captures both `delete_rom_file` and `EACCES`. If the rescue
-  were narrowed back to `Errno::ENOENT`, this test would fail (EACCES is not
-  a subclass of ENOENT) — exactly the regression alarm the brief asked for.
-  Existing ENOENT-path test at 231-237 retained.
-- Tiny `Pathname.stub_any_instance` helper at file end (357-365) is scoped
-  to this test file via top-level reopening — not leaked into production
-  code. Acceptable.
+`app/views/emulator/show.html.erb:76` — `style="aspect-ratio: 2 / 3; max-width: min(100%, 60vh); max-height: 90vh; margin: 0 auto;"` matches commit `9b0bf29` exactly. Confirmed via `git show 9b0bf29 -- app/views/emulator/show.html.erb` — the only change around the `emulator-game` div is indentation (additional 4-space wrap from the new flex-item div). Bob's claim is accurate.
 
-### #2 — Save data size cap + gzip
+### #2 — `@run_sessions` scoping
 
-**Controller cap (`emulator_controller.rb:51-68`):** the `request.content_length
-> MAX_SAVE_DATA_BYTES` check is BEFORE `request.body.read` — verified by
-reading lines 60-65 in order. Defense-in-depth post-read `bytesize` check
-follows on line 65 to catch chunked-encoding clients that lie about
-content_length. Both return `:content_too_large` (the non-deprecated Rails
-8.1 symbol). Constant `MAX_SAVE_DATA_BYTES = 2.megabytes` defined at line
-16 with rationale comment.
+`app/controllers/emulator_controller.rb:38` — `@run_sessions = @run.soul_link_emulator_sessions.order(:id) if @session&.ready?`. Identical guard as `@cheats` on line 32. Non-ready branches incur no extra DB query and the partial cannot accidentally render where the ivar is unset (the partial only loads from inside the `<% else %>` ready branch in `show.html.erb:80`).
 
-**Gzip coder (`soul_link_emulator_session.rb:22-49`):**
-- `dump`: nil → nil; empty → empty bytes (no header); otherwise gzipped.
-- `load`: nil → nil; empty → empty bytes; magic-prefixed → gunzipped;
-  legacy plaintext → passthrough.
-- Round-trip exactness verified by tests at `soul_link_emulator_session_test.rb:289-297`
-  (200KB random bytes round-trip exactly via binary-equality `assert_equal payload, reloaded.save_data.b`).
-- On-disk shrinkage verified at 299-318 via
-  `attributes_before_type_cast["save_data"]` — exactly the assertion the
-  brief asked for. Magic-header check at 316-317. Compression ratio assertion
-  at 312-314 (< 50% on highly-redundant SRAM-like input).
-- nil and empty round-trips at 320-336.
-- Legacy plaintext passthrough exercised via `update_columns` (which bypasses
-  the coder on write) at 341-351.
+### #3 — `read_attribute_before_type_cast` usage
 
-**Controller test for round-trip:** `emulator_controller_test.rb:420-444`
-asserts on-disk bytes are smaller than raw input AND
-`assert_equal payload, sess.save_data.b` for byte-exact equality. Oversized
-test (388-402) asserts `:content_too_large`. Exact-cap test (404-418)
-asserts `:no_content` and round-trips successfully.
+`app/views/emulator/_run_sidebar.html.erb:16` — `s.read_attribute_before_type_cast("save_data")&.bytesize`. Skips the gzip coder, returns raw on-disk bytes, safe-navigates nil. Matches the brief's flag exactly. The `saved_bytes && saved_bytes > 0` check at line 52 also handles the empty-string edge case (the gzip coder normalizes empty saves to `""`).
 
-### #3 — Subprocess kill (TERM → KILL)
+### #4 — Player name fallback chain
 
-- `rom_randomizer.rb:139-152` — `wait_for_subprocess` polls
-  `Process.waitpid(pid, WNOHANG)` against a `Process::CLOCK_MONOTONIC`
-  deadline; on timeout, calls `terminate_subprocess(pid)` and raises
-  `Timeout::Error` (caught by the existing `rescue Timeout::Error` in
-  `call`).
-- `rom_randomizer.rb:158-170` — `terminate_subprocess` calls
-  `Process.kill("TERM", pid)`, sleeps 0.5s, then `Process.kill("KILL", pid)`.
-  `Errno::ESRCH` (already-exited child) and `Errno::ECHILD` (already reaped)
-  both rescued. Reaps via `Process.waitpid` in `ensure`.
-- Bob took the **deeper** test path, not the easier "error_message says
-  timeout" fallback. `rom_randomizer_test.rb:293-338` stubs
-  `Process.spawn`/`waitpid`/`kill`/`sleep`, sets `GENERATION_TIMEOUT = 0`,
-  and asserts SIGTERM was sent to the fake PID via the captured
-  `kill_signals` array. Status reload also asserts `:failed` + "timed out"
-  message. Constant is restored in `ensure`.
+`_run_sidebar.html.erb:17–21` — three branches: `if s.discord_user_id` then `SoulLink::GameState.player_name(uid).presence || s.discord_user_id.to_s`, else `"Unclaimed"`. The middle branch is effectively dead code — `GameState.player_name` returns `"Player #{uid}"` (never nil) for unknown uids per `app/services/soul_link/game_state.rb:80–83` — but the defensive chain is consistent with the brief and harmless.
 
-### #4 — Channel idempotency `with_lock`
+### #5 — `current_user_id` comparison
 
-- `run_channel.rb:86-90` (`generate_emulator_roms`): both the
-  `emulator_status == :none` check AND the `perform_later` are inside the
-  `run.with_lock do … end` block. The brief's anti-pattern (lock the check,
-  enqueue outside) is NOT present.
-- `run_channel.rb:112-117` (`regenerate_emulator_roms`): same — the
-  `:failed` check, `destroy_all` cascade, AND `perform_later` are all inside
-  the lock.
-- Note on AR semantics: AR's `with_lock` calls `lock!` on the receiver,
-  which re-fetches the row with `SELECT … FOR UPDATE`. That is equivalent
-  to the brief's explicit `run.reload` inside the block — Bob's omission of
-  the literal `reload` is correct.
-- Tests at `run_channel_test.rb:245-302` patch `with_lock` per-class for
-  the test duration (with proper `ensure`-block restoration) and assert it
-  was invoked for both `generate` and `regenerate`. Behavioral race test at
-  309-319 asserts the second sequential call no-ops once
-  `emulator_status != :none` — exactly the contract the brief asked for as
-  the lighter fallback.
+`_run_sidebar.html.erb:12` — `s.discord_user_id == current_user_id`. No `.to_s` / `.to_i` coercion. `current_user_id` is set from `auth.uid.to_i` in `SessionsController#create:16,38` (Integer), and `discord_user_id` is `bigint` per `db/schema.rb:124`. Integer-to-Integer direct comparison, matching the locked architecture decision.
 
-### #5 — Guild authorization in `subscribed`
+### #6 — Status badge color choices
 
-- `run_channel.rb:2-18`: rejects when `params[:guild_id]` is blank, when
-  `connection.session[:guild_id]` is blank, OR when the two don't match
-  (string-compared, since session value is Integer post-OAuth and params is
-  String — verified by reading `sessions_controller.rb:41`,
-  `session[:guild_id] = run.guild_id`).
-- `connection.rb:9-14`: `attr_reader :session` exposed and `@session =
-  request.session` set in `connect`. Comment explains why channels need it.
-  Backwards-compatible — existing connections see no behavior change.
-- Tests at `run_channel_test.rb:213-232`:
-  - mismatched guild_id → `subscription.rejected?` (213-218) ✔
-  - blank guild_id → `subscription.rejected?` (220-223) ✔
-  - missing session guild_id → `subscription.rejected?` (225-232) ✔
-- Existing happy-path test at 27-32 still passes via the new
-  `stub_connection_with_session` helper at 19-23.
+- `failed`: `#4a1c1c / #e8a0a0 / #6b2c2c` — these are the literal `gb-flash-alert` palette at `pixeldex.css:140–143` (and re-used by `gb-btn-danger` at 758–765). Existing palette, no invented colors.
+- `ready`: `var(--d1) / var(--l2)` — both vars defined at `pixeldex.css:6,9`. (The minor parity caveat with the actual ACTIVE label is in Should Fix.)
+- `pending`/`generating`: flagged under Should Fix.
 
-### #6 — `RomRandomizer#fail!` save-failure recovery
+### #7 — YOU accent
 
-- `rom_randomizer.rb:199-209`: uses `save` (not `save!`). On
-  `unless session.save`, logs `Rails.logger.error` with session id + the
-  AR errors + the intended message. Returns `false`. Cannot bubble.
-- `rom_randomizer_test.rb:265-283`: stubs `@session.stub(:save, false)`,
-  pipes `Rails.logger` to a `StringIO`, asserts `assert_nothing_raised` and
-  `assert_match(/RomRandomizer fail!/, log_buffer.string)` plus
-  `assert_match(/session #{@session.id}/, …)`.
+Confirmed via `grep -n "accent" pixeldex.css` — zero matches. No `--accent` var exists. Bob's substitution: `border-width: 4px` on the gb-card (whose default border per `pixeldex.css:11` is `3px solid var(--d1)`). This thickens the existing `--d1`-colored border to 4px without inventing a new var. Mirrors the visual weight of `gb-modal`'s 4px border (`pixeldex.css:836`), which is the project's existing "this thing is special" pattern. Reasonable substitution given the constraint.
 
-### #7 — `rom` safety comment
+### #8 — Tests cover all listed assertions
 
-- `emulator_controller.rb:40-47`: comment explains that `rom_full_path` is
-  server-derived (joined with `Rails.root` from a `rom_path` only ever
-  written by `RomRandomizer` via `Pathname#relative_path_from(Rails.root)`),
-  flags the future-risk scenario (admin script writing arbitrary string),
-  and names the guard to add at that point
-  (`path.to_s.start_with?(OUTPUT_DIR)`). No code change. Accurate.
+`test/controllers/emulator_controller_test.rb:147–222`:
 
-### #8 — Brittle `assert_queries_count(16)` dropped
+| Brief assertion | Test location | Status |
+|---|---|---|
+| Body contains `RUN ROSTER` on ready | line 215 (`assert_match`) | ✔ |
+| Body absent `RUN ROSTER` on non-ready | lines 179, 187, 199 (no-run, generating, failed) | ✔ |
+| Body contains current player's display name (`Grey`) | line 217 | ✔ |
+| Body contains `>YOU<` for current player's row | line 219 | ✔ |
+| Body contains `Unclaimed` when other sessions are unclaimed | line 221 | ✔ |
+| Body absent `>YOU<` on non-ready (defensive) | line 201 (failed branch explicitly) | ✔ |
 
-- `run_channel_test.rb:177-182`: explanatory comment in place of the
-  removed test. Names the load-bearing replacement at line 157 (the
-  `session_queries == 2` regression). The targeted N+1 test still proves
-  `.includes(:soul_link_emulator_sessions)` is in place. Confirmed by
-  reading the test body at 157-175.
+The `>YOU<` negative is asserted explicitly only on `failed`, but generating and no-run states implicitly cover it via the `RUN ROSTER` absent assertion (the partial doesn't render at all in those branches). Test 1 (lines 149–172) additionally asserts all 4 sessions render in id-ascending order via unique seeds — the brief's substitute for `assigns(:run_sessions)`, which Rails 8 extracts to `rails-controller-testing` (not in this Gemfile). Body-based assertions are real coverage of the rendered output, more meaningful than ivar inspection.
 
-### #9 — Debug-line sweep
+### #9 — Responsive layout
 
-`grep -rEn 'binding\.pry|byebug|debugger|warn "DEBUG|warn "EMPTY-DIR|warn "SUMMARY|puts "DEBUG' test/ app/`
-returns zero matches. The cleanup-test debug lines at the prior
-`emulator_cleanup_test.rb:110-125` are gone. Bob's `git diff --stat` shows
-only an 8-line removal in that file, consistent with the six `warn`
-deletions plus surrounding whitespace.
+`show.html.erb:59–80`:
+- Container: `display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;` ✔
+- Canvas wrapper: `flex: 1 1 auto; min-width: 0;` (the standard flexbox shrink unlock) ✔
+- Sidebar: `width: 280px; flex-shrink: 0;` ✔
+- No media queries.
 
-### #10 — Comment audit on touched files
+Layout will wrap below the canvas on narrow viewports as specified.
 
-- Read every comment Bob added in the changed-files set. Every one explains
-  WHY (intent, constraint, gotcha) — not WHAT.
-- Examples that pass muster:
-  `soul_link_emulator_session.rb:96-102` (rationale for the rescue
-  widening), `run_channel.rb:80-85` (why `with_lock` over advisory lock),
-  `rom_randomizer.rb:194-198` (why `save` not `save!`),
-  `emulator_controller.rb:55-59` (defense-in-depth size guard rationale),
-  `soul_link_emulator_session.rb:14-21` (gzip coder operating envelope).
-- No redundant WHAT comments on Ruby that already reads cleanly. Bob did
-  not audit files outside the touched set — diff stat confirms.
+### #10 — Tier 1 strictly observed
 
-### Stability
+- `git diff Gemfile Gemfile.lock` — no changes. No new gems.
+- `git diff app/views/runs/` — no changes. Runs page untouched.
+- No SRAM parsing logic in the diff. The two SRAM mentions in `emulator_controller.rb` (lines 3 and 11) are pre-existing comments documenting the save_data round-trip and size cap, not new logic.
+- `_run_sidebar.html.erb:5` explicitly notes "No SRAM parsing — that's Tier 2 and lives in a future step."
+- No changes to other emulator state branches in `show.html.erb` — only the ready `<% else %>` branch wraps existing markup in a flex container plus the new sidebar.
 
-Two consecutive locally-run full suites: **216 runs, 628 assertions, 0
-failures, 0 errors, 0 skips** each. Bob reports three. The suite is
-parallelized across all CPU cores (`parallelize(workers:
-:number_of_processors)` per `test_helper.rb:12`), so each invocation
-already exercises the parallel path. No flakes observed.
+### #11 — DoD all checked
 
-### Scope discipline
+- [x] `EmulatorController#show` sets `@run_sessions` on ready state, ordered by id (line 38)
+- [x] `app/views/emulator/_run_sidebar.html.erb` exists (66 lines, new file)
+- [x] Ready-state view renders canvas + sidebar in flex layout, sidebar on right (`show.html.erb:59–82`)
+- [x] Each session card shows: player name (or fallback), status, last-played time (or "Not started"), save size (or "—"), seed (`_run_sidebar.html.erb:36–67`)
+- [x] Current player's card: visible YOU badge (line 42) + 4px accent border (line 36)
+- [x] Non-ready states render unchanged — sidebar absent, no `@run_sessions` access (controller line 38 guards on `ready?`; partial only rendered in `<% else %>` branch)
+- [x] Canvas style preserved exactly as in `9b0bf29` (verified)
+- [x] Tests cover ivar set on ready + view contains player name + YOU + RUN ROSTER + Unclaimed (verified)
+- [x] Full suite passes (verified locally)
+- [x] 3+ consecutive runs without flakes (verified locally — see Stability)
 
-`git diff --stat HEAD` shows exactly the 13 files in the brief plus three
-handoff documents. No Gemfile/Gemfile.lock changes (verified — no diff).
-No fixture or factory changes. No drift into adjacent code paths. The
-prior step's storage-isolation `Rails.root` stub at
-`test/lib/tasks/emulator_cleanup_test.rb:34` is intact (verified — only
-the `warn` lines were removed).
+### #12 — Suite stability
 
-### Definition of Done
+Ran `bundle exec rails test` three times sequentially using mise Ruby 3.4.5 (per Bob's note about `bin/rails` falling through to system Ruby 3.0.6):
 
-- [x] `delete_rom_file` catches `StandardError`, logs, doesn't bubble
-- [x] PATCH save_data rejects bodies > 2MB with 413, before reading
-- [x] save_data round-trips through gzip; on-disk smaller than raw
-- [x] Subprocess timeout sends TERM (then KILL) to the child Java process
-- [x] `RomRandomizer#fail!` survives a save failure without bubbling
-- [x] `RunChannel#subscribed` rejects mismatched guild_id
-- [x] `generate_emulator_roms` (and regenerate) wrap idempotency check in `with_lock`
-- [x] Concurrent-enqueue race test asserts exactly 1 job under contention
-- [x] `EmulatorController#rom` has a safety comment explaining the path-traversal precondition
-- [x] Brittle `assert_queries_count(16)` test dropped (with explanatory comment)
-- [x] Zero `warn "DEBUG"`, `puts "DEBUG"`, `binding.pry`, `byebug`, `debugger` lines in any test
-- [x] Full suite passes: 200 baseline + 16 new tests = 216, 0 failures
-- [x] Suite passes 3+ consecutive parallel runs (no new flakes; my two match Bob's three)
+```
+Run 1: 221 runs, 660 assertions, 0 failures, 0 errors, 0 skips
+Run 2: 221 runs, 660 assertions, 0 failures, 0 errors, 0 skips
+Run 3: 221 runs, 660 assertions, 0 failures, 0 errors, 0 skips
+```
 
-Step 3 is clear.
+Targeted: `bundle exec rails test test/controllers/emulator_controller_test.rb` → 36 runs, 0 failures.
 
-VERDICT: PASS
+Each invocation already exercises the parallel path via `parallelize(workers: :number_of_processors)` per `test_helper.rb:12`. Note: launching three `rails test` invocations *concurrently against the same `soul_link_test` DB* produces DB-contention errors — that is a test-infrastructure artifact of running multiple processes against a shared schema, not a flake in this code. The authoritative parallel path is the in-process worker pool, which is exercised every single run.
+
+Rubocop on the two touched `.rb` files (`emulator_controller.rb`, `emulator_controller_test.rb`): clean. ERB files raise `Lint/Syntax` against rubocop-rails-omakase as expected (no ERB lint configured); not a real failure. Bob's report only claimed clean on `.rb` files, which matches.
+
+---
+
+Step 4 is clear.
+
+VERDICT: PASS_WITH_OBSERVATIONS

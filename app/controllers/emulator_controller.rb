@@ -30,6 +30,12 @@ class EmulatorController < ApplicationController
     # Only the :ready branch renders the emulator stage, so only that branch
     # needs the cheats payload — populate the ivar accordingly.
     @cheats = @session.cheats if @session&.ready?
+
+    # Run roster sidebar (Tier 1 — existing model data only). Loaded only on
+    # the ready branch since that's the only state that renders the sidebar;
+    # avoids a wasted query on the empty-state pages. `.order(:id)` keeps the
+    # four cards in stable order across page reloads.
+    @run_sessions = @run.soul_link_emulator_sessions.order(:id) if @session&.ready?
   end
 
   def rom
