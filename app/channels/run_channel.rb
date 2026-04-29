@@ -78,6 +78,30 @@ class RunChannel < ApplicationCable::Channel
     transmit({ error: e.message })
   end
 
+  def regenerate_emulator_roms(_data)
+    run = SoulLinkRun.current(@guild_id)
+    unless run
+      transmit({ error: "No active run found" })
+      return
+    end
+
+    # Only valid in :failed state. In any other state we no-op and re-broadcast
+    # so the client reconciles to current truth (handles stale UI / races).
+    if run.emulator_status != :failed
+      broadcast_state
+      return
+    end
+
+    # `destroy_all` (NOT `delete_all`) so the `after_destroy` callback fires
+    # for each session and the on-disk ROM files get cleaned up. This wipes
+    # save_data along with the rows.
+    run.soul_link_emulator_sessions.destroy_all
+    SoulLink::GenerateRunRomsJob.perform_later(run)
+    broadcast_state
+  rescue => e
+    transmit({ error: e.message })
+  end
+
   def self.broadcast_run_state(guild_id)
     current_run = SoulLinkRun.current(guild_id)
     past_runs = SoulLinkRun.history(guild_id).limit(20)

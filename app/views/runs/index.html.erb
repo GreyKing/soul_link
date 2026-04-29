@@ -55,6 +55,11 @@
                 class="gb-btn-primary gb-btn-sm <%= 'hidden' if @current_run&.emulator_status != :none %>">
           Generate Emulator ROMs
         </button>
+        <button data-action="click->run-management#regenerateEmulatorRoms"
+                data-run-management-target="regenerateRomsButton"
+                class="gb-btn-primary gb-btn-sm <%= 'hidden' if @current_run&.emulator_status != :failed %>">
+          Regenerate ROMs
+        </button>
       </div>
     </div>
   </div>

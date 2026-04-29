@@ -4,4 +4,4 @@
 
 ---
 
-*Awaiting next brief from Architect.*
+
