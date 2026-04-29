@@ -43,7 +43,11 @@ module SoulLink
     BLOCK_FOOTER_OFFSET       = 0xCF18           # footer starts here, within the block
     BLOCK_COUNTER_OFFSET      = 0xCF18           # save counter at start of footer
     BLOCK_CRC_OFFSET          = 0xCF2A           # 2 bytes before block end
-    CRC_RANGE_END             = BLOCK_CRC_OFFSET # CRC covers bytes 0..0xCF2A (exclusive)
+    # CRC covers bytes 0..0xCF18 — i.e., everything BEFORE the footer (not just
+    # before the CRC field). Verified empirically against a real Platinum save
+    # on 2026-04-29: variant `0..0xCF18 init=0xFFFF MSB poly=0x1021` produced
+    # the matching stored CRC of 0x6C3C; `0..0xCF2A` produced 0x533D (off).
+    CRC_RANGE_END             = BLOCK_FOOTER_OFFSET
 
     # Trainer ("general") block field offsets within the slot.
     # English Pokemon Platinum. Source: Project Pokemon save-file docs +

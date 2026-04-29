@@ -43,9 +43,10 @@ module SoulLink
       # Save counter at footer start (block-relative 0xCF18, = BLOCK_COUNTER_OFFSET).
       slot[SoulLink::SaveParser::BLOCK_COUNTER_OFFSET, 4] = [ save_counter ].pack("V")
 
-      # CRC over body bytes 0..BLOCK_CRC_OFFSET, written at BLOCK_CRC_OFFSET.
+      # CRC over body bytes 0..CRC_RANGE_END (everything before the footer),
+      # written at BLOCK_CRC_OFFSET (last 2 bytes of the block).
       crc_value = if valid_crc
-        crc16_ccitt(slot.byteslice(0, SoulLink::SaveParser::BLOCK_CRC_OFFSET))
+        crc16_ccitt(slot.byteslice(0, SoulLink::SaveParser::CRC_RANGE_END))
       else
         0xDEAD
       end
