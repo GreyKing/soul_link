@@ -11,9 +11,11 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** *None — awaiting next brief.*
-**Last committed:** `24aff23` — 2026-04-29 (Step 4 — Run Roster Sidebar)
+**Active step:** Step 1 — SRAM Phase 1: Trainer Block Parsing
+**Last committed:** `09b3a7e` — 2026-04-29 (sidebar grid layout fix, inline)
 **Pending deploy:** NO
+
+**Parked plan:** FactoryBot conversion. Inventory + ordering at `handoff/parked-plans/factorybot-conversion.md`. Resume after SRAM Phase 1 ships.
 
 ---
 
