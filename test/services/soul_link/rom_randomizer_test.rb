@@ -127,13 +127,15 @@ module SoulLink
         # Reconstruct the cmd_args the production code would have built so we
         # can assert on the contract. Capture from the call site by reaching
         # into the service to mimic what the real method would have spawned.
+        # Note: `cli` is the first arg after `-jar` — required by PokeRandoZX
+        # to skip GUI bootstrap. No `-seed` flag (CLI mode auto-seeds).
         run_args = [
           "java",
           "-jar", SoulLink::RomRandomizer::JAR_PATH.to_s,
+          "cli",
           "-i", SoulLink::RomRandomizer::BASE_ROM_PATH.to_s,
           "-o", output_path.to_s,
-          "-s", SoulLink::RomRandomizer::SETTINGS_PATH.to_s,
-          "-seed", @session.seed.to_s
+          "-s", SoulLink::RomRandomizer::SETTINGS_PATH.to_s
         ]
         [ "randomized ok", "", fake_status(true) ]
       end
@@ -165,14 +167,20 @@ module SoulLink
       # The CLI invocation matches the documented contract.
       assert_equal "java", run_args.first
       assert_includes run_args, "-jar"
+      assert_includes run_args, "cli", "must include 'cli' subcommand or PokeRandoZX launches GUI"
       assert_includes run_args, "-i"
       assert_includes run_args, "-o"
       assert_includes run_args, "-s"
-      assert_includes run_args, "-seed"
-      assert_includes run_args, @session.seed
+      refute_includes run_args, "-seed", "PokeRandoZX CLI mode does not accept -seed; auto-seeds per invocation"
       assert_includes run_args, SoulLink::RomRandomizer::JAR_PATH.to_s
       assert_includes run_args, SoulLink::RomRandomizer::BASE_ROM_PATH.to_s
       assert_includes run_args, SoulLink::RomRandomizer::SETTINGS_PATH.to_s
+
+      # `cli` must come immediately after `-jar <path>` — order matters to
+      # PokeRandoZX. Anywhere else and it's treated as a positional arg.
+      jar_idx = run_args.index("-jar")
+      assert_equal "cli", run_args[jar_idx + 2],
+                   "`cli` must be the first arg after `-jar <jar_path>`"
     end
 
     # The contract says the session is `generating` mid-call. Capture the

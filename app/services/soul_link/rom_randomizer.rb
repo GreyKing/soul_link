@@ -83,13 +83,23 @@ module SoulLink
     # timeouts that's a slow PID leak. The spawn+waitpid pattern below holds
     # the child PID so we can escalate TERM → KILL on the deadline.
     def run_subprocess(output_path)
+      # PokeRandoZX requires the `cli` subcommand as the first argument after
+      # `-jar` to skip the GUI bootstrap. Without it the JAR launches a Swing
+      # JFrame, which fails on a headless server with `HeadlessException` —
+      # but Java's AWT thread swallows the exception and the process exits
+      # with code 0 having never written the output ROM. Hence: silent
+      # generation failures with `status=ready` but no file on disk.
+      #
+      # CLI mode does NOT accept `-seed` (it auto-generates a seed per run).
+      # Our DB `seed` column is informational only — the four sessions of a
+      # run get four distinct ROMs because the JAR is invoked four times.
       cmd_args = [
         "java",
         "-jar", JAR_PATH.to_s,
+        "cli",
         "-i", BASE_ROM_PATH.to_s,
         "-o", output_path.to_s,
-        "-s", SETTINGS_PATH.to_s,
-        "-seed", session.seed.to_s
+        "-s", SETTINGS_PATH.to_s
       ]
 
       stdout_r, stdout_w = IO.pipe
