@@ -28,7 +28,10 @@ class EmulatorCleanupTaskTest < ActiveSupport::TestCase
     end
     Rake::Task[TASK_NAME].reenable
 
-    Rails.application.stub(:root, @tmp_root) do
+    # `Rails.root` is `Rails.application.config.root`, NOT `Rails.application.root`,
+    # so stubbing the latter is a no-op. Stubbing the module-level entry point is
+    # what actually redirects every `Rails.root.join(...)` lookup into the sandbox.
+    Rails.stub(:root, @tmp_root) do
       super(*args, &block)
     end
   ensure
