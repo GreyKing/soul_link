@@ -52,12 +52,14 @@
   </div>
 
 <% else %>
-  <%# Ready state: emulator stage + run roster sidebar in a flex layout.
-      flex-wrap: wrap lets the sidebar drop below the canvas on narrow
-      viewports (no media queries needed). min-width: 0 on the canvas flex
-      item is the standard flexbox shrink unlock for `flex: 1 1 auto`. %>
-  <div style="display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
-    <div style="flex: 1 1 auto; min-width: 0;">
+  <%# Ready state: emulator stage + run roster sidebar in a 2-col grid.
+      grid-template-columns: minmax(0, 1fr) 280px keeps the sidebar on the
+      right at all desktop sizes — flex-wrap previously dropped it below
+      the canvas because the canvas wrapper grew unbounded. min-width: 0
+      on the main column allows the canvas to shrink under content
+      pressure (standard grid/flex shrink unlock). %>
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start;">
+    <main style="min-width: 0;">
       <div class="gb-card" style="padding: 12px;"
            data-controller="emulator"
            data-emulator-rom-url-value="<%= rom_emulator_path %>"
@@ -75,9 +77,9 @@
         <div id="emulator-game" data-emulator-target="game"
              style="aspect-ratio: 2 / 3; max-width: min(100%, 60vh); max-height: 90vh; margin: 0 auto;"></div>
       </div>
-    </div>
+    </main>
 
-    <aside style="width: 280px; flex-shrink: 0;">
+    <aside>
       <%= render "run_sidebar" %>
     </aside>
   </div>
