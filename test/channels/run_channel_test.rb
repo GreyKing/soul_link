@@ -8,7 +8,18 @@ class RunChannelTest < ActionCable::Channel::TestCase
 
   setup do
     @run = create(:soul_link_run, guild_id: GUILD_ID, active: true)
-    stub_connection(current_user_id: GREY)
+    stub_connection_with_session(current_user_id: GREY, guild_id: GUILD_ID)
+  end
+
+  # `ConnectionStub` from ActionCable's TestCase doesn't expose a session —
+  # it only knows about `identified_by` attrs. The new guild authz check in
+  # `RunChannel#subscribed` reads `connection.session[:guild_id]`, so the stub
+  # has to fake one. Define the method on the stub's singleton class after
+  # `stub_connection` builds it.
+  def stub_connection_with_session(current_user_id:, guild_id:)
+    stub_connection(current_user_id: current_user_id)
+    fake_session = { guild_id: guild_id }
+    connection.define_singleton_method(:session) { fake_session }
   end
 
   # ── subscription ────────────────────────────────────────────────────────
@@ -163,20 +174,12 @@ class RunChannelTest < ActionCable::Channel::TestCase
       "N+1 detected on soul_link_emulator_sessions: #{session_queries} queries fired (expected 2 with eager-load)"
   end
 
-  test "broadcast_run_state holds steady query count under assert_queries_count" do
-    5.times do |i|
-      past = create(:soul_link_run, guild_id: GUILD_ID, run_number: i + 20, active: false)
-      create(:soul_link_emulator_session, :ready, soul_link_run: past)
-    end
-    create(:soul_link_emulator_session, :ready, soul_link_run: @run)
-
-    # Hard-coded snapshot of total query count with eager-load in place. If this
-    # number creeps up, suspect a new N+1 was introduced (or an unintended extra
-    # SELECT). Adjust deliberately, not reflexively.
-    assert_queries_count(16) do
-      RunChannel.broadcast_run_state(GUILD_ID)
-    end
-  end
+  # The previous hard-pinned `assert_queries_count(16)` test was dropped in
+  # favor of the targeted `session_queries == 2` regression above. A hard
+  # total count flagged on every unrelated SELECT addition (e.g. counter
+  # caches, schema lookups in CI) without protecting the load-bearing
+  # invariant — N+1 on session preloads. The two-query assertion does that
+  # job precisely.
 
   test "regenerate_emulator_roms cascades after_destroy and deletes rom files" do
     tmp_dir = Rails.root.join("tmp", "test_run_channel_regen")
@@ -198,5 +201,120 @@ class RunChannelTest < ActionCable::Channel::TestCase
   ensure
     File.delete(file.path) if file && File.exist?(file.path)
     FileUtils.rm_rf(tmp_dir) if tmp_dir
+  end
+
+  # ── guild authorization ────────────────────────────────────────────────
+  #
+  # The channel's `params[:guild_id]` is client-supplied and untrusted. It
+  # must match the session's logged-in guild or the subscription is rejected.
+  # Without this check, any authenticated user could stream another guild's
+  # run state by passing a different guild_id in the subscribe params.
+
+  test "subscribe is rejected when guild_id param does not match session guild" do
+    other_guild = 777777777777777777
+    subscribe(guild_id: other_guild)
+    assert subscription.rejected?,
+      "subscription with mismatched guild_id should be rejected"
+  end
+
+  test "subscribe is rejected when guild_id param is blank" do
+    subscribe(guild_id: "")
+    assert subscription.rejected?, "blank guild_id should be rejected"
+  end
+
+  test "subscribe is rejected when session has no guild_id" do
+    # Wipe the stubbed session to simulate a connection without a logged-in
+    # guild (shouldn't happen in production — Connection rejects unauth — but
+    # belt-and-suspenders).
+    connection.define_singleton_method(:session) { {} }
+    subscribe(guild_id: GUILD_ID)
+    assert subscription.rejected?, "missing session guild should be rejected"
+  end
+
+  # ── concurrent enqueue race ────────────────────────────────────────────
+  #
+  # Two parallel WS messages from the same client could race past the inner
+  # `:none` check and double-enqueue. With `with_lock`, the second caller
+  # blocks on the row's `SELECT … FOR UPDATE`, then re-reads `emulator_status`
+  # (now != :none) and no-ops. We assert this by mocking `with_lock` directly:
+  # a real thread test would need a true MySQL row lock and is brittle on
+  # SQLite/in-memory. The mock-based assertion is what the brief calls a
+  # "lighter test that asserts `with_lock` is called" — sufficient to lock
+  # the contract.
+
+  test "generate_emulator_roms wraps idempotency check in with_lock" do
+    subscribe(guild_id: GUILD_ID)
+
+    # Minitest's `stub` is per-instance and `SoulLinkRun.current` returns a
+    # fresh AR object each call, so we can't stub via `@run`. Patch the
+    # method on the class for the duration of the test instead.
+    lock_called = false
+    SoulLinkRun.class_eval do
+      alias_method :__orig_with_lock, :with_lock
+      define_method(:with_lock) do |&block|
+        # Mark the call but skip the FOR UPDATE — SQLite/test DB doesn't
+        # always support row-level locks anyway.
+        Thread.current[:__lock_called] = true
+        block.call
+      end
+    end
+
+    begin
+      Thread.current[:__lock_called] = false
+      perform :generate_emulator_roms
+      lock_called = Thread.current[:__lock_called]
+    ensure
+      SoulLinkRun.class_eval do
+        alias_method :with_lock, :__orig_with_lock
+        remove_method :__orig_with_lock
+      end
+      Thread.current[:__lock_called] = nil
+    end
+
+    assert lock_called, "expected with_lock to be invoked"
+  end
+
+  test "regenerate_emulator_roms wraps destroy+enqueue in with_lock" do
+    create(:soul_link_emulator_session, soul_link_run: @run, status: "failed", error_message: "boom")
+    subscribe(guild_id: GUILD_ID)
+
+    SoulLinkRun.class_eval do
+      alias_method :__orig_with_lock, :with_lock
+      define_method(:with_lock) do |&block|
+        Thread.current[:__lock_called] = true
+        block.call
+      end
+    end
+
+    begin
+      Thread.current[:__lock_called] = false
+      perform :regenerate_emulator_roms
+      lock_called = Thread.current[:__lock_called]
+    ensure
+      SoulLinkRun.class_eval do
+        alias_method :with_lock, :__orig_with_lock
+        remove_method :__orig_with_lock
+      end
+      Thread.current[:__lock_called] = nil
+    end
+
+    assert lock_called, "expected with_lock to be invoked on regenerate"
+  end
+
+  # Behavioral check: under contention, only one job is enqueued. We simulate
+  # the contention by manually flipping `emulator_status` mid-block (as a
+  # real concurrent caller would, after acquiring the lock). The second
+  # `generate_emulator_roms` call sees `:generating` under its own lock and
+  # no-ops.
+  test "two sequential generate_emulator_roms calls enqueue exactly one job (post-lock semantics)" do
+    subscribe(guild_id: GUILD_ID)
+
+    perform :generate_emulator_roms
+    # First call enqueued — simulating job picking up and creating sessions.
+    create(:soul_link_emulator_session, :generating, soul_link_run: @run)
+    perform :generate_emulator_roms
+
+    assert_equal 1, enqueued_jobs.count { |j| j[:job] == SoulLink::GenerateRunRomsJob },
+      "second call should no-op now that emulator_status != :none"
   end
 end

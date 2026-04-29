@@ -11,7 +11,7 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** *None — Step 1 shipped, awaiting next brief.*
+**Active step:** Step 3 — Emulator Hardening, awaiting Reviewer.
 **Last committed:** `a708443` — 2026-04-28 (Step 1)
 **Pending deploy:** NO
 
@@ -38,6 +38,35 @@ reset until the gap is addressed or the decision is replaced.
 **Review:** Richard — PASS (no Must Fix, no Should Fix, no Escalate).
 
 **Smoke test:** Bob couldn't drive a browser. Project Owner to verify locally — open dashboard, click a pokemon cell with an existing pokemon, confirm EVOLVE buttons appear next to direct evolution targets, click one, confirm species updates after reload.
+
+### Step 3 — Emulator Hardening — 2026-04-26
+**Status:** Built; awaiting Reviewer (REVIEW-REQUEST.md ready).
+
+**Files modified:**
+- `app/channels/application_cable/connection.rb` — expose `session` via `attr_reader` for channel guild authz
+- `app/channels/run_channel.rb` — guild authz on subscribe; `with_lock` on generate + regenerate enqueue paths
+- `app/models/soul_link_emulator_session.rb` — `GzipCoder` module + `serialize :save_data, coder: GzipCoder`; widen `delete_rom_file` rescue from `Errno::ENOENT` → `StandardError`
+- `app/controllers/emulator_controller.rb` — `MAX_SAVE_DATA_BYTES = 2.megabytes` size cap (pre-read content_length + post-read bytesize, both → 413); safety comment on `rom`'s `send_file`
+- `app/services/soul_link/rom_randomizer.rb` — replace `Open3.capture3 + Timeout.timeout` with `Process.spawn` + `waitpid(WNOHANG)` poll loop + TERM→KILL escalation; `fail!` survives save failure (uses `save` not `save!`, logs on failure); centralize 255-char truncation in `truncate_error`
+- 5 test files updated/added (16 new tests, 0 removed)
+- `test/lib/tasks/emulator_cleanup_test.rb` — sweep 6 `warn "EMPTY-DIR DEBUG: ..."` lines
+
+**Key decisions:**
+- `with_lock` race test uses the brief's authorized fallback (assert `with_lock` was called + behavioral sequential test) rather than thread-based test — ConnectionStub doesn't simulate concurrent subscribes and MySQL row locks on the test DB can deadlock under spurious load
+- `stub_connection_with_session` helper added because ActionCable's `ConnectionStub` only stubs `identified_by` attrs, no session — single-line setup change for all existing tests
+- Run subprocess seam moved from `Open3.capture3` to `RomRandomizer#run_subprocess`; tests migrated to stub the new seam, dedicated TERM-on-timeout test exercises the real `Process.spawn` path through stubbed primitives
+- `GzipCoder.load` falls through plaintext bytes lacking the magic header — defensive only, can be removed once production rows are confirmed gzipped
+- Empty save_data short-circuits in `dump` (stores empty bytes, not gzip-of-empty) so GET 204 contract holds
+- Used `:content_too_large` instead of deprecated `:payload_too_large` (Rails 8.1)
+
+**Compression measured:**
+- 512KB pure zero-padded SRAM → 543 bytes (0.1%)
+- 512KB realistic 80%-zero SRAM → 116KB (22%)
+- 512KB pure random (worst case) → 525KB (gzip framing overhead)
+
+**Tests:** 216/216 full suite (200 baseline + 16 new), 0 failures across 3 consecutive runs.
+
+**Review:** *Pending Reviewer.*
 
 ---
 

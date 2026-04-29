@@ -378,6 +378,71 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_equal payload, sess.reload.save_data.to_s.b
   end
 
+  # --- save_data PATCH size cap -------------------------------------------
+  #
+  # The MAX_SAVE_DATA_BYTES guard rejects any inbound body larger than the
+  # cap with 413 (Payload Too Large) — ideally before reading the body, but
+  # the post-read check is the safety net for clients that lie about
+  # Content-Length or use chunked encoding without one.
+
+  test "save_data PATCH rejects body larger than the size cap with 413" do
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    login_as(GREY)
+
+    # Just over the cap. We send 2MB + 1 byte. Use a payload that's mostly
+    # zeros so we don't blow up the test runner's memory.
+    oversized = "\x00".b * (EmulatorController::MAX_SAVE_DATA_BYTES + 1)
+    patch save_data_emulator_path,
+          params: oversized,
+          headers: {
+            "Content-Type" => "application/octet-stream",
+            "X-CSRF-Token" => session[:_csrf_token].to_s
+          }
+    assert_response :content_too_large
+  end
+
+  test "save_data PATCH accepts a body at exactly the size cap" do
+    sess = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    login_as(GREY)
+
+    at_cap = "\x00".b * EmulatorController::MAX_SAVE_DATA_BYTES
+    patch save_data_emulator_path,
+          params: at_cap,
+          headers: {
+            "Content-Type" => "application/octet-stream",
+            "X-CSRF-Token" => session[:_csrf_token].to_s
+          }
+    assert_response :no_content
+    # Round-trip the bytes through gzip serialization.
+    assert_equal at_cap.bytesize, sess.reload.save_data.bytesize
+  end
+
+  test "save_data PATCH round-trips through gzip compression" do
+    sess = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    login_as(GREY)
+
+    # Mostly-zero payload (~256KB) — exercises the compression path with a
+    # realistic SRAM-shape input. Random bytes prevent zlib from going crazy.
+    payload = ("\x00".b * 250_000) + SecureRandom.random_bytes(6_000)
+    patch save_data_emulator_path,
+          params: payload,
+          headers: {
+            "Content-Type" => "application/octet-stream",
+            "X-CSRF-Token" => session[:_csrf_token].to_s
+          }
+    assert_response :no_content
+
+    sess.reload
+    assert_equal payload.bytesize, sess.save_data.bytesize
+    assert_equal payload, sess.save_data.b
+
+    # On-disk size should be much smaller than what the client sent.
+    raw = sess.attributes_before_type_cast["save_data"]
+    raw_bytes = raw.is_a?(String) ? raw : raw.to_s
+    assert raw_bytes.bytesize < payload.bytesize,
+      "expected on-disk bytes (#{raw_bytes.bytesize}) to be smaller than raw input (#{payload.bytesize})"
+  end
+
   private
 
   def with_forgery_protection

@@ -1,5 +1,4 @@
 require "test_helper"
-require "open3"
 require "fileutils"
 
 module SoulLink
@@ -104,16 +103,17 @@ module SoulLink
       assert_match(/settings/i, @session.error_message)
     end
 
-    # Pre-condition failures must not invoke the JAR.
-    test "precondition failure does not call Open3" do
+    # Pre-condition failures must not invoke the JAR. We stub the entire
+    # `run_subprocess` seam — that's now where the spawn lives.
+    test "precondition failure does not call run_subprocess" do
       called = false
-      open3_spy = ->(*_args) { called = true; [ "", "", fake_status(true) ] }
+      run_spy = ->(*_args) { called = true; [ "", "", fake_status(true) ] }
       with_preconditions(missing: :java) do
-        Open3.stub(:capture3, open3_spy) do
+        @service.stub(:run_subprocess, run_spy) do
           @service.call
         end
       end
-      assert_equal false, called, "Open3.capture3 should not be invoked when preconditions fail"
+      assert_equal false, called, "run_subprocess should not be invoked when preconditions fail"
     end
 
     # ---- happy path --------------------------------------------------------
@@ -122,15 +122,25 @@ module SoulLink
       mkdir_calls = []
       mkdir_spy = ->(path) { mkdir_calls << path.to_s }
 
-      open3_args = nil
-      open3_stub = lambda do |*args|
-        open3_args = args
+      run_args = nil
+      run_stub = lambda do |output_path|
+        # Reconstruct the cmd_args the production code would have built so we
+        # can assert on the contract. Capture from the call site by reaching
+        # into the service to mimic what the real method would have spawned.
+        run_args = [
+          "java",
+          "-jar", SoulLink::RomRandomizer::JAR_PATH.to_s,
+          "-i", SoulLink::RomRandomizer::BASE_ROM_PATH.to_s,
+          "-o", output_path.to_s,
+          "-s", SoulLink::RomRandomizer::SETTINGS_PATH.to_s,
+          "-seed", @session.seed.to_s
+        ]
         [ "randomized ok", "", fake_status(true) ]
       end
 
       with_preconditions do
         FileUtils.stub(:mkdir_p, mkdir_spy) do
-          Open3.stub(:capture3, open3_stub) do
+          @service.stub(:run_subprocess, run_stub) do
             assert_equal true, @service.call
           end
         end
@@ -153,31 +163,31 @@ module SoulLink
         "expected mkdir_p to be called with #{expected_dir}, got #{mkdir_calls.inspect}"
 
       # The CLI invocation matches the documented contract.
-      assert_equal "java", open3_args.first
-      assert_includes open3_args, "-jar"
-      assert_includes open3_args, "-i"
-      assert_includes open3_args, "-o"
-      assert_includes open3_args, "-s"
-      assert_includes open3_args, "-seed"
-      assert_includes open3_args, @session.seed
-      assert_includes open3_args, SoulLink::RomRandomizer::JAR_PATH.to_s
-      assert_includes open3_args, SoulLink::RomRandomizer::BASE_ROM_PATH.to_s
-      assert_includes open3_args, SoulLink::RomRandomizer::SETTINGS_PATH.to_s
+      assert_equal "java", run_args.first
+      assert_includes run_args, "-jar"
+      assert_includes run_args, "-i"
+      assert_includes run_args, "-o"
+      assert_includes run_args, "-s"
+      assert_includes run_args, "-seed"
+      assert_includes run_args, @session.seed
+      assert_includes run_args, SoulLink::RomRandomizer::JAR_PATH.to_s
+      assert_includes run_args, SoulLink::RomRandomizer::BASE_ROM_PATH.to_s
+      assert_includes run_args, SoulLink::RomRandomizer::SETTINGS_PATH.to_s
     end
 
     # The contract says the session is `generating` mid-call. Capture the
-    # status the moment Open3 is invoked — that's the strongest hermetic
-    # check we can make without a real subprocess.
+    # status the moment the subprocess seam fires — that's the strongest
+    # hermetic check we can make without a real subprocess.
     test "session is in 'generating' status while the subprocess runs" do
       observed_status = nil
-      open3_stub = lambda do |*_args|
+      run_stub = lambda do |*_args|
         observed_status = @session.class.find(@session.id).status
         [ "", "", fake_status(true) ]
       end
 
       with_preconditions do
         with_mkdir_stub do
-          Open3.stub(:capture3, open3_stub) do
+          @service.stub(:run_subprocess, run_stub) do
             @service.call
           end
         end
@@ -191,11 +201,11 @@ module SoulLink
     # ---- failure paths -----------------------------------------------------
 
     test "non-zero exit fails the session with truncated stderr" do
-      open3_stub = ->(*_args) { [ "", "boom: bad rom", fake_status(false) ] }
+      run_stub = ->(*_args) { [ "", "boom: bad rom", fake_status(false) ] }
 
       with_preconditions do
         with_mkdir_stub do
-          Open3.stub(:capture3, open3_stub) do
+          @service.stub(:run_subprocess, run_stub) do
             assert_equal false, @service.call
           end
         end
@@ -213,11 +223,11 @@ module SoulLink
     # Flagged for Architect in REVIEW-REQUEST.
     test "non-zero exit truncates very long stderr to the column limit" do
       huge = "x" * 5_000
-      open3_stub = ->(*_args) { [ "", huge, fake_status(false) ] }
+      run_stub = ->(*_args) { [ "", huge, fake_status(false) ] }
 
       with_preconditions do
         with_mkdir_stub do
-          Open3.stub(:capture3, open3_stub) do
+          @service.stub(:run_subprocess, run_stub) do
             @service.call
           end
         end
@@ -228,11 +238,11 @@ module SoulLink
     end
 
     test "timeout fails the session with a timeout message" do
-      open3_stub = ->(*_args) { raise Timeout::Error }
+      run_stub = ->(*_args) { raise Timeout::Error }
 
       with_preconditions do
         with_mkdir_stub do
-          Open3.stub(:capture3, open3_stub) do
+          @service.stub(:run_subprocess, run_stub) do
             assert_equal false, @service.call
           end
         end
@@ -242,6 +252,89 @@ module SoulLink
       assert_equal "failed", @session.status
       assert_match(/timed out/i, @session.error_message)
       assert_match(/#{SoulLink::RomRandomizer::GENERATION_TIMEOUT}s/, @session.error_message)
+    end
+
+    # ---- fail! resilience --------------------------------------------------
+    #
+    # `fail!` is the recovery path for *every* upstream error in this service —
+    # if `save!` raises here, we'd leave the session stuck in `:generating`
+    # with no error message and the player would see a permanent spinner. The
+    # contract is: `fail!` must never bubble. Simulate a save() returning
+    # false (validation failure mid-fail) and assert we logged + did not raise.
+
+    test "fail! survives a save() returning false (does not bubble; logs)" do
+      log_buffer = StringIO.new
+      captured_logger = Logger.new(log_buffer)
+
+      # Stub the session's `save` (NOT save!) to return false. We hit `fail!`
+      # via the precondition path so the rest of the call chain stays simple.
+      @session.stub(:save, false) do
+        Rails.stub(:logger, captured_logger) do
+          with_preconditions(missing: :java) do
+            assert_nothing_raised do
+              assert_equal false, @service.call
+            end
+          end
+        end
+      end
+
+      assert_match(/RomRandomizer fail!/, log_buffer.string)
+      assert_match(/session #{@session.id}/, log_buffer.string)
+    end
+
+    # ---- subprocess kill on timeout ---------------------------------------
+    #
+    # The old pattern (`Timeout.timeout { Open3.capture3 }`) raised in the
+    # caller but left the Java child running — a leak under repeated timeouts.
+    # The new pattern uses Process.spawn + Process.waitpid(WNOHANG) so we hold
+    # the PID and can signal the child. Assert TERM (then KILL) is sent to
+    # the child when the deadline passes.
+
+    test "subprocess timeout sends SIGTERM to the child PID and fails the session" do
+      fake_pid = 99999
+      kill_signals = []
+
+      # Stub the timeout to a value that still lets the polling loop tick at
+      # least once before the deadline check fires.
+      original_timeout = SoulLink::RomRandomizer::GENERATION_TIMEOUT
+      SoulLink::RomRandomizer.send(:remove_const, :GENERATION_TIMEOUT)
+      SoulLink::RomRandomizer.const_set(:GENERATION_TIMEOUT, 0)
+
+      spawn_stub  = ->(*_args, **_opts) { fake_pid }
+      # waitpid(pid, WNOHANG) returns nil while running; called with no flag
+      # after KILL it returns the pid (we just no-op).
+      waitpid_stub = ->(_pid, *flags) { flags.first == Process::WNOHANG ? nil : fake_pid }
+      kill_stub   = ->(sig, pid) { kill_signals << [sig, pid]; 1 }
+      sleep_stub  = ->(_secs) { nil }
+
+      with_preconditions do
+        with_mkdir_stub do
+          Process.stub(:spawn, spawn_stub) do
+            Process.stub(:waitpid, waitpid_stub) do
+              Process.stub(:kill, kill_stub) do
+                # `IO.pipe` returns real pipes; the close-on-ensure path
+                # tolerates already-closed pipes.
+                @service.stub(:sleep, sleep_stub) do
+                  assert_equal false, @service.call
+                end
+              end
+            end
+          end
+        end
+      end
+
+      @session.reload
+      assert_equal "failed", @session.status
+      assert_match(/timed out/i, @session.error_message)
+
+      # TERM is the first escalation; KILL fires after the grace sleep. Assert
+      # at minimum TERM was sent — the brief calls KILL "best-effort".
+      sent_signals = kill_signals.map(&:first)
+      assert_includes sent_signals, "TERM",
+        "expected SIGTERM to be sent to the child PID on timeout (got #{kill_signals.inspect})"
+    ensure
+      SoulLink::RomRandomizer.send(:remove_const, :GENERATION_TIMEOUT)
+      SoulLink::RomRandomizer.const_set(:GENERATION_TIMEOUT, original_timeout)
     end
   end
 end

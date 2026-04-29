@@ -8,6 +8,13 @@ class EmulatorController < ApplicationController
   # EmulatorJS v4 (system "nds" maps to [melonds, desmume, desmume2015]).
   EMULATOR_CORE = "melonds".freeze
 
+  # Hard cap on incoming SRAM size. Pokemon Platinum SRAM is ~512KB; the cap
+  # leaves headroom for malformed dumps without letting a hostile or buggy
+  # client OOM the Rails process. Limit is on RAW (uncompressed) bytes — the
+  # model gzips before storage, so the on-disk MEDIUMBLOB stays well under
+  # this even at the cap.
+  MAX_SAVE_DATA_BYTES = 2.megabytes
+
   before_action :require_login
   before_action :set_run
   before_action :set_session, only: [ :show, :rom, :save_data ]
@@ -30,13 +37,33 @@ class EmulatorController < ApplicationController
     path = @session.rom_full_path
     return head :not_found unless path&.exist?
 
+    # Safety: `path` here is `@session.rom_full_path`, which joins the model's
+    # `rom_path` column with `Rails.root`. `rom_path` is server-derived — it
+    # is only ever written by `SoulLink::RomRandomizer` using a path
+    # constructed under `OUTPUT_DIR` via `Pathname#relative_path_from(Rails.root)`,
+    # never user input. If a future migration or admin script ever writes an
+    # arbitrary string to `rom_path`, `send_file` becomes a file-read-anywhere
+    # primitive — at that point, guard with a `path.to_s.start_with?(OUTPUT_DIR)`
+    # check before this line.
     send_file path, type: "application/octet-stream", disposition: "attachment", filename: "rom.nds"
   end
 
   def save_data
     if request.patch?
       return head :not_found if @session.nil?
+
+      # Belt-and-suspenders size guard. We check the advertised content_length
+      # *before* reading the body so a hostile client can't stream a 500MB
+      # body and OOM the worker. Then we check the actual bytesize after
+      # reading — clients can lie about content_length, or use chunked
+      # encoding without one. Both checks return 413 (Payload Too Large).
+      if request.content_length && request.content_length > MAX_SAVE_DATA_BYTES
+        return head :content_too_large
+      end
+
       blob = request.body.read
+      return head :content_too_large if blob.bytesize > MAX_SAVE_DATA_BYTES
+
       @session.update!(save_data: blob)
       head :no_content
     else

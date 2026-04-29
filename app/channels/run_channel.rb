@@ -1,6 +1,18 @@
 class RunChannel < ApplicationCable::Channel
   def subscribed
-    @guild_id = params[:guild_id]
+    guild_id = params[:guild_id]
+    # Authorize the subscription against the session's logged-in guild. The
+    # client-supplied `guild_id` param is untrusted — without this check, any
+    # authenticated user could stream another guild's run state by simply
+    # passing a different param. Compare as strings since `params` may carry
+    # the value as a String while the session value is an Integer (cast by
+    # SessionsController#create at login time).
+    session_guild_id = connection.session && connection.session[:guild_id]
+    if guild_id.blank? || session_guild_id.blank? || guild_id.to_s != session_guild_id.to_s
+      reject
+      return
+    end
+    @guild_id = guild_id
     stream_for @guild_id
     transmit build_state_payload
   end
@@ -65,14 +77,18 @@ class RunChannel < ApplicationCable::Channel
       return
     end
 
-    # Idempotent: if anything other than :none, do nothing — just re-broadcast
-    # so the client lands on the current truth.
-    if run.emulator_status != :none
-      broadcast_state
-      return
+    # Idempotency under contention: two parallel WS messages from the same or
+    # different clients can race past the `:none` check and double-enqueue.
+    # `with_lock` opens a transaction with `SELECT … FOR UPDATE` on the run
+    # row; the second caller blocks until the first commits, then re-reads
+    # `emulator_status` (now != :none) and no-ops. Cheaper than an advisory
+    # lock and self-healing if the connection drops mid-block.
+    run.with_lock do
+      if run.emulator_status == :none
+        SoulLink::GenerateRunRomsJob.perform_later(run)
+      end
     end
 
-    SoulLink::GenerateRunRomsJob.perform_later(run)
     broadcast_state
   rescue => e
     transmit({ error: e.message })
@@ -85,18 +101,21 @@ class RunChannel < ApplicationCable::Channel
       return
     end
 
-    # Only valid in :failed state. In any other state we no-op and re-broadcast
-    # so the client reconciles to current truth (handles stale UI / races).
-    if run.emulator_status != :failed
-      broadcast_state
-      return
-    end
-
+    # Same locking rationale as `generate_emulator_roms`. The destroy_all
+    # cascade and subsequent re-enqueue must happen atomically per run row,
+    # so concurrent regenerate clicks cannot fire the destroy twice or
+    # interleave a destroy with a half-finished regenerate.
+    #
     # `destroy_all` (NOT `delete_all`) so the `after_destroy` callback fires
     # for each session and the on-disk ROM files get cleaned up. This wipes
     # save_data along with the rows.
-    run.soul_link_emulator_sessions.destroy_all
-    SoulLink::GenerateRunRomsJob.perform_later(run)
+    run.with_lock do
+      if run.emulator_status == :failed
+        run.soul_link_emulator_sessions.destroy_all
+        SoulLink::GenerateRunRomsJob.perform_later(run)
+      end
+    end
+
     broadcast_state
   rescue => e
     transmit({ error: e.message })

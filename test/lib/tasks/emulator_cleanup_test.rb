@@ -109,20 +109,12 @@ class EmulatorCleanupTaskTest < ActiveSupport::TestCase
   end
 
   test "empty run dir is removed after cleanup" do
-    warn "EMPTY-DIR DEBUG: pid=#{Process.pid} tmp_root=#{@tmp_root} Rails.root=#{Rails.root}"
     run = create(:soul_link_run, active: false)
-    warn "EMPTY-DIR DEBUG: created run id=#{run.id}"
     rom = create_rom_file(run)
-    warn "EMPTY-DIR DEBUG: rom file created at #{rom} exists=#{rom.exist?}"
     create(:soul_link_emulator_session, soul_link_run: run, status: "ready",
                                         rom_path: relative_to_root(rom))
-    warn "EMPTY-DIR DEBUG: session created, rom still exists=#{rom.exist?}"
 
     run_dir = Rails.root.join("storage", "roms", "randomized", "run_#{run.id}")
-    warn "EMPTY-DIR DEBUG: checking run_dir=#{run_dir} exists=#{run_dir.exist?}"
-    if !run_dir.exist?
-      warn "EMPTY-DIR DEBUG: tmp_root contents=#{Dir.glob(@tmp_root.join('**', '*')).inspect}"
-    end
     assert run_dir.exist?, "precondition: run dir must exist before cleanup"
 
     invoke_task

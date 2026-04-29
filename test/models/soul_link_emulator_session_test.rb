@@ -242,4 +242,124 @@ class SoulLinkEmulatorSessionTest < ActiveSupport::TestCase
 
     assert_nothing_raised { session.destroy }
   end
+
+  # The widened rescue catches *any* StandardError from the underlying delete
+  # (EACCES from a permission-locked dir, EBUSY from a locked file, an NFS
+  # timeout, etc.) so a transient disk problem can never roll back the AR
+  # delete and leave the cascade in a half-deleted state. The original test
+  # above covers ENOENT specifically; this one covers the broader contract.
+  test "after_destroy survives a Pathname#delete raising EACCES and logs it" do
+    tmp_dir = Rails.root.join("tmp", "test_emu_session_eacces")
+    FileUtils.mkdir_p(tmp_dir)
+    file = Tempfile.create(["rom", ".nds"], tmp_dir)
+    file.close
+    rel_path = Pathname.new(file.path).relative_path_from(Rails.root).to_s
+
+    session = create(:soul_link_emulator_session, soul_link_run: @run, rom_path: rel_path)
+    session_id = session.id
+
+    log_buffer = StringIO.new
+    captured_logger = Logger.new(log_buffer)
+
+    Pathname.stub_any_instance(:delete, ->(*) { raise Errno::EACCES, "Permission denied" }) do
+      Rails.stub(:logger, captured_logger) do
+        assert_nothing_raised { session.destroy }
+      end
+    end
+
+    # Row is gone — disk failure must not have rolled back the destroy.
+    assert_nil SoulLinkEmulatorSession.find_by(id: session_id),
+      "row should be destroyed even when on-disk delete raises"
+    # Failure was logged (we don't assert exact wording, just that we logged).
+    assert_match(/delete_rom_file/, log_buffer.string)
+    assert_match(/EACCES/i, log_buffer.string)
+  ensure
+    File.delete(file.path) if file && File.exist?(file.path)
+    FileUtils.rm_rf(tmp_dir) if tmp_dir
+  end
+
+  # --- save_data gzip coder -----------------------------------------------
+  #
+  # Pokemon Platinum SRAM is ~512KB raw and mostly zero-padded; we gzip on
+  # write and gunzip on read so the on-disk MEDIUMBLOB stays small. The
+  # coder must round-trip exact bytes (binary equality) and handle nil and
+  # empty values cleanly so factory defaults and fresh sessions don't blow
+  # up on save.
+
+  test "save_data round-trips a 200KB random byte string exactly" do
+    payload = SecureRandom.random_bytes(200_000)
+    session = create(:soul_link_emulator_session, soul_link_run: @run, save_data: payload)
+
+    reloaded = SoulLinkEmulatorSession.find(session.id)
+    assert_equal payload.bytesize, reloaded.save_data.bytesize
+    assert_equal payload, reloaded.save_data.b,
+      "decompressed bytes must equal original input"
+  end
+
+  test "save_data is stored compressed on disk (smaller than raw input)" do
+    # Use a highly compressible payload that mimics SRAM: ~512KB of mostly
+    # zero bytes. gzip should pull this down by 95%+.
+    payload = ("\x00".b * 500_000) + SecureRandom.random_bytes(12_000)
+    session = create(:soul_link_emulator_session, soul_link_run: @run, save_data: payload)
+
+    raw_on_disk = session.attributes_before_type_cast["save_data"]
+    raw_bytes = raw_on_disk.is_a?(String) ? raw_on_disk : raw_on_disk.to_s
+    assert raw_bytes.bytesize < payload.bytesize,
+      "expected gzipped on-disk bytes (#{raw_bytes.bytesize}) to be smaller than raw input (#{payload.bytesize})"
+    # Ratio sanity check: highly compressible padding should compress by at
+    # least 50%. Real Platinum saves do far better — ~85-95% — but we keep
+    # the threshold conservative for cross-platform zlib variance.
+    assert raw_bytes.bytesize < (payload.bytesize / 2),
+      "expected at least 50% compression on highly-redundant SRAM-like payload " \
+      "(raw=#{payload.bytesize}, compressed=#{raw_bytes.bytesize})"
+    # On-disk bytes start with the gzip magic header.
+    assert raw_bytes.b.start_with?("\x1f\x8b".b),
+      "on-disk bytes should start with gzip magic header"
+  end
+
+  test "save_data nil round-trips as nil" do
+    session = create(:soul_link_emulator_session, soul_link_run: @run, save_data: nil)
+    reloaded = SoulLinkEmulatorSession.find(session.id)
+    assert_nil reloaded.save_data
+  end
+
+  test "save_data empty string round-trips as empty (no gzip overhead written)" do
+    session = create(:soul_link_emulator_session, soul_link_run: @run, save_data: "")
+    reloaded = SoulLinkEmulatorSession.find(session.id)
+    # Coder returns empty bytes for empty input — preserves the legacy
+    # contract that GET save_data returns 204 when blank.
+    assert_equal "", reloaded.save_data.to_s
+    raw = reloaded.attributes_before_type_cast["save_data"]
+    raw_bytes = raw.is_a?(String) ? raw : raw.to_s
+    assert raw_bytes.bytesize == 0 || !raw_bytes.b.start_with?("\x1f\x8b".b),
+      "empty input should not produce a gzip header on disk"
+  end
+
+  # Defensive: if a row from before this coder shipped contains plaintext
+  # bytes, the loader passes them through unchanged. Once verified that all
+  # production rows are gzipped, this branch can be removed.
+  test "save_data load passes through plaintext bytes lacking gzip magic" do
+    plaintext = "LEGACY_PLAINTEXT_SAVE_BYTES_\x00\x01\x02".b
+    # Simulate a legacy row by writing directly through update_columns,
+    # which bypasses the serialization coder.
+    session = create(:soul_link_emulator_session, soul_link_run: @run)
+    session.update_columns(save_data: plaintext)
+
+    reloaded = SoulLinkEmulatorSession.find(session.id)
+    assert_equal plaintext, reloaded.save_data.b,
+      "plaintext legacy values must pass through unchanged"
+  end
+end
+
+# Tiny helper: minitest doesn't ship `stub_any_instance` for `Pathname#delete`.
+# Reopen `Pathname` to provide it for the EACCES test above. Scoped here to
+# this test file so production code is unaffected.
+class Pathname
+  def self.stub_any_instance(method, replacement)
+    original = instance_method(method)
+    define_method(method) { |*args, &block| replacement.call(self, *args, &block) }
+    yield
+  ensure
+    define_method(method, original)
+  end
 end
