@@ -1,6 +1,10 @@
 require "test_helper"
 
 class SoulLinkEmulatorSessionTest < ActiveSupport::TestCase
+  # `assert_enqueued_with` / `assert_no_enqueued_jobs` come from this helper.
+  # Needed for the after_update_commit callback tests below.
+  include ActiveJob::TestHelper
+
   # Named Discord user IDs used as claim targets. Keep them as recognizable
   # constants so the test reads naturally.
   GREY = "153665622641737728"
@@ -348,6 +352,72 @@ class SoulLinkEmulatorSessionTest < ActiveSupport::TestCase
     reloaded = SoulLinkEmulatorSession.find(session.id)
     assert_equal plaintext, reloaded.save_data.b,
       "plaintext legacy values must pass through unchanged"
+  end
+
+  # --- after_update_commit :enqueue_parse_if_save_changed -----------------
+  #
+  # Every save_data PATCH should produce a parse job. Other column updates
+  # (status flips, rom_path swaps, claim transitions) must NOT enqueue —
+  # the parser is expensive enough on a 512KB blob that we don't want it
+  # firing on unrelated writes. Updating save_data to a blank value also
+  # must not enqueue, since the parser will short-circuit on it.
+
+  test "updating save_data enqueues ParseSaveDataJob" do
+    session = create(:soul_link_emulator_session, :ready, soul_link_run: @run)
+
+    assert_enqueued_with(job: SoulLink::ParseSaveDataJob) do
+      session.update!(save_data: ("\x00".b * 0x80000))
+    end
+  end
+
+  test "updating save_data to a different value enqueues ParseSaveDataJob" do
+    session = create(:soul_link_emulator_session, :ready, soul_link_run: @run, save_data: "\x00".b * 100)
+
+    assert_enqueued_with(job: SoulLink::ParseSaveDataJob) do
+      session.update!(save_data: "\xFF".b * 100)
+    end
+  end
+
+  test "updating other columns does NOT enqueue ParseSaveDataJob" do
+    session = create(:soul_link_emulator_session, :ready, soul_link_run: @run)
+
+    assert_no_enqueued_jobs(only: SoulLink::ParseSaveDataJob) do
+      session.update!(status: "failed", error_message: "x")
+    end
+
+    assert_no_enqueued_jobs(only: SoulLink::ParseSaveDataJob) do
+      session.update!(rom_path: "storage/roms/randomized/test/other.nds")
+    end
+
+    assert_no_enqueued_jobs(only: SoulLink::ParseSaveDataJob) do
+      session.update!(discord_user_id: 12345)
+    end
+  end
+
+  test "setting save_data to nil does NOT enqueue ParseSaveDataJob" do
+    session = create(:soul_link_emulator_session, :ready, soul_link_run: @run, save_data: "\x00".b * 100)
+
+    assert_no_enqueued_jobs(only: SoulLink::ParseSaveDataJob) do
+      session.update!(save_data: nil)
+    end
+  end
+
+  test "setting save_data to empty string does NOT enqueue ParseSaveDataJob" do
+    session = create(:soul_link_emulator_session, :ready, soul_link_run: @run, save_data: "\x00".b * 100)
+
+    assert_no_enqueued_jobs(only: SoulLink::ParseSaveDataJob) do
+      session.update!(save_data: "")
+    end
+  end
+
+  # update_columns bypasses the callback — this is what the job uses to
+  # write parsed_* fields without re-triggering a parse.
+  test "update_columns on save_data does NOT enqueue ParseSaveDataJob" do
+    session = create(:soul_link_emulator_session, :ready, soul_link_run: @run)
+
+    assert_no_enqueued_jobs(only: SoulLink::ParseSaveDataJob) do
+      session.update_columns(parsed_trainer_name: "Lyra", parsed_at: Time.current)
+    end
   end
 end
 

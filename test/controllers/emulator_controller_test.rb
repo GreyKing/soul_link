@@ -221,6 +221,86 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Unclaimed/, response.body)
   end
 
+  # --- show: parsed save fields in roster cards --------------------------
+  #
+  # Phase 1 SRAM parser populates parsed_* columns asynchronously via
+  # SoulLink::ParseSaveDataJob; the sidebar renders them when present and
+  # gracefully omits the line when nil.
+
+  test "show roster renders parsed_trainer_name, money, play time, and badges when present" do
+    create(:soul_link_emulator_session,
+           :ready,
+           soul_link_run: @run,
+           discord_user_id: GREY)
+    create(:soul_link_emulator_session,
+           :ready,
+           soul_link_run: @run,
+           discord_user_id: ARATY,
+           parsed_trainer_name: "Lyra",
+           parsed_money: 12_345,
+           parsed_play_seconds: 5 * 3600 + 30 * 60,
+           parsed_badges: 4,
+           parsed_at: Time.current)
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run)
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run)
+
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+
+    assert_match(/Lyra/, response.body)
+    assert_match(/12,345/, response.body)
+    assert_match(/5h 30m/, response.body)
+    assert_match(/Badges:\s*4\s*\/\s*8/, response.body)
+  end
+
+  test "show roster omits parsed_* lines when fields are nil" do
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    # All other sessions have no parsed data — sidebar should still render
+    # without crashing, and should not show stale numbers.
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run)
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run)
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run)
+
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+
+    assert_match(/RUN ROSTER/, response.body)
+    # No "In-game:" labels should appear because no session has parsed_trainer_name.
+    assert_no_match(/In-game:/, response.body)
+    # No "Time played:" line.
+    assert_no_match(/Time played:/, response.body)
+    # No "Money:" line.
+    assert_no_match(/Money:/, response.body)
+    # No badges line either (we gate it on parsed_at to avoid showing 0/8 spam
+    # before any parse has occurred).
+    assert_no_match(/Badges:/, response.body)
+  end
+
+  test "show roster shows '0 / 8' badges for a parsed session with zero badges" do
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    create(:soul_link_emulator_session,
+           :ready,
+           soul_link_run: @run,
+           discord_user_id: ARATY,
+           parsed_trainer_name: "Bob",
+           parsed_money: 0,
+           parsed_play_seconds: 0,
+           parsed_badges: 0,
+           parsed_at: Time.current)
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run)
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run)
+
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+
+    assert_match(/Bob/, response.body)
+    assert_match(/0h 0m/, response.body)
+    assert_match(/Badges:\s*0\s*\/\s*8/, response.body)
+  end
+
   # --- show: cheats payload ----------------------------------------------
 
   test "show renders empty cheats data attribute when no cheats configured" do

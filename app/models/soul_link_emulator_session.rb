@@ -55,6 +55,10 @@ class SoulLinkEmulatorSession < ApplicationRecord
   validates :discord_user_id, uniqueness: { scope: :soul_link_run_id, allow_nil: true }
 
   after_destroy :delete_rom_file
+  # Re-parse the trainer block whenever the SRAM blob changes. The job
+  # writes parsed_* fields via `update_columns` to avoid re-firing this
+  # callback in a tight loop.
+  after_update_commit :enqueue_parse_if_save_changed
 
   scope :ready, -> { where(status: "ready") }
   scope :unclaimed, -> { where(discord_user_id: nil) }
@@ -92,6 +96,17 @@ class SoulLinkEmulatorSession < ApplicationRecord
   end
 
   private
+
+  # Enqueues SoulLink::ParseSaveDataJob whenever save_data was just committed
+  # to a non-nil value. The job populates the parsed_* columns via
+  # update_columns (not update!), so this callback does not refire as a
+  # result of the parse write. Other column updates (status, rom_path,
+  # discord_user_id, parsed_*) do not trigger a parse.
+  def enqueue_parse_if_save_changed
+    return unless saved_change_to_attribute?("save_data")
+    return if save_data.blank?
+    SoulLink::ParseSaveDataJob.perform_later(self)
+  end
 
   # Removes the on-disk ROM when the session is destroyed. File cleanup is
   # best-effort and MUST NOT roll back the AR transaction. `Errno::ENOENT`

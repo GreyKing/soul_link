@@ -11,7 +11,7 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 1 — SRAM Phase 1: Trainer Block Parsing
+**Active step:** Step 1 — SRAM Phase 1: Trainer Block Parsing — **AWAITING REVIEW**
 **Last committed:** `09b3a7e` — 2026-04-29 (sidebar grid layout fix, inline)
 **Pending deploy:** NO
 
@@ -22,7 +22,15 @@ reset until the gap is addressed or the decision is replaced.
 ## Step History
 *Session-scoped.*
 
-*Empty — populated as steps complete.*
+### Step 1 — SRAM Phase 1: Trainer Block Parsing (Builder, 2026-04-29)
+- Migration `20260429215107_add_parsed_save_fields_to_soul_link_emulator_sessions.rb` (6 cols).
+- Service `SoulLink::SaveParser` — slot selection via CRC16-CCITT, Gen IV English char decode, returns nil on any error.
+- Job `SoulLink::ParseSaveDataJob` — `update_columns` writes (no callback recurse), parsed_at on both branches.
+- Model: `after_update_commit :enqueue_parse_if_save_changed`.
+- Helper: `EmulatorHelper#format_play_time`.
+- View: 4 new gated lines in `_run_sidebar.html.erb`.
+- Tests: 34 new (18 parser + 8 job + 6 callback + 3 controller). 221 → 255, 0 failures, 4 clean parallel runs.
+- **Open question for Architect**: real-save offset verification did not happen this session. Map-id specifically unverified.
 
 ---
 

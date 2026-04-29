@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_26_233223) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_29_215107) do
   create_table "gym_drafts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "current_player_index", default: 0, null: false
@@ -123,6 +123,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_26_233223) do
     t.datetime "created_at", null: false
     t.bigint "discord_user_id"
     t.string "error_message"
+    t.datetime "parsed_at"
+    t.integer "parsed_badges", limit: 1, default: 0, null: false
+    t.integer "parsed_map_id", limit: 2
+    t.integer "parsed_money"
+    t.integer "parsed_play_seconds"
+    t.string "parsed_trainer_name", limit: 16
     t.string "rom_path"
     t.binary "save_data", size: :long
     t.string "seed", null: false

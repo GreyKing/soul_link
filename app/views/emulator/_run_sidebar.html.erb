@@ -1,8 +1,9 @@
-<%# Run Roster sidebar — Tier 1 only. Renders one card per session in
-    @run_sessions (typically 4). Displays existing model data only: claim
-    state, ROM build status, last-saved timestamp (from updated_at when
-    save_data is present), compressed save size on disk, and the seed.
-    No SRAM parsing — that's Tier 2 and lives in a future step. %>
+<%# Run Roster sidebar — Tier 1 + Phase 1 in-game info from SRAM. Renders
+    one card per session in @run_sessions (typically 4). The parsed_*
+    fields are populated asynchronously by SoulLink::ParseSaveDataJob after
+    each save_data PATCH; nil values mean "no save yet" or "parse failed"
+    and the corresponding line is omitted (or shows "—"). Pokemon party,
+    PC boxes, and map-name lookup are deferred (Phase 2+). %>
 
 <div class="gb-card" style="padding: 8px 10px; margin-bottom: 8px;">
   <div style="font-size: 11px; color: var(--d1); letter-spacing: 0.1em;">RUN ROSTER</div>
@@ -59,6 +60,35 @@
     <% else %>
       <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">Not started</div>
       <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">Save: &mdash;</div>
+    <% end %>
+
+    <% if s.parsed_trainer_name.present? %>
+      <div style="font-size: 11px; color: var(--d1); margin-top: 6px; margin-bottom: 2px;">
+        In-game: <%= s.parsed_trainer_name %>
+      </div>
+    <% end %>
+
+    <% if s.parsed_play_seconds %>
+      <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
+        Time played: <%= format_play_time(s.parsed_play_seconds) %>
+      </div>
+    <% end %>
+
+    <% if s.parsed_money %>
+      <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
+        Money: &#8369;<%= number_with_delimiter(s.parsed_money) %>
+      </div>
+    <% end %>
+
+    <%# Gate on parsed_trainer_name (a strong signal of successful parse) rather
+        than parsed_at (set on both success and failure paths). parsed_badges
+        defaults to 0 in DB; without this gate, a failed parse renders
+        "Badges: 0 / 8" indistinguishable from "successfully parsed, no badges
+        yet" — violates the brief's :failed → "—" contract. %>
+    <% if s.parsed_trainer_name.present? %>
+      <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
+        Badges: <%= s.parsed_badges %> / 8
+      </div>
     <% end %>
 
     <div style="font-size: 9px; color: var(--d2); opacity: 0.7; margin-top: 4px; word-break: break-all;">
