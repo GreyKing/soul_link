@@ -11,8 +11,8 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 3 — Emulator Hardening, awaiting Reviewer.
-**Last committed:** `a708443` — 2026-04-28 (Step 1)
+**Active step:** *None — awaiting next brief.*
+**Last committed:** `24aff23` — 2026-04-29 (Step 4 — Run Roster Sidebar)
 **Pending deploy:** NO
 
 ---
@@ -20,67 +20,44 @@ reset until the gap is addressed or the decision is replaced.
 ## Step History
 *Session-scoped.*
 
-### Step 1 — Evolve Button on Pokemon Modal — 2026-04-27
-**Status:** Complete, committed `a708443`
-
-**Files modified:**
-- `app/javascript/controllers/pixeldex_controller.js` — added `modalCanEvolve` flag in `#openModal`, threaded `parentIsSelected` through `#renderEvoNode`, new `evolvePokemon` action mirroring `savePokemon`'s fetch shape
-
-**Key decisions:**
-- Per-player scope only — partner co-evolution explicitly out (matches existing per-player precedent for catch/death/team operations)
-- Reused existing `PATCH /pokemon/:id` endpoint; no backend changes, no migration, no new routes
-- Dead-pokemon gate via shared `modalCanEvolve` instance flag (architect-approved alternative to threading status through `#populateEvolution`); set in `#openModal` before evolution renders, inherited by `searchSpecies` mid-edit re-renders
-- Button shows on direct children of the currently-selected species node; species name passed via `dataset.targetSpecies` (textContent rule preserved)
-- Status vocabulary: `EVOLVING...` / `EVOLVE FAILED` (action-specific, parallel to `savePokemon`)
-
-**Tests:** 184/184 full suite, 0 failures. No new tests added (per brief — existing `PokemonControllerTest` covers species PATCH).
-
-**Review:** Richard — PASS (no Must Fix, no Should Fix, no Escalate).
-
-**Smoke test:** Bob couldn't drive a browser. Project Owner to verify locally — open dashboard, click a pokemon cell with an existing pokemon, confirm EVOLVE buttons appear next to direct evolution targets, click one, confirm species updates after reload.
-
-### Step 3 — Emulator Hardening — 2026-04-26
-**Status:** Built; awaiting Reviewer (REVIEW-REQUEST.md ready).
-
-**Files modified:**
-- `app/channels/application_cable/connection.rb` — expose `session` via `attr_reader` for channel guild authz
-- `app/channels/run_channel.rb` — guild authz on subscribe; `with_lock` on generate + regenerate enqueue paths
-- `app/models/soul_link_emulator_session.rb` — `GzipCoder` module + `serialize :save_data, coder: GzipCoder`; widen `delete_rom_file` rescue from `Errno::ENOENT` → `StandardError`
-- `app/controllers/emulator_controller.rb` — `MAX_SAVE_DATA_BYTES = 2.megabytes` size cap (pre-read content_length + post-read bytesize, both → 413); safety comment on `rom`'s `send_file`
-- `app/services/soul_link/rom_randomizer.rb` — replace `Open3.capture3 + Timeout.timeout` with `Process.spawn` + `waitpid(WNOHANG)` poll loop + TERM→KILL escalation; `fail!` survives save failure (uses `save` not `save!`, logs on failure); centralize 255-char truncation in `truncate_error`
-- 5 test files updated/added (16 new tests, 0 removed)
-- `test/lib/tasks/emulator_cleanup_test.rb` — sweep 6 `warn "EMPTY-DIR DEBUG: ..."` lines
-
-**Key decisions:**
-- `with_lock` race test uses the brief's authorized fallback (assert `with_lock` was called + behavioral sequential test) rather than thread-based test — ConnectionStub doesn't simulate concurrent subscribes and MySQL row locks on the test DB can deadlock under spurious load
-- `stub_connection_with_session` helper added because ActionCable's `ConnectionStub` only stubs `identified_by` attrs, no session — single-line setup change for all existing tests
-- Run subprocess seam moved from `Open3.capture3` to `RomRandomizer#run_subprocess`; tests migrated to stub the new seam, dedicated TERM-on-timeout test exercises the real `Process.spawn` path through stubbed primitives
-- `GzipCoder.load` falls through plaintext bytes lacking the magic header — defensive only, can be removed once production rows are confirmed gzipped
-- Empty save_data short-circuits in `dump` (stores empty bytes, not gzip-of-empty) so GET 204 contract holds
-- Used `:content_too_large` instead of deprecated `:payload_too_large` (Rails 8.1)
-
-**Compression measured:**
-- 512KB pure zero-padded SRAM → 543 bytes (0.1%)
-- 512KB realistic 80%-zero SRAM → 116KB (22%)
-- 512KB pure random (worst case) → 525KB (gzip framing overhead)
-
-**Tests:** 216/216 full suite (200 baseline + 16 new), 0 failures across 3 consecutive runs.
-
-**Review:** *Pending Reviewer.*
+*Empty — populated as steps complete.*
 
 ---
 
 ## Known Gaps
 *Durable. Items logged here instead of expanding the current step. Persists across sessions until addressed.*
 
-- Co-evolution of soul-link partners on evolution (deliberate per-step-1; revisit if Project Owner wants paired evolution)
+### From earlier work (Evolve Button feature)
+- Co-evolution of soul-link partners on evolution (deliberate; revisit if Project Owner wants paired evolution)
 - No real-time broadcast of species change to other players' dashboards (they see updates on next refresh)
 - No level/method gating on EVOLVE button (always available; player owns in-game timing)
 - No loading state on EVOLVE button itself (status text only)
+
+### From the emulator deploy + polish session (2026-04-29)
+- **Tier 2 SRAM parsing** for in-game info (character name, time-played, money, party count, current map, badges earned) — separate feature, real engineering effort (Gen IV character set decoder + checksum/slot logic)
+- **No automated browser test harness** — smoke tests are manual; Project Owner verifies UI changes
+- **`#d4b14a` amber color** for pending-state status badge is inline in `_run_sidebar.html.erb`. If used in a third place, promote to a `--amber` palette token in `pixeldex.css`.
+- **Randomizer settings file** (`random_basic_1.rnqs`) is small/basic — heavier randomization (abilities, types-per-move, evolutions) requires re-export from the GUI and re-scp
+- **Destructive regenerate** wipes save_data for ready/claimed sessions when status is `:failed`. Acceptable v1 tradeoff; future iteration could selectively preserve `:ready` sessions.
+- **`error_message` column at varchar(255)** — widen to text only if real-world stack traces prove limiting
+- **Convert legacy fixture-based tests to FactoryBot** — deferred; do not bundle into feature work
+- **No real-time updates on the run roster sidebar** — page-load refresh only. Could broadcast on save_data PATCH if live "X just saved" UX is wanted.
+- **Channel-layer guild authz cached at login** — if user joins a new guild mid-session without re-logging-in, they won't see it. Acceptable for current use.
 
 ---
 
 ## Architecture Decisions
 *Durable. Locked decisions that cannot be changed without breaking the system. Persists across sessions.*
 
-*None.*
+### Emulator infrastructure (locked 2026-04-29)
+- **PokeRandoZX must be invoked with `cli` as the first arg after `-jar`.** CLI mode auto-seeds; do NOT pass `-seed`. Without the `cli` subcommand, the JAR launches a Swing GUI which fails on headless servers with `HeadlessException` but exits 0 — silent generation failure.
+- **`save_data` column is gzip-compressed** via `SoulLinkEmulatorSession::GzipCoder` (custom serializer). Reads/writes are transparent. Use `read_attribute_before_type_cast("save_data")` for raw compressed bytes (e.g. for size display); regular `save_data` accessor triggers decompression.
+- **Inbound PATCH `save_data` is capped at 2MB raw** (`EmulatorController::MAX_SAVE_DATA_BYTES`). Pokemon Platinum SRAM is ~512KB; cap is a generous DoS bound enforced via `request.content_length` check + post-read `bytesize` check.
+- **`RunChannel#subscribed`** rejects when `params[:guild_id]` doesn't match `connection.session[:guild_id]`. Single check, applies to every channel action.
+- **`RunChannel#generate_emulator_roms` and `#regenerate_emulator_roms`** wrap their idempotency check + enqueue in `run.with_lock` — prevents the channel-layer race where two concurrent clicks both pass `:none` and both enqueue.
+- **Subprocess pattern: `Process.spawn` + `waitpid(WNOHANG)` poll loop + TERM→KILL on deadline.** `Open3.capture3 + Timeout.timeout` is banned (raises in calling thread but leaves child Java running — zombie leak).
+- **`emulator_session.rom_path` is server-derived** — only ever set by `RomRandomizer` via `Pathname#relative_path_from(Rails.root)` of a path constructed under `OUTPUT_DIR`. Never user input. If a future writer changes this, `EmulatorController#rom`'s `send_file` becomes a file-read-anywhere primitive and needs an explicit `path.start_with?(OUTPUT_DIR)` guard.
+
+### Carried over (still load-bearing)
+- Discord user IDs are `bigint` in DB columns, `String` in Stimulus values, coerced at the controller boundary
+- New tests use FactoryBot factories from `test/factories/`; legacy tests stay on fixtures from `test/fixtures/`; do not convert legacy without an explicit step
