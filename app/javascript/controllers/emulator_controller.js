@@ -101,7 +101,7 @@ export default class extends Controller {
     window.EJS_onSaveSave = (event) => {
       if (!event || !event.save) return
       this._uploadSave(event.save)
-      this._triggerDownload(event.save, event.format)
+      this._triggerDownload(event.save)
     }
 
     // EJS_ready fires once after window.EJS_emulator is constructed. This
@@ -195,16 +195,18 @@ export default class extends Controller {
   }
 
   // Triggers a browser download of the SRAM bytes. Called only from the
-  // manual "Save File" button path — the auto-save tick should not spam
-  // the user's Downloads folder every 30 seconds.
-  _triggerDownload(saveBytes, format) {
+  // manual "Save File" button path. NOTE: EmulatorJS's saveSave event
+  // payload exposes `format` as the *screenshot* format ("png"/"jpg"),
+  // NOT the save format — using it gave us .png filenames containing
+  // SRAM bytes. SRAM is always .sav for DS games, hardcoded here.
+  _triggerDownload(saveBytes) {
     if (!saveBytes || saveBytes.byteLength === 0) return
     const bytes = saveBytes instanceof Uint8Array ? saveBytes : new Uint8Array(saveBytes)
     const blob = new Blob([bytes], { type: "application/octet-stream" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `pokemon-platinum-save.${format || "sav"}`
+    a.download = "pokemon-platinum-save.sav"
     document.body.appendChild(a)
     a.click()
     a.remove()
