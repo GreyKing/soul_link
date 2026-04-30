@@ -219,7 +219,7 @@ module SoulLink
 
     test "unknown character index renders as U+FFFD replacement char" do
       # Inject an index that's not in the table (0x0500 is unmapped).
-      indices = [ 0x000C, 0x0500, 0x000D ] # 'A', UNKNOWN, 'B'
+      indices = [ 0x012B, 0x0500, 0x012C ] # 'A', UNKNOWN, 'B'
       slot = build_slot(name_indices: indices)
       sram = build_sram(slot_a: slot)
 
@@ -233,7 +233,7 @@ module SoulLink
       # is 0x00 padding from the build helper. Padding (0x0000) is *not*
       # the terminator; we treat it as "unset slot — skip" so we don't
       # spam replacement characters across the empty tail.
-      indices = [ 0x000C ] # 'A'
+      indices = [ 0x012B ] # 'A'
       slot = build_slot(name_indices: indices)
       sram = build_sram(slot_a: slot)
 

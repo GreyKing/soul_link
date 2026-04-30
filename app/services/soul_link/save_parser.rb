@@ -66,30 +66,41 @@ module SoulLink
     MAP_ID_OFFSET        = 0x1234  # 2 bytes LE (uint16) — UNVERIFIED, see notes
 
     # Gen IV English character table (index → Unicode codepoint).
-    # Source: https://projectpokemon.org/home/docs/gen-4/character-encoding-r68/
-    # Only the English subset is implemented per the Phase 1 scope. Anything
-    # outside the table renders as U+FFFD REPLACEMENT CHARACTER. Terminator
-    # 0xFFFF stops decoding (the Pokemon-internal end-of-string marker).
+    # Empirically verified against a real Pokemon Platinum save on 2026-04-29:
+    # the trainer-name index 0x0131 corresponded to "G" in-game, which fixes
+    # the offset of the alphanumeric block. Before that, an earlier
+    # speculative table mapped A=0x000C and put trainer-name decoding into
+    # U+FFFD-only territory.
+    #
+    # Layout: 0x0001 = space, digits start at 0x0121, uppercase at 0x012B,
+    # lowercase at 0x0145. Punctuation is included for names that contain
+    # apostrophes / quotes (some defaults do).
+    #
+    # Source: pret/pokeplatinum charmap_en.txt + Project Pokemon Gen-4
+    # character encoding doc (https://projectpokemon.org/home/docs/).
+    # Anything outside the table renders as U+FFFD REPLACEMENT CHARACTER.
+    # Terminator 0xFFFF stops decoding.
     GEN4_CHAR_TABLE = {
-      # Space + digits
+      # Space
       0x0001 => " ",
-      0x0002 => "0", 0x0003 => "1", 0x0004 => "2", 0x0005 => "3", 0x0006 => "4",
-      0x0007 => "5", 0x0008 => "6", 0x0009 => "7", 0x000A => "8", 0x000B => "9",
+      # Digits 0-9
+      0x0121 => "0", 0x0122 => "1", 0x0123 => "2", 0x0124 => "3", 0x0125 => "4",
+      0x0126 => "5", 0x0127 => "6", 0x0128 => "7", 0x0129 => "8", 0x012A => "9",
       # Uppercase A-Z
-      0x000C => "A", 0x000D => "B", 0x000E => "C", 0x000F => "D", 0x0010 => "E",
-      0x0011 => "F", 0x0012 => "G", 0x0013 => "H", 0x0014 => "I", 0x0015 => "J",
-      0x0016 => "K", 0x0017 => "L", 0x0018 => "M", 0x0019 => "N", 0x001A => "O",
-      0x001B => "P", 0x001C => "Q", 0x001D => "R", 0x001E => "S", 0x001F => "T",
-      0x0020 => "U", 0x0021 => "V", 0x0022 => "W", 0x0023 => "X", 0x0024 => "Y",
-      0x0025 => "Z",
+      0x012B => "A", 0x012C => "B", 0x012D => "C", 0x012E => "D", 0x012F => "E",
+      0x0130 => "F", 0x0131 => "G", 0x0132 => "H", 0x0133 => "I", 0x0134 => "J",
+      0x0135 => "K", 0x0136 => "L", 0x0137 => "M", 0x0138 => "N", 0x0139 => "O",
+      0x013A => "P", 0x013B => "Q", 0x013C => "R", 0x013D => "S", 0x013E => "T",
+      0x013F => "U", 0x0140 => "V", 0x0141 => "W", 0x0142 => "X", 0x0143 => "Y",
+      0x0144 => "Z",
       # Lowercase a-z
-      0x0026 => "a", 0x0027 => "b", 0x0028 => "c", 0x0029 => "d", 0x002A => "e",
-      0x002B => "f", 0x002C => "g", 0x002D => "h", 0x002E => "i", 0x002F => "j",
-      0x0030 => "k", 0x0031 => "l", 0x0032 => "m", 0x0033 => "n", 0x0034 => "o",
-      0x0035 => "p", 0x0036 => "q", 0x0037 => "r", 0x0038 => "s", 0x0039 => "t",
-      0x003A => "u", 0x003B => "v", 0x003C => "w", 0x003D => "x", 0x003E => "y",
-      0x003F => "z",
-      # Common punctuation present in trainer names
+      0x0145 => "a", 0x0146 => "b", 0x0147 => "c", 0x0148 => "d", 0x0149 => "e",
+      0x014A => "f", 0x014B => "g", 0x014C => "h", 0x014D => "i", 0x014E => "j",
+      0x014F => "k", 0x0150 => "l", 0x0151 => "m", 0x0152 => "n", 0x0153 => "o",
+      0x0154 => "p", 0x0155 => "q", 0x0156 => "r", 0x0157 => "s", 0x0158 => "t",
+      0x0159 => "u", 0x015A => "v", 0x015B => "w", 0x015C => "x", 0x015D => "y",
+      0x015E => "z",
+      # Common punctuation in trainer names
       0x00AB => "!",
       0x00AC => "?",
       0x00AD => ",",
