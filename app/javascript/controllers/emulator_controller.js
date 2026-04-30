@@ -39,8 +39,15 @@ export default class extends Controller {
     // localStorage overrides these for returning users who've changed
     // them via the in-game menu.
     //
-    // - save-save-interval: auto-flush SRAM every 30s, fires saveSaveFiles
-    //   event for the server PATCH.
+    // - save-save-interval = "0": auto-flush DISABLED. The 30s tick
+    //   calls melonDS's cmd_savefiles WASM export mid-frame, which races
+    //   with Pokemon's own SRAM writes during intro animations (name
+    //   input, gender selection, receive-starter cutscene) and corrupts
+    //   the running emulation — observed as a hang at starter selection
+    //   on Pokemon Platinum. melonDS doesn't promise thread-safety
+    //   between cmd_savefiles and the running CPU emulation. Players
+    //   back up to the server by clicking the EmulatorJS "Save File"
+    //   button after an in-game save (fires saveSave → EJS_onSaveSave).
     // - melonds_boot_mode = "direct": skip the DS firmware boot UI and
     //   jump straight into the ROM. REQUIRED when firmware is dumped from
     //   a DSi or 3DS — those firmwares aren't bootable
@@ -52,7 +59,7 @@ export default class extends Controller {
     //   libretro core. Setting both is harmless; whichever core
     //   EmulatorJS resolves will pick up its own key.
     window.EJS_defaultOptions = {
-      "save-save-interval": "30",
+      "save-save-interval": "0",
       "melonds_boot_mode": "direct",
       "melonds_boot_directly": "enabled"
     }
