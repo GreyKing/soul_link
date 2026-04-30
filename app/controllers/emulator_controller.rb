@@ -22,7 +22,8 @@ class EmulatorController < ApplicationController
   # PATCH /emulator/save_data has a binary body — the standard form-CSRF
   # token can't ride along. The Stimulus controller still sends it via
   # `X-CSRF-Token` (belt-and-suspenders), but we accept the request even
-  # without one.
+  # without one. DELETE goes through the standard CSRF path; the Stimulus
+  # controller sends `X-CSRF-Token` like the rest of the destructive UI.
   protect_from_forgery with: :null_session, only: [ :save_data ], if: -> { request.patch? }
 
   def show
@@ -71,6 +72,24 @@ class EmulatorController < ApplicationController
       return head :content_too_large if blob.bytesize > MAX_SAVE_DATA_BYTES
 
       @session.update!(save_data: blob)
+      head :no_content
+    elsif request.delete?
+      return head :not_found if @session.nil?
+
+      # Player-initiated wipe. Clears the SRAM blob and the four parsed_*
+      # cache columns (which mirror fields decoded from the blob — leaving
+      # them populated would surface a stale name/badges/money on the now-
+      # empty session). parsed_at also nil so the sidebar doesn't show a
+      # parse timestamp from a save that no longer exists.
+      @session.update!(
+        save_data:           nil,
+        parsed_trainer_name: nil,
+        parsed_money:        nil,
+        parsed_play_seconds: nil,
+        parsed_badges:       0,
+        parsed_map_id:       nil,
+        parsed_at:           nil
+      )
       head :no_content
     else
       data = @session&.save_data

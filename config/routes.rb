@@ -44,9 +44,10 @@ Rails.application.routes.draw do
 
   # Player-facing emulator (auto-claims one of the run's randomized ROMs)
   resource :emulator, only: [ :show ], controller: "emulator" do
-    get   :rom
-    get   :save_data
-    patch :save_data
+    get    :rom
+    get    :save_data
+    patch  :save_data
+    delete :save_data
   end
 
   # Interactive region map

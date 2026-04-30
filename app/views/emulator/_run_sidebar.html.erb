@@ -94,5 +94,22 @@
     <div style="font-size: 9px; color: var(--d2); opacity: 0.7; margin-top: 4px; word-break: break-all;">
       Seed: <%= s.seed %>
     </div>
+
+    <%# Clear-save action lives on the player's own card only. saved_bytes
+        guards the button — nothing to clear on a session that has never
+        saved, so we don't render the button there. %>
+    <% if is_you && saved_bytes && saved_bytes > 0 %>
+      <div data-controller="clear-save"
+           data-clear-save-url-value="<%= save_data_emulator_path %>"
+           data-clear-save-csrf-value="<%= form_authenticity_token %>"
+           style="margin-top: 8px;">
+        <button type="button"
+                data-action="click->clear-save#clear"
+                class="type-text"
+                style="background: #4a1c1c; color: #e8a0a0; border: 2px solid #6b2c2c; font-size: 9px; letter-spacing: 0.05em; cursor: pointer; width: 100%; padding: 4px 6px;">
+          CLEAR SAVE DATA
+        </button>
+      </div>
+    <% end %>
   </div>
 <% end %>

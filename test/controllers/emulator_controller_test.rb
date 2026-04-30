@@ -31,6 +31,11 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to login_path
   end
 
+  test "save_data DELETE requires login" do
+    delete save_data_emulator_path
+    assert_redirected_to login_path
+  end
+
   # --- show: no active run ------------------------------------------------
 
   test "show renders 'no active run' when guild has no active run" do
@@ -598,6 +603,71 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     raw_bytes = raw.is_a?(String) ? raw : raw.to_s
     assert raw_bytes.bytesize < payload.bytesize,
       "expected on-disk bytes (#{raw_bytes.bytesize}) to be smaller than raw input (#{payload.bytesize})"
+  end
+
+  # --- save_data DELETE ---------------------------------------------------
+
+  test "save_data DELETE clears save_data and the parsed_* cache columns" do
+    sess = create(:soul_link_emulator_session,
+                  :ready,
+                  soul_link_run: @run,
+                  discord_user_id: GREY,
+                  save_data: "EXISTING_SAVE_BYTES".b,
+                  parsed_trainer_name: "Lyra",
+                  parsed_money: 12_345,
+                  parsed_play_seconds: 4_200,
+                  parsed_badges: 3,
+                  parsed_map_id: 426,
+                  parsed_at: Time.current)
+    login_as(GREY)
+
+    delete save_data_emulator_path,
+           headers: { "X-CSRF-Token" => session[:_csrf_token].to_s }
+    assert_response :no_content
+
+    sess.reload
+    assert_nil sess.save_data
+    assert_nil sess.parsed_trainer_name
+    assert_nil sess.parsed_money
+    assert_nil sess.parsed_play_seconds
+    assert_equal 0, sess.parsed_badges
+    assert_nil sess.parsed_map_id
+    assert_nil sess.parsed_at
+  end
+
+  test "save_data DELETE returns 404 when caller has no claimed session" do
+    # No session created for ARATY in this run.
+    login_as(ARATY)
+
+    delete save_data_emulator_path,
+           headers: { "X-CSRF-Token" => session[:_csrf_token].to_s }
+    assert_response :not_found
+  end
+
+  test "save_data DELETE only clears the caller's own session, not other players'" do
+    mine = create(:soul_link_emulator_session,
+                  :ready,
+                  soul_link_run: @run,
+                  discord_user_id: GREY,
+                  save_data: "MINE".b,
+                  parsed_trainer_name: "Mine")
+    other = create(:soul_link_emulator_session,
+                   :ready,
+                   soul_link_run: @run,
+                   discord_user_id: ARATY,
+                   save_data: "THEIRS".b,
+                   parsed_trainer_name: "Theirs")
+    login_as(GREY)
+
+    delete save_data_emulator_path,
+           headers: { "X-CSRF-Token" => session[:_csrf_token].to_s }
+    assert_response :no_content
+
+    assert_nil mine.reload.save_data
+    assert_nil mine.parsed_trainer_name
+    # Other player's session untouched.
+    assert_equal "THEIRS".b, other.reload.save_data.to_s.b
+    assert_equal "Theirs", other.parsed_trainer_name
   end
 
   private
