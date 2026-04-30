@@ -1,5 +1,5 @@
 namespace :soul_link do
-  desc "Re-enqueue ParseSaveDataJob for every session that has save_data — use after a parser offset fix to refresh the parsed_* cache columns without waiting for the next in-game save"
+  desc "Re-run ParseSaveDataJob for every session that has save_data — use after a parser offset fix to refresh the parsed_* cache columns without waiting for the next in-game save"
   task reparse_all_saves: :environment do
     sessions = SoulLinkEmulatorSession.where.not(save_data: nil).order(:id)
     if sessions.empty?
@@ -7,11 +7,16 @@ namespace :soul_link do
       next
     end
 
+    # perform_now (not perform_later): the Async queue adapter runs jobs on a
+    # thread pool that gets torn down when this rake process exits. With
+    # perform_later, fast-finishing jobs win the race and slow ones get
+    # killed mid-flight. Synchronous execution in the main thread is the
+    # reliable path for a one-shot batch reparse.
     sessions.each do |s|
-      SoulLink::ParseSaveDataJob.perform_later(s)
-      puts "Enqueued reparse for session id=#{s.id} player=#{s.discord_user_id}"
+      SoulLink::ParseSaveDataJob.perform_now(s)
+      puts "Reparsed session id=#{s.id} player=#{s.discord_user_id}"
     end
-    puts "Enqueued #{sessions.size} reparse job(s)."
+    puts "Reparsed #{sessions.size} session(s)."
   end
 
   desc "Hex-dump the trainer-block region of every session's SRAM (for parser offset debugging)"
