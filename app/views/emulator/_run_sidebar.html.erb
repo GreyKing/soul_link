@@ -50,9 +50,13 @@
       </span>
     </div>
 
+    <%# `updated_at` ticks every ~30s the player has the emulator open
+        (auto-save interval), so it's a "is this player active" signal,
+        NOT "when did they last save in-game". The parsed Time played
+        field below is the in-game-save ground truth. %>
     <% if saved_bytes && saved_bytes > 0 %>
       <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-        Played <%= time_ago_in_words(s.updated_at) %> ago
+        Active <%= time_ago_in_words(s.updated_at) %> ago
       </div>
       <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
         Save: <%= number_to_human_size(saved_bytes) %>

@@ -61,12 +61,15 @@ export default class extends Controller {
     }
 
     // EmulatorJS fires "saveSave" with { screenshot, format, save } when the
-    // user clicks the EmulatorJS UI's manual "Save File" button. The
-    // presence of this handler also suppresses the default download dialog.
+    // user clicks the EmulatorJS UI's manual "Save File" button. The mere
+    // presence of this handler suppresses the default download dialog —
+    // so we have to do the download ourselves on top of the server PATCH.
     // Belt-and-suspenders: the saveSaveFiles listener registered in
     // EJS_ready covers in-game saves and the auto-save interval.
     window.EJS_onSaveSave = (event) => {
-      if (event && event.save) this._uploadSave(event.save)
+      if (!event || !event.save) return
+      this._uploadSave(event.save)
+      this._triggerDownload(event.save, event.format)
     }
 
     // EJS_ready fires once after window.EJS_emulator is constructed. This
@@ -156,6 +159,23 @@ export default class extends Controller {
     } catch (e) {
       console.error("Emulator: failed to inject existing save:", e)
     }
+  }
+
+  // Triggers a browser download of the SRAM bytes. Called only from the
+  // manual "Save File" button path — the auto-save tick should not spam
+  // the user's Downloads folder every 30 seconds.
+  _triggerDownload(saveBytes, format) {
+    if (!saveBytes || saveBytes.byteLength === 0) return
+    const bytes = saveBytes instanceof Uint8Array ? saveBytes : new Uint8Array(saveBytes)
+    const blob = new Blob([bytes], { type: "application/octet-stream" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `pokemon-platinum-save.${format || "sav"}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
   }
 
   async _uploadSave(saveBytes) {
