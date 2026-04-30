@@ -15,6 +15,15 @@ class EmulatorController < ApplicationController
   # this even at the cap.
   MAX_SAVE_DATA_BYTES = 2.megabytes
 
+  # Real DS BIOS + firmware ZIP for melonDS. EmulatorJS's NDS core checks the
+  # WiFi calibration bytes inside firmware.bin during Pokemon's save-load
+  # path; melonDS-WASM's auto-generated firmware leaves those FF-padded,
+  # which trips Pokemon's "A communication error has occurred" message. A
+  # real-hardware firmware dump fixes it. ENV var lets dev/test point at a
+  # different path; production config writes firmware.zip alongside
+  # /etc/soul_link/env via the deploy script.
+  DEFAULT_FIRMWARE_PATH = "/etc/soul_link/firmware.zip".freeze
+
   before_action :require_login
   before_action :set_run
   before_action :set_session, only: [ :show, :rom, :save_data ]
@@ -37,6 +46,18 @@ class EmulatorController < ApplicationController
     # avoids a wasted query on the empty-state pages. `.order(:id)` keeps the
     # four cards in stable order across page reloads.
     @run_sessions = @run.soul_link_emulator_sessions.order(:id) if @session&.ready?
+  end
+
+  def firmware
+    path = ENV.fetch("SOUL_LINK_FIRMWARE_PATH", DEFAULT_FIRMWARE_PATH)
+    return head :not_found unless File.exist?(path)
+
+    # Cache aggressively per browser session. Firmware bytes never change
+    # for a given deploy; setting expires_in lets the browser skip the
+    # round-trip on every page load. private = don't let intermediaries
+    # cache it, since it's auth-gated.
+    expires_in 1.day, public: false
+    send_file path, type: "application/zip", disposition: "inline", filename: "firmware.zip"
   end
 
   def rom

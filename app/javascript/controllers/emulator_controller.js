@@ -18,6 +18,7 @@ export default class extends Controller {
   static values = {
     romUrl: String,
     saveDataUrl: String,
+    firmwareUrl: String,
     csrf: String,
     core: String,
     pathtodata: String,
@@ -45,6 +46,13 @@ export default class extends Controller {
     window.EJS_pathtodata = this.pathtodataValue
     window.EJS_startOnLoaded = true
     window.EJS_Buttons = {}
+
+    // Real DS firmware ZIP — fixes Pokemon's "communication error" on save
+    // load by giving melonDS valid WiFi calibration bytes (its auto-
+    // generated firmware leaves them FF-padded, which Pokemon rejects).
+    // EmulatorJS extracts the ZIP and reads bios7.bin / bios9.bin /
+    // firmware.bin from the BIOS/system folder via this URL.
+    if (this.firmwareUrlValue) window.EJS_biosUrl = this.firmwareUrlValue
 
     // EmulatorJS reads window.EJS_cheats in loader.js (assigned to
     // config.cheats), which emulator.js consumes as an array of [desc, code]
@@ -112,6 +120,7 @@ export default class extends Controller {
     window.EJS_ready = undefined
     window.EJS_cheats = undefined
     window.EJS_defaultOptions = undefined
+    window.EJS_biosUrl = undefined
     if (this._loaderScript && this._loaderScript.parentNode) {
       this._loaderScript.parentNode.removeChild(this._loaderScript)
     }

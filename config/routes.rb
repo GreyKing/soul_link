@@ -48,6 +48,7 @@ Rails.application.routes.draw do
     get    :save_data
     patch  :save_data
     delete :save_data
+    get    :firmware
   end
 
   # Interactive region map

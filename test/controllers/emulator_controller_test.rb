@@ -36,6 +36,11 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to login_path
   end
 
+  test "firmware requires login" do
+    get firmware_emulator_path
+    assert_redirected_to login_path
+  end
+
   # --- show: no active run ------------------------------------------------
 
   test "show renders 'no active run' when guild has no active run" do
@@ -670,6 +675,47 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Theirs", other.parsed_trainer_name
   end
 
+  # --- firmware -----------------------------------------------------------
+
+  test "firmware serves the configured ZIP when present" do
+    Tempfile.create([ "firmware", ".zip" ]) do |f|
+      f.write("FAKE_FIRMWARE_ZIP_CONTENT".b)
+      f.flush
+
+      with_firmware_path(f.path) do
+        login_as(GREY)
+        get firmware_emulator_path
+        assert_response :success
+        assert_equal "application/zip", response.media_type
+        assert_equal "FAKE_FIRMWARE_ZIP_CONTENT".b, response.body.b
+      end
+    end
+  end
+
+  test "firmware returns 404 when configured ZIP is missing" do
+    with_firmware_path("/nonexistent/path/firmware.zip") do
+      login_as(GREY)
+      get firmware_emulator_path
+      assert_response :not_found
+    end
+  end
+
+  test "firmware sets a Cache-Control header so the browser skips re-download on each page load" do
+    Tempfile.create([ "firmware", ".zip" ]) do |f|
+      f.write("X".b)
+      f.flush
+
+      with_firmware_path(f.path) do
+        login_as(GREY)
+        get firmware_emulator_path
+        assert_response :success
+        # expires_in 1.day, public: false → "max-age=86400, private"
+        assert_match(/max-age=\d+/, response.headers["Cache-Control"].to_s)
+        assert_match(/private/,     response.headers["Cache-Control"].to_s)
+      end
+    end
+  end
+
   private
 
   def with_forgery_protection
@@ -678,5 +724,13 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     yield
   ensure
     ActionController::Base.allow_forgery_protection = original
+  end
+
+  def with_firmware_path(path)
+    original = ENV["SOUL_LINK_FIRMWARE_PATH"]
+    ENV["SOUL_LINK_FIRMWARE_PATH"] = path
+    yield
+  ensure
+    ENV["SOUL_LINK_FIRMWARE_PATH"] = original
   end
 end
