@@ -24,9 +24,14 @@ export default class extends Controller {
   static targets = ["game"]
 
   async connect() {
-    // Pull any existing save before EmulatorJS boots so we can hand it
-    // straight to the in-emulator FS once the core is ready.
-    const existingSave = await this._fetchSave()
+    // Diagnostic mode: SRAM injection is currently disabled to test whether
+    // EmulatorJS's built-in IndexedDB persistence handles save round-trip on
+    // its own. If saves persist locally and EJS_onSaveSave fires for our
+    // server backup, the previous _injectExistingSave path is the corruption
+    // source (likely a melonDS state mismatch when we writeFile after init).
+    // Re-enable injection once we identify the right hook.
+    //
+    // const existingSave = await this._fetchSave()
 
     window.EJS_player = "#" + this.gameTarget.id
     window.EJS_gameUrl = this.romUrlValue
@@ -58,10 +63,14 @@ export default class extends Controller {
       if (event && event.save) this._uploadSave(event.save)
     }
 
-    // EJS_ready fires once the core is initialized. That's our chance to
-    // inject the previous SRAM into the in-emulator filesystem.
-    if (existingSave) {
-      window.EJS_ready = () => this._injectExistingSave(existingSave)
+    // EJS_ready injection disabled while we diagnose the load mechanism.
+    // EmulatorJS's IndexedDB will handle local SRAM persistence. The server
+    // PATCH (via EJS_onSaveSave above) keeps a backup of any new saves.
+    // if (existingSave) {
+    //   window.EJS_ready = () => this._injectExistingSave(existingSave)
+    // }
+    window.EJS_ready = () => {
+      console.log("Emulator: EJS_ready fired", { hasEmulator: !!window.EJS_emulator })
     }
 
     const script = document.createElement("script")
