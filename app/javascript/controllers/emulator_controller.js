@@ -3,11 +3,14 @@
 // EmulatorJS configures itself via `window.EJS_*` globals that loader.js
 // reads when it boots. This controller's job:
 //   1. Fetch any existing SRAM for this player's session.
-//   2. Set the EJS_* globals (rom URL, core, pathtodata, save callback).
-//   3. On EJS_ready, write the existing SRAM into the emulator's virtual
+//   2. Set the EJS_* globals (rom URL, core, pathtodata, save callbacks,
+//      auto-save interval default).
+//   3. On EJS_ready, register the in-game-save listener (saveSaveFiles)
+//      and then write the server's SRAM into the emulator's virtual
 //      filesystem so the player resumes where they left off.
 //   4. Inject loader.js into the page.
-//   5. When EmulatorJS fires saveSave (from the in-game / button save),
+//   5. When EmulatorJS fires saveSaveFiles (from the auto-save interval,
+//      exit, or netplay-pause) or saveSave (manual "Save File" button),
 //      PATCH the SRAM bytes back to the server.
 import { Controller } from "@hotwired/stimulus"
 
@@ -24,14 +27,17 @@ export default class extends Controller {
   static targets = ["game"]
 
   async connect() {
-    // Diagnostic mode: SRAM injection is currently disabled to test whether
-    // EmulatorJS's built-in IndexedDB persistence handles save round-trip on
-    // its own. If saves persist locally and EJS_onSaveSave fires for our
-    // server backup, the previous _injectExistingSave path is the corruption
-    // source (likely a melonDS state mismatch when we writeFile after init).
-    // Re-enable injection once we identify the right hook.
-    //
-    // const existingSave = await this._fetchSave()
+    // Server is the source of truth on load. IDBFS is a local convenience
+    // cache; if both have data, we inject the server copy into MEMFS inside
+    // EJS_ready so melonDS reloads from it.
+    const existingSave = await this._fetchSave()
+
+    // Set the auto-save interval default BEFORE loader.js boots. loader.js
+    // reads window.EJS_defaultOptions synchronously and feeds it through
+    // config.defaultOptions → menu UI's defaultOption path, which sets up
+    // the internal save-save-interval setInterval. localStorage overrides
+    // this for returning users who've changed it via the in-game menu.
+    window.EJS_defaultOptions = { "save-save-interval": "30" }
 
     window.EJS_player = "#" + this.gameTarget.id
     window.EJS_gameUrl = this.romUrlValue
@@ -54,23 +60,33 @@ export default class extends Controller {
       if (tuples.length > 0) window.EJS_cheats = tuples
     }
 
-    // EmulatorJS fires "saveSave" with { screenshot, format, save }
-    // whenever the player triggers an SRAM save (the in-game Save menu
-    // writes to SRAM, then the user hits the "Save File" button in the
-    // EmulatorJS UI). The presence of this handler suppresses the default
-    // download dialog.
+    // EmulatorJS fires "saveSave" with { screenshot, format, save } when the
+    // user clicks the EmulatorJS UI's manual "Save File" button. The
+    // presence of this handler also suppresses the default download dialog.
+    // Belt-and-suspenders: the saveSaveFiles listener registered in
+    // EJS_ready covers in-game saves and the auto-save interval.
     window.EJS_onSaveSave = (event) => {
       if (event && event.save) this._uploadSave(event.save)
     }
 
-    // EJS_ready injection disabled while we diagnose the load mechanism.
-    // EmulatorJS's IndexedDB will handle local SRAM persistence. The server
-    // PATCH (via EJS_onSaveSave above) keeps a backup of any new saves.
-    // if (existingSave) {
-    //   window.EJS_ready = () => this._injectExistingSave(existingSave)
-    // }
+    // EJS_ready fires once after window.EJS_emulator is constructed. This
+    // is the earliest safe point to register listeners on the emulator
+    // instance and to write into MEMFS via gameManager.
     window.EJS_ready = () => {
-      console.log("Emulator: EJS_ready fired", { hasEmulator: !!window.EJS_emulator })
+      // Register the saveSaveFiles listener BEFORE injecting the existing
+      // save. _injectExistingSave calls gm.loadSaveFiles(), which can race
+      // with an auto-save tick; if the listener weren't already attached
+      // we'd miss the first event.
+      if (window.EJS_emulator) {
+        window.EJS_emulator.on("saveSaveFiles", (bytes) => this._uploadSave(bytes))
+      }
+      if (existingSave) {
+        this._injectExistingSave(existingSave)
+      }
+      console.log("Emulator: hooks attached", {
+        hasExistingSave: !!existingSave,
+        hasEmulator: !!window.EJS_emulator
+      })
     }
 
     const script = document.createElement("script")
@@ -92,6 +108,7 @@ export default class extends Controller {
     window.EJS_onSaveSave = undefined
     window.EJS_ready = undefined
     window.EJS_cheats = undefined
+    window.EJS_defaultOptions = undefined
     if (this._loaderScript && this._loaderScript.parentNode) {
       this._loaderScript.parentNode.removeChild(this._loaderScript)
     }
@@ -142,6 +159,10 @@ export default class extends Controller {
   }
 
   async _uploadSave(saveBytes) {
+    // Skip null / 0-byte payloads. getSaveFile(false) returns null pre-first-
+    // save, and an empty SRAM PATCH would clobber an existing real save on
+    // the server.
+    if (!saveBytes || saveBytes.byteLength === 0) return
     const blob = saveBytes instanceof Uint8Array
       ? saveBytes
       : new Uint8Array(saveBytes)

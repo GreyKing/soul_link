@@ -11,7 +11,7 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** *None — awaiting next brief.*
+**Active step:** Step 2 — Auto-Persist In-Game Saves to Server. Awaiting review.
 **Last committed:** `62be21e` — 2026-04-29 (Step 1: SRAM Phase 1)
 **Pending deploy:** NO
 
@@ -21,6 +21,25 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 2 — Auto-Persist In-Game Saves to Server — 2026-04-29
+**Status:** Awaiting review
+
+**Files modified:**
+- `app/javascript/controllers/emulator_controller.js` — re-enabled `_fetchSave()` on `connect()`; added `window.EJS_defaultOptions = { "save-save-interval": "30" }` before loader.js boot; replaced diagnostic `EJS_ready` with: register `saveSaveFiles` listener first, then inject existing save if present, then log `"Emulator: hooks attached"` once with `hasExistingSave`/`hasEmulator` flags; added null/0-byte guard at top of `_uploadSave`; cleared `EJS_defaultOptions` in `disconnect()`. `EJS_onSaveSave` retained (manual export). `_injectExistingSave` body untouched.
+
+**Key decisions:**
+- Centralized null/0-byte guard inside `_uploadSave` so both call paths (`EJS_onSaveSave` event payload, `saveSaveFiles` direct bytes) share it. Brief asked for "defensive layering"; placing the guard in the function-under-call makes it impossible to bypass.
+- Listener registration ordered BEFORE inject inside `EJS_ready` per the brief's race-condition warning (`gm.loadSaveFiles()` could trigger an auto-save tick between attach points).
+- `EJS_defaultOptions` set FIRST in `connect()`, before `EJS_player`/`EJS_gameUrl`/etc. The brief said "before any EJS_* global is set"; obeyed literally to keep the ordering guarantee tight in case loader.js evolves to read globals at any point during script-tag append.
+
+**Tests:** 255/255 pass. No backend change; suite count unchanged from Step 1.
+
+**Lint:** No new Ruby. JS controller has no lint configured (Importmap project, no Node toolchain). Pre-existing rubocop offenses (133 across 127 files) are unrelated; documented previously in Known Gaps.
+
+**Review:** *Pending.*
+
+---
 
 ### Step 1 — SRAM Phase 1: Trainer Block Parsing — 2026-04-29
 **Status:** Complete, committed `62be21e`
