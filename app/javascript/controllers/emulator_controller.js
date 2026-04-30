@@ -2,7 +2,7 @@
 //
 // EmulatorJS configures itself via `window.EJS_*` globals that loader.js
 // reads when it boots. This controller's job:
-//   1. Fetch any existing SRAM for this player's session.
+//   1. Fetch the existing active-slot SRAM for this player's session.
 //   2. Set the EJS_* globals (rom URL, core, pathtodata, save callbacks,
 //      auto-save interval default).
 //   3. On EJS_ready, register the in-game-save listener (saveSaveFiles)
@@ -11,13 +11,17 @@
 //   4. Inject loader.js into the page.
 //   5. When EmulatorJS fires saveSaveFiles (from the auto-save interval,
 //      exit, or netplay-pause) or saveSave (manual "Save File" button),
-//      PATCH the SRAM bytes back to the server.
+//      POST the SRAM bytes to /emulator/save_slots — the server picks the
+//      first empty slot OR returns 409 if all 5 are full, in which case we
+//      dispatch a window event that the slot column listens for and
+//      offers an overwrite click.
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static values = {
     romUrl: String,
     saveDataUrl: String,
+    saveSlotsUrl: String,
     firmwareUrl: String,
     csrf: String,
     core: String,
@@ -95,7 +99,7 @@ export default class extends Controller {
     // EmulatorJS fires "saveSave" with { screenshot, format, save } when the
     // user clicks the EmulatorJS UI's manual "Save File" button. The mere
     // presence of this handler suppresses the default download dialog —
-    // so we have to do the download ourselves on top of the server PATCH.
+    // so we have to do the download ourselves on top of the server POST.
     // Belt-and-suspenders: the saveSaveFiles listener registered in
     // EJS_ready covers in-game saves and the auto-save interval.
     window.EJS_onSaveSave = (event) => {
@@ -215,15 +219,14 @@ export default class extends Controller {
 
   async _uploadSave(saveBytes) {
     // Skip null / 0-byte payloads. getSaveFile(false) returns null pre-first-
-    // save, and an empty SRAM PATCH would clobber an existing real save on
-    // the server.
+    // save, and an empty SRAM POST would land an empty slot on the server.
     if (!saveBytes || saveBytes.byteLength === 0) return
     const blob = saveBytes instanceof Uint8Array
       ? saveBytes
       : new Uint8Array(saveBytes)
     try {
-      const res = await fetch(this.saveDataUrlValue, {
-        method: "PATCH",
+      const res = await fetch(this.saveSlotsUrlValue, {
+        method: "POST",
         headers: {
           "Content-Type": "application/octet-stream",
           "X-CSRF-Token": this.csrfValue
@@ -231,11 +234,22 @@ export default class extends Controller {
         credentials: "same-origin",
         body: blob
       })
-      if (!res.ok) {
-        console.error("Emulator: failed to upload save:", res.status)
+      if (res.status === 409) {
+        // All 5 slots full. The slot column listens for this event and
+        // arms each card as a click-to-overwrite target.
+        let payload = null
+        try { payload = await res.json() } catch (_) { /* no body */ }
+        window.dispatchEvent(new CustomEvent("save-slots:overwrite-needed", { detail: payload }))
+        return
       }
+      if (!res.ok) {
+        console.error("Emulator: save_slots POST failed:", res.status)
+        return
+      }
+      // 201 Created — refresh the slot column.
+      window.dispatchEvent(new CustomEvent("save-slots:saved"))
     } catch (e) {
-      console.error("Emulator: error uploading save:", e)
+      console.error("Emulator: error saving slot:", e)
     }
   }
 }

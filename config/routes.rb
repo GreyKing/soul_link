@@ -46,9 +46,14 @@ Rails.application.routes.draw do
   resource :emulator, only: [ :show ], controller: "emulator" do
     get    :rom
     get    :save_data
-    patch  :save_data
-    delete :save_data
+    delete :save_data         # wipes ALL slots for the player's session
     get    :firmware
+    resources :save_slots, only: [ :index, :create, :update, :destroy ], param: :slot_number do
+      member do
+        post :restore
+        get  :download
+      end
+    end
   end
 
   # Interactive region map

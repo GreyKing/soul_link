@@ -1,8 +1,9 @@
 require "test_helper"
 
 class SoulLinkEmulatorSessionTest < ActiveSupport::TestCase
-  # `assert_enqueued_with` / `assert_no_enqueued_jobs` come from this helper.
-  # Needed for the after_update_commit callback tests below.
+  # `assert_no_enqueued_jobs` comes from this helper. The parse-on-save
+  # callback used to live here but moved to SoulLinkEmulatorSaveSlot when
+  # save_data was migrated off this model in the Save Slots step.
   include ActiveJob::TestHelper
 
   # Named Discord user IDs used as claim targets. Keep them as recognizable
@@ -209,15 +210,11 @@ class SoulLinkEmulatorSessionTest < ActiveSupport::TestCase
   # the regenerate channel action reclaims disk via `destroy_all`). It must
   # be defensive against missing files and nil rom_path — both happen in
   # practice (cleanup rake task already nilled the path; or manual cleanup).
-  #
-  # Tempfiles are created under `Rails.root.join("tmp")` so the relative
-  # `rom_path` round-trips through the model's `Rails.root.join(rom_path)`
-  # back to the real on-disk file. No writes to `storage/roms/`.
 
   test "after_destroy deletes the on-disk rom file" do
     tmp_dir = Rails.root.join("tmp", "test_emu_session_destroy")
     FileUtils.mkdir_p(tmp_dir)
-    file = Tempfile.create(["rom", ".nds"], tmp_dir)
+    file = Tempfile.create([ "rom", ".nds" ], tmp_dir)
     file.close
     rel_path = Pathname.new(file.path).relative_path_from(Rails.root).to_s
 
@@ -250,12 +247,11 @@ class SoulLinkEmulatorSessionTest < ActiveSupport::TestCase
   # The widened rescue catches *any* StandardError from the underlying delete
   # (EACCES from a permission-locked dir, EBUSY from a locked file, an NFS
   # timeout, etc.) so a transient disk problem can never roll back the AR
-  # delete and leave the cascade in a half-deleted state. The original test
-  # above covers ENOENT specifically; this one covers the broader contract.
+  # delete and leave the cascade in a half-deleted state.
   test "after_destroy survives a Pathname#delete raising EACCES and logs it" do
     tmp_dir = Rails.root.join("tmp", "test_emu_session_eacces")
     FileUtils.mkdir_p(tmp_dir)
-    file = Tempfile.create(["rom", ".nds"], tmp_dir)
+    file = Tempfile.create([ "rom", ".nds" ], tmp_dir)
     file.close
     rel_path = Pathname.new(file.path).relative_path_from(Rails.root).to_s
 
@@ -282,142 +278,45 @@ class SoulLinkEmulatorSessionTest < ActiveSupport::TestCase
     FileUtils.rm_rf(tmp_dir) if tmp_dir
   end
 
-  # --- save_data gzip coder -----------------------------------------------
+  # --- save_slots association + active_slot --------------------------------
   #
-  # Pokemon Platinum SRAM is ~512KB raw and mostly zero-padded; we gzip on
-  # write and gunzip on read so the on-disk MEDIUMBLOB stays small. The
-  # coder must round-trip exact bytes (binary equality) and handle nil and
-  # empty values cleanly so factory defaults and fresh sessions don't blow
-  # up on save.
+  # save_data + parsed_* moved off the session in the Save Slots step. The
+  # session now has up to 5 SoulLinkEmulatorSaveSlot rows (1..5) and a
+  # nullable `active_save_slot` pointer that resolves to one of them.
 
-  test "save_data round-trips a 200KB random byte string exactly" do
-    payload = SecureRandom.random_bytes(200_000)
-    session = create(:soul_link_emulator_session, soul_link_run: @run, save_data: payload)
+  test "has_many :save_slots returns the session's slots" do
+    s1 = create(:soul_link_emulator_save_slot, soul_link_emulator_session: @claimed, slot_number: 1)
+    s2 = create(:soul_link_emulator_save_slot, soul_link_emulator_session: @claimed, slot_number: 2)
+    other = create(:soul_link_emulator_save_slot, soul_link_emulator_session: @unclaimed, slot_number: 1)
 
-    reloaded = SoulLinkEmulatorSession.find(session.id)
-    assert_equal payload.bytesize, reloaded.save_data.bytesize
-    assert_equal payload, reloaded.save_data.b,
-      "decompressed bytes must equal original input"
+    assert_includes @claimed.save_slots, s1
+    assert_includes @claimed.save_slots, s2
+    assert_not_includes @claimed.save_slots, other
   end
 
-  test "save_data is stored compressed on disk (smaller than raw input)" do
-    # Use a highly compressible payload that mimics SRAM: ~512KB of mostly
-    # zero bytes. gzip should pull this down by 95%+.
-    payload = ("\x00".b * 500_000) + SecureRandom.random_bytes(12_000)
-    session = create(:soul_link_emulator_session, soul_link_run: @run, save_data: payload)
-
-    raw_on_disk = session.attributes_before_type_cast["save_data"]
-    raw_bytes = raw_on_disk.is_a?(String) ? raw_on_disk : raw_on_disk.to_s
-    assert raw_bytes.bytesize < payload.bytesize,
-      "expected gzipped on-disk bytes (#{raw_bytes.bytesize}) to be smaller than raw input (#{payload.bytesize})"
-    # Ratio sanity check: highly compressible padding should compress by at
-    # least 50%. Real Platinum saves do far better — ~85-95% — but we keep
-    # the threshold conservative for cross-platform zlib variance.
-    assert raw_bytes.bytesize < (payload.bytesize / 2),
-      "expected at least 50% compression on highly-redundant SRAM-like payload " \
-      "(raw=#{payload.bytesize}, compressed=#{raw_bytes.bytesize})"
-    # On-disk bytes start with the gzip magic header.
-    assert raw_bytes.b.start_with?("\x1f\x8b".b),
-      "on-disk bytes should start with gzip magic header"
+  test "destroying a session destroys its save_slots (dependent: :destroy)" do
+    slot = create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: @claimed, slot_number: 1)
+    @claimed.destroy
+    assert_nil SoulLinkEmulatorSaveSlot.find_by(id: slot.id)
   end
 
-  test "save_data nil round-trips as nil" do
-    session = create(:soul_link_emulator_session, soul_link_run: @run, save_data: nil)
-    reloaded = SoulLinkEmulatorSession.find(session.id)
-    assert_nil reloaded.save_data
+  test "active_slot returns the save_slot whose slot_number matches active_save_slot" do
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: @claimed, slot_number: 1)
+    s2 = create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: @claimed, slot_number: 2)
+    @claimed.update!(active_save_slot: 2)
+    assert_equal s2, @claimed.active_slot
   end
 
-  test "save_data empty string round-trips as empty (no gzip overhead written)" do
-    session = create(:soul_link_emulator_session, soul_link_run: @run, save_data: "")
-    reloaded = SoulLinkEmulatorSession.find(session.id)
-    # Coder returns empty bytes for empty input — preserves the legacy
-    # contract that GET save_data returns 204 when blank.
-    assert_equal "", reloaded.save_data.to_s
-    raw = reloaded.attributes_before_type_cast["save_data"]
-    raw_bytes = raw.is_a?(String) ? raw : raw.to_s
-    assert raw_bytes.bytesize == 0 || !raw_bytes.b.start_with?("\x1f\x8b".b),
-      "empty input should not produce a gzip header on disk"
+  test "active_slot returns nil when active_save_slot is nil" do
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: @claimed, slot_number: 1)
+    @claimed.update!(active_save_slot: nil)
+    assert_nil @claimed.active_slot
   end
 
-  # Defensive: if a row from before this coder shipped contains plaintext
-  # bytes, the loader passes them through unchanged. Once verified that all
-  # production rows are gzipped, this branch can be removed.
-  test "save_data load passes through plaintext bytes lacking gzip magic" do
-    plaintext = "LEGACY_PLAINTEXT_SAVE_BYTES_\x00\x01\x02".b
-    # Simulate a legacy row by writing directly through update_columns,
-    # which bypasses the serialization coder.
-    session = create(:soul_link_emulator_session, soul_link_run: @run)
-    session.update_columns(save_data: plaintext)
-
-    reloaded = SoulLinkEmulatorSession.find(session.id)
-    assert_equal plaintext, reloaded.save_data.b,
-      "plaintext legacy values must pass through unchanged"
-  end
-
-  # --- after_update_commit :enqueue_parse_if_save_changed -----------------
-  #
-  # Every save_data PATCH should produce a parse job. Other column updates
-  # (status flips, rom_path swaps, claim transitions) must NOT enqueue —
-  # the parser is expensive enough on a 512KB blob that we don't want it
-  # firing on unrelated writes. Updating save_data to a blank value also
-  # must not enqueue, since the parser will short-circuit on it.
-
-  test "updating save_data enqueues ParseSaveDataJob" do
-    session = create(:soul_link_emulator_session, :ready, soul_link_run: @run)
-
-    assert_enqueued_with(job: SoulLink::ParseSaveDataJob) do
-      session.update!(save_data: ("\x00".b * 0x80000))
-    end
-  end
-
-  test "updating save_data to a different value enqueues ParseSaveDataJob" do
-    session = create(:soul_link_emulator_session, :ready, soul_link_run: @run, save_data: "\x00".b * 100)
-
-    assert_enqueued_with(job: SoulLink::ParseSaveDataJob) do
-      session.update!(save_data: "\xFF".b * 100)
-    end
-  end
-
-  test "updating other columns does NOT enqueue ParseSaveDataJob" do
-    session = create(:soul_link_emulator_session, :ready, soul_link_run: @run)
-
-    assert_no_enqueued_jobs(only: SoulLink::ParseSaveDataJob) do
-      session.update!(status: "failed", error_message: "x")
-    end
-
-    assert_no_enqueued_jobs(only: SoulLink::ParseSaveDataJob) do
-      session.update!(rom_path: "storage/roms/randomized/test/other.nds")
-    end
-
-    assert_no_enqueued_jobs(only: SoulLink::ParseSaveDataJob) do
-      session.update!(discord_user_id: 12345)
-    end
-  end
-
-  test "setting save_data to nil does NOT enqueue ParseSaveDataJob" do
-    session = create(:soul_link_emulator_session, :ready, soul_link_run: @run, save_data: "\x00".b * 100)
-
-    assert_no_enqueued_jobs(only: SoulLink::ParseSaveDataJob) do
-      session.update!(save_data: nil)
-    end
-  end
-
-  test "setting save_data to empty string does NOT enqueue ParseSaveDataJob" do
-    session = create(:soul_link_emulator_session, :ready, soul_link_run: @run, save_data: "\x00".b * 100)
-
-    assert_no_enqueued_jobs(only: SoulLink::ParseSaveDataJob) do
-      session.update!(save_data: "")
-    end
-  end
-
-  # update_columns bypasses the callback — this is what the job uses to
-  # write parsed_* fields without re-triggering a parse.
-  test "update_columns on save_data does NOT enqueue ParseSaveDataJob" do
-    session = create(:soul_link_emulator_session, :ready, soul_link_run: @run)
-
-    assert_no_enqueued_jobs(only: SoulLink::ParseSaveDataJob) do
-      session.update_columns(parsed_trainer_name: "Lyra", parsed_at: Time.current)
-    end
+  test "active_slot returns nil when active_save_slot points at a non-existent slot_number" do
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: @claimed, slot_number: 1)
+    @claimed.update!(active_save_slot: 4)
+    assert_nil @claimed.active_slot
   end
 end
 

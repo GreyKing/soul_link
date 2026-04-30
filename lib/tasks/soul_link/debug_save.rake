@@ -1,9 +1,9 @@
 namespace :soul_link do
-  desc "Re-run ParseSaveDataJob for every session that has save_data — use after a parser offset fix to refresh the parsed_* cache columns without waiting for the next in-game save"
+  desc "Re-run ParseSaveDataJob for every save slot — use after a parser offset fix to refresh the parsed_* cache columns without waiting for the next in-game save"
   task reparse_all_saves: :environment do
-    sessions = SoulLinkEmulatorSession.where.not(save_data: nil).order(:id)
-    if sessions.empty?
-      puts "No sessions with save_data."
+    slots = SoulLinkEmulatorSaveSlot.where.not(save_data: nil).order(:soul_link_emulator_session_id, :slot_number)
+    if slots.empty?
+      puts "No slots with save_data."
       next
     end
 
@@ -12,28 +12,28 @@ namespace :soul_link do
     # perform_later, fast-finishing jobs win the race and slow ones get
     # killed mid-flight. Synchronous execution in the main thread is the
     # reliable path for a one-shot batch reparse.
-    sessions.each do |s|
-      SoulLink::ParseSaveDataJob.perform_now(s)
-      puts "Reparsed session id=#{s.id} player=#{s.discord_user_id}"
+    slots.each do |slot|
+      SoulLink::ParseSaveDataJob.perform_now(slot)
+      puts "Reparsed slot id=#{slot.id} session=#{slot.soul_link_emulator_session_id} slot_number=#{slot.slot_number}"
     end
-    puts "Reparsed #{sessions.size} session(s)."
+    puts "Reparsed #{slots.size} slot(s)."
   end
 
-  desc "Hex-dump the trainer-block region of every session's SRAM (for parser offset debugging)"
+  desc "Hex-dump the trainer-block region of every slot's SRAM (for parser offset debugging)"
   task debug_save_offsets: :environment do
-    sessions = SoulLinkEmulatorSession.where.not(save_data: nil).order(:id)
-    if sessions.empty?
-      puts "No sessions with save_data."
+    slots = SoulLinkEmulatorSaveSlot.where.not(save_data: nil).order(:soul_link_emulator_session_id, :slot_number)
+    if slots.empty?
+      puts "No slots with save_data."
       next
     end
 
-    sessions.each do |s|
+    slots.each do |s|
       bytes = s.save_data
       next unless bytes.is_a?(String)
 
       size_note = bytes.bytesize == 0x80000 ? "" : " (UNEXPECTED — should be 0x80000)"
       puts "=" * 70
-      puts "Session id=#{s.id} player=#{s.discord_user_id} bytes=0x#{bytes.bytesize.to_s(16)}#{size_note}"
+      puts "Slot id=#{s.id} session=#{s.soul_link_emulator_session_id} slot=#{s.slot_number} bytes=0x#{bytes.bytesize.to_s(16)}#{size_note}"
 
       [ 0x0000, 0x40000 ].each do |slot_off|
         slot = bytes.byteslice(slot_off, 0x40000)

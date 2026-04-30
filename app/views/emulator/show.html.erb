@@ -52,18 +52,23 @@
   </div>
 
 <% else %>
-  <%# Ready state: emulator stage + run roster sidebar in a 2-col grid.
-      grid-template-columns: minmax(0, 1fr) 280px keeps the sidebar on the
-      right at all desktop sizes — flex-wrap previously dropped it below
-      the canvas because the canvas wrapper grew unbounded. min-width: 0
-      on the main column allows the canvas to shrink under content
-      pressure (standard grid/flex shrink unlock). %>
-  <div style="display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start;">
+  <%# Ready state: 3-column grid — save-slots sidebar on the LEFT, canvas
+      in the middle, run roster sidebar on the RIGHT.
+      grid-template-columns: 280px minmax(0, 1fr) 280px keeps both sidebars
+      pinned at fixed widths while the canvas grows/shrinks fluidly.
+      min-width: 0 on the main column allows the canvas to shrink under
+      content pressure (standard grid/flex shrink unlock). %>
+  <div style="display: grid; grid-template-columns: 280px minmax(0, 1fr) 280px; gap: 16px; align-items: start;">
+    <aside>
+      <%= render "save_slots_sidebar" %>
+    </aside>
+
     <main style="min-width: 0;">
       <div class="gb-card" style="padding: 12px;"
            data-controller="emulator"
            data-emulator-rom-url-value="<%= rom_emulator_path %>"
            data-emulator-save-data-url-value="<%= save_data_emulator_path %>"
+           data-emulator-save-slots-url-value="<%= emulator_save_slots_path %>"
            data-emulator-firmware-url-value="<%= firmware_emulator_path %>"
            data-emulator-csrf-value="<%= form_authenticity_token %>"
            data-emulator-core-value="<%= EmulatorController::EMULATOR_CORE %>"

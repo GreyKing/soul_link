@@ -1,11 +1,11 @@
 module SoulLink
-  # Parses the SRAM blob attached to a SoulLinkEmulatorSession (after every
-  # save_data PATCH commit) and persists the surfaced trainer fields back
-  # onto the row so the emulator-page sidebar can render them without doing
-  # parse work on every request.
+  # Parses the SRAM blob attached to a SoulLinkEmulatorSaveSlot (after every
+  # slot create/update commit) and persists the surfaced trainer fields back
+  # onto the slot row so the emulator-page slot column can render them
+  # without doing parse work on every request.
   #
   # On failure the parsed_* fields are nil-ed out (and parsed_at is still
-  # set). The sidebar renders "—" — that's the documented :failed path.
+  # set). The slot card renders "—" — that's the documented :failed path.
   #
   # **Critical**: writes via `update_columns` so the after_update_commit
   # callback that enqueued *this* job does not refire and create an
@@ -14,11 +14,11 @@ module SoulLink
   class ParseSaveDataJob < ApplicationJob
     queue_as :default
 
-    def perform(session)
-      return if session.nil?
-      return if session.save_data.blank?
+    def perform(slot)
+      return if slot.nil?
+      return if slot.save_data.blank?
 
-      result = SoulLink::SaveParser.parse(session.save_data)
+      result = SoulLink::SaveParser.parse(slot.save_data)
 
       attrs = if result
         {
@@ -31,7 +31,7 @@ module SoulLink
         }
       else
         # Parse failed (corrupt SRAM, both slots invalid, etc.). Write nils
-        # plus parsed_at so the sidebar renders "—" and we don't loop.
+        # plus parsed_at so the slot card renders "—" and we don't loop.
         {
           parsed_trainer_name: nil,
           parsed_money:        nil,
@@ -42,7 +42,7 @@ module SoulLink
         }
       end
 
-      session.update_columns(attrs)
+      slot.update_columns(attrs)
     end
   end
 end

@@ -26,11 +26,6 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to login_path
   end
 
-  test "save_data PATCH requires login" do
-    patch save_data_emulator_path
-    assert_redirected_to login_path
-  end
-
   test "save_data DELETE requires login" do
     delete save_data_emulator_path
     assert_redirected_to login_path
@@ -149,9 +144,34 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_match(/data-controller="emulator"/, response.body)
     assert_match(/data-emulator-rom-url-value=/, response.body)
     assert_match(/data-emulator-save-data-url-value=/, response.body)
+    assert_match(/data-emulator-save-slots-url-value=/, response.body)
     assert_match(/data-emulator-core-value="melonds"/, response.body)
     assert_match(/data-emulator-pathtodata-value="\/emulatorjs\/data\/"/, response.body)
     assert_match(/data-emulator-cheats-value=/, response.body)
+  end
+
+  test "show renders save slots sidebar when session is ready" do
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+    assert_match(/SAVE SLOTS/, response.body)
+    assert_match(/data-controller="save-slots"/, response.body)
+    # 5 slot cards rendered, all empty.
+    (1..5).each do |n|
+      assert_match Regexp.new(Regexp.escape("SLOT #{n}")), response.body
+    end
+  end
+
+  test "show renders ACTIVE badge on the slot matching active_save_slot" do
+    sess = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: sess, slot_number: 2)
+    sess.update!(active_save_slot: 2)
+
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+    assert_match(/>ACTIVE</, response.body)
   end
 
   # --- show: run roster sidebar ------------------------------------------
@@ -166,14 +186,11 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     get emulator_path
     assert_response :success
 
-    # All four sessions appear (verified via their unique seeds).
     [ s1, s2, s3, s4 ].each do |s|
       assert_match Regexp.new(Regexp.escape(s.seed)), response.body,
         "expected seed #{s.seed} in roster body"
     end
 
-    # Cards must render in id order — assert seeds appear in ascending-id order
-    # in the response body. Sort by id (creation order), then check positions.
     ordered = [ s1, s2, s3, s4 ].sort_by(&:id)
     positions = ordered.map { |s| response.body.index(s.seed) }
     assert positions.all?, "all seeds must be present in the body"
@@ -207,7 +224,6 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     get emulator_path
     assert_response :success
     assert_no_match(/RUN ROSTER/, response.body)
-    # Defensive: the YOU badge should not leak into non-ready states.
     assert_no_match(/>YOU</, response.body)
   end
 
@@ -221,36 +237,32 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     get emulator_path
     assert_response :success
 
-    # Section header.
     assert_match(/RUN ROSTER/, response.body)
-    # Current player's display name (from settings.yml: GREY → "Grey").
     assert_match(/Grey/, response.body)
-    # YOU badge for the current player's card.
     assert_match(/>YOU</, response.body)
-    # At least one Unclaimed entry (we created two unclaimed sessions).
     assert_match(/Unclaimed/, response.body)
   end
 
-  # --- show: parsed save fields in roster cards --------------------------
+  # --- show: parsed save fields in roster cards (other players) ----------
   #
-  # Phase 1 SRAM parser populates parsed_* columns asynchronously via
-  # SoulLink::ParseSaveDataJob; the sidebar renders them when present and
-  # gracefully omits the line when nil.
+  # Phase 1 SRAM parser populates parsed_* columns asynchronously on the
+  # active save slot; the run-roster sidebar renders OTHER players' parsed
+  # info (your own parsed info shows in the slot column on the left
+  # instead).
 
-  test "show roster renders parsed_trainer_name, money, play time, and badges when present" do
-    create(:soul_link_emulator_session,
-           :ready,
-           soul_link_run: @run,
-           discord_user_id: GREY)
-    create(:soul_link_emulator_session,
-           :ready,
-           soul_link_run: @run,
-           discord_user_id: ARATY,
+  test "show roster renders parsed_trainer_name, money, play time, and badges for OTHER players" do
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    other = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: ARATY)
+    create(:soul_link_emulator_save_slot,
+           soul_link_emulator_session: other,
+           slot_number: 1,
+           save_data: "EXISTING".b,
            parsed_trainer_name: "Lyra",
            parsed_money: 12_345,
            parsed_play_seconds: 5 * 3600 + 30 * 60,
            parsed_badges: 4,
            parsed_at: Time.current)
+    other.update!(active_save_slot: 1)
     create(:soul_link_emulator_session, :ready, soul_link_run: @run)
     create(:soul_link_emulator_session, :ready, soul_link_run: @run)
 
@@ -264,10 +276,8 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Badges:\s*4\s*\/\s*8/, response.body)
   end
 
-  test "show roster omits parsed_* lines when fields are nil" do
+  test "show roster omits parsed_* lines when no slot has parsed data" do
     create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
-    # All other sessions have no parsed data — sidebar should still render
-    # without crashing, and should not show stale numbers.
     create(:soul_link_emulator_session, :ready, soul_link_run: @run)
     create(:soul_link_emulator_session, :ready, soul_link_run: @run)
     create(:soul_link_emulator_session, :ready, soul_link_run: @run)
@@ -277,28 +287,26 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
 
     assert_match(/RUN ROSTER/, response.body)
-    # No "In-game:" labels should appear because no session has parsed_trainer_name.
     assert_no_match(/In-game:/, response.body)
-    # No "Time played:" line.
     assert_no_match(/Time played:/, response.body)
-    # No "Money:" line.
     assert_no_match(/Money:/, response.body)
-    # No badges line either (we gate it on parsed_at to avoid showing 0/8 spam
-    # before any parse has occurred).
-    assert_no_match(/Badges:/, response.body)
+    # The slot column header "Money:" line lives only inside FILLED slot
+    # cards (gated on parsed_money). With all slots empty, nothing shows.
   end
 
-  test "show roster shows '0 / 8' badges for a parsed session with zero badges" do
+  test "show roster shows '0 / 8' badges for a parsed other-player session with zero badges" do
     create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
-    create(:soul_link_emulator_session,
-           :ready,
-           soul_link_run: @run,
-           discord_user_id: ARATY,
+    other = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: ARATY)
+    create(:soul_link_emulator_save_slot,
+           soul_link_emulator_session: other,
+           slot_number: 1,
+           save_data: "EXISTING".b,
            parsed_trainer_name: "Bob",
            parsed_money: 0,
            parsed_play_seconds: 0,
            parsed_badges: 0,
            parsed_at: Time.current)
+    other.update!(active_save_slot: 1)
     create(:soul_link_emulator_session, :ready, soul_link_run: @run)
     create(:soul_link_emulator_session, :ready, soul_link_run: @run)
 
@@ -320,7 +328,6 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
       get emulator_path
     end
     assert_response :success
-    # `[].to_json` HTML-escapes to `[]` inside the attribute.
     assert_match(/data-emulator-cheats-value="\[\]"/, response.body)
   end
 
@@ -336,8 +343,6 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_match(/data-emulator-cheats-value=/, response.body)
     assert_match(/Walk Through Walls/, response.body)
-    # AR codes contain spaces; ERB JSON escaping leaves them as-is. Probe the
-    # opcode prefix so we know the code body landed in the attribute.
     assert_match(/02000000/, response.body)
   end
 
@@ -378,9 +383,6 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     losing = create(:soul_link_emulator_session, :ready, soul_link_run: @run)
     winning = create(:soul_link_emulator_session, :ready, soul_link_run: @run)
 
-    # Stub `claim!` so the first call (against `losing`) raises and the
-    # second call (against `winning`) succeeds. Use a counter so we don't
-    # depend on object identity (set_session re-queries between attempts).
     call_count = 0
     SoulLinkEmulatorSession.class_eval do
       alias_method :__orig_claim!, :claim!
@@ -405,10 +407,11 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
       end
     end
 
-    # Exactly one session should now be claimed by the player.
     claimed_count = @run.soul_link_emulator_sessions.where(discord_user_id: GREY).count
     assert_equal 1, claimed_count
     assert_equal 2, call_count, "expected exactly two claim! attempts (one losing, one winning retry)"
+    # Sanity: both `losing` and `winning` exist; one of them got claimed.
+    assert [ losing.reload.discord_user_id, winning.reload.discord_user_id ].include?(GREY)
   end
 
   # --- rom ----------------------------------------------------------------
@@ -427,10 +430,6 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: ARATY)
     login_as(GREY)
     get rom_emulator_path
-    # set_session won't auto-claim on rom action? Actually it will — same
-    # before_action. The player gets ARATY's row claimed first, then we
-    # check: ARATY's already claimed, so unclaimed.first is nil, @session
-    # is nil, head :not_found.
     assert_response :not_found
   end
 
@@ -467,37 +466,51 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # --- save_data GET ------------------------------------------------------
+  # --- save_data GET (sources from active save slot) ---------------------
 
-  test "save_data GET returns 204 when save_data is nil" do
+  test "save_data GET returns 204 when session has no active slot" do
     create(:soul_link_emulator_session,
            :ready,
            soul_link_run: @run,
-           discord_user_id: GREY,
-           save_data: nil)
+           discord_user_id: GREY)
     login_as(GREY)
     get save_data_emulator_path
     assert_response :no_content
   end
 
-  test "save_data GET returns 204 when save_data is empty bytes" do
-    create(:soul_link_emulator_session,
-           :ready,
-           soul_link_run: @run,
-           discord_user_id: GREY,
-           save_data: "")
+  test "save_data GET returns 204 when active slot has nil bytes" do
+    sess = create(:soul_link_emulator_session,
+                  :ready,
+                  soul_link_run: @run,
+                  discord_user_id: GREY)
+    create(:soul_link_emulator_save_slot, soul_link_emulator_session: sess, slot_number: 1, save_data: nil)
+    sess.update!(active_save_slot: 1)
     login_as(GREY)
     get save_data_emulator_path
     assert_response :no_content
   end
 
-  test "save_data GET sends the bytes when present" do
+  test "save_data GET returns 204 when active slot has empty bytes" do
+    sess = create(:soul_link_emulator_session,
+                  :ready,
+                  soul_link_run: @run,
+                  discord_user_id: GREY)
+    create(:soul_link_emulator_save_slot, soul_link_emulator_session: sess, slot_number: 1, save_data: "")
+    sess.update!(active_save_slot: 1)
+    login_as(GREY)
+    get save_data_emulator_path
+    assert_response :no_content
+  end
+
+  test "save_data GET sends the active slot's bytes when present" do
     payload = "PLATINUM_SRAM_DUMP_BYTES_x01x02x03".b
-    create(:soul_link_emulator_session,
-           :ready,
-           soul_link_run: @run,
-           discord_user_id: GREY,
-           save_data: payload)
+    sess = create(:soul_link_emulator_session,
+                  :ready,
+                  soul_link_run: @run,
+                  discord_user_id: GREY)
+    create(:soul_link_emulator_save_slot, soul_link_emulator_session: sess, slot_number: 1, save_data: "OTHER".b)
+    create(:soul_link_emulator_save_slot, soul_link_emulator_session: sess, slot_number: 2, save_data: payload)
+    sess.update!(active_save_slot: 2)
     login_as(GREY)
     get save_data_emulator_path
     assert_response :success
@@ -505,125 +518,17 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_equal payload, response.body.b
   end
 
-  # --- save_data PATCH ----------------------------------------------------
+  # --- save_data DELETE (wipes ALL slots + clears active pointer) -------
 
-  test "save_data PATCH writes the request body to the session" do
+  test "save_data DELETE wipes all slots and clears active_save_slot" do
     sess = create(:soul_link_emulator_session,
                   :ready,
                   soul_link_run: @run,
                   discord_user_id: GREY)
-    login_as(GREY)
-
-    payload = "NEW_SAVE_BYTES_\x00\x01\x02".b
-    patch save_data_emulator_path,
-          params: payload,
-          headers: {
-            "Content-Type" => "application/octet-stream",
-            "X-CSRF-Token" => session[:_csrf_token].to_s
-          }
-    assert_response :no_content
-    assert_equal payload, sess.reload.save_data.to_s.b
-  end
-
-  test "save_data PATCH succeeds without a CSRF token (null_session bypass)" do
-    sess = create(:soul_link_emulator_session,
-                  :ready,
-                  soul_link_run: @run,
-                  discord_user_id: GREY)
-    login_as(GREY)
-
-    payload = "BYTES_WITHOUT_CSRF".b
-    # Force forgery protection on for this test — controllers default to
-    # off in test env, which would make the bypass test trivially pass.
-    with_forgery_protection do
-      patch save_data_emulator_path,
-            params: payload,
-            headers: { "Content-Type" => "application/octet-stream" }
-    end
-
-    assert_response :no_content
-    assert_equal payload, sess.reload.save_data.to_s.b
-  end
-
-  # --- save_data PATCH size cap -------------------------------------------
-  #
-  # The MAX_SAVE_DATA_BYTES guard rejects any inbound body larger than the
-  # cap with 413 (Payload Too Large) — ideally before reading the body, but
-  # the post-read check is the safety net for clients that lie about
-  # Content-Length or use chunked encoding without one.
-
-  test "save_data PATCH rejects body larger than the size cap with 413" do
-    create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
-    login_as(GREY)
-
-    # Just over the cap. We send 2MB + 1 byte. Use a payload that's mostly
-    # zeros so we don't blow up the test runner's memory.
-    oversized = "\x00".b * (EmulatorController::MAX_SAVE_DATA_BYTES + 1)
-    patch save_data_emulator_path,
-          params: oversized,
-          headers: {
-            "Content-Type" => "application/octet-stream",
-            "X-CSRF-Token" => session[:_csrf_token].to_s
-          }
-    assert_response :content_too_large
-  end
-
-  test "save_data PATCH accepts a body at exactly the size cap" do
-    sess = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
-    login_as(GREY)
-
-    at_cap = "\x00".b * EmulatorController::MAX_SAVE_DATA_BYTES
-    patch save_data_emulator_path,
-          params: at_cap,
-          headers: {
-            "Content-Type" => "application/octet-stream",
-            "X-CSRF-Token" => session[:_csrf_token].to_s
-          }
-    assert_response :no_content
-    # Round-trip the bytes through gzip serialization.
-    assert_equal at_cap.bytesize, sess.reload.save_data.bytesize
-  end
-
-  test "save_data PATCH round-trips through gzip compression" do
-    sess = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
-    login_as(GREY)
-
-    # Mostly-zero payload (~256KB) — exercises the compression path with a
-    # realistic SRAM-shape input. Random bytes prevent zlib from going crazy.
-    payload = ("\x00".b * 250_000) + SecureRandom.random_bytes(6_000)
-    patch save_data_emulator_path,
-          params: payload,
-          headers: {
-            "Content-Type" => "application/octet-stream",
-            "X-CSRF-Token" => session[:_csrf_token].to_s
-          }
-    assert_response :no_content
-
-    sess.reload
-    assert_equal payload.bytesize, sess.save_data.bytesize
-    assert_equal payload, sess.save_data.b
-
-    # On-disk size should be much smaller than what the client sent.
-    raw = sess.attributes_before_type_cast["save_data"]
-    raw_bytes = raw.is_a?(String) ? raw : raw.to_s
-    assert raw_bytes.bytesize < payload.bytesize,
-      "expected on-disk bytes (#{raw_bytes.bytesize}) to be smaller than raw input (#{payload.bytesize})"
-  end
-
-  # --- save_data DELETE ---------------------------------------------------
-
-  test "save_data DELETE clears save_data and the parsed_* cache columns" do
-    sess = create(:soul_link_emulator_session,
-                  :ready,
-                  soul_link_run: @run,
-                  discord_user_id: GREY,
-                  save_data: "EXISTING_SAVE_BYTES".b,
-                  parsed_trainer_name: "Lyra",
-                  parsed_money: 12_345,
-                  parsed_play_seconds: 4_200,
-                  parsed_badges: 3,
-                  parsed_map_id: 426,
-                  parsed_at: Time.current)
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: sess, slot_number: 1)
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: sess, slot_number: 3)
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: sess, slot_number: 5)
+    sess.update!(active_save_slot: 3)
     login_as(GREY)
 
     delete save_data_emulator_path,
@@ -631,48 +536,37 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_response :no_content
 
     sess.reload
-    assert_nil sess.save_data
-    assert_nil sess.parsed_trainer_name
-    assert_nil sess.parsed_money
-    assert_nil sess.parsed_play_seconds
-    assert_equal 0, sess.parsed_badges
-    assert_nil sess.parsed_map_id
-    assert_nil sess.parsed_at
+    assert_equal 0, sess.save_slots.count
+    assert_nil sess.active_save_slot
   end
 
   test "save_data DELETE returns 404 when caller has no claimed session" do
-    # No session created for ARATY in this run.
     login_as(ARATY)
-
     delete save_data_emulator_path,
            headers: { "X-CSRF-Token" => session[:_csrf_token].to_s }
     assert_response :not_found
   end
 
-  test "save_data DELETE only clears the caller's own session, not other players'" do
+  test "save_data DELETE only wipes the caller's own slots, not other players'" do
     mine = create(:soul_link_emulator_session,
                   :ready,
                   soul_link_run: @run,
-                  discord_user_id: GREY,
-                  save_data: "MINE".b,
-                  parsed_trainer_name: "Mine")
+                  discord_user_id: GREY)
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: mine, slot_number: 1)
     other = create(:soul_link_emulator_session,
                    :ready,
                    soul_link_run: @run,
-                   discord_user_id: ARATY,
-                   save_data: "THEIRS".b,
-                   parsed_trainer_name: "Theirs")
+                   discord_user_id: ARATY)
+    other_slot = create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: other, slot_number: 1)
     login_as(GREY)
 
     delete save_data_emulator_path,
            headers: { "X-CSRF-Token" => session[:_csrf_token].to_s }
     assert_response :no_content
 
-    assert_nil mine.reload.save_data
-    assert_nil mine.parsed_trainer_name
-    # Other player's session untouched.
-    assert_equal "THEIRS".b, other.reload.save_data.to_s.b
-    assert_equal "Theirs", other.parsed_trainer_name
+    assert_equal 0, mine.reload.save_slots.count
+    # Other player's slot untouched.
+    assert_not_nil SoulLinkEmulatorSaveSlot.find_by(id: other_slot.id)
   end
 
   # --- firmware -----------------------------------------------------------
@@ -717,14 +611,6 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
-
-  def with_forgery_protection
-    original = ActionController::Base.allow_forgery_protection
-    ActionController::Base.allow_forgery_protection = true
-    yield
-  ensure
-    ActionController::Base.allow_forgery_protection = original
-  end
 
   def with_firmware_path(path)
     original = ENV["SOUL_LINK_FIRMWARE_PATH"]

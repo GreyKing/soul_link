@@ -1,9 +1,9 @@
-<%# Run Roster sidebar — Tier 1 + Phase 1 in-game info from SRAM. Renders
-    one card per session in @run_sessions (typically 4). The parsed_*
-    fields are populated asynchronously by SoulLink::ParseSaveDataJob after
-    each save_data PATCH; nil values mean "no save yet" or "parse failed"
-    and the corresponding line is omitted (or shows "—"). Pokemon party,
-    PC boxes, and map-name lookup are deferred (Phase 2+). %>
+<%# Run Roster sidebar — Tier 1 + Phase 1 in-game info from the active save
+    slot. Renders one card per session in @run_sessions (typically 4). For
+    OTHER players' cards we show the parsed metadata from their active save
+    slot (each player still wants to see everyone else's progress). For YOU,
+    the slot column on the LEFT shows your slots in detail — we omit the
+    duplicate parsed info from the YOU card here. %>
 
 <div class="gb-card" style="padding: 8px 10px; margin-bottom: 8px;">
   <div style="font-size: 11px; color: var(--d1); letter-spacing: 0.1em;">RUN ROSTER</div>
@@ -11,10 +11,13 @@
 
 <% @run_sessions.each do |s| %>
   <% is_you = s.discord_user_id == current_user_id %>
+  <%# Resolve the session's active slot (if any). For empty sessions or
+      sessions whose `active_save_slot` is nil, this is nil — the card
+      falls through to "Not started" semantics. %>
+  <% active_slot = s.active_save_slot ? s.save_slots.find { |sl| sl.slot_number == s.active_save_slot } : nil %>
   <%# read_attribute_before_type_cast skips the gzip coder; the on-disk
-      compressed bytes are what we want for the "save size" stat. Decompressing
-      just to measure would be wasteful. %>
-  <% saved_bytes = s.read_attribute_before_type_cast("save_data")&.bytesize %>
+      compressed bytes are what we want for the "save size" stat. %>
+  <% saved_bytes = active_slot&.read_attribute_before_type_cast("save_data")&.bytesize %>
   <% player_label = if s.discord_user_id
                      SoulLink::GameState.player_name(s.discord_user_id).presence || s.discord_user_id.to_s
                    else
@@ -50,13 +53,13 @@
       </span>
     </div>
 
-    <%# `updated_at` ticks every ~30s the player has the emulator open
-        (auto-save interval), so it's a "is this player active" signal,
-        NOT "when did they last save in-game". The parsed Time played
-        field below is the in-game-save ground truth. %>
+    <%# `updated_at` ticks every save → it's an "is this player active"
+        signal. The parsed Time played field below is the in-game ground
+        truth. Render save-presence + size on every card (it's lightweight
+        and consistent with the prior layout). %>
     <% if saved_bytes && saved_bytes > 0 %>
       <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-        Active <%= time_ago_in_words(s.updated_at) %> ago
+        Active <%= time_ago_in_words(active_slot.updated_at) %> ago
       </div>
       <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
         Save: <%= number_to_human_size(saved_bytes) %>
@@ -66,54 +69,40 @@
       <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">Save: &mdash;</div>
     <% end %>
 
-    <% if s.parsed_trainer_name.present? %>
+    <%# Parsed in-game info renders for OTHER players (not YOU) — your own
+        slot column on the left covers your detailed view. Other players'
+        cards still need their progress visible here. %>
+    <% if !is_you && active_slot&.parsed_trainer_name.present? %>
       <div style="font-size: 11px; color: var(--d1); margin-top: 6px; margin-bottom: 2px;">
-        In-game: <%= s.parsed_trainer_name %>
+        In-game: <%= active_slot.parsed_trainer_name %>
       </div>
     <% end %>
 
-    <% if s.parsed_play_seconds %>
+    <% if !is_you && active_slot&.parsed_play_seconds %>
       <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-        Time played: <%= format_play_time(s.parsed_play_seconds) %>
+        Time played: <%= format_play_time(active_slot.parsed_play_seconds) %>
       </div>
     <% end %>
 
-    <% if s.parsed_money %>
+    <% if !is_you && active_slot&.parsed_money %>
       <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-        Money: &#8369;<%= number_with_delimiter(s.parsed_money) %>
+        Money: &#8369;<%= number_with_delimiter(active_slot.parsed_money) %>
       </div>
     <% end %>
 
-    <%# Gate on parsed_trainer_name (a strong signal of successful parse) rather
-        than parsed_at (set on both success and failure paths). parsed_badges
-        defaults to 0 in DB; without this gate, a failed parse renders
-        "Badges: 0 / 8" indistinguishable from "successfully parsed, no badges
-        yet" — violates the brief's :failed → "—" contract. %>
-    <% if s.parsed_trainer_name.present? %>
+    <%# Gate badges line on parsed_trainer_name (a strong signal of successful
+        parse) rather than parsed_at (set on both success and failure paths).
+        parsed_badges defaults to 0 in DB; without this gate, a failed parse
+        renders "Badges: 0 / 8" indistinguishable from "successfully parsed,
+        no badges yet". %>
+    <% if !is_you && active_slot&.parsed_trainer_name.present? %>
       <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-        Badges: <%= s.parsed_badges %> / 8
+        Badges: <%= active_slot.parsed_badges %> / 8
       </div>
     <% end %>
 
     <div style="font-size: 9px; color: var(--d2); opacity: 0.7; margin-top: 4px; word-break: break-all;">
       Seed: <%= s.seed %>
     </div>
-
-    <%# Clear-save action lives on the player's own card only. saved_bytes
-        guards the button — nothing to clear on a session that has never
-        saved, so we don't render the button there. %>
-    <% if is_you && saved_bytes && saved_bytes > 0 %>
-      <div data-controller="clear-save"
-           data-clear-save-url-value="<%= save_data_emulator_path %>"
-           data-clear-save-csrf-value="<%= form_authenticity_token %>"
-           style="margin-top: 8px;">
-        <button type="button"
-                data-action="click->clear-save#clear"
-                class="type-text"
-                style="background: #4a1c1c; color: #e8a0a0; border: 2px solid #6b2c2c; font-size: 9px; letter-spacing: 0.05em; cursor: pointer; width: 100%; padding: 4px 6px;">
-          CLEAR SAVE DATA
-        </button>
-      </div>
-    <% end %>
   </div>
 <% end %>

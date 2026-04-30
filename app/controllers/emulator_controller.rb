@@ -1,6 +1,7 @@
 # Player-facing browser emulator. Each player visits `/emulator`, gets
 # auto-assigned an unclaimed randomized ROM for the active run, and plays it
-# in EmulatorJS. SRAM round-trips through `save_data` GET/PATCH.
+# in EmulatorJS. SRAM round-trips through `save_data` GET (reads the active
+# save slot) and `/emulator/save_slots` (saves go to one of 5 slots).
 class EmulatorController < ApplicationController
   include DiscordAuthentication
 
@@ -28,13 +29,6 @@ class EmulatorController < ApplicationController
   before_action :set_run
   before_action :set_session, only: [ :show, :rom, :save_data ]
 
-  # PATCH /emulator/save_data has a binary body — the standard form-CSRF
-  # token can't ride along. The Stimulus controller still sends it via
-  # `X-CSRF-Token` (belt-and-suspenders), but we accept the request even
-  # without one. DELETE goes through the standard CSRF path; the Stimulus
-  # controller sends `X-CSRF-Token` like the rest of the destructive UI.
-  protect_from_forgery with: :null_session, only: [ :save_data ], if: -> { request.patch? }
-
   def show
     # The view renders one of six states based on @run / @session.
     # Only the :ready branch renders the emulator stage, so only that branch
@@ -44,8 +38,17 @@ class EmulatorController < ApplicationController
     # Run roster sidebar (Tier 1 — existing model data only). Loaded only on
     # the ready branch since that's the only state that renders the sidebar;
     # avoids a wasted query on the empty-state pages. `.order(:id)` keeps the
-    # four cards in stable order across page reloads.
-    @run_sessions = @run.soul_link_emulator_sessions.order(:id) if @session&.ready?
+    # four cards in stable order across page reloads. Eager-load save_slots
+    # so each card can render parsed_* metadata of the active slot without
+    # N+1 queries.
+    if @session&.ready?
+      @run_sessions = @run.soul_link_emulator_sessions
+                          .includes(:save_slots)
+                          .order(:id)
+      # Pre-fetch the player's own slots in slot-number order for the
+      # left-column sidebar. Avoids a second round-trip on render.
+      @save_slots = @session.save_slots.order(:slot_number).to_a
+    end
   end
 
   def firmware
@@ -77,43 +80,19 @@ class EmulatorController < ApplicationController
   end
 
   def save_data
-    if request.patch?
+    if request.delete?
       return head :not_found if @session.nil?
 
-      # Belt-and-suspenders size guard. We check the advertised content_length
-      # *before* reading the body so a hostile client can't stream a 500MB
-      # body and OOM the worker. Then we check the actual bytesize after
-      # reading — clients can lie about content_length, or use chunked
-      # encoding without one. Both checks return 413 (Payload Too Large).
-      if request.content_length && request.content_length > MAX_SAVE_DATA_BYTES
-        return head :content_too_large
-      end
-
-      blob = request.body.read
-      return head :content_too_large if blob.bytesize > MAX_SAVE_DATA_BYTES
-
-      @session.update!(save_data: blob)
-      head :no_content
-    elsif request.delete?
-      return head :not_found if @session.nil?
-
-      # Player-initiated wipe. Clears the SRAM blob and the four parsed_*
-      # cache columns (which mirror fields decoded from the blob — leaving
-      # them populated would surface a stale name/badges/money on the now-
-      # empty session). parsed_at also nil so the sidebar doesn't show a
-      # parse timestamp from a save that no longer exists.
-      @session.update!(
-        save_data:           nil,
-        parsed_trainer_name: nil,
-        parsed_money:        nil,
-        parsed_play_seconds: nil,
-        parsed_badges:       0,
-        parsed_map_id:       nil,
-        parsed_at:           nil
-      )
+      # Player-initiated full wipe. Removes ALL slots and clears the active
+      # pointer. The slot column re-renders empty on the next page load.
+      @session.save_slots.destroy_all
+      @session.update_column(:active_save_slot, nil)
       head :no_content
     else
-      data = @session&.save_data
+      # GET — serve the active slot's bytes. The active_slot association
+      # resolves to the SoulLinkEmulatorSaveSlot whose slot_number matches
+      # `active_save_slot`, or nil when no active slot is set.
+      data = @session&.active_slot&.save_data
       return head :no_content if data.blank?
       send_data data, type: "application/octet-stream", disposition: "attachment", filename: "save.dat"
     end

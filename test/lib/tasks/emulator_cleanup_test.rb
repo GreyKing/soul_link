@@ -64,33 +64,39 @@ class EmulatorCleanupTaskTest < ActiveSupport::TestCase
 
   # ── tests ──────────────────────────────────────────────────────────────
 
-  test "active run is untouched: rom_path, save_data, and on-disk file all preserved" do
+  test "active run is untouched: rom_path, save slots, and on-disk file all preserved" do
     run = create(:soul_link_run, active: true)
     rom = create_rom_file(run)
     session = create(:soul_link_emulator_session, soul_link_run: run,
-                     status: "ready", rom_path: relative_to_root(rom),
-                     save_data: "some-bytes")
+                     status: "ready", rom_path: relative_to_root(rom))
+    create(:soul_link_emulator_save_slot, :filled,
+           soul_link_emulator_session: session, slot_number: 1)
+    session.update!(active_save_slot: 1)
 
     invoke_task
 
     session.reload
     assert_equal relative_to_root(rom), session.rom_path
-    assert_equal "some-bytes", session.save_data
+    assert_equal 1, session.save_slots.count
+    assert_equal 1, session.active_save_slot
     assert rom.exist?, "active run's ROM file should still exist on disk"
   end
 
-  test "inactive run is cleaned: rom_path nil, save_data nil, file deleted" do
+  test "inactive run is cleaned: rom_path nil, slots wiped, file deleted" do
     run = create(:soul_link_run, active: false)
     rom = create_rom_file(run)
     session = create(:soul_link_emulator_session, soul_link_run: run,
-                     status: "ready", rom_path: relative_to_root(rom),
-                     save_data: "some-bytes")
+                     status: "ready", rom_path: relative_to_root(rom))
+    create(:soul_link_emulator_save_slot, :filled,
+           soul_link_emulator_session: session, slot_number: 1)
+    session.update!(active_save_slot: 1)
 
     invoke_task
 
     session.reload
     assert_nil session.rom_path
-    assert_nil session.save_data
+    assert_equal 0, session.save_slots.count
+    assert_nil session.active_save_slot
     assert_not rom.exist?, "inactive run's ROM file should have been deleted"
   end
 
@@ -99,8 +105,7 @@ class EmulatorCleanupTaskTest < ActiveSupport::TestCase
     # rom_path points at a path that never existed on disk.
     session = create(:soul_link_emulator_session, soul_link_run: run,
                      status: "failed",
-                     rom_path: "storage/roms/randomized/run_#{run.id}/missing.nds",
-                     save_data: nil)
+                     rom_path: "storage/roms/randomized/run_#{run.id}/missing.nds")
 
     assert_nothing_raised { invoke_task }
 
@@ -131,9 +136,10 @@ class EmulatorCleanupTaskTest < ActiveSupport::TestCase
 
     inactive = create(:soul_link_run, active: false)
     inactive_rom = create_rom_file(inactive)
-    create(:soul_link_emulator_session, soul_link_run: inactive, status: "ready",
-                                        rom_path: relative_to_root(inactive_rom),
-                                        save_data: "blob")
+    inactive_session = create(:soul_link_emulator_session, soul_link_run: inactive, status: "ready",
+                                                            rom_path: relative_to_root(inactive_rom))
+    create(:soul_link_emulator_save_slot, :filled,
+           soul_link_emulator_session: inactive_session, slot_number: 1)
 
     output = invoke_task
 

@@ -5,20 +5,23 @@ class SoulLinkEmulatorSession < ApplicationRecord
   STATUSES = %w[pending generating ready failed].freeze
 
   # Standard gzip header. Used to distinguish gzipped values (everything
-  # written by this model) from any legacy plaintext that may exist in older
-  # rows from before this coder shipped.
+  # written through this coder) from any legacy plaintext that may exist in
+  # older rows from before this coder shipped.
   GZIP_MAGIC = "\x1f\x8b".b.freeze
 
   class AlreadyClaimedError < StandardError; end
 
-  # Transparent gzip compression of the save_data BLOB. Pokemon Platinum SRAM
-  # is ~512KB raw, mostly zero-padded — gzipping pulls that down to roughly
-  # 50-80KB on typical save dumps. Stays fully opaque to EmulatorJS: the
-  # client sends/receives raw bytes; the coder handles the transform.
+  # Transparent gzip compression of binary BLOB columns. Pokemon Platinum
+  # SRAM is ~512KB raw, mostly zero-padded — gzipping pulls that down to
+  # roughly 50-80KB on typical save dumps. Stays fully opaque to clients:
+  # raw bytes go in and come out; the coder handles the transform.
   #
   # The coder must handle every shape AR may hand it: `nil` (column unset),
   # `""` (empty payload from a fresh save), and pre-coder plaintext (defensive
   # only — nothing should be in this state).
+  #
+  # Now also used by SoulLinkEmulatorSaveSlot — kept on this class for
+  # compatibility with existing references.
   module GzipCoder
     def self.dump(value)
       return nil if value.nil?
@@ -46,19 +49,18 @@ class SoulLinkEmulatorSession < ApplicationRecord
     end
   end
 
-  serialize :save_data, coder: GzipCoder
-
   belongs_to :soul_link_run
+  has_many :save_slots,
+           class_name: "SoulLinkEmulatorSaveSlot",
+           foreign_key: :soul_link_emulator_session_id,
+           dependent: :destroy,
+           inverse_of: :soul_link_emulator_session
 
   validates :status, inclusion: { in: STATUSES }
   validates :seed, presence: true
   validates :discord_user_id, uniqueness: { scope: :soul_link_run_id, allow_nil: true }
 
   after_destroy :delete_rom_file
-  # Re-parse the trainer block whenever the SRAM blob changes. The job
-  # writes parsed_* fields via `update_columns` to avoid re-firing this
-  # callback in a tight loop.
-  after_update_commit :enqueue_parse_if_save_changed
 
   scope :ready, -> { where(status: "ready") }
   scope :unclaimed, -> { where(discord_user_id: nil) }
@@ -74,6 +76,14 @@ class SoulLinkEmulatorSession < ApplicationRecord
 
   def rom_full_path
     Rails.root.join(rom_path) if rom_path.present?
+  end
+
+  # Returns the SoulLinkEmulatorSaveSlot whose `slot_number` matches
+  # `active_save_slot`, or nil when no active slot is set. Used by the
+  # emulator GET save_data endpoint to resolve which slot's bytes to serve.
+  def active_slot
+    return nil if active_save_slot.nil?
+    save_slots.find_by(slot_number: active_save_slot)
   end
 
   # Global Action Replay cheats for this run. Sourced from
@@ -96,17 +106,6 @@ class SoulLinkEmulatorSession < ApplicationRecord
   end
 
   private
-
-  # Enqueues SoulLink::ParseSaveDataJob whenever save_data was just committed
-  # to a non-nil value. The job populates the parsed_* columns via
-  # update_columns (not update!), so this callback does not refire as a
-  # result of the parse write. Other column updates (status, rom_path,
-  # discord_user_id, parsed_*) do not trigger a parse.
-  def enqueue_parse_if_save_changed
-    return unless saved_change_to_attribute?("save_data")
-    return if save_data.blank?
-    SoulLink::ParseSaveDataJob.perform_later(self)
-  end
 
   # Removes the on-disk ROM when the session is destroyed. File cleanup is
   # best-effort and MUST NOT roll back the AR transaction. `Errno::ENOENT`
