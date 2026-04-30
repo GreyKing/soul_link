@@ -51,15 +51,22 @@ module SoulLink
 
     # Trainer ("general") block field offsets within the slot.
     # English Pokemon Platinum. Source: Project Pokemon save-file docs +
-    # pret/pokeplatinum (struct PlayerData / SaveData).
+    # pret/pokeplatinum (struct PlayerData / SaveData) + PKHeX SAV4Pt.cs
+    # offsets, cross-referenced against a real Platinum save dumped via
+    # the soul_link:debug_save_offsets rake task on 2026-04-30.
+    BADGES_OFFSET        = 0x0060  # 1-byte bitfield, 8 Sinnoh badges (verified)
     NAME_OFFSET          = 0x0068  # 16 bytes (8 * uint16 chars), Gen IV charset
     NAME_BYTES           = 16
-    GENDER_OFFSET        = 0x0078  # 1 byte (unused here; reserved for Phase 2)
-    MONEY_OFFSET         = 0x0078 + 4  # 0x007C, 4 bytes LE (uint32)
-    BADGES_OFFSET        = 0x0084  # 1-byte bitfield, 8 Sinnoh badges
-    PLAY_HOURS_OFFSET    = 0x0086  # 2 bytes LE (uint16)
-    PLAY_MINUTES_OFFSET  = 0x0088  # 1 byte
-    PLAY_SECONDS_OFFSET  = 0x0089  # 1 byte
+    TRAINER_ID_OFFSET    = 0x0078  # 2 bytes LE (uint16) — unused here, doc only
+    SECRET_ID_OFFSET     = 0x007A  # 2 bytes LE (uint16) — unused here, doc only
+    MONEY_OFFSET         = 0x007C  # 4 bytes LE (uint32) — verified
+    GENDER_OFFSET        = 0x0080  # 1 byte (unused here; reserved for Phase 2)
+    # 0x0081 country, 0x0082 language, 0x0083 trainer-card avatar — unused
+    # 0x0084 game version (0x0C = Pt) — was previously misread as BADGES_OFFSET,
+    # which gave a constant "2 / 8" on every English Pt save (0x0C has two bits).
+    PLAY_HOURS_OFFSET    = 0x0086  # 2 bytes LE (uint16) — verified
+    PLAY_MINUTES_OFFSET  = 0x0088  # 1 byte — verified
+    PLAY_SECONDS_OFFSET  = 0x0089  # 1 byte — verified
     # Map id ("current location"): less consistently documented than the
     # fields above. Returning nil on out-of-band values keeps the sidebar
     # honest if the offset turns out to be wrong for this game.

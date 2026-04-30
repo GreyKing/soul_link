@@ -1,4 +1,19 @@
 namespace :soul_link do
+  desc "Re-enqueue ParseSaveDataJob for every session that has save_data — use after a parser offset fix to refresh the parsed_* cache columns without waiting for the next in-game save"
+  task reparse_all_saves: :environment do
+    sessions = SoulLinkEmulatorSession.where.not(save_data: nil).order(:id)
+    if sessions.empty?
+      puts "No sessions with save_data."
+      next
+    end
+
+    sessions.each do |s|
+      SoulLink::ParseSaveDataJob.perform_later(s)
+      puts "Enqueued reparse for session id=#{s.id} player=#{s.discord_user_id}"
+    end
+    puts "Enqueued #{sessions.size} reparse job(s)."
+  end
+
   desc "Hex-dump the trainer-block region of every session's SRAM (for parser offset debugging)"
   task debug_save_offsets: :environment do
     sessions = SoulLinkEmulatorSession.where.not(save_data: nil).order(:id)
