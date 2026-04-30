@@ -33,12 +33,29 @@ export default class extends Controller {
     // EJS_ready so melonDS reloads from it.
     const existingSave = await this._fetchSave()
 
-    // Set the auto-save interval default BEFORE loader.js boots. loader.js
-    // reads window.EJS_defaultOptions synchronously and feeds it through
-    // config.defaultOptions → menu UI's defaultOption path, which sets up
-    // the internal save-save-interval setInterval. localStorage overrides
-    // this for returning users who've changed it via the in-game menu.
-    window.EJS_defaultOptions = { "save-save-interval": "30" }
+    // Set core / save defaults BEFORE loader.js boots. loader.js reads
+    // window.EJS_defaultOptions synchronously and feeds it through
+    // config.defaultOptions, which becomes the core's option file.
+    // localStorage overrides these for returning users who've changed
+    // them via the in-game menu.
+    //
+    // - save-save-interval: auto-flush SRAM every 30s, fires saveSaveFiles
+    //   event for the server PATCH.
+    // - melonds_boot_mode = "direct": skip the DS firmware boot UI and
+    //   jump straight into the ROM. REQUIRED when firmware is dumped from
+    //   a DSi or 3DS — those firmwares aren't bootable
+    //   (https://docs.libretro.com/library/melonds_ds/), and "native"
+    //   mode tries to boot the firmware UI and crashes the game later.
+    //   With direct boot, the firmware bytes are still loaded so Pokemon's
+    //   WiFi calibration check passes.
+    // - melonds_boot_directly: same intent for the older melonDS 2021
+    //   libretro core. Setting both is harmless; whichever core
+    //   EmulatorJS resolves will pick up its own key.
+    window.EJS_defaultOptions = {
+      "save-save-interval": "30",
+      "melonds_boot_mode": "direct",
+      "melonds_boot_directly": "enabled"
+    }
 
     window.EJS_player = "#" + this.gameTarget.id
     window.EJS_gameUrl = this.romUrlValue
