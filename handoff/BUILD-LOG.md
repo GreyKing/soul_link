@@ -11,9 +11,9 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 3 — Save Slots (5 per session). Awaiting Reviewer.
-**Last committed:** `2e9e934` — 2026-04-30 (Step 2: Auto-persist in-game saves)
-**Pending deploy:** NO — Step 3 not yet committed.
+**Active step:** *None — awaiting next brief.*
+**Last committed:** `29186e6` — 2026-04-30 (Step 3: Save Slots, 5 per session)
+**Pending deploy:** NO — deployed via GitHub Actions run 25193821050 (test + deploy both green).
 
 **Parked plan:** FactoryBot conversion. Inventory + ordering at `handoff/parked-plans/factorybot-conversion.md`.
 
@@ -23,7 +23,7 @@ reset until the gap is addressed or the decision is replaced.
 *Session-scoped.*
 
 ### Step 3 — Save Slots (5 per session) — 2026-04-30
-**Status:** Awaiting review
+**Status:** Complete, committed `29186e6`, deployed to `4luckyclovers.com`
 
 **Files created:**
 - `db/migrate/20260430143102_create_soul_link_emulator_save_slots.rb` — slots table + `active_save_slot` pointer on session; data-preservation INSERT migrates existing per-session save into slot 1; columns dropped with type args so rollback is reversible (data lost on rollback per Project Owner acceptance)
@@ -65,7 +65,9 @@ reset until the gap is addressed or the decision is replaced.
 
 **Migration verified:** Ran `db:migrate` + `db:rollback` + `db:migrate` cycle in dev. Rollback reverts schema cleanly (data not preserved — accepted). Re-migrate is idempotent.
 
-**Open questions for Reviewer:** see REVIEW-REQUEST.md.
+**Review:** Richard — APPROVED (no Conditions, no Escalations). Verified: migration order + raw-SQL data preservation, authorization scoping at every endpoint via `set_session`, `active_save_slot` consistency across all four mutation paths (create / overwrite / destroy-of-active / restore), Approach 2 stateless overwrite (slot Stimulus calls `gameManager.getSaveFile()` at click time, no JS-side stash), no setInterval/setTimeout re-introduction, layout regression-free.
+
+**Deploy:** GitHub Actions run 25193821050 — test + deploy both succeeded. Migration ran cleanly on prod via the deploy script's `bin/rails db:migrate`; existing 2 saves on prod migrated to slot 1 with `active_save_slot = 1` automatically.
 
 ### Step 2 — Auto-Persist In-Game Saves to Server — 2026-04-30
 **Status:** Complete, committed `2e9e934`, deployed to `4luckyclovers.com`
