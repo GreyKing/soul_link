@@ -11,9 +11,9 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 2 — Auto-Persist In-Game Saves to Server. Awaiting review.
-**Last committed:** `62be21e` — 2026-04-29 (Step 1: SRAM Phase 1)
-**Pending deploy:** NO
+**Active step:** *None — awaiting next brief.*
+**Last committed:** `2e9e934` — 2026-04-30 (Step 2: Auto-persist in-game saves)
+**Pending deploy:** NO — deployed via GitHub Actions run 25143303161 (test 50s, deploy 17s, both green)
 
 **Parked plan:** FactoryBot conversion. Inventory + ordering at `handoff/parked-plans/factorybot-conversion.md`.
 
@@ -22,8 +22,8 @@ reset until the gap is addressed or the decision is replaced.
 ## Step History
 *Session-scoped.*
 
-### Step 2 — Auto-Persist In-Game Saves to Server — 2026-04-29
-**Status:** Awaiting review
+### Step 2 — Auto-Persist In-Game Saves to Server — 2026-04-30
+**Status:** Complete, committed `2e9e934`, deployed to `4luckyclovers.com`
 
 **Files modified:**
 - `app/javascript/controllers/emulator_controller.js` — re-enabled `_fetchSave()` on `connect()`; added `window.EJS_defaultOptions = { "save-save-interval": "30" }` before loader.js boot; replaced diagnostic `EJS_ready` with: register `saveSaveFiles` listener first, then inject existing save if present, then log `"Emulator: hooks attached"` once with `hasExistingSave`/`hasEmulator` flags; added null/0-byte guard at top of `_uploadSave`; cleared `EJS_defaultOptions` in `disconnect()`. `EJS_onSaveSave` retained (manual export). `_injectExistingSave` body untouched.
@@ -37,7 +37,9 @@ reset until the gap is addressed or the decision is replaced.
 
 **Lint:** No new Ruby. JS controller has no lint configured (Importmap project, no Node toolchain). Pre-existing rubocop offenses (133 across 127 files) are unrelated; documented previously in Known Gaps.
 
-**Review:** *Pending.*
+**Review:** Richard — APPROVED (no conditions, no escalations). All six Architect focus areas verified: listener order in `EJS_ready`, null/0-byte guard centralization, `EJS_defaultOptions` set position, `EJS_onSaveSave` retained, `disconnect()` cleanup, scope discipline (single code file).
+
+**Deploy:** GitHub Actions run 25143303161 — test job 50s (255/255 pass), deploy job 17s (VPS SSH, asset precompile, web + bot service restart). All green.
 
 ---
 
@@ -104,6 +106,7 @@ reset until the gap is addressed or the decision is replaced.
 *Durable. Locked decisions that cannot be changed without breaking the system. Persists across sessions.*
 
 ### Emulator infrastructure (locked 2026-04-29)
+- **In-game SRAM saves are persisted via the `saveSaveFiles` event, NOT `saveSave`.** `saveSave` (loader.js auto-wires `EJS_onSaveSave`) only fires on the manual "Save File" export button. The internal SRAM commit lifecycle uses `saveSaveFiles`, fired by `gameManager.saveSaveFiles()` after every `cmd_savefiles` flush. We register `window.EJS_emulator.on("saveSaveFiles", cb)` inside `EJS_ready` and set `EJS_defaultOptions["save-save-interval"] = "30"` so the auto-save tick covers in-game saves. `EJS_onSaveSave` is retained as belt-and-suspenders for the manual button. Server is the source of truth on load: `_injectExistingSave` runs in `EJS_ready` after the listener is attached. `_uploadSave` short-circuits null / 0-byte payloads — `getSaveFile(false)` returns null pre-first-save, and an empty SRAM PATCH would clobber a real server save.
 - **PokeRandoZX must be invoked with `cli` as the first arg after `-jar`.** CLI mode auto-seeds; do NOT pass `-seed`. Without the `cli` subcommand, the JAR launches a Swing GUI which fails on headless servers with `HeadlessException` but exits 0 — silent generation failure.
 - **`save_data` column is gzip-compressed** via `SoulLinkEmulatorSession::GzipCoder` (custom serializer). Reads/writes are transparent. Use `read_attribute_before_type_cast("save_data")` for raw compressed bytes (e.g. for size display); regular `save_data` accessor triggers decompression.
 - **Inbound PATCH `save_data` is capped at 2MB raw** (`EmulatorController::MAX_SAVE_DATA_BYTES`). Pokemon Platinum SRAM is ~512KB; cap is a generous DoS bound enforced via `request.content_length` check + post-read `bytesize` check.
