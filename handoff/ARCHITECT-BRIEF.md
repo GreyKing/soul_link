@@ -4,223 +4,240 @@
 
 ---
 
-## Step 10 — UX Batch 2: Tier-B/C/D/E + YOU-badge follow-up + KG-5
+## Step 11 — Enforce "One Active SoulLinkRun Per Guild" Invariant
 
 ### Context
 
-Step 9 (commit `7513764`, on main) shipped the first real-time UX (KG-1 / KG-2) plus 5 Tier-A silent-failure fixes. Step 10 continues with the natural next tier.
+`SoulLinkRun.current(guild_id)` lacks a hard invariant. Today, the model relies on `start_run` flows always deactivating the previous active run before creating a new one — a soft contract that:
 
-`handoff/PROJECT-REVIEW-2026-04-30.md` lists 18 UI/UX items across Tiers A-E. Tier A is done. This step picks the highest-ROI Tier B-E items + a couple of small KGs.
+- The Step 6 fixture-coexistence pain (`SoulLinkRun.where(guild_id: ...).destroy_all` in 7 controller test setups) was a direct symptom: two active runs sharing a guild produced silent fallback behavior in `current(guild_id)`.
+- A race in `RunChannel#start_run` between two parallel WS messages could leak a second active row.
+- Manual DB tampering / direct `update!(active: true)` on an inactive run while another is active would silently break the invariant.
 
-**Architect-level scoping notes:** during pre-flight reads, several PROJECT-REVIEW items turned out to already be handled in the codebase (the review was based on an earlier scan). Items skipped:
+Step 11 closes this with a real database constraint. After this step, no path — application or otherwise — can produce two active runs for the same guild.
 
-- **B.6 (gym draft button disable):** all six action handlers (`ready`, `vote`, `pickPokemon`, `nominatePokemon`, `approveNomination`, `rejectNomination`) already disable the relevant buttons or set `pointer-events: none` on click. `disablePokemonCards` covers the clicked card. The "spam-clicks possible" diagnosis no longer holds. Skip.
-- **B.8 (run_management auto-dismiss):** [run_management_controller.js:56](app/javascript/controllers/run_management_controller.js:56) already has `setTimeout(() => this.clearError(), 8000)`. Skip.
-- **B.9 (no empty state for gym drafts):** there is no `index` action / route — `gym_drafts/show` is only reachable by ID after `START GYM DRAFT` button creates one. There's no "no draft" page that needs an empty state. Skip.
-- **B.11 (no "no species assigned" placeholder):** [_group_card.html.erb](app/views/species_assignments/_group_card.html.erb) already shows per-player rows with placeholders ("Drop your species here" for the current user, "waiting..." for others), which is clearer than a single all-empty message. Skip.
-- **C.12 (form `for=scheduled_at` not associated):** the input at [gym_schedules/index.html.erb:12](app/views/gym_schedules/index.html.erb:12) already has `id="scheduled_at"` matching the label's `for=`. Skip.
-- **D.16 (save-slot operations hard-reload):** turning `window.location.reload()` into a targeted turbo_stream replace is meaningful work (server-side broadcast on slot create/update/destroy + frame wrapping per slot). Compounds with KG-1 plumbing but expands its surface; defer to a future step.
-
-**Items in scope for Step 10 (9 total):**
-
-1. **B.7** — Drop misleading `opacity: 0.6` on Cancel button
-2. **B.10** — Add "schedule already active" hint when gym schedule form vanishes
-3. **C.13** — Avatar alt text uses player name
-4. **C.14** — `aria-label="Close modal"` on every `gb-modal-close` button
-5. **D.15** — Emulator page mobile breakpoint (stack columns below 900px)
-6. **E.17** — Mark Dead custom modal (replace native `confirm()`)
-7. **E.18** — FALLEN section tooltip
-8. **KG-Step9-followup** — YOU badge restoration via small Stimulus controller (the regression Step 9 logged)
-9. **KG-5** — Run `rubocop -a` (safe autocorrect) sweep — 113 fixable offenses
+The PROJECT-REVIEW (Soft Point #3) flagged this as a Tier-1-adjacent risk. It's not a refactor (no behavior change in the happy path); it's a guardrail against a known failure mode.
 
 ### Project Owner decisions (locked)
 
-- **Auto-accept mode for this work.** Bob can act decisively; Reviewer + tests are the backstop.
-- **Tier-1 structural refactors NOT in this batch.** Save for a fresh main-checkout session per Project Owner's worktree preference.
-- **`rubocop -a` (safe) only — NOT `-A` (unsafe).** The 113 fixable offenses are mostly whitespace + style (Layout/SpaceInsideArrayLiteralBrackets, Style/DefWithParentheses, etc.). `-A` would also run cops that change semantics ("CRITICAL", "Lint" categories). Keep this sweep purely cosmetic.
-- **Mark Dead modal reuses the existing pixeldex-style modal pattern.** No new component library; same gb-modal/gb-card/gb-btn-* tokens that the pokemon modal uses.
-- **Don't touch tests for items where the change is purely visual / aria-label / inline style.** The full suite must still pass; new tests are required only for the YOU-badge Stimulus controller (small unit shape) and any model-level changes (none here).
+- **Auto-accept mode for this work.** Bob can act decisively; Reviewer + tests + the migration's backfill check are the backstops.
+- **MySQL 8.0 virtual generated column + unique index.** Postgres has partial unique indexes (`UNIQUE INDEX ... WHERE active = true`); MySQL doesn't. The cleanest equivalent on MySQL 8 is a virtual generated column whose value is `guild_id` when `active = true` and `NULL` otherwise, plus a regular unique index on it. NULLs don't conflict in unique indexes, so multiple inactive runs per guild remain fine.
+- **Backfill check is a hard fail.** If the migration finds a guild with multiple active runs, it must `raise ActiveRecord::IrreversibleMigration` with a clear remediation message — not silently coerce. The Project Owner's main instance has 4 trusted players; this should never trip in practice, but the safety belt matters.
+- **No changes to the `start_run` flow.** The deactivate-then-create pattern in `RunChannel#start_run` (and the equivalent in `discord_bot.rb` and `lib/tasks/soul_link.rake`) already produces the right outcome on the happy path. Adding a transaction wrapper or an advisory lock is out of scope; the new DB constraint is what catches the rare race.
 
-### Scope per item
+### Implementation
 
-#### B.7 — Cancel button opacity
+#### 1. Migration: virtual generated column + unique index
 
-[app/views/gym_schedules/show.html.erb:66](app/views/gym_schedules/show.html.erb:66): `class="gb-btn-danger gb-btn-sm" style="opacity: 0.6;"`. Drop the inline `style="opacity: 0.6;"`. The `gb-btn-danger` already provides the visual "danger" cue — opacity makes it look disabled.
+New file `db/migrate/<timestamp>_enforce_single_active_run_per_guild.rb`:
 
-#### B.10 — Gym schedule form silent vanish
+```ruby
+class EnforceSingleActiveRunPerGuild < ActiveRecord::Migration[8.1]
+  def up
+    # Backfill check — abort if production data already violates the
+    # invariant. The Architect's expectation is that this never trips
+    # (the `start_run` flow always deactivates first), but raw DB
+    # tampering or a never-tested race could have left dupes. Better to
+    # raise loudly than to silently coerce.
+    duplicate_guilds = SoulLinkRun.where(active: true)
+                                  .group(:guild_id)
+                                  .having("COUNT(*) > 1")
+                                  .count
 
-[app/views/gym_schedules/index.html.erb:7-18](app/views/gym_schedules/index.html.erb:7): the propose-schedule form is wrapped in `<% unless @schedules.any? %>`. When schedules exist, the form simply doesn't render — users think the UI is broken.
+    if duplicate_guilds.any?
+      detail = duplicate_guilds.map { |g, n| "guild_id=#{g}: #{n} active runs" }.join("; ")
+      raise ActiveRecord::IrreversibleMigration, <<~MSG.squish
+        Cannot enforce one-active-run-per-guild: #{detail}.
+        Deactivate the extras manually before re-running:
+        SoulLinkRun.where(guild_id: <id>, active: true).order(:run_number).limit(N-1).update_all(active: false)
+      MSG
+    end
 
-Add an `<% else %>` branch (or sibling `<% if @schedules.any? %>` block above the upcoming list) with copy like:
+    # MySQL 8 virtual generated column. Value is guild_id when active is
+    # true, NULL otherwise. NULLs don't conflict in unique indexes, so
+    # multiple inactive runs per guild remain fine. The unique index on
+    # this column enforces the invariant at the storage layer.
+    add_column :soul_link_runs, :active_guild_id, :bigint,
+               as: "(CASE WHEN active = 1 THEN guild_id END)"
 
-```erb
-<% else %>
-  <div class="gb-card" style="max-width: 500px; padding: 12px; margin-bottom: 16px;">
-    <div style="font-size: 11px; color: var(--d2); line-height: 1.6;">
-      A schedule is already active. Cancel the active one below before proposing a new time.
-    </div>
-  </div>
-<% end %>
+    add_index :soul_link_runs, :active_guild_id, unique: true,
+              name: "index_soul_link_runs_on_active_guild_id"
+  end
+
+  def down
+    remove_index :soul_link_runs, name: "index_soul_link_runs_on_active_guild_id"
+    remove_column :soul_link_runs, :active_guild_id
+  end
+end
 ```
 
-The semantic is: only one active schedule per run at a time. The hint explains why the form isn't there.
+Notes:
+- The column type is `:bigint` because `guild_id` is `:bigint` (it's a Discord snowflake).
+- Default storage for MySQL generated columns in Rails 8.1 is VIRTUAL. No `stored:` arg → virtual. We don't need it materialized; the unique index gets recomputed on writes.
+- `db/schema.rb` will dump this as `t.virtual "active_guild_id", type: :bigint, as: "..."`. Rails 8.1's schema dumper handles virtual columns natively.
+- The CASE expression uses `active = 1` (not `active = true`) because MySQL stores BOOLEAN as TINYINT.
 
-#### C.13 — Avatar alt text
+#### 2. Model: validation + `current(guild_id)` refactor
 
-[app/views/layouts/application.html.erb:46](app/views/layouts/application.html.erb:46): `alt="avatar"` → `alt="<%= current_username %>'s avatar"`. Single-line edit.
+Update `app/models/soul_link_run.rb`:
 
-#### C.14 — Modal close aria-label
+**Add validation:**
+```ruby
+validate :no_other_active_run_for_guild, if: -> { active? }
 
-Four files use `class="gb-modal-close"`:
-- `app/views/dashboard/_pokemon_modal.html.erb:13`
-- `app/views/dashboard/_catch_modal.html.erb:13`
-- `app/views/species_assignments/show.html.erb:137`
-- `app/views/teams/_quick_calc_modal.html.erb:15`
+private
 
-Each renders `&times;` with no aria-label. Add `aria-label="Close modal"` to all four. Plus `app/views/map/show.html.erb:219` uses inline-styled `&times;` (same intent, no `gb-modal-close` class) — also add `aria-label`.
-
-#### D.15 — Emulator mobile breakpoint
-
-[app/views/emulator/show.html.erb:72](app/views/emulator/show.html.erb:72): inline `display: grid; grid-template-columns: 280px minmax(0, 1fr) 280px; gap: 16px; align-items: stretch;`. Below 900px viewport, the center column goes negative.
-
-Move to a CSS class in `pixeldex.css`:
-
-```css
-.emulator-grid {
-  display: grid;
-  grid-template-columns: 1fr; /* mobile / narrow: stacked */
-  gap: 16px;
-  align-items: stretch;
-}
-
-@media (min-width: 900px) {
-  .emulator-grid {
-    grid-template-columns: 280px minmax(0, 1fr) 280px;
-  }
-}
+def no_other_active_run_for_guild
+  scope = self.class.where(guild_id: guild_id, active: true)
+  scope = scope.where.not(id: id) if persisted?
+  return unless scope.exists?
+  errors.add(:active, "another run is already active for this guild")
+end
 ```
 
-Then in `emulator/show.html.erb`, replace the inline `style="..."` with `class="emulator-grid"`.
+The `if: -> { active? }` gate is critical: validations only run when this row IS (or is becoming) active. Updating an inactive run's other fields shouldn't trigger the check. The `where.not(id: id) if persisted?` excludes self so an already-active row can be saved (e.g., updating `gyms_defeated`).
 
-The `align-items: stretch` keeps the canvas full-height in the desktop layout; in stacked mobile layout it doesn't matter (single column).
+**Simplify `current`:**
+```ruby
+def self.current(guild_id)
+  find_by(guild_id: guild_id, active: true)
+end
+```
 
-#### E.17 — Mark Dead custom modal
+Drops the `order(run_number: :desc).first` defensive ordering. With the invariant, there's at most one active row per guild — `find_by` is exact. The existing `(guild_id, active)` index covers this query.
 
-Permadeath in a Nuzlocke is irreversible. The current `markDead` in [dashboard_controller.js:80-82](app/javascript/controllers/dashboard_controller.js:80) uses native `confirm()` — generic, ugly on mobile, doesn't show the Pokemon details.
+#### 3. Tests
 
-**Plan:**
-1. New partial `app/views/dashboard/_mark_dead_modal.html.erb` modeled on `_pokemon_modal.html.erb`'s structure (background overlay, gb-modal container, close button, header, content, action row).
-2. Modal shows: pokemon sprite (using `pokemon_sprite_tag` if available, or a simple icon), group nickname, location, and a warning sentence: "This permanently removes <nickname> from all teams and marks every linked pokemon as dead."
-3. Two action buttons: "CANCEL" (closes modal) and "CONFIRM DEATH" (fires the actual PATCH).
-4. Wire via Stimulus targets on the dashboard controller:
-   - `markDeadModal` (the modal container)
-   - `markDeadNickname` (the displayed nickname)
-   - `markDeadLocation` (location text)
-   - `markDeadGroupId` (hidden field)
-5. Replace `markDead(event)` body: instead of `confirm(...)` then PATCH, set up the modal + show it. Add a new `confirmMarkDead()` action that fires the PATCH; add `closeMarkDeadModal()` to hide.
+New tests in `test/models/soul_link_run_test.rb`:
 
-The existing pokemon modal's MARK DEAD button at [_pokemon_modal.html.erb:107-111](app/views/dashboard/_pokemon_modal.html.erb:107) currently calls `dashboard#markDead` and relies on `data-group-id` + `data-group-nickname`. The new flow:
-- `dashboard#openMarkDeadModal(event)` — reads `groupId`, `groupNickname`, `groupLocation` from the dataset, populates the modal, shows it. Optionally closes the pokemon modal first.
-- `dashboard#confirmMarkDead()` — fires the PATCH with `markDeadGroupIdTarget.value`.
-- `dashboard#closeMarkDeadModal()` — hides without firing.
+```ruby
+# ── one-active-run invariant ─────────────────────────────────────────────
 
-The data attributes already include `groupNickname`. Add `data-group-location="<%= group.location %>"` to the MARK DEAD button (button is currently set up by `pixeldex_controller#updateModalForGroup`, so the location needs to be passed through there too).
+test "validates only one active run per guild" do
+  # @run from setup is already active, guild=999...
+  duplicate = build(:soul_link_run, guild_id: @run.guild_id, run_number: @run.run_number + 1)
+  assert_not duplicate.valid?
+  assert_includes duplicate.errors[:active], "another run is already active for this guild"
+end
 
-Actually simpler: read location from `modalGroupId` → look up the cell in the DOM. OR just skip the location for now; nickname is enough context. Keep modal copy simple for v1: nickname + warning text + actions.
+test "allows a second run for the same guild after deactivating the first" do
+  @run.deactivate!
+  next_run = build(:soul_link_run, guild_id: @run.guild_id, run_number: @run.run_number + 1)
+  assert next_run.valid?
+end
 
-The new partial gets rendered inline in `dashboard/show.html.erb` after the existing modal renders.
+test "allows runs in different guilds to be simultaneously active" do
+  other = build(:soul_link_run, guild_id: @run.guild_id + 1, run_number: 1)
+  assert other.valid?
+end
 
-#### E.18 — FALLEN section tooltip
+test "allows updating an already-active run without self-conflict" do
+  @run.update!(gyms_defeated: 3)
+  assert @run.persisted?
+  assert_equal 3, @run.reload.gyms_defeated
+end
 
-Two places: [app/views/dashboard/_pc_box_content.html.erb:72](app/views/dashboard/_pc_box_content.html.erb:72) and [app/views/dashboard/_pc_box_panel.html.erb:63](app/views/dashboard/_pc_box_panel.html.erb:63). Both render `<div class="box-section-label" style="margin-top: 14px;">FALLEN (<count>)</div>`.
+test "DB-level unique index catches a race that bypassed validation" do
+  # Simulate a TOCTOU race: validate against a snapshot that's about to
+  # become stale, then INSERT directly via raw SQL skipping validations.
+  # The DB constraint must catch it.
+  @run.update_column(:active, false) # bypass validation cleanly
+  first_active = create(:soul_link_run, guild_id: @run.guild_id, run_number: @run.run_number + 1)
+  # First active row exists. Now insert a second via raw SQL bypassing AR.
+  assert_raises(ActiveRecord::RecordNotUnique) do
+    SoulLinkRun.connection.execute(<<~SQL)
+      INSERT INTO soul_link_runs (guild_id, run_number, active, gyms_defeated, created_at, updated_at)
+      VALUES (#{first_active.guild_id}, #{first_active.run_number + 1}, 1, 0, NOW(), NOW())
+    SQL
+  end
+end
 
-Add `title="Pokemon that died this run"` to the div in both places. Trivial.
+# ── current(guild_id) ────────────────────────────────────────────────────
 
-Optionally: also add `title` to `YOUR POKEMON` / `STORAGE` headings if it reads better — but PROJECT-REVIEW only flagged FALLEN as ambiguous, so just that.
+test "current returns the single active run for a guild" do
+  assert_equal @run, SoulLinkRun.current(@run.guild_id)
+end
 
-#### KG-Step9-followup — YOU badge restoration via Stimulus
+test "current returns nil when no active run exists for guild" do
+  @run.deactivate!
+  assert_nil SoulLinkRun.current(@run.guild_id)
+end
 
-Step 9 dropped the YOU badge + 4px-border from run-roster cards because preserving them across Turbo broadcast frame replacements requires either passing `current_user_id` into a model callback (layer violation) or wrapping markers outside the frame (DOM fragility).
+test "current returns nil for an unknown guild" do
+  assert_nil SoulLinkRun.current(@run.guild_id + 999)
+end
+```
 
-The clean solution per the BUILD-LOG Known Gap: a small Stimulus controller that decorates the matching `<turbo-frame>` post-render.
+The "DB-level unique index" test exercises the constraint directly via raw SQL — Bob should verify the test passes (the INSERT raises `RecordNotUnique`).
 
-**Plan:**
-1. New file `app/javascript/controllers/roster_you_marker_controller.js`. Simple Stimulus controller.
-2. Stimulus value: `currentUserId: String` — set from a meta tag or data attr in the layout.
-3. The controller's `connect()` (and a new method `apply()` triggered on Turbo stream events) iterates over `<turbo-frame id^="emulator_roster_session_">`. For each, if its inner card has `data-discord-user-id` matching the value, add a YOU badge and a "current-user" CSS class for the 4px border.
-4. The roster card partial `_run_sidebar_card.html.erb` adds `data-discord-user-id="<%= s.discord_user_id %>"` to the outer card div so the Stimulus controller can find it.
-5. The Stimulus controller listens for `turbo:before-stream-render` on the document so it re-applies the marker after broadcast replacements.
-6. CSS: a new `.gb-card--current-user { border-width: 4px; }` rule in `pixeldex.css` for the 4px-border treatment.
-7. Mount the controller on the run-sidebar wrapper in `_run_sidebar.html.erb` with `data-controller="roster-you-marker" data-roster-you-marker-current-user-id-value="<%= current_user_id %>"`.
+#### 4. Schema.rb dump
 
-**Why a separate Stimulus controller, not adding to an existing one:** the existing `save-slots` controller is scoped to the LEFT slot column; the run-roster sidebar on the RIGHT has no Stimulus controller of its own. A small dedicated controller keeps responsibilities clean.
+After running the migration, `db/schema.rb` will pick up:
+```ruby
+t.virtual "active_guild_id", type: :bigint, as: "(case when `active` = 1 then `guild_id` end)"
+t.index ["active_guild_id"], name: "index_soul_link_runs_on_active_guild_id", unique: true
+```
 
-**Test:** add a unit-shape JS test? The project doesn't run JS tests. Instead: a smoke render test in `_run_sidebar_card_test.rb` that confirms `data-discord-user-id` is present in the rendered partial (so the Stimulus selector won't break silently). One test addition.
-
-Actually the project doesn't have a `_run_sidebar_card_test.rb` either — partial render is exercised in the model broadcast tests from Step 9. Add a small assertion to one of those: `assert_includes rendered, "data-discord-user-id="`.
-
-#### KG-5 — Rubocop autocorrect sweep
-
-113 auto-fixable offenses. Run `bundle exec rubocop -a` (safe autocorrect ONLY — not `-A` which includes unsafe corrections). Commit the result as a single logical change.
-
-After the sweep:
-- Re-run full test suite — must stay green
-- Re-run `bundle exec rubocop` — should report many fewer offenses (only the unsafe-correctable + non-correctable remain)
-- Spot-check a few changed files for sanity (mostly Layout/SpaceInsideArrayLiteralBrackets and similar style changes)
-
-Bob has discretion to revert specific edits if rubocop's autocorrect makes a code worse-looking change.
+The exact `as:` SQL string may vary based on MySQL's normalization (backticks, casing). Bob should commit whatever Rails dumps — don't hand-edit.
 
 ### Out of Scope (do NOT expand)
 
-- Tier-1 structural refactors (god-object decomp, presenter extraction, GzipCoder concern move) — fresh session
-- D.16 save-slot turbo_stream replace (compounds with KG-1, separate scope)
-- KG-6 (Map ID → name lookup) — needs Gen IV map ID research, defer
-- KG-7 (real-save offset verification) — needs a real `.sav` file from Project Owner
-- KG-8/9/10 (channel authz, error_message column, destructive regenerate) — defer
-- Adding a global toast component (still using `window.alert()` from Step 9; cleanup is a follow-up)
-- Bot-process broadcasts (still requires redis cable adapter)
-- B.6 / B.8 / B.9 / B.11 / C.12 / D.16 (already handled or deferred per Architect notes)
-- Refactoring the dashboard controller's view-model setup (Tier-1)
+- Wrapping `start_run` in an explicit transaction (the DB constraint catches the rare race; an explicit txn is a possible follow-up but adds review surface for no behavior change in the happy path)
+- Advisory locking on guild_id during run creation (same reasoning)
+- Refactoring `discord_bot.rb` create-run flow (Tier-1 work — fresh-session candidate)
+- Refactoring `lib/tasks/soul_link.rake` create-run flows (low-risk, defer)
+- Adding a Ruby-level "deactivate-then-create" helper (`SoulLinkRun.start_for_guild!(guild_id)`) — would be cleaner but expands scope
+- Touching the `(guild_id, active)` composite index — it's still useful for listing past runs in `history`
+- Postgres-specific paths (the project is MySQL-only per `config/database.yml`)
+- Adding a CHECK constraint that `run_number > 0` or similar — separate cleanup
+- Production data inspection — the migration's backfill check is the verification
 
 ### Constraints / Flags
 
-- **Sequence the work**: B.7/B.10/C.13/C.14/E.18 first (trivial — verify visually, no test impact), then D.15 (CSS class extraction), then E.17 (Mark Dead modal — bigger), then YOU-badge controller (new file + partial edits), then KG-5 last (autocorrect sweep — runs after all manual edits).
-- **305/310 tests must still pass** (310 from Step 9 with the broadcast tests). KG-5 autocorrect can break tests if it changes semantics — the safe `-a` flag should keep tests green; if it breaks, investigate per-cop.
-- **`bundle exec rubocop` clean on touched files at the end** — KG-5 should make this trivially true.
-- **No new `window.alert()` calls.** Step 9 added them as a stopgap; Step 10's Mark Dead modal supersedes the worst offender (the dashboard's `confirm()` was the most jarring native dialog). Don't ADD more alerts.
-- **YOU badge controller doesn't violate the model-callback layer**. The Stimulus controller is purely client-side; it reads `current_user_id` from a meta tag/data attr set in the layout (where controller context exists). Models stay clean.
-- **All 4 modal close buttons get the same `aria-label="Close modal"`** — don't customize per modal (they all close their respective modal, semantic is identical).
-- **Mark Dead modal's "CONFIRM DEATH" button is the danger action.** Use `gb-btn-danger` class. The CANCEL button uses default `gb-btn` styling.
-- **Don't add new CSS variables.** The amber token from Step 9 is the latest addition; further palette additions should be deliberate.
+- **Sequence the work**: write the migration first, run `db:migrate` locally + verify in `db/schema.rb`. THEN add the model validation + simplify `current`. THEN add tests. Run tests against the new constraint. The order matters because the model validation tests presume the migration's column exists.
+- **310/310 must still pass** after the migration + model change. The 7 controller tests that previously had `destroy_all` lines (removed in Step 8) MUST keep passing — the new validation catches what the destroy_all used to clean up. If any test fails because two `create(:soul_link_run)` calls happen in the same transaction, Bob should investigate (likely a test that needs `active: false` on one of the creates) and fix at the test site.
+- **Migration backfill check must NOT auto-fix data.** If duplicate active runs exist, raise. The Project Owner is the only one who decides which to keep. Document the manual cleanup query in the raise message.
+- **`active?` predicate.** Rails generates `active?` automatically from a boolean column (it's the same as `active`). Use `active?` in the validation guard for readability.
+- **Don't change the existing `(guild_id, active)` index.** It's used by `history` and other queries. The new unique index on `active_guild_id` is a separate index with a different shape.
+- **Verify the schema.rb dump committed** is reproducible — running `db:migrate` from scratch should produce the same schema.rb. If Rails picks weird capitalization/quoting in the `as:` string, that's the dumper's choice — don't fight it.
+- **Pre-existing rubocop offenses on lines Bob touches** — fix them. Step 10's KG-5 sweep brought the codebase to 0 offenses; Step 11 should keep it that way.
 
 ### Acceptance Criteria
 
-- All 9 items shipped (B.7, B.10, C.13, C.14, D.15, E.17, E.18, YOU-badge, KG-5).
-- Full suite green: 310/310 (or +N if YOU-badge test added).
-- `bundle exec rubocop` reports 113 fewer offenses (or close to it — autocorrect may surface chain reactions).
-- Manual smoke test (Bob): open `/dashboard`, click a Pokemon cell, click MARK DEAD — see the new modal, verify CANCEL closes without firing, verify CONFIRM DEATH fires the PATCH.
-- Manual smoke test: open `/emulator` in a narrow window (< 900px) — sidebars stack vertically; in a wide window — they sit side-by-side.
-- Manual smoke test: open `/emulator` as the current user — see the YOU badge + 4px-border on your roster card; trigger a save (which broadcasts a frame replace) — YOU badge re-applies post-broadcast.
-- Diff scope: 5+ JS controllers, 6+ views, 1 stylesheet, 1 new view partial, 1 new JS controller, ~80+ files touched by KG-5 autocorrect, 4 handoff files. Plus any test files Bob touches for the YOU-badge follow-up.
+- New migration `db/migrate/<timestamp>_enforce_single_active_run_per_guild.rb` exists.
+- `bin/rails db:migrate` runs cleanly on the dev DB; schema.rb updates with the virtual column + unique index.
+- The migration's backfill check raises a clear error if duplicate-active-runs exist (verified by manually creating dupes via `update_column(:active, true)` on an inactive run, attempting migrate, observing the raise, then cleaning up — Bob does this once locally to verify the safety belt works, then reverts the test data).
+- Model `SoulLinkRun` has the new `validate :no_other_active_run_for_guild` and the simplified `find_by`-based `current` method.
+- New tests in `test/models/soul_link_run_test.rb` covering: validation rejects duplicate active, validation accepts after deactivate, validation accepts different guilds, validation allows self-update, DB constraint catches raw-SQL bypass, `current` returns the single active, `current` returns nil for no-active, `current` returns nil for unknown guild. **8 new tests total.**
+- Full suite green: 310 + 8 = **318/318** passing, 0 failures, 0 errors.
+- `bundle exec rubocop` clean (0 offenses, same as Step 10's end state).
+- Diff scope: 1 new migration, 1 model edit, 1 test file edit, 1 schema.rb update, 4 handoff files. Anything else is a Reviewer Condition.
+
+### Approval-needed checkpoint
+
+If the migration's backfill check finds violating data on **the dev DB** during local testing, that's expected (Bob is artificially creating dupes to verify the safety belt). Just clean up and re-run.
+
+If the same check finds violating data on **production** (via the deploy script's `db:migrate`), the migration aborts the deploy. That's the desired behavior — it's the Project Owner's call which run to keep. **Do NOT auto-resolve in code.** A manual rake task or console session is the right cleanup path, decided by the Project Owner.
+
+For Step 11's purposes (local dev + test): Bob assumes no prod-data interference. The Project Owner runs the deploy and gets the constraint or the loud abort.
 
 ### Files Bob Should Read
 
-For B.7: `app/views/gym_schedules/show.html.erb` line 66
-For B.10: `app/views/gym_schedules/index.html.erb` lines 7-18
-For C.13: `app/views/layouts/application.html.erb` line 46
-For C.14: `app/views/dashboard/_pokemon_modal.html.erb`, `_catch_modal.html.erb`, `app/views/species_assignments/show.html.erb`, `app/views/teams/_quick_calc_modal.html.erb`, `app/views/map/show.html.erb` (close button)
-For D.15: `app/views/emulator/show.html.erb` line 72, `app/assets/stylesheets/pixeldex.css` (`:root` block + appendable area for new class)
-For E.17: `app/javascript/controllers/dashboard_controller.js` (markDead at 77), `app/views/dashboard/_pokemon_modal.html.erb` (where MARK DEAD button lives), `app/views/dashboard/_catch_modal.html.erb` (modal pattern reference)
-For E.18: `app/views/dashboard/_pc_box_content.html.erb` line 72, `app/views/dashboard/_pc_box_panel.html.erb` line 63
-For YOU-badge: `app/views/emulator/_run_sidebar.html.erb`, `_run_sidebar_card.html.erb`, `app/javascript/controllers/` directory listing for similar small Stimulus controllers (e.g. `clear_save_controller.js` for shape reference)
-For KG-5: just run `bundle exec rubocop -a` and review the diff before committing
+- `app/models/soul_link_run.rb` (entire file — small)
+- `db/schema.rb` lines around `create_table "soul_link_runs"` (verify column types, existing indexes)
+- `app/channels/run_channel.rb` `start_run` method (sanity-check the existing flow plays nice with the new constraint)
+- `app/services/soul_link/discord_bot.rb` lines 235-285 (the bot's create-run flow — same sanity check)
+- `lib/tasks/soul_link.rake` lines 35-55, 305-320 (rake tasks — same sanity check)
+- `test/models/soul_link_run_test.rb` (entire file — to know where new tests slot in)
+- `test/factories/soul_link_runs.rb` (to know the factory's defaults — guild_id is constant 999..., not a sequence)
+- One existing migration in `db/migrate/` for the file-naming + style reference
 
-DO NOT load app/controllers, app/services, or any model code (no business-logic changes in this step).
+DO NOT load the full app/services or app/controllers — no business logic changes.
 
 ### Files Bob Should Update at the End
 
 - `handoff/REVIEW-REQUEST.md` — files-changed table, self-review answers, open questions, `Ready for Review: YES`
-- `handoff/BUILD-LOG.md` — Step 10 history entry. **Update Known Gaps:** close the YOU-badge follow-up (added in Step 9, closed here).
+- `handoff/BUILD-LOG.md` — Step 11 history entry. **Update Architecture Decisions § Carried over** to add: "One active SoulLinkRun per guild is enforced by a virtual-column unique index on `soul_link_runs.active_guild_id` (added in Step 11). DB-level constraint catches any path that bypasses `RunChannel#start_run`'s deactivate-then-create flow."
 
 ---
 
@@ -228,20 +245,24 @@ DO NOT load app/controllers, app/services, or any model code (no business-logic 
 
 When this lands on your desk, focus on:
 
-1. **The skipped items (B.6, B.8, B.9, B.11, C.12, D.16) are correctly diagnosed.** Spot-check 1-2 to verify they're already handled. Bob's notes in REVIEW-REQUEST should explain.
+1. **Migration backfill check actually raises** on duplicate data. Bob should describe in REVIEW-REQUEST his local test of this safety belt (artificially create dupes via `update_column`, run migrate, see the raise, clean up).
 
-2. **Mark Dead modal flow.** Open dashboard, click a Pokemon, click MARK DEAD button — the new modal opens with the right pokemon's nickname + warning text. CANCEL closes without firing. CONFIRM DEATH fires the PATCH and reloads the page (current behavior). No regression to the existing markDead → server flow.
+2. **The virtual column expression is correct.** `(CASE WHEN active = 1 THEN guild_id END)` — when active is true, returns guild_id; when false, returns NULL (CASE without ELSE returns NULL). NULLs don't conflict in unique indexes. Multiple inactive rows for the same guild work.
 
-3. **YOU-badge Stimulus controller.** Open `/emulator` as a logged-in player. The session card for THAT player should have the YOU badge + 4px-border re-applied by the controller. After a save (which broadcasts a frame replace), the YOU badge should re-apply on the next render. Open dev tools and watch the controller's `apply()` method run on `turbo:before-stream-render`.
+3. **Schema.rb dump is committed.** Running `db:rollback && db:migrate` should produce no diff. Bob should describe this verification.
 
-4. **D.15 mobile breakpoint.** Resize the emulator page below 900px — sidebars stack. Above 900px — three-column layout returns. CSS class is in pixeldex.css; inline style is gone.
+4. **Validation gate `if: -> { active? }`** is correct. Inactive→inactive updates should not trigger the validation. Active→active updates (e.g., bumping gyms_defeated) should pass via `where.not(id: id)`.
 
-5. **KG-5 sweep.** Verify the autocorrect didn't introduce semantic changes — spot-check 5-10 randomly modified files. Look for: behavior-preserving whitespace tweaks (Layout/SpaceInsideArrayLiteralBrackets), parens-on-no-arg-defs, etc. If any look semantically suspect, flag.
+5. **The "DB constraint catches raw-SQL bypass" test** actually exercises the constraint, not just the validation. If Bob's test only triggers the validation (e.g., via `create!` with a duplicate active row), it doesn't prove the DB constraint works. The test should use `connection.execute` to bypass AR.
 
-6. **Tests still pass post-autocorrect.** 310/310 (+N if YOU-badge test added). If KG-5 broke a test, it's a Reviewer Condition (rubocop -a should be safe).
+6. **`current(guild_id)` returns at most one row.** With `find_by(guild_id:, active: true)`, two-active-rows is now impossible. Drop the defensive `order(run_number: :desc).first`.
 
-7. **No app/controllers, app/services, or app/models changes.** Step 10 is view + JS + CSS + Stimulus + lint. Models from Step 9 stay clean.
+7. **No regression on `RunChannel#start_run`, `discord_bot.rb`, or `lib/tasks/soul_link.rake`.** Their deactivate-then-create flow still works because the deactivate updates `active_guild_id` to NULL before the new INSERT. Walk one path manually to confirm.
 
-8. **Diff scope.** `git diff --stat HEAD~1 main` should show many files (KG-5 sweeps the whole tree) but ZERO logic changes. Sanity-check a few samples.
+8. **No regression on Step 9's broadcast tests.** `SoulLinkEmulatorSaveSlot` broadcasts to `[run, :emulator]`. The run reference is unchanged. Tests should pass without modification.
+
+9. **No changes to the controller tests' setup blocks.** The Step 8 sweep removed `destroy_all` lines; they were redundant. With Step 11's constraint, even if they came back, they'd still work — but they're not needed.
+
+10. **The factory's static `guild_id { 999... }` is unchanged.** Tests that need a different guild explicitly pass it; the constraint catches any test that accidentally creates two active runs in the same guild (which would be a test bug, not a constraint flaw).
 
 Out-of-scope items found during review → BUILD-LOG Known Gaps. Do not bundle.

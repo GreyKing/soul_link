@@ -9,13 +9,18 @@ class SoulLinkRun < ApplicationRecord
 
   validates :run_number, presence: true, uniqueness: { scope: :guild_id }
   validates :guild_id, presence: true
+  validate :no_other_active_run_for_guild, if: -> { active? }
+
   scope :active, -> { where(active: true) }
   scope :inactive, -> { where(active: false) }
   scope :for_guild, ->(guild_id) { where(guild_id: guild_id) }
   scope :history, ->(guild_id) { for_guild(guild_id).inactive.order(run_number: :desc) }
 
+  # At most one active run per guild — enforced at the DB level by a
+  # virtual-column unique index on `active_guild_id` (Step 11 migration).
+  # This is a single-row lookup; the `(guild_id, active)` index covers it.
   def self.current(guild_id)
-    active.for_guild(guild_id).order(run_number: :desc).first
+    find_by(guild_id: guild_id, active: true)
   end
 
   # Group-based queries (primary — used by panels)
@@ -71,5 +76,18 @@ class SoulLinkRun < ApplicationRecord
       has_discord_channels: discord_channels_configured?,
       emulator_status: emulator_status
     }
+  end
+
+  private
+
+  # User-friendly counterpart to the DB-level unique index on
+  # active_guild_id. Without this, the constraint violation surfaces as
+  # a 500 with `ActiveRecord::RecordNotUnique`; with it, callers see a
+  # validation error and can branch on `record.errors`.
+  def no_other_active_run_for_guild
+    scope = self.class.where(guild_id: guild_id, active: true)
+    scope = scope.where.not(id: id) if persisted?
+    return unless scope.exists?
+    errors.add(:active, "another run is already active for this guild")
   end
 end
