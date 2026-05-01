@@ -11,9 +11,9 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 4 — Build All Missing FactoryBot Factories. **Awaiting review.**
-**Last committed:** `a3cf783` — 2026-04-30 (Step 3 logging follow-up)
-**Pending deploy:** N/A — Step 4 is test-only (no app code, no migration).
+**Active step:** *None — Step 4 shipped, awaiting next brief.*
+**Last committed:** `6e2c8c8` — 2026-04-30 (Step 4: FactoryBot factories) — pushed to `origin/claude/gallant-bell-cb4390`. Branch awaits PR/merge to `main`.
+**Pending deploy:** N/A — Step 4 is test-only (no app code, no migration). Branch can merge to `main` without a deploy.
 
 **Parked plan:** FactoryBot conversion. Phases 1+2 land in this step (Step 4); Phase 3+ in Steps 5–6. See `handoff/parked-plans/factorybot-conversion.md`.
 
@@ -23,7 +23,7 @@ reset until the gap is addressed or the decision is replaced.
 *Session-scoped.*
 
 ### Step 4 — Build All Missing FactoryBot Factories — 2026-04-30
-**Status:** Awaiting review.
+**Status:** Complete, committed `6e2c8c8`, pushed to `origin/claude/gallant-bell-cb4390`. Test-only — no deploy required.
 
 **Files created (6, all under `test/factories/`):**
 - `soul_link_pokemon_groups.rb` — base factory + 6 named traits (`:route201`–`:route206`). Each trait sets `nickname`/`location`/`status` via attribute assignment and uses `after(:create) update_columns(position:, caught_at:)` to **override** the model's `before_create :set_position` and `:set_caught_at` callbacks (fixtures bypass these via raw SQL; the override reproduces fixture state exactly).
