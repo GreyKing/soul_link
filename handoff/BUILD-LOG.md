@@ -11,11 +11,11 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 8 — Final Sweep: Delete Fixtures + Drop Hybrid Convention. **Awaiting review.**
-**Last committed:** Step 7 (`a18a27f`) shipped + merged to `main`. Step 8 not yet committed.
-**Pending deploy:** N/A — Step 8 is test/docs only.
+**Active step:** Step 9 — UX Batch (Tier-A + KG-1/2/3/4). **Awaiting review.**
+**Last committed:** Step 8 (`64364d9`) shipped + merged to `main`. Step 9 not yet committed.
+**Pending deploy:** N/A — Step 9 is web-process-only (broadcasts use the in-process async cable adapter; no infra change).
 
-**Parked plan:** Archived to `handoff/archive/2026-04-30-factorybot-conversion.md` with COMPLETE status marker. The FactoryBot conversion is fully done — Steps 4-8.
+**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — diagnostic punch-list that fed Step 9. Stays in handoff/ for future reference.
 
 **Parked plan:** FactoryBot conversion. Phases 1+2 land in this step (Step 4); Phase 3+ in Steps 5–6. See `handoff/parked-plans/factorybot-conversion.md`.
 
@@ -23,6 +23,60 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 9 — UX Batch: Tier-A Silent-Failure Fixes + KG-1/2/3/4 — 2026-04-30
+**Status:** Awaiting review.
+
+Drew its punch-list directly from `handoff/PROJECT-REVIEW-2026-04-30.md`. Ships 9 items in one focused step:
+
+**Tier-A silent-failure fixes (5 items):**
+- **A.1 — `save_slots_controller.js` user-facing toasts.** Every error branch in `makeActive`, `deleteSlot`, `overwriteSlot` (5 `console.error` sites) now also fires `window.alert(...)` with an actionable message ("contact the run creator").
+- **A.2 — `gym_draft_controller.js` error banner.** `handleMessage` now calls a new `showError(message)` method that renders `errorBannerTarget` for 8 seconds, falling back to `alert()` if the target isn't present. Added `errorBanner` to the static targets and a `<div data-gym-draft-target="errorBanner" hidden>` in `gym_drafts/show.html.erb`.
+- **A.3 — `team_builder_controller.js` pixeldex status classes.** Replaced Tailwind `text-yellow-400`/`green-400`/`red-400` (which were silently no-ops in the dashboard layout) with semantic `team-builder-status--saving`/`saved`/`error` modifiers wired through new `.team-builder-status` rules in `pixeldex.css`. Save status is now visible.
+- **A.4 — Save-slot action buttons disabled in overwrite-pending mode.** `_enterOverwriteMode` and `_exitOverwriteMode` now toggle `disabled` on every `[data-action*='save-slots#makeActive'], [data-action*='save-slots#deleteSlot']` button via a new `_actionButtons()` helper. Tab-focus + screen-reader paths can no longer trigger Delete during an overwrite flow.
+- **A.5 — Pokemon modal SAVE button disable in-flight.** `pixeldex_controller.js#savePokemon(event)` now disables the click target before the first PATCH and re-enables on every error-return path. Success path leaves it disabled (page reloads anyway). `evolvePokemon` (KG-3 below) gets the same treatment.
+
+**Knowledge Gap closures:**
+- **KG-1 — Real-time roster sidebar.** Extracted `app/views/emulator/_run_sidebar_card.html.erb` (single-session card) from `_run_sidebar.html.erb`. Wrapped each session render in `turbo_frame_tag "emulator_roster_session_#{s.id}"`. Added `turbo_stream_from @run, :emulator` to the emulator show page. `SoulLinkEmulatorSaveSlot` gained `after_create_commit :broadcast_roster_card_on_create` and `after_update_commit :broadcast_roster_card_on_update, if: :saved_change_to_parsed?` — both call a shared `broadcast_roster_card` helper that issues `Turbo::StreamsChannel.broadcast_replace_to([run, :emulator], target: "emulator_roster_session_#{session.id}", partial: "emulator/run_sidebar_card", locals: { s: session })`. After the SRAM parse job writes a slot's parsed_* fields, every viewer's emulator page sees that session's roster card refresh without a full page reload (which would tear down the running emulator iframe).
+- **KG-2 — Real-time dashboard.** Added `broadcasts_refreshes_to ->(record) { [ record.soul_link_run, :dashboard ] }` to `SoulLinkPokemon` and `SoulLinkPokemonGroup`. Dashboard show page subscribes via `turbo_stream_from @run, :dashboard` and configures `turbo_refreshes_with method: :morph, scroll: :preserve` so the page morphs in place rather than full-reloading. Pokemon edits / group status changes propagate across all open dashboards in the run.
+- **KG-3 — EVOLVE button loading state.** `evolvePokemon(event)` now disables the button + sets text to "EVOLVING..." on click; re-enables + restores text on error-return paths. Success path reloads.
+- **KG-4 — `--amber` palette token.** Added `--amber: #d4b14a;` to `:root` in `pixeldex.css`. Replaced the inline `#d4b14a` literal in `_run_sidebar.html.erb` (status-pill background for pending/generating sessions) with `var(--amber)`. The new `team-builder-status--saving` class also references it.
+
+**Files modified (12):**
+- `app/javascript/controllers/save_slots_controller.js` — A.1 toasts + A.4 button disable in overwrite mode + helper method
+- `app/javascript/controllers/gym_draft_controller.js` — A.2 errorBanner target + showError method
+- `app/javascript/controllers/team_builder_controller.js` — A.3 pixeldex modifier classes
+- `app/javascript/controllers/pixeldex_controller.js` — A.5 SAVE disable + KG-3 EVOLVE loading state
+- `app/models/soul_link_emulator_save_slot.rb` — KG-1 broadcast callbacks (two distinct method names to avoid Rails callback dedup; documented inline)
+- `app/models/soul_link_pokemon.rb` — KG-2 broadcasts_refreshes_to
+- `app/models/soul_link_pokemon_group.rb` — KG-2 broadcasts_refreshes_to
+- `app/views/emulator/show.html.erb` — KG-1 turbo_stream_from
+- `app/views/emulator/_run_sidebar.html.erb` — KG-1 frame wrap + KG-4 amber token (also dropped YOU badge / 4px-border, see Known Gap below)
+- `app/views/dashboard/show.html.erb` — KG-2 turbo_refreshes_with + turbo_stream_from
+- `app/views/gym_drafts/show.html.erb` — A.2 errorBanner target div
+- `app/assets/stylesheets/pixeldex.css` — KG-4 amber token + A.3 team-builder-status classes
+
+**Files created (1):**
+- `app/views/emulator/_run_sidebar_card.html.erb` — single-session card partial that renders cleanly with only `s` (the session) as a local
+
+**Test changes (2 files):**
+- `test/models/soul_link_emulator_save_slot_test.rb` — added 5 new tests for KG-1 broadcasts: create broadcasts to `[run, :emulator]`, update on parsed_* broadcasts, update_columns does NOT broadcast (callbacks bypassed), update on non-parsed field does NOT broadcast, partial renders standalone with only `s` local. Pulled in `Turbo::Broadcastable::TestHelper` (with explicit `require "turbo/broadcastable/test_helper"`).
+- `test/controllers/emulator_controller_test.rb` — renamed "show roster renders player names, YOU badge, and Unclaimed entries" to "show roster renders player names and Unclaimed entries"; dropped the `assert_match(/>YOU</)` line + comment explaining why (Known Gap, see below).
+
+**Key decisions:**
+- **`broadcasts_refreshes_to` for pokemon + group, but `broadcast_replace_to` for save_slot.** Different scope: pokemon/group changes affect many areas of the dashboard, so a Turbo morph refresh is right. Save-slot updates only affect the per-session roster card on the emulator page; a page refresh would tear down the running emulator iframe, so we use targeted frame replacement.
+- **Two distinct callback method names on `SoulLinkEmulatorSaveSlot` (`broadcast_roster_card_on_create` vs `broadcast_roster_card_on_update`).** Rails dedupes callback registrations by method name across lifecycle events: registering the SAME method on both `after_create_commit` and `after_update_commit` keeps only the second registration. Splitting into two methods that delegate to a shared helper is the workaround. Documented inline.
+- **Turbo test helper requires explicit require + include.** `Turbo::Broadcastable::TestHelper` isn't auto-loaded; the test file explicitly `require "turbo/broadcastable/test_helper"` and `include`s it. Tests that diff "before vs after" broadcast count (because `assert_turbo_stream_broadcasts` captures the entire test's broadcast history, not just the block) use `capture_turbo_stream_broadcasts` and explicit count math.
+- **YOU badge / 4px-border dropped from the run roster.** Preserving them across Turbo Stream broadcasts would require either passing `current_user_id` into a model callback (a layer violation) or rendering markers outside the frame in DOM-fragile ways. The `player_label` still disambiguates which card is theirs. Logged as Known Gap below.
+- **`window.alert()` for Tier-A toasts.** Smallest user-facing change that closes the silent-failure gap. A proper styled toast component is out of scope; future polish step can replace.
+
+**Tests:** 305 → 310 (+5 broadcast tests for save_slot model). 0 failures, 0 errors.
+
+**Lint:** `bundle exec rubocop` clean on all 5 touched Ruby files (3 models, 2 tests).
+
+**Diff scope:** 12 modified, 1 created (the new partial), plus `handoff/PROJECT-REVIEW-2026-04-30.md` (created in the prior session, committed here as it's the input doc for Step 9), and the four handoff docs (`ARCHITECT-BRIEF.md`, `BUILD-LOG.md`, `REVIEW-REQUEST.md`, `REVIEW-FEEDBACK.md`).
+
+---
 
 ### Step 8 — Final Sweep: Delete Fixtures + Drop Hybrid Convention — 2026-04-30
 **Status:** Awaiting review.
@@ -314,21 +368,29 @@ ALL FACTORY SMOKE CHECKS PASSED
 ## Known Gaps
 *Durable. Items logged here instead of expanding the current step. Persists across sessions until addressed.*
 
+### Closed in Step 9 (2026-04-30)
+- ~~**No real-time broadcast of species change to other players' dashboards**~~ — closed (KG-2: `broadcasts_refreshes_to` on `SoulLinkPokemon` + `SoulLinkPokemonGroup`)
+- ~~**No loading state on EVOLVE button itself**~~ — closed (KG-3: button disable + "EVOLVING..." text)
+- ~~**`#d4b14a` amber color inline in `_run_sidebar.html.erb`**~~ — closed (KG-4: promoted to `--amber` palette token in `pixeldex.css`)
+- ~~**No real-time updates on the run roster sidebar**~~ — closed (KG-1: targeted frame replacement on save-slot parsed_* updates)
+- ~~**Convert legacy fixture-based tests to FactoryBot**~~ — closed in Steps 4-8 (FactoryBot conversion shipped)
+
 ### From earlier work (Evolve Button feature)
 - Co-evolution of soul-link partners on evolution (deliberate; revisit if Project Owner wants paired evolution)
-- No real-time broadcast of species change to other players' dashboards (they see updates on next refresh)
 - No level/method gating on EVOLVE button (always available; player owns in-game timing)
-- No loading state on EVOLVE button itself (status text only)
+
+### New — From Step 9 (2026-04-30)
+- **YOU badge + 4px-border removed from run roster cards.** Preserving them across Turbo Stream broadcasts would require passing `current_user_id` into a model callback (a layer violation) or rendering markers outside the frame in DOM-fragile ways. The `player_label` still disambiguates which card is the viewer's own. A future iteration could add a small "current-user marker" Stimulus controller that reads `current_user_id` from a meta tag and decorates the matching `<turbo-frame>` post-render.
+- **`window.alert()` for Tier-A error toasts.** Smallest user-facing change that closed the silent-failure gap; a styled toast component (matching the `gb-flash gb-flash-alert` palette) would be cleaner. Track if alerts feel intrusive in real use.
+- **Bot-process broadcasts not yet supported.** The async cable adapter is in-process; Discord modal updates (which run in the bot process via `rake soul_link:bot`) don't propagate to web clients in real time. Switching to a redis cable adapter would unlock this. Out of scope for Step 9.
+- **Pre-existing soft points from `handoff/PROJECT-REVIEW-2026-04-30.md`** — 20 items, ranked by ROI in that document. Top-priority structural cleanups: (1) `discord_bot.rb` god-object decomposition; (2) zero test coverage on services/channels; (3) `SoulLinkRun.current(guild_id)` lacks a hard "one active per guild" invariant; (4) `DashboardController#show` needs presenter extraction; (5) `SoulLinkEmulatorSession::GzipCoder` should move to a concern. None of these are urgent.
 
 ### From the emulator deploy + polish session (2026-04-29)
 - **Tier 2 SRAM parsing** for in-game info (character name, time-played, money, party count, current map, badges earned) — separate feature, real engineering effort (Gen IV character set decoder + checksum/slot logic)
 - **No automated browser test harness** — smoke tests are manual; Project Owner verifies UI changes
-- **`#d4b14a` amber color** for pending-state status badge is inline in `_run_sidebar.html.erb`. If used in a third place, promote to a `--amber` palette token in `pixeldex.css`.
 - **Randomizer settings file** (`random_basic_1.rnqs`) is small/basic — heavier randomization (abilities, types-per-move, evolutions) requires re-export from the GUI and re-scp
 - **Destructive regenerate** wipes save_data for ready/claimed sessions when status is `:failed`. Acceptable v1 tradeoff; future iteration could selectively preserve `:ready` sessions.
 - **`error_message` column at varchar(255)** — widen to text only if real-world stack traces prove limiting
-- **Convert legacy fixture-based tests to FactoryBot** — deferred; do not bundle into feature work
-- **No real-time updates on the run roster sidebar** — page-load refresh only. Could broadcast on save_data PATCH if live "X just saved" UX is wanted.
 - **Channel-layer guild authz cached at login** — if user joins a new guild mid-session without re-logging-in, they won't see it. Acceptable for current use.
 
 ### From SRAM Phase 1 (2026-04-29)

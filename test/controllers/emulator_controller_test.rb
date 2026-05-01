@@ -227,7 +227,7 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_no_match(/>YOU</, response.body)
   end
 
-  test "show roster renders player names, YOU badge, and Unclaimed entries" do
+  test "show roster renders player names and Unclaimed entries" do
     create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
     create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: ARATY)
     create(:soul_link_emulator_session, :ready, soul_link_run: @run) # unclaimed
@@ -239,8 +239,12 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
 
     assert_match(/RUN ROSTER/, response.body)
     assert_match(/Grey/, response.body)
-    assert_match(/>YOU</, response.body)
     assert_match(/Unclaimed/, response.body)
+    # YOU badge + 4px-border were removed in Step 9 because preserving
+    # them across Turbo Stream broadcasts would require passing
+    # current_user_id into a model callback (a layer violation). The
+    # player_label still disambiguates which card is theirs. Tracked as
+    # a Known Gap in BUILD-LOG.
   end
 
   # --- show: parsed save fields in roster cards (other players) ----------

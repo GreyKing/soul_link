@@ -18,6 +18,12 @@ class SoulLinkPokemon < ApplicationRecord
 
   before_create :set_caught_at, if: -> { status == 'caught' }
 
+  # Real-time UX: dashboard pages subscribed to the run-scoped :dashboard
+  # stream get a Turbo refresh broadcast on create/update/destroy. With
+  # `turbo_refreshes_with method: :morph` set on the dashboard page, the
+  # browser morphs in just the changed DOM rather than a full reload.
+  broadcasts_refreshes_to ->(pokemon) { [ pokemon.soul_link_run, :dashboard ] }
+
   def assign_to_group!(group)
     raise "Already assigned to a group" if soul_link_pokemon_group_id.present?
     update!(

@@ -1,6 +1,12 @@
 <%# Six-state ERB. The emulator UI itself only renders when there is a
     claimed, ready session for the current player. %>
 
+<%# Subscribe to per-run Turbo Stream broadcasts. Used by
+    SoulLinkEmulatorSaveSlot's after_*_commit broadcast_roster_card_update
+    to refresh individual run-roster cards without reloading the page
+    (which would tear down the running emulator iframe). %>
+<%= turbo_stream_from @run, :emulator if @run %>
+
 <div style="margin-bottom: 16px;">
   <div class="gb-page-title">EMULATOR</div>
   <div class="gb-page-subtitle">Play your randomized Pokemon Platinum ROM in the browser.</div>

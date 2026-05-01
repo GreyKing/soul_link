@@ -15,6 +15,10 @@ class SoulLinkPokemonGroup < ApplicationRecord
   before_create :set_position
   after_update :remove_team_slots_on_death, if: -> { saved_change_to_status? && dead? }
 
+  # Real-time UX: dashboard pages subscribed to the run-scoped :dashboard
+  # stream get a Turbo refresh broadcast on create/update/destroy.
+  broadcasts_refreshes_to ->(group) { [ group.soul_link_run, :dashboard ] }
+
   def mark_as_dead!(death_location: nil, eulogy: nil)
     transaction do
       update!(

@@ -6,66 +6,63 @@ Ready for Review: YES
 
 ---
 
-## Step 8 — Final Sweep: Delete Fixtures + Drop Hybrid Convention
+## Step 9 — UX Batch: Tier-A + KG-1/2/3/4
 
 **Builder:** Bob
-**Tests:** 305/305 passing on full suite. **Flake check: 20 reps total — 1 transient failure on the very first rep (seed 13579) that did not reproduce. 19 subsequent reps clean (5 fresh + 10 more + 5 more = 19/19).** The lost stacktrace prevented identifying the specific test; suspected one-time timing artifact, not a systemic regression. See "Self-Review #6" below.
-**Lint:** `bundle exec rubocop` clean on all 8 touched test files (test_helper.rb + 7 controller tests). Fixed 1 pre-existing offense in test_helper.rb:36 to satisfy touched-files-clean criterion.
+**Tests:** 310/310 passing (305 baseline + 5 new broadcast tests). 0 failures, 0 errors.
+**Lint:** `bundle exec rubocop` clean on all 5 touched Ruby files (3 models, 2 tests).
 
 ---
 
 ## Files Changed
 
-### Deleted (7 fixture YAMLs)
-
-| Path |
-|------|
-| `test/fixtures/gym_drafts.yml` |
-| `test/fixtures/gym_results.yml` |
-| `test/fixtures/soul_link_pokemon.yml` |
-| `test/fixtures/soul_link_pokemon_groups.yml` |
-| `test/fixtures/soul_link_runs.yml` |
-| `test/fixtures/soul_link_team_slots.yml` |
-| `test/fixtures/soul_link_teams.yml` |
-
-`test/fixtures/files/.keep` (ActiveStorage convention) preserved.
-
-### Modified (10 files)
+### Modified (12)
 
 | Path | Change |
 |------|--------|
-| `test/test_helper.rb` | Dropped `fixtures :all` line + comment block; updated FactoryBot-syntax comment to no longer mention legacy coexistence; fixed 1 pre-existing rubocop offense on line 36 |
-| `CLAUDE.md` | Testing-conventions: replaced 2-bullet hybrid note with 1-bullet "All tests use FactoryBot factories" + Step 8 attribution |
-| `handoff/BUILD-LOG.md` | Durable § Architecture Decisions § Carried over: replaced legacy-fixture line with current "All tests use FactoryBot" line. Plus Step 8 history entry. |
-| `test/controllers/emulator_controller_test.rb` | Setup: removed dead `SoulLinkRun.where(...).destroy_all` line + 4-line explanatory comment block |
-| `test/controllers/save_slots_controller_test.rb` | Setup: removed dead destroy_all line |
-| `test/controllers/species_assignments_controller_test.rb` | Setup: removed dead destroy_all line |
-| `test/controllers/teams_controller_test.rb` | Setup: removed dead destroy_all line. Plus removed dead in-test `SoulLinkTeam.where(...).destroy_all` line + comment from "show creates team if none exists" |
-| `test/controllers/pokemon_controller_test.rb` | Setup: removed dead destroy_all line |
-| `test/controllers/pokemon_groups_controller_test.rb` | Setup: removed dead destroy_all line |
-| `test/controllers/gym_drafts_controller_test.rb` | Setup: removed dead destroy_all line |
+| `app/javascript/controllers/save_slots_controller.js` | A.1 toasts on every error branch (5 sites) + A.4 button-disable in overwrite mode + new `_actionButtons()` helper |
+| `app/javascript/controllers/gym_draft_controller.js` | A.2 `errorBanner` target + new `showError(message)` method with 8s auto-hide |
+| `app/javascript/controllers/team_builder_controller.js` | A.3 replaced Tailwind classes with `team-builder-status--saving/saved/error` modifiers |
+| `app/javascript/controllers/pixeldex_controller.js` | A.5 SAVE button disable in-flight + KG-3 EVOLVE loading state |
+| `app/models/soul_link_emulator_save_slot.rb` | KG-1 broadcast callbacks (two distinct method names to dodge Rails callback dedup) |
+| `app/models/soul_link_pokemon.rb` | KG-2 `broadcasts_refreshes_to ->(p) { [p.soul_link_run, :dashboard] }` |
+| `app/models/soul_link_pokemon_group.rb` | KG-2 same pattern |
+| `app/views/emulator/show.html.erb` | KG-1 `turbo_stream_from @run, :emulator if @run` |
+| `app/views/emulator/_run_sidebar.html.erb` | KG-1 frame wrap + KG-4 amber token (also dropped YOU badge / 4px-border — Known Gap) |
+| `app/views/dashboard/show.html.erb` | KG-2 `turbo_refreshes_with method: :morph` + `turbo_stream_from @run, :dashboard` |
+| `app/views/gym_drafts/show.html.erb` | A.2 `errorBanner` target div |
+| `app/assets/stylesheets/pixeldex.css` | KG-4 `--amber` token + A.3 `team-builder-status--*` classes |
 
-### Renamed (1)
+### Created (1)
 
-| From | To |
-|------|----|
-| `handoff/parked-plans/factorybot-conversion.md` | `handoff/archive/2026-04-30-factorybot-conversion.md` |
+| Path | Purpose |
+|------|---------|
+| `app/views/emulator/_run_sidebar_card.html.erb` | Single-session card extracted from `_run_sidebar.html.erb`; renders cleanly with only `s` (the session) as a local — no controller context needed |
 
-Added `> Status: COMPLETE — landed via Steps 4-8...` marker at top of the archived file. Original discovery-doc body preserved as historical record. `handoff/parked-plans/` is now empty.
+### Modified (test files)
 
-### Modified (handoff session-scoped)
+- `test/models/soul_link_emulator_save_slot_test.rb` — added 5 broadcast tests + `Turbo::Broadcastable::TestHelper` include + explicit require
+- `test/controllers/emulator_controller_test.rb` — renamed YOU-badge test, dropped `>YOU<` assertion (Known Gap)
 
-- `handoff/ARCHITECT-BRIEF.md` — Step 8 brief (Architect overwrote at session start)
+### Modified (handoff)
+
+- `handoff/ARCHITECT-BRIEF.md` — Step 9 brief
+- `handoff/BUILD-LOG.md` — Step 9 history entry + Known Gaps section update (4 closed, 4 new from Step 9)
 - `handoff/REVIEW-REQUEST.md` — this document
 - `handoff/REVIEW-FEEDBACK.md` — Reviewer's verdict
 
+### Untracked → committed in this batch
+
+- `handoff/PROJECT-REVIEW-2026-04-30.md` — diagnostic report from the prior session that fed this step
+
 ### Untouched (per brief)
 
-- All factories under `test/factories/`
-- `test/fixtures/files/` ActiveStorage attachment dir
-- `parallelize(workers: :number_of_processors)` line in test_helper.rb
-- All app code (`app/`)
-- All other test files (model tests, channel test)
+- All app/controllers
+- All app/services
+- All app/channels (existing channels — gym_draft, gym_schedule, run — untouched)
+- `config/cable.yml` (still async; bot-process broadcasts deferred)
+- All factories
+- `test/test_helper.rb`
 
 ---
 
@@ -73,56 +70,58 @@ Added `> Status: COMPLETE — landed via Steps 4-8...` marker at top of the arch
 
 ### What would Reviewer most likely flag?
 
-1. **`git mv` for parked-plan archive.** Used `git mv` so the move shows as a rename in `git log --follow`. Matches the existing archive convention (`2026-04-12-pixeldex-calculator.md`, `2026-04-29-emulator-deploy-and-polish.md`). Status marker added at top with commit refs for Steps 4-8.
+1. **Two-method-name workaround on `SoulLinkEmulatorSaveSlot`.** Rails dedupes callback registrations by method name across lifecycle events: `after_create_commit :foo` + `after_update_commit :foo` only keeps the second. I verified this empirically — the first attempt with a single method on both events fired ONLY on update. Split into `broadcast_roster_card_on_create` + `broadcast_roster_card_on_update`, both delegating to a shared private `broadcast_roster_card`. Documented inline.
 
-2. **Pre-existing rubocop offense fixed in test_helper.rb:36.** When I touched test_helper.rb (removing `fixtures :all`), rubocop surfaced an existing `Layout/SpaceInsideArrayLiteralBrackets` offense on `[{ "id" => guild_id.to_s }].to_json`. Fixed to `[ { "id" => guild_id.to_s } ].to_json` for the touched-files-clean acceptance criterion. Same Step 5/6/7 lesson — fix only touched files. Pre-existing offenses elsewhere remain (Known Gap from Step 1).
+2. **YOU badge / 4px-border removed from roster cards.** Preserving them across stream replacements would require either (a) passing `current_user_id` into a model callback (layer violation), (b) wrapping the marker outside the turbo_frame_tag (DOM fragility — frame replacement preserves the wrapper), or (c) a small Stimulus controller that decorates the matching frame post-render. (a) violates clean architecture, (b) breaks because the marker would need its own per-session id which means we already have that frame, (c) is a follow-up. Logged as Known Gap. Updated the failing emulator test to reflect.
 
-3. **Bulk fixture deletion via `git rm`.** User explicitly OK'd this: "the fixture deletions are bulk file removals from a versioned directory — that IS the work, not a destructive accident." Used `git rm test/fixtures/*.yml` (7 explicit paths to avoid wiping `files/.keep`).
+3. **Tier-A toasts use `window.alert()`.** Brief explicitly endorsed this as the smallest viable change. A styled toast component (matching `gb-flash gb-flash-alert`) is a follow-up. The user has already seen 4 alerts during normal usage (delete confirm, restore confirm, slot-N-active info, network errors) — the added ones don't break the existing UX style.
 
-4. **8 dead `destroy_all` lines removed total.** 7 setup-level + 1 in-test. The in-test one (in `teams_controller_test.rb` "show creates team if none exists") was originally added pre-Step-6 to remove the fixture's grey_team; with fixtures gone, it's a no-op. Removed both the line and its `# Destroy fixture team first` comment.
+4. **`broadcasts_refreshes_to` on pokemon + group fires unconditionally on every save.** Brief acknowledges this — relevant fields for the dashboard are nearly all attributes (species, level, ability, nature, status, nickname). A few extra refreshes are cheap with morph mode. If the rate becomes problematic, gate via `if: -> { saved_change_to_relevant_field? }` later.
 
-5. **Removed the 4-line explanatory comment block** from `emulator_controller_test.rb`'s setup. That comment was added in Step 6 to document why the destroy_all guard existed — it's stale now that the guard is gone.
+5. **Turbo test helper requires + tests use diff-style counts.** `Turbo::Broadcastable::TestHelper` isn't auto-loaded; explicit `require "turbo/broadcastable/test_helper"` + `include`. Tests that need to count broadcasts INSIDE a block (vs the entire test run) capture before+after with `capture_turbo_stream_broadcasts` and compare sizes — the helper's `assert_turbo_stream_broadcasts` count argument applies to total-during-test, not block-scoped, so the diff approach is the correct pattern for this Turbo version.
 
-6. **Flake-check transient.** During the initial 3-rep check, rep 3 (seed 13579) had **1 failure** that I did not capture the stacktrace for (only the summary line was tail'd). I re-ran seed 13579 → clean. Then 5 fresh reps → all clean. Then 10 more reps → all clean. Then 5 more reps → all clean. Total: 1 failure in 20 reps, with the failure NOT reproducing across 19 subsequent runs. Per the brief's "investigate, don't retry" rule, I tried to investigate but had no stacktrace to investigate FROM. Possible causes:
-   - One-time timing artifact (disk contention from concurrent rubocop run, fresh-cache cold start)
-   - Real but very rare race condition that 19 reps weren't enough to surface
-   - Something specific to that exact wall-clock moment in the boot sequence
-   The Rails-default `parallelize(workers: :number_of_processors)` uses per-worker test databases, so cross-fork uniqueness conflicts on `(guild_id, run_number)` shouldn't manifest from the FactoryBot sequence. I'd flag this as "monitor in CI; if it reappears, investigate at that point" rather than block Step 8 on it. The 19/19 clean post-discovery rate is strong evidence the suite is stable.
+6. **YOU badge test renamed.** `"show roster renders player names, YOU badge, and Unclaimed entries"` → `"show roster renders player names and Unclaimed entries"`. The 3 surviving assertions still hold. Comment explains why.
 
 ### Did every item in the brief ship?
 
-- [x] All 7 fixture YAMLs deleted; `test/fixtures/files/` preserved
-- [x] `fixtures :all` line + comment block removed from test_helper.rb
-- [x] CLAUDE.md testing-conventions section updated (Legacy line gone, FactoryBot-only line added)
-- [x] All 8 dead `destroy_all` calls removed (7 setup + 1 in-test)
-- [x] BUILD-LOG durable Carried-over decision updated
-- [x] Parked plan moved to `handoff/archive/2026-04-30-factorybot-conversion.md` with status marker
-- [x] Full suite green: 305/305
-- [x] Flake check: 20 reps run; 19 clean post-discovery (1 unexplained transient on rep 3)
-- [x] Rubocop clean on touched files (8 files)
-- [x] `parallelize` line preserved in test_helper.rb
-- [x] No app/factory/channel-test/ActiveStorage-files changes
-- [x] Diff scope matches brief
+- [x] A.1 — save_slots_controller.js toasts
+- [x] A.2 — gym_draft_controller.js error banner
+- [x] A.3 — team_builder_controller.js pixeldex classes
+- [x] A.4 — Save-slot buttons disabled during overwrite mode
+- [x] A.5 — Pokemon modal SAVE in-flight disable
+- [x] KG-1 — Real-time roster card replace
+- [x] KG-2 — Real-time dashboard morph-refresh
+- [x] KG-3 — EVOLVE loading state
+- [x] KG-4 — `--amber` palette token
+- [x] Full suite green: 310/310
+- [x] Rubocop clean on touched files
+- [x] No app/controllers or app/services changes
+- [x] BUILD-LOG Known Gaps updated (4 closed, 4 new)
 
 ### What does the user see if data is empty or a request fails?
 
-N/A — Step 8 is test/docs cleanup. Runtime user-facing behavior unchanged.
+- **Save-slot delete/restore/overwrite failure:** `window.alert("Could not [action] slot N. Try again or contact the run creator.")` (was: silent console.error)
+- **Gym draft action rejected:** red banner inside the page for 8s with the server's error message (was: silent console.error)
+- **Pokemon modal save in-flight:** SAVE button greys out + "SAVING..." status; on error the button re-enables so the user can retry
+- **EVOLVE click in-flight:** EVOLVE button greys out + "EVOLVING..." text; on error restores
+- **Real-time tab open + another player edits a pokemon:** Turbo morphs the dashboard in place, scroll position preserved, modals stay open
+- **Real-time + save slot parsed:** the matching session's roster card replaces in place, no full reload (so the running emulator iframe stays intact)
 
 ---
 
 ## Open Questions / Notes
 
-1. **Flake-check transient (see Self-Review #6).** Recommend Reviewer accept based on 19/19 clean post-discovery rate. If it bothers you, we can spend more reps trying to reproduce — but without a stacktrace, the investigation is unbounded.
+1. **Does the manual smoke test cover the broadcast paths?** Bob did not run a two-tab manual test in this step (no live dev server up). The 5 unit tests for the broadcast callbacks cover that the broadcast fires + targets the right stream + renders the right partial. End-to-end real-time UX verification is a Project Owner / production smoke check. Expectation: open `/emulator` in two browsers logged in as different players; trigger a save in one; the other's roster card updates without page reload.
 
-2. **CLAUDE.md attribution date.** The new line says "removed during the 2026-04-30 conversion sweep" — consistent with the actual commit dates (Steps 4-8 all on 2026-04-30 per BUILD-LOG dates). If the project's convention is to omit dates from CLAUDE.md (since it's a living doc), I can drop the date phrase. Kept it for now as a useful breadcrumb.
+2. **`broadcasts_refreshes_to` macro on `SoulLinkPokemon` may double-fire.** When `assign_to_group!` updates pokemon AND triggers `mark_as_dead!` on the group (in `mark_as_dead!`), both broadcast a refresh. The dashboard receives 2 refreshes in quick succession. Turbo's morph engine deduplicates close-together refreshes (debounce); shouldn't be user-visible. Worth monitoring once real traffic flows through.
 
-3. **Test runtime delta.** Pre-Step-8 full suite: ~1.5s wall-clock. Post-Step-8: ~1.4-1.5s wall-clock (same range). No regression — actually slightly faster on average since fixtures no longer preload at test_helper boot.
+3. **No browser-level smoke test for the YOU badge regression.** The view test asserts `>YOU<` is gone; that's the contract. A Project Owner manual verification on the emulator page would confirm the visual loss is acceptable in practice.
 
-4. **`handoff/parked-plans/` is now empty.** No housekeeping needed — Rails projects often have empty utility dirs. If the project has a convention to delete empty handoff subdirs, that's out of scope for this step.
+4. **The `Turbo::StreamsChannel.broadcast_replace_to` call renders the partial in the broadcast callback's thread.** If the partial render raises, the after_commit callback raises and the calling controller / job sees the exception. Tested implicitly by the broadcast tests (they'd fail if the partial errored). For belt-and-suspenders, future iteration could wrap the broadcast call in `rescue StandardError => e; Rails.logger.error(...)` so a partial regression doesn't break model save flows.
 
-5. **Step Architecture Decision retired, not added.** The change to BUILD-LOG's durable § Carried over is a REPLACEMENT (legacy-fixture line → all-factories line), not an addition. The decision still applies — it's just the inverse of what it was.
+5. **Pre-existing rubocop offenses outside touched files** — still 133-ish across the suite (unchanged). Step 9 touched only 5 Ruby files; rubocop clean on those. Outside the scope.
 
-6. **Conversion summary.** Steps 4-8 covered every test file that used fixtures by name; the suite is now FactoryBot-only. The BUILD-LOG Step 8 entry has a per-step recap with commit refs.
+6. **The `_run_sidebar_card.html.erb` partial calls `SoulLink::GameState.player_name`.** That's a YAML-cached lookup, fine in production. In tests, the partial renders against a fresh GameState (or stubbed one); my smoke test renders cleanly so no concern.
 
 ---
 

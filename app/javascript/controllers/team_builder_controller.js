@@ -69,7 +69,7 @@ export default class extends Controller {
     const cards = this.teamListTarget.querySelectorAll(".pokemon-card")
     const groupIds = Array.from(cards).map(c => c.dataset.groupId)
 
-    this.showStatus("Saving...", "text-yellow-400")
+    this.showStatus("Saving...", "team-builder-status--saving")
 
     try {
       const response = await fetch(this.updateUrlValue, {
@@ -82,14 +82,14 @@ export default class extends Controller {
       })
 
       if (response.ok) {
-        this.showStatus("Saved!", "text-green-400")
+        this.showStatus("Saved!", "team-builder-status--saved")
         setTimeout(() => this.showStatus("", ""), 2000)
       } else {
         const data = await response.json()
-        this.showStatus(data.error || "Save failed", "text-red-400")
+        this.showStatus(data.error || "Save failed", "team-builder-status--error")
       }
     } catch (error) {
-      this.showStatus("Network error", "text-red-400")
+      this.showStatus("Network error", "team-builder-status--error")
     }
   }
 
@@ -128,10 +128,9 @@ export default class extends Controller {
     })
   }
 
-  showStatus(text, className) {
-    if (this.hasSaveStatusTarget) {
-      this.saveStatusTarget.textContent = text
-      this.saveStatusTarget.className = `text-xs ${className}`
-    }
+  showStatus(text, modifier) {
+    if (!this.hasSaveStatusTarget) return
+    this.saveStatusTarget.textContent = text
+    this.saveStatusTarget.className = modifier ? `team-builder-status ${modifier}` : ""
   }
 }

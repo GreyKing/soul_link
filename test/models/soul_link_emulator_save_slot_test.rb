@@ -1,7 +1,9 @@
 require "test_helper"
+require "turbo/broadcastable/test_helper"
 
 class SoulLinkEmulatorSaveSlotTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
+  include Turbo::Broadcastable::TestHelper
 
   setup do
     @run = create(:soul_link_run)
@@ -174,5 +176,58 @@ class SoulLinkEmulatorSaveSlotTest < ActiveSupport::TestCase
     assert_no_enqueued_jobs(only: SoulLink::ParseSaveDataJob) do
       slot.update_columns(parsed_trainer_name: "Lyra", parsed_at: Time.current)
     end
+  end
+
+  # --- KG-1: roster card broadcast ----------------------------------------
+  #
+  # The model fires a Turbo Stream replace on `[run, :emulator]` when a
+  # parsed_* field changes (and on initial create). The broadcast renders
+  # `emulator/_run_sidebar_card.html.erb` with `s: session` as the only
+  # local — no current_user_id, no controller context. These tests guard
+  # against that partial regressing into a state that requires more.
+
+  test "create broadcasts a roster card replace to [run, :emulator]" do
+    streams = capture_turbo_stream_broadcasts [ @run, :emulator ] do
+      create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: @session, slot_number: 1)
+    end
+    assert_equal 1, streams.size, "expected 1 turbo-stream; saw #{streams.size}: #{streams.map(&:to_s)}"
+    assert_equal "replace", streams.first["action"]
+    assert_equal "emulator_roster_session_#{@session.id}", streams.first["target"]
+  end
+
+  # `assert_turbo_stream_broadcasts` captures every broadcast on the
+  # stream during the test (not just the block), so tests that need
+  # baseline-vs-after counts use `capture_turbo_stream_broadcasts` to
+  # snapshot before+after and diff explicitly.
+
+  test "update to a parsed_* field broadcasts a roster card replace" do
+    slot = create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: @session, slot_number: 1)
+    before = capture_turbo_stream_broadcasts([ @run, :emulator ]).size
+    slot.update!(parsed_trainer_name: "Lyra")
+    after = capture_turbo_stream_broadcasts([ @run, :emulator ]).size
+    assert_equal 1, after - before, "expected 1 new broadcast; got #{after - before}"
+  end
+
+  test "update_columns on parsed_* does NOT broadcast (callbacks bypassed)" do
+    slot = create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: @session, slot_number: 1)
+    before = capture_turbo_stream_broadcasts([ @run, :emulator ]).size
+    slot.update_columns(parsed_trainer_name: "Updated", parsed_at: Time.current)
+    after = capture_turbo_stream_broadcasts([ @run, :emulator ]).size
+    assert_equal 0, after - before, "expected no new broadcasts; got #{after - before}"
+  end
+
+  test "update to a non-parsed field does NOT broadcast" do
+    slot = create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: @session, slot_number: 1)
+    before = capture_turbo_stream_broadcasts([ @run, :emulator ]).size
+    slot.touch
+    after = capture_turbo_stream_broadcasts([ @run, :emulator ]).size
+    assert_equal 0, after - before, "expected no new broadcasts; got #{after - before}"
+  end
+
+  test "run_sidebar_card partial renders standalone with only `s` local" do
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: @session, slot_number: 1)
+    @session.update_column(:active_save_slot, 1)
+    rendered = ApplicationController.render(partial: "emulator/run_sidebar_card", locals: { s: @session.reload })
+    assert_includes rendered, @session.seed
   end
 end

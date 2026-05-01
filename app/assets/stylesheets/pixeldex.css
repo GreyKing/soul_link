@@ -8,10 +8,18 @@
   --l1: #8a9e6a;
   --l2: #9aae7a;
   --white: #c0d0a0;
+  --amber: #d4b14a;
   --border: 3px solid var(--d1);
   --border-thin: 2px solid var(--d1);
   --border-double: 4px double var(--d1);
 }
+
+/* Team-builder save-status colors. Class set by team_builder_controller.js
+   showStatus(text, modifier) — `modifier` is one of the three below. */
+.team-builder-status { font-size: 11px; line-height: 1.6; }
+.team-builder-status--saving { color: var(--amber); }
+.team-builder-status--saved  { color: var(--l1); }
+.team-builder-status--error  { color: #e8a0a0; }
 
 html { scroll-behavior: smooth; }
 

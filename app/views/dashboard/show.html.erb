@@ -1,3 +1,10 @@
+<%# Real-time refresh: SoulLinkPokemon and SoulLinkPokemonGroup broadcasts
+    push a Turbo refresh to this stream on create/update/destroy. With
+    morph + scroll preserve, edits in one player's tab show up across all
+    open dashboards in the run without a full page reload. %>
+<%= turbo_refreshes_with method: :morph, scroll: :preserve %>
+<%= turbo_stream_from @run, :dashboard %>
+
 <div data-controller="dashboard pixeldex"
      data-dashboard-groups-url-value="<%= pokemon_groups_path %>"
      data-dashboard-csrf-value="<%= form_authenticity_token %>"

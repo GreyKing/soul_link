@@ -294,7 +294,7 @@ export default class extends Controller {
     }
   }
 
-  async savePokemon() {
+  async savePokemon(event) {
     const pokemonId = this.modalPokemonIdTarget.value
     const groupId = this.modalGroupIdTarget.value
     const species = this.modalSpeciesHiddenTarget.value || this.modalSpeciesInputTarget.value.trim()
@@ -303,6 +303,10 @@ export default class extends Controller {
     const nature = this.modalNatureTarget.value || null
     const nickname = this.modalNicknameTarget.value.trim()
 
+    // Disable the SAVE button while the request is in flight so a double-click
+    // can't fire 2-3 PATCHes in parallel (last-write-wins race).
+    const saveBtn = event?.currentTarget
+    if (saveBtn) saveBtn.disabled = true
     this.modalStatusTarget.textContent = "SAVING..."
 
     try {
@@ -317,6 +321,7 @@ export default class extends Controller {
         if (!pokemonRes.ok) {
           const data = await pokemonRes.json()
           this.modalStatusTarget.textContent = data.error || "SAVE FAILED"
+          if (saveBtn) saveBtn.disabled = false
           return
         }
       } else if (species && groupId) {
@@ -330,6 +335,7 @@ export default class extends Controller {
         if (!createRes.ok) {
           const data = await createRes.json()
           this.modalStatusTarget.textContent = data.error || "SAVE FAILED"
+          if (saveBtn) saveBtn.disabled = false
           return
         }
       }
@@ -344,13 +350,17 @@ export default class extends Controller {
         if (!groupRes.ok) {
           const data = await groupRes.json()
           this.modalStatusTarget.textContent = data.error || "SAVE FAILED"
+          if (saveBtn) saveBtn.disabled = false
           return
         }
       }
 
+      // Success path — reload destroys the page state, so leave the button
+      // disabled (no point re-enabling something that's about to be torn down).
       window.location.reload()
     } catch (error) {
       this.modalStatusTarget.textContent = "NETWORK ERROR"
+      if (saveBtn) saveBtn.disabled = false
     }
   }
 
@@ -361,6 +371,12 @@ export default class extends Controller {
     const targetSpecies = event.currentTarget.dataset.targetSpecies
     if (!targetSpecies) return
 
+    // Disable the EVOLVE button + show loading text. Re-enable on error so
+    // the player can retry; success path reloads the page.
+    const evolveBtn = event.currentTarget
+    evolveBtn.disabled = true
+    const originalText = evolveBtn.textContent
+    evolveBtn.textContent = "EVOLVING..."
     this.modalStatusTarget.textContent = "EVOLVING..."
 
     try {
@@ -373,12 +389,16 @@ export default class extends Controller {
       if (!res.ok) {
         const data = await res.json()
         this.modalStatusTarget.textContent = data.error || "EVOLVE FAILED"
+        evolveBtn.disabled = false
+        evolveBtn.textContent = originalText
         return
       }
 
       window.location.reload()
     } catch (error) {
       this.modalStatusTarget.textContent = "NETWORK ERROR"
+      evolveBtn.disabled = false
+      evolveBtn.textContent = originalText
     }
   }
 

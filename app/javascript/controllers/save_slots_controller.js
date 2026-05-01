@@ -52,11 +52,13 @@ export default class extends Controller {
       })
       if (!res.ok) {
         console.error("SaveSlots: restore failed:", res.status)
+        window.alert(`Could not make slot ${slotNumber} active. Try again or contact the run creator.`)
         return
       }
       window.alert(`Slot ${slotNumber} is now active. Refresh the page to load it.`)
     } catch (e) {
       console.error("SaveSlots: restore error:", e)
+      window.alert(`Network error making slot ${slotNumber} active. Try again or contact the run creator.`)
     }
   }
 
@@ -73,11 +75,13 @@ export default class extends Controller {
       })
       if (!res.ok) {
         console.error("SaveSlots: delete failed:", res.status)
+        window.alert(`Could not delete slot ${slotNumber}. Try again or contact the run creator.`)
         return
       }
       window.location.reload()
     } catch (e) {
       console.error("SaveSlots: delete error:", e)
+      window.alert(`Network error deleting slot ${slotNumber}. Try again or contact the run creator.`)
     }
   }
 
@@ -95,12 +99,24 @@ export default class extends Controller {
       const overlay = card.querySelector("[data-save-slots-target='overwriteOverlay']")
       if (overlay) overlay.hidden = false
     })
+    // Disable the per-slot action buttons while overwrite mode is armed —
+    // the overlay covers them visually, but tab navigation + screen readers
+    // can still focus them. Without this, a misclick or stray Enter could
+    // delete a slot the player only meant to overwrite.
+    this._actionButtons().forEach((btn) => { btn.disabled = true })
   }
 
   _exitOverwriteMode() {
     this._overwritePending = false
     if (this.hasBannerTarget) this.bannerTarget.hidden = true
     this.overwriteOverlayTargets.forEach((overlay) => { overlay.hidden = true })
+    this._actionButtons().forEach((btn) => { btn.disabled = false })
+  }
+
+  _actionButtons() {
+    return this.element.querySelectorAll(
+      "[data-action*='save-slots#makeActive'], [data-action*='save-slots#deleteSlot']"
+    )
   }
 
   async overwriteSlot(event) {
@@ -147,6 +163,7 @@ export default class extends Controller {
       window.location.reload()
     } catch (e) {
       console.error("SaveSlots: overwrite error:", e)
+      window.alert("Network error overwriting the slot. Try again or contact the run creator.")
     }
   }
 

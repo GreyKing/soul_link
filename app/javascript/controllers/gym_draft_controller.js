@@ -3,7 +3,7 @@ import { createConsumer } from "@rails/actioncable"
 
 export default class extends Controller {
   static targets = [
-    "phaseLabel", "phaseInfo",
+    "phaseLabel", "phaseInfo", "errorBanner",
     "lobbyPanel", "readyGrid", "readyButton",
     "votingPanel", "voteGrid", "voteStatus",
     "draftingPanel", "teamSlots", "turnIndicator", "myPokemonGrid",
@@ -39,12 +39,26 @@ export default class extends Controller {
   handleMessage(data) {
     if (data.error) {
       console.error("Draft error:", data.error)
+      this.showError(data.error)
       return
     }
     if (data.type === "state_update") {
       this.state = data.state
       this.render()
     }
+  }
+
+  showError(message) {
+    if (!this.hasErrorBannerTarget) {
+      window.alert(`Draft error: ${message}`)
+      return
+    }
+    this.errorBannerTarget.textContent = message
+    this.errorBannerTarget.hidden = false
+    if (this._errorTimer) clearTimeout(this._errorTimer)
+    this._errorTimer = setTimeout(() => {
+      this.errorBannerTarget.hidden = true
+    }, 8000)
   }
 
   // ── User Actions ──
