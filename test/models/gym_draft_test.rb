@@ -5,19 +5,14 @@ class GymDraftTest < ActiveSupport::TestCase
   ARATY   = 600802903967531093
   SCYTHE  = 189518174125817856
   ZEALOUS = 182742127061630976
-  ALL_PLAYERS = [GREY, ARATY, SCYTHE, ZEALOUS].freeze
+  ALL_PLAYERS = [ GREY, ARATY, SCYTHE, ZEALOUS ].freeze
 
   setup do
-    @run = soul_link_runs(:active_run)
-    @draft = gym_drafts(:lobby_draft)
-    @groups = [
-      soul_link_pokemon_groups(:group_route201),
-      soul_link_pokemon_groups(:group_route202),
-      soul_link_pokemon_groups(:group_route203),
-      soul_link_pokemon_groups(:group_route204),
-      soul_link_pokemon_groups(:group_route205),
-      soul_link_pokemon_groups(:group_route206)
-    ]
+    @run = create(:soul_link_run)
+    @groups = %i[route201 route202 route203 route204 route205 route206].map do |trait|
+      create(:soul_link_pokemon_group, trait, soul_link_run: @run)
+    end
+    @draft = create(:gym_draft, :lobby, soul_link_run: @run)
   end
 
   # ── Lobby Phase ──
@@ -85,7 +80,7 @@ class GymDraftTest < ActiveSupport::TestCase
     @draft.cast_vote!(ZEALOUS, ARATY)
     @draft.reload
     assert_equal "drafting", @draft.status
-    assert_includes [GREY, ARATY], @draft.pick_order.first
+    assert_includes [ GREY, ARATY ], @draft.pick_order.first
     assert_equal 4, @draft.pick_order.size
   end
 

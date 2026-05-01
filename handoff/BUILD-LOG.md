@@ -11,9 +11,11 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** *None — Step 4 shipped, awaiting next brief.*
-**Last committed:** `6e2c8c8` — 2026-04-30 (Step 4: FactoryBot factories) — pushed to `origin/claude/gallant-bell-cb4390`. Branch awaits PR/merge to `main`.
-**Pending deploy:** N/A — Step 4 is test-only (no app code, no migration). Branch can merge to `main` without a deploy.
+**Active step:** Step 5 — Convert Model Unit Tests from Fixtures to FactoryBot. **Awaiting review.**
+**Last committed:** Step 4 (`6e2c8c8` + log `856d898`) shipped + merged to `main`. Step 5 not yet committed.
+**Pending deploy:** N/A — Step 5 is test-only.
+
+**Parked plan:** FactoryBot conversion. Step 5 covers the 3 model unit tests (Phase 3); Step 6 (deferred to fresh session) handles controller/channel tests + fixture deletion.
 
 **Parked plan:** FactoryBot conversion. Phases 1+2 land in this step (Step 4); Phase 3+ in Steps 5–6. See `handoff/parked-plans/factorybot-conversion.md`.
 
@@ -21,6 +23,37 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 5 — Convert Model Unit Tests from Fixtures to FactoryBot — 2026-04-30
+**Status:** Awaiting review.
+
+**Files modified (3, all under `test/models/`):**
+- `soul_link_pokemon_test.rb` — added `setup` block creating `@run` / `@group_201` / `@group_202` / `@pokemon`; replaced 9 fixture-helper calls with ivar references; renamed "fixture pokemon is valid" → "factory pokemon is valid" per brief. Test count preserved at 7.
+- `gym_draft_test.rb` — replaced `setup` block with factory creates: `@run = create(:soul_link_run)`, `@groups = %i[route201..route206].map { |t| create(:soul_link_pokemon_group, t, soul_link_run: @run) }`, `@draft = create(:gym_draft, :lobby, soul_link_run: @run)`. The 22 test bodies (Architect's brief said 21 — it was always 22; minor undercount, not a deviation) and 3 private helpers (`move_to_voting!` / `move_to_drafting!` / `move_to_nominating!`) unchanged. Fixed 2 pre-existing rubocop offenses (`Layout/SpaceInsideArrayLiteralBrackets` on lines `ALL_PLAYERS = [ ... ]` and `assert_includes [ GREY, ARATY ], ...`) since the brief required clean lint.
+- `gym_result_test.rb` — added `@groups` array creation in `setup` (parallels gym_draft pattern), inline-seeded 6 pokemon (one per group via `:routeNNN_grey` traits) inside the `snapshot_from_groups` test so `.limit(2)` finds groups with pokemon regardless of DB row order. Test count preserved at 4.
+
+**Files modified (handoff):**
+- `handoff/ARCHITECT-BRIEF.md` — Step 5 brief (overwritten from Step 4)
+- `handoff/BUILD-LOG.md` — this entry
+- `handoff/REVIEW-REQUEST.md` — Step 5 review request
+- `handoff/REVIEW-FEEDBACK.md` — Reviewer's Step 5 verdict (added during this same session)
+
+**Key decisions:**
+- **Inline pokemon seeding in `gym_result_test.rb` snapshot test, not setup.** The test was the only one needing pokemon. Inline keeps the setup block clean for the other 3 tests in the file. Used `each_with_index` over the trait list to seed all 6 groups (matches fixture-era state where every group had pokemon — the original `.limit(2)` worked because all groups had pokemon, regardless of which 2 were picked).
+- **Did NOT add `.order(:id)` to the snapshot test's `.limit(2)` query.** Brief said preserve assertions/queries. Seeding all 6 groups removes the ordering dependency without touching the test's query shape. First attempt (seed only `@groups[0]` and `@groups[1]`) failed because `.limit(2)` returned different groups; the all-6-seed fix is more robust and keeps the original query untouched.
+- **Renamed "fixture pokemon is valid" → "factory pokemon is valid"** (per brief). All other test names unchanged.
+- **Fixed 2 pre-existing `Layout/SpaceInsideArrayLiteralBrackets` offenses** in gym_draft_test (lines 8 + 83). Pre-existing in the file before Step 5; brief required rubocop clean on touched files. Two-line whitespace adjustment.
+- **Did NOT touch fixtures, factories, test_helper.rb, or any other test file.** Step 6 will handle those.
+
+**Tests:** 305/305 passing (file-level: 7 + 22 + 4 = 33; full suite 305). 0 failures, 0 errors. Ran each file individually post-conversion (per brief sequencing) and full suite at the end.
+
+**Lint:** `bundle exec rubocop test/models/soul_link_pokemon_test.rb test/models/gym_draft_test.rb test/models/gym_result_test.rb` clean.
+
+**Diff scope check:** `git status` shows only `handoff/ARCHITECT-BRIEF.md` + 3 test files modified (plus this BUILD-LOG and the two REVIEW docs as the step closes). App code, fixtures, factories, test_helper.rb, other test files all untouched per brief.
+
+**Fixture-helper grep verification:** `grep -nE "soul_link_pokemon\(|soul_link_runs\(|soul_link_pokemon_groups\(|gym_drafts\(|gym_results\(" test/models/{soul_link_pokemon,gym_draft,gym_result}_test.rb` returns zero matches.
+
+---
 
 ### Step 4 — Build All Missing FactoryBot Factories — 2026-04-30
 **Status:** Complete, committed `6e2c8c8`, pushed to `origin/claude/gallant-bell-cb4390`. Test-only — no deploy required.

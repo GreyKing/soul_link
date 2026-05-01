@@ -4,133 +4,177 @@
 
 ---
 
-## Step 4 — Build All Missing FactoryBot Factories
+## Step 5 — Convert Model Unit Tests from Fixtures to FactoryBot
 
 ### Context
 
-The test suite uses a hybrid model: new tests use FactoryBot factories from `test/factories/`, legacy tests use YAML fixtures from `test/fixtures/`. This step is the first phase of converting fully to factories — it is **purely additive**: build the missing factories, leave fixtures and tests untouched, suite stays at 305/305.
+Step 4 shipped the missing factories (commit `6e2c8c8`, merged to main). Step 5 is the first of two test-conversion steps. We now eliminate fixture-helper calls in three model unit-test files and replace them with `create(:factory, :trait)` calls against the factories we just built. Other fixture-based tests (controllers, channels, integration) stay on fixtures until Step 6 — Step 5 is scoped tightly to model specs to keep the diff small and reversible.
 
-The full conversion plan is at `handoff/parked-plans/factorybot-conversion.md`. This step covers all factories needed (Phases 1 + 2 of that plan, compressed). Steps 5 (convert tests) and 6 (delete fixtures + sweep) come after.
+After Step 5: tests still pass, fixtures still load via `fixtures :all`, but these three files no longer reference any fixture by name. After Step 6: fixtures get deleted, `fixtures :all` removed, every test is factory-based.
 
 ### Project Owner decisions (locked)
 
-- **Auto-accept mode for this work.** Bob can act decisively; Reviewer + tests are the backstop. Don't escalate minor judgment calls.
-- **Factories must be drop-in replacements for fixture references.** A trait `:route201` on the pokemon-group factory must produce a record with the same shape as `soul_link_pokemon_groups(:group_route201)`. Goal: Step 5's test conversion is mechanical (`soul_link_pokemon_groups(:group_route201)` → `create(:soul_link_pokemon_group, :route201)`), one-to-one substitution.
-- **Existing factories stay.** `soul_link_runs`, `soul_link_emulator_sessions`, `soul_link_emulator_save_slots` are correct as-is; do not refactor them.
-- **Existing fixtures stay** for Step 4. They co-exist with factories until Step 6.
-- **Don't touch any model, controller, or test file.** Step 4 only adds files under `test/factories/`.
+- **Auto-accept mode for this work.** Bob can act decisively; Reviewer + tests are the backstop.
+- **Convert exactly three files.** No fourth file, no controller tests, no channel tests. Step 6 picks up the rest.
+- **Preserve every test.** Same test name, same assertions, same semantics. The conversion is mechanical; if a test must change shape, that's a Reviewer flag.
+- **Don't touch fixtures, don't touch test_helper, don't touch factories, don't touch app code.** Step 5 only edits the three target test files.
+- **`create(...)`, not `build(...)`.** Persisted records match fixture semantics — fixtures are pre-saved rows.
 
-### Factories to Create
+### Files to Convert (3 total)
 
-Six new factory files. Field shapes derived from `test/fixtures/*.yml` — read those for the canonical data.
+#### 1. `test/models/soul_link_pokemon_test.rb` (9 fixture-helper calls)
 
-#### 1. `test/factories/soul_link_pokemon_groups.rb`
+Current calls:
+- `soul_link_pokemon(:pkmn_route201_grey)` — 5×
+- `soul_link_runs(:active_run)` — 1×
+- `soul_link_pokemon_groups(:group_route201)` — 1×
+- `soul_link_pokemon_groups(:group_route202)` — 2×
 
-`SoulLinkPokemonGroup` belongs to a `SoulLinkRun`. Six fixture entries (`group_route201`–`group_route206`) with route names, nicknames (ROY/TOMMY/RACHEL/SPIKE/LUNA/BLAZE), positions 1-6, status "caught", `caught_at` 1-6 days ago.
+Pattern. Add a `setup` block that creates the world:
 
-Required traits: `:route201`, `:route202`, `:route203`, `:route204`, `:route205`, `:route206` — each producing a record matching the corresponding fixture entry exactly. Each trait sets `location`, `nickname`, `position`, `caught_at`. The base factory provides the `soul_link_run` association (default: `association :soul_link_run`); tests can override with their own run.
+```ruby
+setup do
+  @run = create(:soul_link_run)
+  @group_201 = create(:soul_link_pokemon_group, :route201, soul_link_run: @run)
+  @group_202 = create(:soul_link_pokemon_group, :route202, soul_link_run: @run)
+  @pokemon = create(:soul_link_pokemon, :route201_grey,
+                   soul_link_run: @run,
+                   soul_link_pokemon_group: @group_201)
+end
+```
 
-Default base factory (no traits) produces a generic group: status "caught", position from a sequence, location from a sequence, generic nickname.
+Per-test rewrites:
+- `pokemon = soul_link_pokemon(:pkmn_route201_grey)` → `pokemon = @pokemon` (or `pokemon = @pokemon.reload` if the test mutates and re-reads)
+- `run = soul_link_runs(:active_run)` → `run = @run`
+- `group = soul_link_pokemon_groups(:group_route201)` → `group = @group_201`
+- `group = soul_link_pokemon_groups(:group_route202)` → `group = @group_202`
 
-#### 2. `test/factories/soul_link_pokemon.rb`
+The "fixture pokemon is valid" test becomes "factory pokemon is valid" — same assertion, the @pokemon record satisfies validations because the factory builds valid records.
 
-`SoulLinkPokemon` belongs to a run AND a group. **24 fixture entries** generated by the ERB nested loop in `soul_link_pokemon.yml`: 6 routes × 4 players. Discord IDs in the fixture:
-- Grey: 153665622641737728
-- ARatypuss: 600802903967531093
-- Scythe461: 189518174125817856
-- Zealous: 182742127061630976
+The "enforces unique discord_user_id per group" test currently builds a duplicate `SoulLinkPokemon.new(...)` — keep that exact code, just swap `existing = soul_link_pokemon(:pkmn_route201_grey)` with `existing = @pokemon`. Don't refactor the duplicate construction into another factory call.
 
-Species per route:
-- route_201: Starly / Bidoof / Shinx / Kricketot (Grey/ARatypuss/Scythe461/Zealous)
-- route_202: Budew / Zubat / Geodude / Machop
-- route_203: Abra / Ponyta / Gastly / Roselia
-- route_204: Buizel / Shellos / Pachirisu / Aipom
-- route_205: Eevee / Murkrow / Misdreavus / Gligar
-- route_206: Bronzor / Chingling / Meditite / Stunky
+The "assign_to_group sets group..." test currently creates a fresh pokemon via `run.soul_link_pokemon.create!(...)` — keep that exact code (it's testing `assign_to_group!` semantics on an unassigned pokemon, and the explicit `create!` makes the unassigned-state contract obvious). Just swap `run = soul_link_runs(:active_run)` and `group = soul_link_pokemon_groups(:group_route201)` with `@run` / `@group_201`.
 
-Trait naming: `:route201_grey`, `:route201_aratypuss`, `:route201_scythe461`, `:route201_zealous`, ... matching the fixture key shape `pkmn_route201_grey` etc.
+The "assign_to_group raises if already assigned" test references both `:pkmn_route201_grey` and `:group_route202` — port both via setup vars.
 
-Each trait must set: `discord_user_id`, `species`, `name` (= species in the fixture), `location` (e.g. "route_201"), `status: "caught"`. The trait does NOT set the `soul_link_pokemon_group` association — Step 5's conversion will pass the matching group from the test's local `groups` variable. The base factory provides `association :soul_link_pokemon_group` and `association :soul_link_run`; traits override or extend.
+#### 2. `test/models/gym_draft_test.rb` (8 fixture-helper calls)
 
-The trait list is large (24 traits). Use Ruby metaprogramming if it keeps the factory file readable — define traits in a loop. Keep the data table at the top of the factory file as a Ruby constant so future maintainers see the same shape as the fixture's ERB.
+Current setup block:
+```ruby
+setup do
+  @run = soul_link_runs(:active_run)
+  @draft = gym_drafts(:lobby_draft)
+  @groups = [
+    soul_link_pokemon_groups(:group_route201),
+    soul_link_pokemon_groups(:group_route202),
+    soul_link_pokemon_groups(:group_route203),
+    soul_link_pokemon_groups(:group_route204),
+    soul_link_pokemon_groups(:group_route205),
+    soul_link_pokemon_groups(:group_route206)
+  ]
+end
+```
 
-#### 3. `test/factories/soul_link_teams.rb`
+Replacement:
+```ruby
+setup do
+  @run = create(:soul_link_run)
+  @groups = %i[route201 route202 route203 route204 route205 route206].map do |trait|
+    create(:soul_link_pokemon_group, trait, soul_link_run: @run)
+  end
+  @draft = create(:gym_draft, :lobby, soul_link_run: @run)
+end
+```
 
-`SoulLinkTeam` belongs to a run, has a `discord_user_id`. One fixture entry (`grey_team`) with Grey's ID and a reference to `active_run`.
+The order is critical — `@draft` must be created AFTER `@groups` because the draft tests pick groups by index from `@groups`. The factory's `:lobby` trait pins the JSON state, matching the fixture exactly.
 
-Traits:
-- `:grey_team` — sets `discord_user_id: 153665622641737728`. Base factory uses a sequence for IDs.
+`@groups` stays an Array (not a Hash) — the test references `@groups[0]`, `@groups[4]`, `@groups[5]` etc. Index 0 = route201, index 5 = route206, mirroring the current ordering.
 
-#### 4. `test/factories/soul_link_team_slots.rb`
+ID-on-fixture-state assertions (`assert_equal @groups[0].id, @draft.picks.first["group_id"]`) work correctly because `@groups[0]` is the same record both at pick time and at assertion time.
 
-`SoulLinkTeamSlot` belongs to a team AND a group, has a `position`. Two fixture entries (`grey_slot_1`, `grey_slot_2`) referencing grey_team + groups + positions 1, 2.
+The 18 remaining test bodies are unchanged — they reference `@run`, `@draft`, `@groups[i]`, and the four `GREY/ARATY/SCYTHE/ZEALOUS` constants. The `move_to_voting!` / `move_to_drafting!` / `move_to_nominating!` private helpers also stay unchanged.
 
-Traits:
-- `:slot_1` — `position: 1`
-- `:slot_2` — `position: 2`
+#### 3. `test/models/gym_result_test.rb` (1 fixture-helper call + indirect group fixture use)
 
-The team and group associations are passed by the test (no defaults). Tests construct `create(:soul_link_team_slot, :slot_1, soul_link_team: t, soul_link_pokemon_group: g)`.
+Current setup:
+```ruby
+setup do
+  @run = soul_link_runs(:active_run)
+end
+```
 
-#### 5. `test/factories/gym_drafts.rb`
+Becomes:
+```ruby
+setup do
+  @run = create(:soul_link_run)
+  @groups = %i[route201 route202 route203 route204 route205 route206].map do |trait|
+    create(:soul_link_pokemon_group, trait, soul_link_run: @run)
+  end
+end
+```
 
-`GymDraft` belongs to a run, has `status`, `current_round`, `current_player_index`, `pick_order` (JSON), `state_data` (JSON). One fixture entry (`lobby_draft`) with status "lobby", round 0, player_index 0, empty arrays in JSON.
+The `setup` block grows because `snapshot_from_groups` (line 28-37) currently relies on the fixture run having pokemon groups attached to it via `fixtures :all`. After conversion, those groups must be created explicitly. The "snapshot_from_groups builds correct structure" test calls `@run.soul_link_pokemon_groups.includes(:soul_link_pokemon).limit(2)` — without the explicit factory creates, this would return an empty relation and the assertion `assert_equal 2, snapshot["groups"].size` would fail.
 
-Traits:
-- `:lobby` — matches the `lobby_draft` fixture: status "lobby", current_round 0, current_player_index 0, pick_order [], state_data { ready_players: [], first_pick_votes: {}, picks: [] }
+The snapshot test also asserts `first_group["pokemon"].first.key?("species")` — for that to pass, the groups must HAVE pokemon. Recommended pattern (inline seeding inside the test, since only one test needs the pokemon):
 
-The base factory provides default values that satisfy validations (most likely matching `:lobby` since that's the canonical starting state).
+```ruby
+test "snapshot_from_groups builds correct structure" do
+  create(:soul_link_pokemon, :route201_grey, soul_link_run: @run, soul_link_pokemon_group: @groups[0])
+  create(:soul_link_pokemon, :route202_grey, soul_link_run: @run, soul_link_pokemon_group: @groups[1])
+  groups = @run.soul_link_pokemon_groups.includes(:soul_link_pokemon).limit(2)
+  snapshot = GymResult.snapshot_from_groups(groups)
+  ...
+end
+```
 
-#### 6. `test/factories/gym_results.rb`
-
-`GymResult` — fixture is empty. Build a basic factory with sensible defaults (whatever the model validates). Reference the `GymResult` model + existing tests (`test/models/gym_result_test.rb`, `test/controllers/gym_drafts_controller_test.rb`) for what fields exist and what scenarios are tested.
+Inline seeding keeps the setup block lighter and makes the test self-documenting.
 
 ### Out of Scope (do NOT expand)
 
-- Any changes to test files — Step 5 will convert them
-- Any changes to fixtures (`test/fixtures/*.yml`) — Step 6 deletes them
-- Any model / controller / view / migration changes
-- Refactoring existing factories (runs, emulator_sessions, emulator_save_slots)
-- Updating `CLAUDE.md`'s Testing conventions section — Step 6 does that
-- Updating `test_helper.rb` — Step 6 does that
-- Performance optimization of the factory definitions
+- Any other test file (controllers, channels, integration)
+- Fixtures (`test/fixtures/*.yml`) — Step 6 deletes them
+- `test/test_helper.rb` `fixtures :all` line — Step 6 removes it
+- Any factory file — Step 4 shipped them; if Bob finds a missing trait, that's a Reviewer-flagged scope expansion, NOT an inline factory edit
+- App code, models, controllers, views, JS, ERB templates
+- Refactoring helper methods on the three test files (e.g., `move_to_voting!` style cleanup)
+- Adding new test cases or removing existing ones — preserve test count exactly: pokemon=7, gym_draft=21, gym_result=4
 
 ### Constraints / Flags
 
-- DO NOT use `create_list` defaults that would create records eagerly. Factories are blueprints; records get created when tests call `create(:factory)`.
-- DO NOT add validations or callbacks to factory definitions. Factories build valid model instances; that's it.
-- DO NOT use `before(:create)` blocks unless necessary to satisfy a model-level validation (e.g., a model that requires associated records before save). Reference existing factories' style.
-- DO NOT shadow Rails fixtures by sharing names — use the `:trait` form, not separate factory definitions.
-- For `SoulLinkPokemon`, the trait names MUST follow `:route<N>_<player_lowercase>` exactly so Step 5's mechanical conversion works (e.g., `:route201_grey` for the fixture key `pkmn_route201_grey`).
-- For trait dispatch on the Pokemon factory: a metaprogrammed loop with a data table is acceptable AND encouraged — 24 traits hardcoded would be unreadable.
-- DO NOT include any model-instance build logic that fixtures handle implicitly (e.g., the fixture's automatic `soul_link_run: active_run` reference is just a YAML association). Use FactoryBot's `association :soul_link_run` with a sensible default.
-- Factories must produce records that pass model validations. Run `create(:soul_link_pokemon_group, :route201)` mentally and confirm no validation will fail.
+- **Run tests after each file is converted.** Don't batch all three and run once at the end — if a conversion subtly breaks something, you want to localize it. Sequence: convert pokemon test → run pokemon test → convert gym_draft test → run gym_draft test → convert gym_result test → run full suite.
+- **Same test count: 305/305 must pass at the end.** Each test must keep its name and assertion shape. Adding `setup` lines is fine; removing or splitting tests is NOT.
+- **Don't introduce `let` / `subject` / RSpec idioms.** Project uses Minitest with `setup` blocks and ivars. Match that.
+- **Don't introduce `before(:each)` or `before(:all)`.** Use `setup do ... end` (Minitest's idiom).
+- **`@groups` in gym_draft_test stays an Array.** Don't refactor to Hash because the test uses positional indexing.
+- **Prefer `create(:foo, :trait, soul_link_run: @run)` keyword form** over chained `.create!`. Matches the existing factory test style.
+- **The pokemon factory's traits do NOT default `soul_link_pokemon_group`** — every `create(:soul_link_pokemon, :trait)` call MUST pass `soul_link_pokemon_group:` explicitly. Forgetting this builds a record with a fresh, orphan group from the base association default — the test "passes" but has wrong topology. (Why this matters: Step 4's brief locked traits to NOT set the group association so callers control which group they bind to. Verify by grep: every `create(:soul_link_pokemon, ...)` in the diff must have `soul_link_pokemon_group:` in its kwargs.)
+- **Do NOT add factory traits.** If a test needs a non-existent shape, escalate; don't extend the factory.
+- **Don't reorder tests.** Tests are in semantic groups (Lobby Phase, Voting Phase, etc. — see comments). Preserve the order.
+- **Watch `test "fixture pokemon is valid"`.** Rename the test to `test "factory pokemon is valid"` to keep semantics honest.
 
 ### Acceptance Criteria
 
-- All 6 new factory files exist under `test/factories/`.
-- 305/305 tests still pass (no regressions; fixtures untouched).
-- A spot-check `bin/rails console`-style invocation succeeds for each factory:
-  - `FactoryBot.create(:soul_link_pokemon_group, :route201)` → record with `nickname: "ROY"`, `location: "route_201"`, `position: 1`
-  - `FactoryBot.create(:soul_link_pokemon, :route201_grey)` → record with `species: "Starly"`, `discord_user_id: 153665622641737728`, `location: "route_201"`, `status: "caught"`
-  - `FactoryBot.create(:soul_link_team, :grey_team)` → record with `discord_user_id: 153665622641737728`
-  - `FactoryBot.create(:soul_link_team_slot, :slot_1, soul_link_team: t, soul_link_pokemon_group: g)` → record with `position: 1`
-  - `FactoryBot.create(:gym_draft, :lobby)` → record with `status: "lobby"`, all JSON fields matching the fixture exactly
-  - `FactoryBot.create(:gym_result)` → a valid record (whatever the model needs)
-- `bundle exec rubocop` clean on all 6 new files.
+- All three files compile and run individually: `bin/rails test test/models/soul_link_pokemon_test.rb`, `bin/rails test test/models/gym_draft_test.rb`, `bin/rails test test/models/gym_result_test.rb` — each green.
+- Full suite green: `bin/rails test` → 305/305 passing, 0 failures, 0 errors.
+- `bundle exec rubocop` clean on all three files.
+- Self-review item: confirm via grep that no `soul_link_pokemon(`, `soul_link_runs(`, `soul_link_pokemon_groups(`, `gym_drafts(` calls remain in the three converted files.
+- Diff scope: only `test/models/soul_link_pokemon_test.rb`, `test/models/gym_draft_test.rb`, `test/models/gym_result_test.rb`, `handoff/BUILD-LOG.md`, `handoff/REVIEW-REQUEST.md`, `handoff/REVIEW-FEEDBACK.md` (Reviewer's). Anything else is a Reviewer Condition.
 
 ### Files Bob Should Read
 
-- `test/fixtures/soul_link_runs.yml`, `soul_link_pokemon_groups.yml`, `soul_link_pokemon.yml`, `soul_link_teams.yml`, `soul_link_team_slots.yml`, `gym_drafts.yml`, `gym_results.yml` — source of truth for trait data
-- `test/factories/soul_link_runs.rb`, `soul_link_emulator_sessions.rb`, `soul_link_emulator_save_slots.rb` — style reference
-- `app/models/soul_link_pokemon_group.rb`, `soul_link_pokemon.rb`, `soul_link_team.rb`, `soul_link_team_slot.rb`, `gym_draft.rb`, `gym_result.rb` — for required validations and any model-level constraints
-- `handoff/parked-plans/factorybot-conversion.md` — the original discovery doc (for context only; this brief supersedes it for Step 4)
+- `test/models/soul_link_pokemon_test.rb` — current state (Bob converts)
+- `test/models/gym_draft_test.rb` — current state (Bob converts)
+- `test/models/gym_result_test.rb` — current state (Bob converts)
+- `test/factories/soul_link_pokemon.rb`, `soul_link_pokemon_groups.rb`, `gym_drafts.rb`, `gym_results.rb`, `soul_link_runs.rb` — what's available
+- `test/fixtures/soul_link_pokemon.yml`, `soul_link_pokemon_groups.yml`, `gym_drafts.yml` — only to verify nothing was lost in the trait set
+- `handoff/parked-plans/factorybot-conversion.md` — original conversion plan (this brief is the operational version)
 
-DO NOT load test files for this step. Step 5 converts them; reading them now invites scope creep.
+DO NOT load app/models or app/controllers. The model semantics are not changing.
 
 ### Files Bob Should Update at the End
 
-- `handoff/REVIEW-REQUEST.md` — files added (6), one-sentence-per-factory reasoning, self-review answers, open questions, `Ready for Review: YES`
-- `handoff/BUILD-LOG.md` — Step History entry for Step 4 (status: Awaiting review)
+- `handoff/REVIEW-REQUEST.md` — files-changed table, self-review answers, open questions, `Ready for Review: YES`
+- `handoff/BUILD-LOG.md` — Step History entry for Step 5 (status: Awaiting review)
 
 ---
 
@@ -138,11 +182,18 @@ DO NOT load test files for this step. Step 5 converts them; reading them now inv
 
 When this lands on your desk, focus on:
 
-1. **Trait-name-to-fixture-name correspondence.** For every trait Bob creates, verify the produced record's columns match the fixture entry it claims to mirror. Field-by-field check.
-2. **Pokemon factory's metaprogrammed traits.** 24 traits is a lot — verify the loop produces the right names and the trait closure captures variables correctly (no late-binding bug where all traits resolve to the last loop iteration's values).
-3. **Validations satisfied.** Each `create(:factory, :trait)` invocation must produce a record that passes model validations. Confirm with `valid?` calls if needed.
-4. **No test-file changes.** Verify the diff touches only `test/factories/*.rb` (and the two handoff files). Anything else is a Condition.
-5. **Style consistency** with the existing 3 factories. Don't accept divergent patterns (e.g., one factory using `before(:create)` while others use direct attribute assignment) without justification.
-6. **Pokemon factory's `soul_link_pokemon_group` association** — the brief specifies traits do NOT set this; the test passes it explicitly. Verify the trait definitions don't accidentally lock in a group association.
+1. **Test count + test name preservation.** Run `bin/rails test test/models/soul_link_pokemon_test.rb test/models/gym_draft_test.rb test/models/gym_result_test.rb -v` and count test names. pokemon=7, gym_draft=21, gym_result=4. Any rename (e.g. "fixture pokemon is valid" → "factory pokemon is valid") is acceptable; any add/remove is a Condition.
+
+2. **`soul_link_pokemon_group:` keyword on every `create(:soul_link_pokemon, ...)` call.** The factory's traits don't default the group association — a missing kwarg orphan-couples the pokemon to a fresh, throwaway group. Grep the diff: every `create(:soul_link_pokemon, ` line must have `soul_link_pokemon_group:` somewhere on the same line or its block.
+
+3. **`@groups` array order in gym_draft_test.rb.** `@groups[0]` must be the route201 group, `@groups[5]` must be route206. Tests at lines 99 (`@groups[0].id`), 188 (`@groups[4].id`), 207-220 (`@groups[4]`, `@groups[5]`) rely on this. Walk the conversion and confirm the order of `%i[route201 route202 route203 route204 route205 route206].map` matches.
+
+4. **`gym_result_test.rb` snapshot test seeds pokemon.** Without explicitly creating two pokemon (via `create(:soul_link_pokemon, :route201_grey, ..., soul_link_pokemon_group: @groups[0])`), the snapshot's `pokemon.first.key?("species")` assertion fails because the groups have no associated pokemon. Verify Bob added these creates either inline in the test or in the setup block.
+
+5. **No fixture references in the three files after conversion.** Run `grep -E "soul_link_pokemon\(|soul_link_runs\(|soul_link_pokemon_groups\(|gym_drafts\(|gym_results\(" test/models/soul_link_pokemon_test.rb test/models/gym_draft_test.rb test/models/gym_result_test.rb` — should return zero matches.
+
+6. **Diff scope.** Confirm via `git status` and `git diff --stat` that ONLY the three test files + two handoff files appear. App code, fixtures, factories, test_helper.rb, other test files — all untouched.
+
+7. **Test runtime delta.** Fixtures load once per process; factories create rows per test. If runtime regressed by >2× on the three converted files, that's not a Condition (Step 5 is correctness-focused) but log it for the Step 6 sweep.
 
 Out-of-scope items found during review → BUILD-LOG Known Gaps. Do not bundle.

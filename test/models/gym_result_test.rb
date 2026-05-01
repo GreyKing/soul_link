@@ -2,7 +2,10 @@ require "test_helper"
 
 class GymResultTest < ActiveSupport::TestCase
   setup do
-    @run = soul_link_runs(:active_run)
+    @run = create(:soul_link_run)
+    @groups = %i[route201 route202 route203 route204 route205 route206].map do |trait|
+      create(:soul_link_pokemon_group, trait, soul_link_run: @run)
+    end
   end
 
   test "valid with required attributes" do
@@ -26,6 +29,13 @@ class GymResultTest < ActiveSupport::TestCase
   end
 
   test "snapshot_from_groups builds correct structure" do
+    # Seed one pokemon per group so .limit(2) finds groups with pokemon
+    # regardless of DB-defined row order (replicates fixture-era state where
+    # every group had pokemon attached).
+    %i[route201_grey route202_grey route203_grey route204_grey route205_grey route206_grey]
+      .each_with_index do |trait, i|
+      create(:soul_link_pokemon, trait, soul_link_run: @run, soul_link_pokemon_group: @groups[i])
+    end
     groups = @run.soul_link_pokemon_groups.includes(:soul_link_pokemon).limit(2)
     snapshot = GymResult.snapshot_from_groups(groups)
     assert_equal 2, snapshot["groups"].size
