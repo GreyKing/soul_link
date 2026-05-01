@@ -17,6 +17,6 @@ class Pokemon::BaseStat < ApplicationRecord
   end
 
   def types
-    [type1, type2].compact
+    [ type1, type2 ].compact
   end
 end

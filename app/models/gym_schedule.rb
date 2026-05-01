@@ -15,10 +15,10 @@ class GymSchedule < ApplicationRecord
 
   # ── Status Helpers ──
 
-  def proposed?()  = status == "proposed"
-  def confirmed?() = status == "confirmed"
-  def completed?() = status == "completed"
-  def cancelled?() = status == "cancelled"
+  def proposed?  = status == "proposed"
+  def confirmed? = status == "confirmed"
+  def completed? = status == "completed"
+  def cancelled? = status == "cancelled"
 
   # ── Data Access ──
 

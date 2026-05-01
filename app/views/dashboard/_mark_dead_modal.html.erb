@@ -1,0 +1,54 @@
+<%# Mark Dead confirmation modal — replaces the native confirm() dialog
+    that used to gate the markDead action. Permadeath in a Nuzlocke is
+    irreversible: the modal shows the group nickname + warning copy +
+    two clearly-distinct buttons. CONFIRM DEATH is the destructive path
+    (gb-btn-danger); CANCEL is the safe out (default styling).
+
+    Wired by `dashboard` Stimulus controller:
+    - `openMarkDeadModal(event)` populates + shows
+    - `confirmMarkDead()` fires the PATCH
+    - `closeMarkDeadModal()` hides without firing
+    - The MARK DEAD button on the pokemon modal calls
+      `dashboard#openMarkDeadModal` instead of the old `dashboard#markDead`. %>
+<div data-dashboard-target="markDeadModal"
+     class="hidden"
+     style="position: fixed; inset: 0; z-index: 60;">
+  <div data-action="click->dashboard#closeMarkDeadModal"
+       style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.85);"></div>
+
+  <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
+    <div class="gb-modal" style="max-width: 440px;">
+      <div class="gb-modal-title">
+        MARK AS DEAD
+        <button data-action="click->dashboard#closeMarkDeadModal"
+                class="gb-modal-close"
+                aria-label="Close modal">&times;</button>
+      </div>
+
+      <div style="padding: 12px 4px 4px;">
+        <div style="font-size: 14px; margin-bottom: 10px;">
+          <span data-dashboard-target="markDeadNickname" style="color: #e8a0a0;"></span>
+        </div>
+
+        <div style="font-size: 11px; color: var(--d2); line-height: 1.6; margin-bottom: 16px;">
+          This permanently marks every linked pokemon in this group as dead and removes the group from all teams. <strong style="color: var(--d1);">Nuzlocke runs are irreversible.</strong>
+        </div>
+
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+          <button type="button"
+                  data-action="click->dashboard#closeMarkDeadModal"
+                  class="gb-btn gb-btn-sm">
+            CANCEL
+          </button>
+          <button type="button"
+                  data-action="click->dashboard#confirmMarkDead"
+                  class="gb-btn-danger gb-btn-sm">
+            CONFIRM DEATH
+          </button>
+        </div>
+      </div>
+
+      <input type="hidden" data-dashboard-target="markDeadGroupId">
+    </div>
+  </div>
+</div>

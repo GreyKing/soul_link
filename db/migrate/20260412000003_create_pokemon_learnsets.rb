@@ -8,7 +8,7 @@ class CreatePokemonLearnsets < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :pokemon_learnsets, [:pokemon_base_stat_id, :pokemon_move_id, :learn_method],
+    add_index :pokemon_learnsets, [ :pokemon_base_stat_id, :pokemon_move_id, :learn_method ],
               unique: true, name: "idx_learnset_unique"
   end
 end

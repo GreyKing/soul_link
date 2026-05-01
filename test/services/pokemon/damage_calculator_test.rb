@@ -7,7 +7,7 @@ class Pokemon::DamageCalculatorTest < ActiveSupport::TestCase
     OpenStruct.new(
       species: species, hp: hp, atk: atk, def_stat: def_stat,
       spa: spa, spd: spd, spe: spe, type1: type1, type2: type2,
-      types: [type1, type2].compact
+      types: [ type1, type2 ].compact
     )
   end
 

@@ -29,7 +29,7 @@ class GymReadyController < ApplicationController
     # Progression: all segments up to and including the current one
     @progression = SoulLink::GameState.progression
     segments = @progression["segments"] || []
-    @current_segment_index = [@gyms_defeated, segments.size - 1].min
+    @current_segment_index = [ @gyms_defeated, segments.size - 1 ].min
     @segments = segments[0..@current_segment_index]
 
     # Groups by location for caught/uncaught status on routes

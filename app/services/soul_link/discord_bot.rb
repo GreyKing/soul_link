@@ -11,7 +11,7 @@ module SoulLink
 
       @bot = Discordrb::Bot.new(
         token: @bot_token,
-        intents: [:server_messages, :servers]
+        intents: [ :server_messages, :servers ]
       )
 
       register_commands
@@ -251,9 +251,9 @@ module SoulLink
       existing_run = SoulLinkRun.current(guild_id)
       general_channel = if existing_run
                           server.channels.find { |c| c.id == existing_run.general_channel_id }
-                        else
+      else
                           server.channels.find { |c| c.name == 'general' && c.parent_id == category.id }
-                        end
+      end
 
       if general_channel
         general_channel.parent = category
@@ -353,9 +353,9 @@ module SoulLink
 
       description = if groups.empty?
                       "*No Pokemon caught yet. Click 'Add Catch' to start a new group!*"
-                    else
+      else
                       groups.map.with_index(1) do |group, idx|
-                        lines = ["**#{idx}.** #{group.nickname} *(#{GameState.location_name(group.location)})*"]
+                        lines = [ "**#{idx}.** #{group.nickname} *(#{GameState.location_name(group.location)})*" ]
 
                         group.soul_link_pokemon.each do |pokemon|
                           lines << "   #{GameState.player_name(pokemon.discord_user_id)}: #{pokemon.species}"
@@ -367,7 +367,7 @@ module SoulLink
 
                         lines.join("\n")
                       end.join("\n\n")
-                    end
+      end
 
       Discordrb::Webhooks::Embed.new(
         title: "🎯 Caught Pokemon",
@@ -383,9 +383,9 @@ module SoulLink
 
       description = if groups.empty?
                       "*No deaths yet. Stay safe out there!*"
-                    else
+      else
                       groups.map.with_index(1) do |group, idx|
-                        lines = ["**#{idx}.** #{group.nickname} *(#{GameState.location_name(group.location)})*"]
+                        lines = [ "**#{idx}.** #{group.nickname} *(#{GameState.location_name(group.location)})*" ]
 
                         group.soul_link_pokemon.each do |pokemon|
                           lines << "   #{GameState.player_name(pokemon.discord_user_id)}: #{pokemon.species}"
@@ -397,7 +397,7 @@ module SoulLink
 
                         lines.join("\n")
                       end.join("\n\n")
-                    end
+      end
 
       Discordrb::Webhooks::Embed.new(
         title: "💀 Fallen Pokemon",
@@ -966,11 +966,11 @@ module SoulLink
     def current_run(event)
       guild_id = if event.respond_to?(:server_id)
                    event.server_id
-                 elsif event.respond_to?(:server) && event.server
+      elsif event.respond_to?(:server) && event.server
                    event.server.id
-                 elsif event.respond_to?(:interaction) && event.interaction
+      elsif event.respond_to?(:interaction) && event.interaction
                    event.interaction.server_id
-                 end
+      end
 
       SoulLinkRun.current(guild_id)
     end

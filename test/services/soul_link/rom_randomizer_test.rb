@@ -312,7 +312,7 @@ module SoulLink
       # waitpid(pid, WNOHANG) returns nil while running; called with no flag
       # after KILL it returns the pid (we just no-op).
       waitpid_stub = ->(_pid, *flags) { flags.first == Process::WNOHANG ? nil : fake_pid }
-      kill_stub   = ->(sig, pid) { kill_signals << [sig, pid]; 1 }
+      kill_stub   = ->(sig, pid) { kill_signals << [ sig, pid ]; 1 }
       sleep_stub  = ->(_secs) { nil }
 
       with_preconditions do

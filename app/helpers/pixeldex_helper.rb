@@ -154,9 +154,9 @@ module PixeldexHelper
 
       sprite = if pokemon&.species.present?
                  pokemon_sprite_tag(pokemon.species, size: sprite_size)
-               else
+      else
                  pixeldex_unknown_sprite(size: sprite_size)
-               end
+      end
 
       content_tag(:div, safe_join([
         content_tag(:span, short_name, style: "font-size: 7px; color: var(--d2); width: 30px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"),

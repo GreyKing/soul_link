@@ -7,19 +7,22 @@
     reloading the whole emulator page (which would tear down the running
     emulator iframe).
 
-    The YOU badge / 4px-border that used to mark the current player's
-    card was removed in Step 9; preserving it across stream replacements
-    requires either passing current_user_id into a model callback (a
-    layer violation) or rendering the marker outside the turbo_frame_tag
-    (DOM fragility). Tracked as a Known Gap. The player_label still
-    shows their own name; that's the disambiguation. %>
+    The YOU badge + 4px-border are applied client-side by the
+    `roster-you-marker` Stimulus controller, which walks
+    [data-discord-user-id] cards on connect + on each
+    turbo:before-stream-render. This keeps current_user_id out of the
+    model callback (broadcast renders run without controller context)
+    and the marker re-applies across frame replacements. %>
 
-<div class="gb-card" style="padding: 8px 10px; margin-bottom: 8px;">
-  <div style="font-size: 11px; color: var(--d1); letter-spacing: 0.1em;">RUN ROSTER</div>
-</div>
+<div data-controller="roster-you-marker"
+     data-roster-you-marker-current-user-id-value="<%= current_user_id %>">
+  <div class="gb-card" style="padding: 8px 10px; margin-bottom: 8px;">
+    <div style="font-size: 11px; color: var(--d1); letter-spacing: 0.1em;">RUN ROSTER</div>
+  </div>
 
-<% @run_sessions.each do |s| %>
-  <%= turbo_frame_tag "emulator_roster_session_#{s.id}" do %>
-    <%= render "emulator/run_sidebar_card", s: s %>
+  <% @run_sessions.each do |s| %>
+    <%= turbo_frame_tag "emulator_roster_session_#{s.id}" do %>
+      <%= render "emulator/run_sidebar_card", s: s %>
+    <% end %>
   <% end %>
-<% end %>
+</div>

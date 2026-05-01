@@ -119,7 +119,6 @@ module PokemonDataFetcher
 end
 
 namespace :pokemon do
-
   desc "Fetch Gen IV Platinum data from PokeAPI into local YAML cache"
   task fetch: :environment do
     output_dir = Rails.root.join("config", "pokemon_data")

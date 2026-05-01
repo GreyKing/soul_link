@@ -184,7 +184,7 @@ class RunChannelTest < ActionCable::Channel::TestCase
   test "regenerate_emulator_roms cascades after_destroy and deletes rom files" do
     tmp_dir = Rails.root.join("tmp", "test_run_channel_regen")
     FileUtils.mkdir_p(tmp_dir)
-    file = Tempfile.create(["rom", ".nds"], tmp_dir)
+    file = Tempfile.create([ "rom", ".nds" ], tmp_dir)
     file.close
     rel_path = Pathname.new(file.path).relative_path_from(Rails.root).to_s
 

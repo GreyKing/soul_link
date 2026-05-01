@@ -11,11 +11,11 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 9 — UX Batch (Tier-A + KG-1/2/3/4). **Awaiting review.**
-**Last committed:** Step 8 (`64364d9`) shipped + merged to `main`. Step 9 not yet committed.
-**Pending deploy:** N/A — Step 9 is web-process-only (broadcasts use the in-process async cable adapter; no infra change).
+**Active step:** Step 10 — UX Batch 2: Tier-B/C/D/E + YOU-badge follow-up + KG-5. **Awaiting review.**
+**Last committed:** Step 9 (`7513764`) shipped + merged to `main`. Step 10 not yet committed.
+**Pending deploy:** N/A — Step 10 is view + JS + CSS + Stimulus + lint sweep.
 
-**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — diagnostic punch-list that fed Step 9. Stays in handoff/ for future reference.
+**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — feeder document for Steps 9 and 10. Stays in handoff/ for future reference.
 
 **Parked plan:** FactoryBot conversion. Phases 1+2 land in this step (Step 4); Phase 3+ in Steps 5–6. See `handoff/parked-plans/factorybot-conversion.md`.
 
@@ -23,6 +23,51 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 10 — UX Batch 2: Tier-B/C/D/E + YOU-badge follow-up + KG-5 — 2026-04-30
+**Status:** Awaiting review.
+
+Drew its punch-list from the unfinished items in `handoff/PROJECT-REVIEW-2026-04-30.md`. Ships 9 items: 1 Tier-B, 1 Tier-B, 1 Tier-C, 1 Tier-C, 1 Tier-D, 1 Tier-E, 1 Tier-E, 1 follow-up KG, 1 lint sweep KG.
+
+**Pre-flight scope reductions (Architect):** during target-file reads, six PROJECT-REVIEW items turned out to already be handled in the codebase (the review was based on an earlier scan): B.6 (gym-draft button disable — all six handlers already disable buttons or set pointer-events on click), B.8 (run_management auto-dismiss — already at line 56), B.9 (no empty state for gym drafts — there's no index route, only show-by-ID after create), B.11 (no "no species assigned" placeholder — the per-player rows already show "Drop your species here"/"waiting..."), C.12 (form-label `for` mismatch — input already has matching `id`), and D.16 (save-slot hard-reload → turbo_stream — meaningful work, deferred). Documented in REVIEW-REQUEST.
+
+**Items shipped:**
+
+- **B.7 — Cancel button opacity.** Dropped misleading `style="opacity: 0.6;"` from the Cancel button in `gym_schedules/show.html.erb:66`. The button looked disabled but was fully clickable.
+- **B.10 — Gym schedule form silent vanish.** Added an explanatory hint card when `@schedules.any?` so the propose-form doesn't disappear without context. Copy: "A schedule is already active. Cancel the active one below before proposing a new time."
+- **C.13 — Avatar alt text.** `alt="avatar"` → `alt="<%= current_username %>'s avatar"` in `app/views/layouts/application.html.erb`.
+- **C.14 — Modal close `aria-label`.** Added `aria-label="Close modal"` to all four `.gb-modal-close` buttons (pokemon modal, catch modal, species modal, quick-calc modal) plus `aria-label="Close panel"` to the map-show timeline panel close button (different control, equivalent semantic).
+- **D.15 — Emulator mobile breakpoint.** Extracted `display: grid; grid-template-columns: 280px minmax(0, 1fr) 280px;` from inline-style into a new `.emulator-grid` class in `pixeldex.css`. Below 900px the grid stacks (`grid-template-columns: 1fr`); above 900px the three-column desktop layout returns. Players on mobile no longer see a negative-width canvas.
+- **E.17 — Mark Dead custom modal.** Replaced the native `confirm()` in `dashboard_controller.js#markDead`. New partial `_mark_dead_modal.html.erb` (modeled on `_pokemon_modal.html.erb` structure: overlay + gb-modal + close button + content + actions). Wired three Stimulus actions: `openMarkDeadModal(event)` populates + shows, `confirmMarkDead()` fires the PATCH, `closeMarkDeadModal()` hides without firing. The pokemon modal's MARK DEAD button now calls `openMarkDeadModal` instead of the old `markDead`. Modal copy emphasizes Nuzlocke-permadeath ("Nuzlocke runs are irreversible") with the group nickname highlighted in `#e8a0a0` (danger-text palette).
+- **E.18 — FALLEN tooltip.** Added `title="Pokemon that died this run"` to the `box-section-label` div in both `_pc_box_content.html.erb` and `_pc_box_panel.html.erb`. Two-line edits.
+- **YOU-badge restoration (Step 9 follow-up KG).** New file `app/javascript/controllers/roster_you_marker_controller.js` — small Stimulus controller mounted on the run-sidebar wrapper. On `connect()` and on `turbo:before-stream-render` it walks `[data-discord-user-id]` cards and decorates the matching one with a YOU badge + `gb-card--current-user` CSS class (4px-border). The roster card partial gained `data-discord-user-id="<%= s.discord_user_id %>"`. Solves the Step 9 regression cleanly client-side without passing `current_user_id` into a model callback. Step 9's broadcast-test partial-render assertion was extended to verify the data attribute survives.
+- **KG-5 — Rubocop autocorrect sweep.** Ran `bundle exec rubocop -a` (safe autocorrect only, NOT `-A`). 144 files inspected, 121 offenses corrected. Most are `Layout/SpaceInsideArrayLiteralBrackets` (the rails-omakase preference for `[ a, b ]` over `[a, b]`). Post-sweep: **0 offenses** across the entire codebase. 310/310 tests still green.
+
+**Files modified (52):**
+- View edits (manual, 11 files): `gym_schedules/show.html.erb`, `gym_schedules/index.html.erb`, `layouts/application.html.erb`, `dashboard/_pokemon_modal.html.erb`, `dashboard/_catch_modal.html.erb`, `dashboard/_pc_box_content.html.erb`, `dashboard/_pc_box_panel.html.erb`, `dashboard/show.html.erb`, `species_assignments/show.html.erb`, `teams/_quick_calc_modal.html.erb`, `map/show.html.erb`, `emulator/show.html.erb`, `emulator/_run_sidebar.html.erb`, `emulator/_run_sidebar_card.html.erb`
+- JS edits (manual, 1 file): `app/javascript/controllers/dashboard_controller.js` (Mark Dead flow)
+- CSS edits (manual, 1 file): `app/assets/stylesheets/pixeldex.css` (emulator-grid + .gb-card--current-user)
+- Tests (1 file): `test/models/soul_link_emulator_save_slot_test.rb` (extended partial-render test)
+- Rubocop autocorrect: 38 additional Ruby files (see git diff for full list — diffs are pure whitespace / style)
+
+**Files created (2):**
+- `app/views/dashboard/_mark_dead_modal.html.erb` — Mark Dead confirmation modal
+- `app/javascript/controllers/roster_you_marker_controller.js` — YOU-badge restoration controller
+
+**Key decisions:**
+- **`window.alert()` carry-over.** Step 9's Tier-A error toasts use `window.alert()`. Step 10 didn't add new alerts; the Mark Dead custom modal supersedes the worst confirm()-based UX. A styled toast component is still a future polish item.
+- **Mark Dead modal lives in the dashboard layout, not the pokemon modal.** Two separate modals, both reachable. The pokemon modal's MARK DEAD button just opens the new modal; both modals can be open simultaneously (the Mark Dead modal has higher z-index 60 vs pokemon modal's 50). Closing the Mark Dead modal returns the user to the pokemon modal context.
+- **YOU-badge controller injects the badge dynamically rather than rendering it server-side.** This keeps the broadcast-rendered partial context-free (no current_user_id needed in model callbacks). The badge gets re-applied on each `turbo:before-stream-render` so it survives broadcasts.
+- **Rubocop autocorrect on `if / else / end` patterns produces visually-awkward (but functionally identical) indentation in a few files** (e.g., `discord_bot.rb:251-261`). The `Layout/EndAlignment` cop fixed `else`/`end` alignment to match the `if` opener, but didn't reindent the bodies between them. Code is correct; tests pass; visually less readable in those spots. Logged as a follow-up cleanup item below.
+- **Pre-existing rubocop offenses fully closed.** The Step 1 BUILD-LOG known gap noted "133 across 127 files"; Step 10 brought that to **0**. Future CI gating on rubocop is now a small lift.
+
+**Tests:** 310/310 passing (no test count change). 0 failures, 0 errors. The extended `run_sidebar_card partial renders standalone` test now also asserts `data-discord-user-id=` is present.
+
+**Lint:** `bundle exec rubocop` reports 0 offenses across 144 files. Down from ~133 pre-Step-10.
+
+**Diff scope:** 50 files changed (~13 manual + 38 autocorrect + 4 handoff docs). 2 new files.
+
+---
 
 ### Step 9 — UX Batch: Tier-A Silent-Failure Fixes + KG-1/2/3/4 — 2026-04-30
 **Status:** Awaiting review.
@@ -368,22 +413,28 @@ ALL FACTORY SMOKE CHECKS PASSED
 ## Known Gaps
 *Durable. Items logged here instead of expanding the current step. Persists across sessions until addressed.*
 
-### Closed in Step 9 (2026-04-30)
-- ~~**No real-time broadcast of species change to other players' dashboards**~~ — closed (KG-2: `broadcasts_refreshes_to` on `SoulLinkPokemon` + `SoulLinkPokemonGroup`)
-- ~~**No loading state on EVOLVE button itself**~~ — closed (KG-3: button disable + "EVOLVING..." text)
-- ~~**`#d4b14a` amber color inline in `_run_sidebar.html.erb`**~~ — closed (KG-4: promoted to `--amber` palette token in `pixeldex.css`)
-- ~~**No real-time updates on the run roster sidebar**~~ — closed (KG-1: targeted frame replacement on save-slot parsed_* updates)
+### Closed in Steps 9-10 (2026-04-30)
+- ~~**KG-1: No real-time updates on the run roster sidebar**~~ — closed in Step 9 (targeted frame replacement on save-slot parsed_* updates)
+- ~~**KG-2: No real-time broadcast of species change to other players' dashboards**~~ — closed in Step 9 (`broadcasts_refreshes_to` on `SoulLinkPokemon` + `SoulLinkPokemonGroup`)
+- ~~**KG-3: No loading state on EVOLVE button**~~ — closed in Step 9 (button disable + "EVOLVING..." text)
+- ~~**KG-4: `#d4b14a` amber color inline**~~ — closed in Step 9 (promoted to `--amber` palette token)
+- ~~**KG-5: 133 pre-existing rubocop offenses**~~ — closed in Step 10 (`rubocop -a` autocorrect; codebase now 0 offenses across 144 files)
+- ~~**YOU-badge restoration follow-up (logged in Step 9)**~~ — closed in Step 10 (new `roster_you_marker_controller.js` decorates the matching `[data-discord-user-id]` card on `connect()` + `turbo:before-stream-render`)
 - ~~**Convert legacy fixture-based tests to FactoryBot**~~ — closed in Steps 4-8 (FactoryBot conversion shipped)
 
 ### From earlier work (Evolve Button feature)
 - Co-evolution of soul-link partners on evolution (deliberate; revisit if Project Owner wants paired evolution)
 - No level/method gating on EVOLVE button (always available; player owns in-game timing)
 
-### New — From Step 9 (2026-04-30)
-- **YOU badge + 4px-border removed from run roster cards.** Preserving them across Turbo Stream broadcasts would require passing `current_user_id` into a model callback (a layer violation) or rendering markers outside the frame in DOM-fragile ways. The `player_label` still disambiguates which card is the viewer's own. A future iteration could add a small "current-user marker" Stimulus controller that reads `current_user_id` from a meta tag and decorates the matching `<turbo-frame>` post-render.
-- **`window.alert()` for Tier-A error toasts.** Smallest user-facing change that closed the silent-failure gap; a styled toast component (matching the `gb-flash gb-flash-alert` palette) would be cleaner. Track if alerts feel intrusive in real use.
-- **Bot-process broadcasts not yet supported.** The async cable adapter is in-process; Discord modal updates (which run in the bot process via `rake soul_link:bot`) don't propagate to web clients in real time. Switching to a redis cable adapter would unlock this. Out of scope for Step 9.
-- **Pre-existing soft points from `handoff/PROJECT-REVIEW-2026-04-30.md`** — 20 items, ranked by ROI in that document. Top-priority structural cleanups: (1) `discord_bot.rb` god-object decomposition; (2) zero test coverage on services/channels; (3) `SoulLinkRun.current(guild_id)` lacks a hard "one active per guild" invariant; (4) `DashboardController#show` needs presenter extraction; (5) `SoulLinkEmulatorSession::GzipCoder` should move to a concern. None of these are urgent.
+### Outstanding from Step 9 (2026-04-30)
+- **`window.alert()` for Tier-A error toasts** (Step 9). Smallest user-facing change that closed the silent-failure gap; a styled toast component (matching the `gb-flash gb-flash-alert` palette) would be cleaner. Track if alerts feel intrusive in real use.
+- **Bot-process broadcasts not yet supported.** The async cable adapter is in-process; Discord modal updates (which run in the bot process via `rake soul_link:bot`) don't propagate to web clients in real time. Switching to a redis cable adapter would unlock this.
+- **Pre-existing soft points from `handoff/PROJECT-REVIEW-2026-04-30.md`** — 20 items, ranked by ROI in that document. Top-priority structural cleanups: (1) `discord_bot.rb` god-object decomposition; (2) zero test coverage on services/channels; (3) `SoulLinkRun.current(guild_id)` lacks a hard "one active per guild" invariant; (4) `DashboardController#show` needs presenter extraction; (5) `SoulLinkEmulatorSession::GzipCoder` should move to a concern. None of these are urgent — Tier-1 refactor work, fresh-session candidate.
+
+### New — From Step 10 (2026-04-30)
+- **Visual indentation in a few autocorrected files is awkward.** `Layout/EndAlignment` autocorrect fixed `else`/`end` alignment to match the `if` opener but didn't reindent the bodies between them — for `<var> = if cond \n  body \n else \n  body \n end` patterns the body is now visibly under-aligned vs. the keywords. Specific spots: `app/services/soul_link/discord_bot.rb` lines around 251-261, 353-369, 383-394. Code is correct, tests pass — purely cosmetic. A 5-minute manual cleanup pass would resolve.
+- **D.16 (save-slot operations hard-reload) deferred.** `window.location.reload()` after slot ops loses emulator in-memory state. Compounds with KG-1's broadcast plumbing — a follow-up step could turn the slot column into a turbo_stream-receiving frame and broadcast on slot create/update/destroy.
+- **KG-6 (Map ID → name lookup) deferred.** The SRAM parser's `parsed_map_id` (when populated) renders as a number; `config/soul_link/maps.yml` with Gen IV Platinum map IDs would let the sidebar render "Eterna City" etc. ~1 hour of work, separate session.
 
 ### From the emulator deploy + polish session (2026-04-29)
 - **Tier 2 SRAM parsing** for in-game info (character name, time-played, money, party count, current map, badges earned) — separate feature, real engineering effort (Gen IV character set decoder + checksum/slot logic)

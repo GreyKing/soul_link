@@ -127,13 +127,13 @@ namespace :soul_link do
       # Build location lookup from caught groups
       caught_lookup = {}
       (data['caught_pokemon'] || []).each do |cp|
-        key = [cp['nickname'], cp['caught_at']]
+        key = [ cp['nickname'], cp['caught_at'] ]
         caught_lookup[key] = cp['location']
       end
 
       data['dead_pokemon'].each do |group_data|
         location = group_data['location'] ||
-                   caught_lookup[[group_data['nickname'], group_data['caught_at']]] ||
+                   caught_lookup[[ group_data['nickname'], group_data['caught_at'] ]] ||
                    'unknown'
 
         group = run.soul_link_pokemon_groups.create!(
@@ -180,14 +180,14 @@ namespace :soul_link do
     # (caught list often includes pokemon that later died)
     dead_keys = Set.new
     (data['dead_pokemon'] || []).each do |dp|
-      dead_keys << [dp['name'], dp['caught_at']]
+      dead_keys << [ dp['name'], dp['caught_at'] ]
     end
 
     if data['caught_pokemon']
       puts "Importing caught Pokemon (legacy format)..."
       data['caught_pokemon'].each do |poke|
         # Skip if this pokemon appears in the dead list (it'll be imported as dead)
-        if dead_keys.include?([poke['name'], poke['caught_at']])
+        if dead_keys.include?([ poke['name'], poke['caught_at'] ])
           puts "  ⏩ #{poke['name']} (#{poke['location']}) — skipped (in dead list)"
           next
         end
@@ -221,13 +221,13 @@ namespace :soul_link do
 
       caught_lookup = {}
       (data['caught_pokemon'] || []).each do |cp|
-        key = [cp['name'], cp['caught_at']]
+        key = [ cp['name'], cp['caught_at'] ]
         caught_lookup[key] = cp['location']
       end
 
       data['dead_pokemon'].each do |poke|
         location = poke['location'] ||
-                   caught_lookup[[poke['name'], poke['caught_at']]] ||
+                   caught_lookup[[ poke['name'], poke['caught_at'] ]] ||
                    'unknown'
 
         group = run.soul_link_pokemon_groups.create!(
@@ -396,10 +396,10 @@ namespace :soul_link do
 
     runs = if guild_id
              run = SoulLinkRun.current(guild_id)
-             run ? [run] : []
-           else
+             run ? [ run ] : []
+    else
              SoulLinkRun.active.order(:guild_id, run_number: :desc)
-           end
+    end
 
     if runs.empty?
       puts guild_id ? "❌ No active run found for guild #{guild_id}" : "❌ No active runs found"

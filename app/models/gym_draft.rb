@@ -13,11 +13,11 @@ class GymDraft < ApplicationRecord
 
   # ── State Helpers ──
 
-  def lobby?() = status == "lobby"
-  def voting?() = status == "voting"
-  def drafting?() = status == "drafting"
-  def nominating?() = status == "nominating"
-  def complete?() = status == "complete"
+  def lobby? = status == "lobby"
+  def voting? = status == "voting"
+  def drafting? = status == "drafting"
+  def nominating? = status == "nominating"
+  def complete? = status == "complete"
 
   def data
     (state_data || {}).with_indifferent_access
@@ -95,7 +95,7 @@ class GymDraft < ApplicationRecord
     raise "Not your turn" unless current_drafter_id == picker_uid.to_i
     raise "That pokemon has already been picked" if picks.any? { |p| p["group_id"] == group_id.to_i }
 
-    new_picks = picks + [{ "round" => picks.size + 1, "group_id" => group_id.to_i, "picked_by" => picker_uid.to_i }]
+    new_picks = picks + [ { "round" => picks.size + 1, "group_id" => group_id.to_i, "picked_by" => picker_uid.to_i } ]
     next_index = current_player_index + 1
 
     if new_picks.size >= INDIVIDUAL_ROUNDS
@@ -162,7 +162,7 @@ class GymDraft < ApplicationRecord
     update_data!("current_nomination" => nom)
 
     # Check if all other players have voted
-    other_ids = player_ids.map(&:to_s) - [nom["nominator_id"].to_s]
+    other_ids = player_ids.map(&:to_s) - [ nom["nominator_id"].to_s ]
     all_voted = other_ids.all? { |id| nom["votes"].key?(id) }
 
     if all_voted
@@ -216,7 +216,7 @@ class GymDraft < ApplicationRecord
 
     # Build pick order: winner first, rest in settings.yml order
     remaining = player_ids.reject { |id| id == first_pick }
-    order = [first_pick] + remaining
+    order = [ first_pick ] + remaining
 
     update!(
       status: "drafting",
@@ -228,17 +228,17 @@ class GymDraft < ApplicationRecord
 
   def resolve_nomination!
     nom = current_nomination
-    other_ids = player_ids.map(&:to_s) - [nom["nominator_id"].to_s]
+    other_ids = player_ids.map(&:to_s) - [ nom["nominator_id"].to_s ]
     approvals = other_ids.count { |id| nom["votes"][id] == true }
     # Majority of others (2+ out of 3)
     approved = approvals >= (other_ids.size / 2.0).ceil
 
     if approved
-      new_picks = picks + [{
+      new_picks = picks + [ {
         "round" => picks.size + 1,
         "group_id" => nom["group_id"],
         "picked_by" => nom["nominator_id"]
-      }]
+      } ]
       next_nominator_index = (current_player_index + 1) % pick_order.size
 
       if new_picks.size >= TOTAL_SLOTS

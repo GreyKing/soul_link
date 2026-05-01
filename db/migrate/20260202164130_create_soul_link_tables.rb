@@ -26,7 +26,7 @@ class CreateSoulLinkTables < ActiveRecord::Migration[7.0]
       t.timestamps
     end
 
-    add_index :soul_link_pokemon, [:soul_link_run_id, :status]
+    add_index :soul_link_pokemon, [ :soul_link_run_id, :status ]
     add_index :soul_link_pokemon, :status
   end
 end

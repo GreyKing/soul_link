@@ -11,6 +11,6 @@ class CreateGymDrafts < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :gym_drafts, [:soul_link_run_id, :status]
+    add_index :gym_drafts, [ :soul_link_run_id, :status ]
   end
 end

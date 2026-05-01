@@ -13,6 +13,6 @@ class CreateGymSchedules < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :gym_schedules, [:soul_link_run_id, :status]
+    add_index :gym_schedules, [ :soul_link_run_id, :status ]
   end
 end

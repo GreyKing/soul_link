@@ -17,7 +17,7 @@ class GymScheduleDiscordUpdateJob < ApplicationJob
     request = Net::HTTP::Patch.new(uri)
     request["Authorization"] = "Bot #{token}"
     request["Content-Type"] = "application/json"
-    request.body = { embeds: [embed], components: components }.to_json
+    request.body = { embeds: [ embed ], components: components }.to_json
 
     response = http.request(request)
     Rails.logger.error "Discord embed update failed: #{response.code} #{response.body}" unless response.is_a?(Net::HTTPSuccess)
@@ -31,20 +31,20 @@ class GymScheduleDiscordUpdateJob < ApplicationJob
       name = player["display_name"]
       response = schedule.rsvp_for(uid)
       emoji = case response
-              when "yes" then "\u2705"
-              when "no" then "\u274C"
-              when "maybe" then "\u2753"
-              else "\u23F3"
-              end
+      when "yes" then "\u2705"
+      when "no" then "\u274C"
+      when "maybe" then "\u2753"
+      else "\u23F3"
+      end
       "#{emoji} **#{name}**: #{response&.capitalize || 'Pending'}"
     end
 
     status_text = case schedule.status
-                  when "proposed" then "\u{1F4CB} Proposed"
-                  when "confirmed" then "\u2705 Confirmed"
-                  when "completed" then "\u{1F3C6} Completed"
-                  when "cancelled" then "\u274C Cancelled"
-                  end
+    when "proposed" then "\u{1F4CB} Proposed"
+    when "confirmed" then "\u2705 Confirmed"
+    when "completed" then "\u{1F3C6} Completed"
+    when "cancelled" then "\u274C Cancelled"
+    end
 
     {
       title: "\u{1F4C5} Gym Day Schedule",

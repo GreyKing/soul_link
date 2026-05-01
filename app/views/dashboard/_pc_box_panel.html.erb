@@ -60,7 +60,7 @@
     </div>
 
     <%# FALLEN section %>
-    <div class="box-section-label" style="margin-top: 14px;">FALLEN (<%= @fallen_groups.size %>)</div>
+    <div class="box-section-label" style="margin-top: 14px;" title="Pokemon that died this run">FALLEN (<%= @fallen_groups.size %>)</div>
     <div class="box-grid">
       <% @fallen_groups.each do |group| %>
         <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>

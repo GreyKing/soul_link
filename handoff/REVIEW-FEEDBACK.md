@@ -1,4 +1,4 @@
-# Review Feedback — Step 9
+# Review Feedback — Step 10
 Date: 2026-04-30
 Status: APPROVED
 
@@ -12,57 +12,69 @@ None.
 
 ## Cleared
 
-Reviewed Step 9 (UX Batch: Tier-A + KG-1/2/3/4) end-to-end: 12 modified files + 1 new partial + 5 new broadcast tests + handoff updates. Diff scope matches the brief — no app/controllers, no app/services, no config changes.
+Reviewed Step 10 (UX Batch 2 + KG-5 sweep) end-to-end: 13 manual edits + 2 new files + 38 autocorrected Ruby files. Diff scope matches the brief — no app/controllers, app/models, app/services, or app/channels semantic changes (autocorrect touched some but only style/whitespace).
 
 Verifications performed (independently of Bob's claims):
 
-- **Tier-A.1 — `save_slots_controller.js` toasts.** Grep `console.error` returns 6 sites; each has a sibling `window.alert(...)` call within 1-3 lines. The earlier alert at line 143 (unchanged from prior step) is the only one without a paired console.error — it's already a toast, not an additional one. ✓
+- **Skipped items correctly diagnosed (B.6, B.8, B.9, B.11, C.12, D.16).** Spot-checked all six:
+  - B.6: read `gym_draft_controller.js` — every action handler does disable buttons or set pointer-events. Skip valid.
+  - B.8: `run_management_controller.js:56` confirmed has `setTimeout(...8000)`. Skip valid.
+  - B.9: `routes.rb` has `resources :gym_drafts, only: [:create, :show]` — no index action. The "no draft" page doesn't exist. Skip valid.
+  - B.11: `_group_card.html.erb` shows per-player rows with placeholders. Skip valid.
+  - C.12: input has `id="scheduled_at"` matching label `for=`. Skip valid.
+  - D.16: meaningful work, deferred per brief. Skip valid.
 
-- **Tier-A.2 — `gym_draft_controller.js` errorBanner.** `static targets` includes `errorBanner`. `handleMessage` calls `this.showError(data.error)` after the `console.error`. `showError` falls back to `alert()` if the target is missing (defensive, in case the view is loaded without the target div). The 8s auto-hide via `setTimeout` matches Step 5's pattern in `run_management_controller.js`. The view's `<div data-gym-draft-target="errorBanner" hidden>` is in `gym_drafts/show.html.erb` line 30. ✓
+- **B.7 cancel opacity gone.** `gym_schedules/show.html.erb:65-66` no longer has `style="opacity: 0.6;"`. Class is just `gb-btn-danger gb-btn-sm`. ✓
 
-- **Tier-A.3 — `team_builder_controller.js` pixeldex classes.** Grep `text-yellow-400|text-green-400|text-red-400` returns ZERO matches in the controller. `showStatus` now writes `team-builder-status ${modifier}` where modifier is one of three semantic classes. CSS rules in `pixeldex.css` lines 18-21 define the three modifiers with the existing palette tokens. ✓
+- **B.10 schedule-already-active hint present.** `gym_schedules/index.html.erb` flipped from `unless @schedules.any?` to `if @schedules.any?` with explanatory copy in the active branch. The propose-form lives in the else branch. ✓
 
-- **Tier-A.4 — Save-slot buttons disabled in overwrite mode.** `_enterOverwriteMode` and `_exitOverwriteMode` call `_actionButtons().forEach(btn => btn.disabled = ...)`. `_actionButtons()` selects `[data-action*='save-slots#makeActive'], [data-action*='save-slots#deleteSlot']` within `this.element`. Tab nav + screen reader can no longer focus these during overwrite mode. ✓
+- **C.13 avatar alt text.** `application.html.erb:46` uses `alt="<%= current_username %>'s avatar"`. ✓
 
-- **Tier-A.5 — Pokemon modal SAVE in-flight disable.** `savePokemon(event)` accepts an `event` param now (existing call sites already pass it via `data-action`). `saveBtn = event?.currentTarget; if (saveBtn) saveBtn.disabled = true` at top; every error-return path re-enables; success path leaves disabled (page reloads). ✓
+- **C.14 modal close aria-labels.** Verified all 5 sites:
+  - `dashboard/_pokemon_modal.html.erb:14` ✓
+  - `dashboard/_catch_modal.html.erb:14` ✓
+  - `species_assignments/show.html.erb:138` ✓
+  - `teams/_quick_calc_modal.html.erb:16` ✓
+  - `map/show.html.erb:219` ✓ (uses `aria-label="Close panel"` since it's a panel close, not modal — semantically correct)
+  - Plus the new `dashboard/_mark_dead_modal.html.erb:25` ✓
 
-- **KG-1 — Roster broadcast.** Verified the entire chain:
-  - `_run_sidebar_card.html.erb` exists, renders cleanly with only `s` as a local (no `current_user_id`, no `@run_sessions`); confirmed by reading the file end-to-end and by Bob's smoke test.
-  - `_run_sidebar.html.erb` wraps each session render in `turbo_frame_tag "emulator_roster_session_#{s.id}"`. The header card ("RUN ROSTER") is outside the loop, untouched.
-  - `emulator/show.html.erb` line 8: `turbo_stream_from @run, :emulator if @run`.
-  - Model: `SoulLinkEmulatorSaveSlot` has `after_create_commit :broadcast_roster_card_on_create` and `after_update_commit :broadcast_roster_card_on_update, if: :saved_change_to_parsed?`. Both delegate to `broadcast_roster_card`, which calls `Turbo::StreamsChannel.broadcast_replace_to(run, :emulator, target: "emulator_roster_session_#{session.id}", partial: "emulator/run_sidebar_card", locals: { s: session })`.
-  - The two-method-name workaround for Rails callback dedup is documented inline; the comment correctly identifies the symptom (registering the same method twice keeps only the second registration). Bob verified empirically via the diagnostic test before settling on this.
+- **D.15 emulator mobile breakpoint.** `pixeldex.css:27-37` defines `.emulator-grid` with default `1fr` and a `@media (min-width: 900px)` block that switches to `280px minmax(0, 1fr) 280px`. `emulator/show.html.erb:72` uses `class="emulator-grid"` (inline grid styles gone). ✓
 
-- **KG-2 — Dashboard refresh.** Both `SoulLinkPokemon` (line 25) and `SoulLinkPokemonGroup` (line 20) have `broadcasts_refreshes_to ->(record) { [ record.soul_link_run, :dashboard ] }`. `dashboard/show.html.erb` lines 5-6 set `turbo_refreshes_with method: :morph, scroll: :preserve` and `turbo_stream_from @run, :dashboard`. The morph mode + scroll-preserve combo means edits in one player's tab show up in others without scroll loss or modal teardown. ✓
+- **E.17 Mark Dead modal flow.** Read all four pieces:
+  - New partial `_mark_dead_modal.html.erb` exists (53 lines, modeled on `_pokemon_modal.html.erb`).
+  - `dashboard_controller.js` has `openMarkDeadModal`, `closeMarkDeadModal`, `confirmMarkDead` methods plus 3 new targets (`markDeadModal`, `markDeadNickname`, `markDeadGroupId`).
+  - The pokemon modal's MARK DEAD button's `data-action` changed from `click->dashboard#markDead` to `click->dashboard#openMarkDeadModal` (one-line edit in `_pokemon_modal.html.erb:109`).
+  - `dashboard/show.html.erb:59` renders the new modal partial.
+  - The flow: open populates + shows; cancel hides without firing; confirm fires the PATCH (same body as the old `markDead`) and reloads on success. Error paths re-show the modal closing to allow retry.
+  - The old `markDead` method is fully removed (replaced with the three-action flow). Verified.
 
-- **KG-3 — EVOLVE loading state.** `evolvePokemon(event)` disables the button + sets text to "EVOLVING..." at top; both error-return paths restore disabled+text. Success path reloads (button is going away anyway). ✓
+- **E.18 FALLEN tooltips.** `_pc_box_content.html.erb:72` and `_pc_box_panel.html.erb:63` both have `title="Pokemon that died this run"`. ✓
 
-- **KG-4 — Amber token.** `pixeldex.css:11` adds `--amber: #d4b14a;` to the `:root` block. `_run_sidebar.html.erb` (line 33 in the original; the file is now smaller after Bob extracted the card partial) — the inline `#d4b14a` literal is gone, replaced by `var(--amber)`. The new `team-builder-status--saving` modifier also references `--amber`. Grep confirms only the new token-references and the original `:root` declaration remain. ✓
+- **YOU-badge controller.** Read `roster_you_marker_controller.js` end-to-end:
+  - `static values = { currentUserId: String }`
+  - `connect()` registers a `turbo:before-stream-render` listener (with `requestAnimationFrame` deferral so the swap is in the DOM before `apply()` walks it) and runs `apply()` immediately.
+  - `apply()` walks `[data-discord-user-id]` cards within `this.element`. For each, if `dataset.discordUserId === this.currentUserIdValue`, it adds the `gb-card--current-user` class and (if not already present) injects a YOU badge `<span>` into the player_label row.
+  - Non-matching cards have the class removed and any leftover badge cleaned up — handles the case where a card's discord_user_id changes (player claim).
+  - `disconnect()` unregisters the listener cleanly.
+  - The controller is mounted on `_run_sidebar.html.erb`'s outer `<div data-controller="roster-you-marker" data-roster-you-marker-current-user-id-value="<%= current_user_id %>">`. ✓
+  - The roster card partial gained `data-discord-user-id="<%= s.discord_user_id %>"` on its outer `gb-card` div. ✓
+  - CSS class `gb-card--current-user { border-width: 4px; }` defined in `pixeldex.css`. ✓
+  - The Step 9 partial-render test was extended with `assert_includes rendered, "data-discord-user-id="` so future regression on the data attr fails fast.
 
-- **Diff scope (brief acceptance criterion).** `git status --short` shows: 12 modified files (5 JS controllers, 3 models, 4 views, 1 stylesheet), 1 new file (`_run_sidebar_card.html.erb`), and 4 handoff files (`ARCHITECT-BRIEF.md`, `BUILD-LOG.md`, `REVIEW-REQUEST.md`, `REVIEW-FEEDBACK.md`), plus `handoff/PROJECT-REVIEW-2026-04-30.md` (carried over from the prior session, included in this commit since it fed Step 9). No controllers, no services, no factory or test_helper changes. ✓
+- **KG-5 rubocop autocorrect sweep.** Ran `bundle exec rubocop -a` independently — confirmed clean (`0 offenses`). 144 files inspected, all pass.
+  - Spot-checked 5 randomly-modified files (damage_calculator.rb, type_chart.rb, gym_draft.rb, dashboard_controller.rb, base_stat.rb) — all changes are `Layout/SpaceInsideArrayLiteralBrackets` (`[a,b]` → `[ a, b ]`) and similar style cops. No semantic changes.
+  - Bob's flagged Known Gap (visually awkward indentation in `discord_bot.rb` from `Layout/EndAlignment`): verified at lines 251-261, 353-369, 383-394. The `else`/`end` keywords are at column ~6 while the bodies between them are at column ~26. Functionally identical (Ruby parses fine), tests pass, but visually misleading. Accepted as tracked Known Gap. A 5-minute manual cleanup is the natural follow-up.
 
-- **YOU badge regression.** `_run_sidebar.html.erb` no longer renders `>YOU<` or the 4px-border conditional. The view test was renamed and the relevant assertion dropped. The Known Gap is logged in BUILD-LOG with two paths to recover it (per-frame Stimulus controller, or wrapper-outside-frame trick). Player can still distinguish their card via `player_label`.
+- **Tests.** Ran `bin/rails test` independently: 310 runs, 0 failures, 0 errors. Same as pre-Step-10 (no test count change; the partial-render test was extended with one additional assertion, not a new test).
 
-- **Test coverage of the broadcast callbacks.** 5 new tests in `soul_link_emulator_save_slot_test.rb`:
-  1. Create with `:filled` trait → 1 broadcast on `[run, :emulator]`. Verified `streams.first["action"] == "replace"` and target matches `emulator_roster_session_<session_id>`.
-  2. Update parsed_trainer_name → 1 new broadcast (diff-style: before vs after `capture_turbo_stream_broadcasts.size`).
-  3. `update_columns` on parsed_* → 0 new broadcasts (callbacks bypassed; this is the contract — the parse job uses update_columns precisely so the broadcast doesn't fire from inside the job and double up the create-time broadcast).
-  4. Update non-parsed field (`touch`) → 0 new broadcasts (the `if: :saved_change_to_parsed?` guard works).
-  5. Partial renders standalone with only `s` local → no exception, contains the expected seed string.
-  Diff-style counting (capture before + after, compare sizes) is the correct pattern for turbo-rails 2.0.20 because `assert_turbo_stream_broadcasts count: N` captures total-during-test, not block-scoped.
+- **Diff scope.** `git status --short` shows 50 files changed (13 manual + 38 autocorrect + 4 handoff docs - 5 overlap = ~50). 2 new files. No app/controllers, app/models, app/services, app/channels semantic changes — only style/whitespace from rubocop autocorrect. ✓
 
-- **`Turbo::Broadcastable::TestHelper` include + require.** Bob used explicit `require "turbo/broadcastable/test_helper"` + `include Turbo::Broadcastable::TestHelper`. Without the require the constant isn't autoloaded in 2.0.20. Verified by reproducing the original NameError before the fix.
+- **No new `window.alert()` calls.** Grep confirmed Step 10 didn't add any. The Mark Dead modal supersedes the worst native `confirm()` use; remaining alerts (from Step 9) carry over and are tracked as a follow-up.
 
-- **Tests.** Ran `bin/rails test` independently: 310 runs, 0 failures, 0 errors. Pre-Step-9 was 305. The 5 new tests are all in the broadcast-callback area.
+- **No regression on Step 9 broadcasts.** Ran `bin/rails test test/models/soul_link_emulator_save_slot_test.rb` — 23/23 green including the 5 broadcast tests added in Step 9.
 
-- **Rubocop.** Ran `bundle exec rubocop` on all 5 touched Ruby files: clean. No new offenses; no changes outside the touched lines.
+- **No regression on existing channel functionality.** Ran `bin/rails test test/channels/` — all green.
 
-- **`broadcasts_refreshes_to` double-fire risk.** Bob's open question #2 calls out that `SoulLinkPokemonGroup#mark_as_dead!` updates both group + cascading pokemon, each emitting a refresh. Turbo morph debounces close-together refreshes per page, so the user sees one effective update. If telemetry shows excessive refreshes in production, gating on `if: -> { saved_change_to_relevant_field? }` is a 5-minute follow-up. Not blocking.
+Bob shipped exactly what the brief specified, plus correctly identified and skipped six PROJECT-REVIEW items that turned out to be already addressed. The five flagged self-review items are all well-reasoned. The autocorrect-indent visual issue in `discord_bot.rb` is the only durable downside, and it's logged as a Known Gap with a clear remediation path.
 
-- **No regression on existing channel functionality.** Ran `bin/rails test test/channels/` — 9 + N runs all green. The new Turbo broadcasts use the `Turbo::StreamsChannel`; the existing `GymDraftChannel`, `GymScheduleChannel`, `RunChannel` use their own custom broadcast paths and are independent.
-
-- **Manual smoke test deferred.** Bob did not run a live two-tab smoke test. The 5 unit tests cover the broadcast wire; end-to-end UX verification is a Project Owner check. Acceptable for this scope.
-
-Bob shipped exactly what the brief specified, plus discovered + correctly handled the Rails-callback-dedup gotcha and the turbo-rails-test-helper-needs-explicit-require gotcha. The five flagged self-review items are all well-reasoned. No deviations from the brief in the diff. Ships as-is.
-
-**Step 9 closes 4 Knowledge Gaps + ships 5 Tier-A silent-failure fixes. The first real-time multi-player UX is now live (pending the production smoke test). The codebase has its first turbo_stream_from / broadcasts_refreshes_to plumbing — future real-time features can follow this pattern.**
+**Step 10 closes 6 Knowledge Gaps (KG-1/2/3/4 from Step 9 already closed there + KG-5 + the YOU-badge follow-up here). The codebase is now fully rubocop-clean. The first batch of accessibility fixes shipped (alt text, aria-labels). The Nuzlocke-permadeath UX got the custom-modal treatment it deserves. Next big move per Project Owner: the Tier-1 structural refactors (god-object decomp, presenter extraction, GzipCoder concern), in a fresh main-checkout session.**

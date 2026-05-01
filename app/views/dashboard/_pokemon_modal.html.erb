@@ -10,7 +10,8 @@
       <div class="gb-modal-title">
         POKEMON DETAILS
         <button data-action="click->pixeldex#closePokemonModal"
-                class="gb-modal-close">&times;</button>
+                class="gb-modal-close"
+                aria-label="Close modal">&times;</button>
       </div>
 
       <%# ── Header: Sprite + Species + Types ── %>
@@ -105,7 +106,7 @@
         <div style="display: flex; gap: 6px;">
           <button type="button"
                   data-pixeldex-target="modalDeadBtn"
-                  data-action="click->dashboard#markDead"
+                  data-action="click->dashboard#openMarkDeadModal"
                   class="gb-btn-danger gb-btn-sm">
             MARK DEAD
           </button>

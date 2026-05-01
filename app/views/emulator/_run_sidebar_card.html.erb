@@ -29,7 +29,12 @@
                     "background: var(--l2); color: var(--d1); border: 2px solid var(--d2);"
                   end %>
 
-<div class="gb-card" style="padding: 10px; margin-bottom: 8px;">
+<%# data-discord-user-id is read by roster_you_marker_controller.js to
+    decorate the card matching the viewer's current_user_id with the YOU
+    badge + 4px border. nil sessions render the attribute as empty
+    string — matches no user, harmless. %>
+<div class="gb-card" style="padding: 10px; margin-bottom: 8px;"
+     data-discord-user-id="<%= s.discord_user_id %>">
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 6px;">
     <div style="font-size: 12px; color: var(--d1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
       <%= player_label %>

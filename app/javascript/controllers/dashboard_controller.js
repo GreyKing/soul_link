@@ -2,7 +2,8 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = [
-    "catchModal", "catchNickname", "catchLocation", "catchSpecies", "catchStatus"
+    "catchModal", "catchNickname", "catchLocation", "catchSpecies", "catchStatus",
+    "markDeadModal", "markDeadNickname", "markDeadGroupId"
   ]
   static values = {
     groupsUrl: String,
@@ -73,14 +74,32 @@ export default class extends Controller {
   }
 
   // ── Mark Dead ──
+  //
+  // Three-step flow replacing the old native confirm() dialog. The
+  // pokemon modal's MARK DEAD button now opens the custom modal with
+  // the group's nickname pre-filled. CONFIRM DEATH fires the PATCH;
+  // CANCEL hides without firing. Permadeath in a Nuzlocke is high-stakes
+  // — the explicit modal beats a generic browser confirm.
 
-  async markDead(event) {
+  openMarkDeadModal(event) {
     const groupId = event.currentTarget.dataset.groupId
     const nickname = event.currentTarget.dataset.groupNickname || "this group"
+    if (!groupId) return
 
-    if (!confirm(`Mark "${nickname}" as dead? This will kill all linked pokemon and remove from teams.`)) {
-      return
-    }
+    this.markDeadGroupIdTarget.value = groupId
+    this.markDeadNicknameTarget.textContent = nickname
+    this.markDeadModalTarget.classList.remove("hidden")
+  }
+
+  closeMarkDeadModal() {
+    if (!this.hasMarkDeadModalTarget) return
+    this.markDeadModalTarget.classList.add("hidden")
+    this.markDeadGroupIdTarget.value = ""
+  }
+
+  async confirmMarkDead() {
+    const groupId = this.markDeadGroupIdTarget.value
+    if (!groupId) return
 
     try {
       const response = await fetch(`${this.groupsUrlValue}/${groupId}`, {
@@ -97,9 +116,11 @@ export default class extends Controller {
       } else {
         const data = await response.json()
         alert(data.error || "Failed to mark as dead")
+        this.closeMarkDeadModal()
       }
     } catch (error) {
       alert("Network error")
+      this.closeMarkDeadModal()
     }
   }
 }

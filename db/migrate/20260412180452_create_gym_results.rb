@@ -10,6 +10,6 @@ class CreateGymResults < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :gym_results, [:soul_link_run_id, :gym_number], unique: true
+    add_index :gym_results, [ :soul_link_run_id, :gym_number ], unique: true
   end
 end

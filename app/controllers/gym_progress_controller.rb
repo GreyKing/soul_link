@@ -29,7 +29,7 @@ class GymProgressController < ApplicationController
         gym_number: gym_number,
         beaten_at: Time.current
       )
-      run.update!(gyms_defeated: [run.gyms_defeated, gym_number].max)
+      run.update!(gyms_defeated: [ run.gyms_defeated, gym_number ].max)
     end
 
     render json: { gyms_defeated: run.gyms_defeated }

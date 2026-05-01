@@ -4,7 +4,16 @@
 </div>
 
 <%# ── Create New Schedule ── %>
-<% unless @schedules.any? %>
+<% if @schedules.any? %>
+  <%# Only one active schedule at a time. The propose-form is hidden so
+      players can't double-book — the hint below explains why instead of
+      letting the form vanish silently. %>
+  <div class="gb-card" style="max-width: 500px; padding: 12px; margin-bottom: 16px;">
+    <div style="font-size: 11px; color: var(--d2); line-height: 1.6;">
+      A schedule is already active. Cancel the active one below before proposing a new time.
+    </div>
+  </div>
+<% else %>
   <div class="gb-card" style="max-width: 500px; padding: 16px; margin-bottom: 16px;">
     <div style="font-size: 12px; margin-bottom: 12px;">PROPOSE A GYM DAY</div>
     <%= form_with url: gym_schedules_path, method: :post, style: "display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;" do |f| %>

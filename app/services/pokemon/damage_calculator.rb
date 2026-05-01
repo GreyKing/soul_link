@@ -66,7 +66,7 @@ module Pokemon
 
         # Explosion / Self-Destruct halve defense
         if explosion_move?(move_record)
-          def_stat = [def_stat / 2, 1].max
+          def_stat = [ def_stat / 2, 1 ].max
         end
 
         # Type effectiveness
@@ -154,8 +154,8 @@ module Pokemon
 
       def stat_keys_for(category)
         case category
-        when "physical" then [:atk, :def_stat]
-        when "special"  then [:spa, :spd]
+        when "physical" then [ :atk, :def_stat ]
+        when "special"  then [ :spa, :spd ]
         end
       end
 
@@ -211,7 +211,7 @@ module Pokemon
       # At Lv.1: ~0 EVs. At Lv.50: ~126 EVs. At Lv.100: 252 EVs (max).
       # Applied uniformly across all stats (no specialization assumed).
       def level_scaled_evs(level)
-        ev = [(level * 252 / 100).floor, 252].min
+        ev = [ (level * 252 / 100).floor, 252 ].min
         { hp: ev, atk: ev, def_stat: ev, spa: ev, spd: ev, spe: ev }
       end
 
@@ -231,7 +231,7 @@ module Pokemon
         damage = (damage * roll / 100)
 
         # Minimum 1 damage (unless immunity, handled before this is called)
-        [damage, 1].max
+        [ damage, 1 ].max
       end
 
       def zero_result(stab: false, effectiveness: 0.0, attacker_stat: 0, defender_stat: 0)

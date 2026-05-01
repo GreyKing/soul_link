@@ -8,9 +8,9 @@ class AddGuildIdToSoulLinkRuns < ActiveRecord::Migration[7.0]
 
     # Replace the global run_number unique index with one scoped to guild
     remove_index :soul_link_runs, :run_number
-    add_index :soul_link_runs, [:guild_id, :run_number], unique: true
+    add_index :soul_link_runs, [ :guild_id, :run_number ], unique: true
 
     # Add index for the most common query: finding the active run for a guild
-    add_index :soul_link_runs, [:guild_id, :active]
+    add_index :soul_link_runs, [ :guild_id, :active ]
   end
 end

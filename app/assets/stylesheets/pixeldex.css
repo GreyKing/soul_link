@@ -21,6 +21,29 @@
 .team-builder-status--saved  { color: var(--l1); }
 .team-builder-status--error  { color: #e8a0a0; }
 
+/* Emulator page layout. Single-column stack on narrow viewports so the
+   sidebars don't squeeze the canvas to negative width below ~900px;
+   three-column desktop layout above. */
+.emulator-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
+@media (min-width: 900px) {
+  .emulator-grid {
+    grid-template-columns: 280px minmax(0, 1fr) 280px;
+  }
+}
+
+/* YOU-badge marker for the run-roster card whose discord_user_id matches
+   the current player. Applied by roster_you_marker_controller.js after
+   each Turbo Stream broadcast replaces the frame's contents. */
+.gb-card--current-user {
+  border-width: 4px;
+}
+
 html { scroll-behavior: smooth; }
 
 body {

@@ -32,7 +32,7 @@ module EmulatorJSInstaller
 
     asset = (release["assets"] || []).find { |a| a["name"].to_s.end_with?(".7z") }
     raise "No .7z asset found in release #{tag_name}" unless asset
-    [tag_name, asset["browser_download_url"]]
+    [ tag_name, asset["browser_download_url"] ]
   rescue JSON::ParserError => e
     raise "Failed to parse GitHub release JSON from #{url}: #{e.message}"
   end

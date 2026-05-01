@@ -7,7 +7,7 @@ class AllowNullGroupOnSoulLinkPokemon < ActiveRecord::Migration[8.0]
     # species where group_id is NULL. Remove and re-add without uniqueness,
     # since the controller validates assignment uniqueness at the app level.
     remove_index :soul_link_pokemon, name: 'index_pokemon_on_group_and_user'
-    add_index :soul_link_pokemon, [:soul_link_pokemon_group_id, :discord_user_id],
+    add_index :soul_link_pokemon, [ :soul_link_pokemon_group_id, :discord_user_id ],
               name: 'index_pokemon_on_group_and_user'
   end
 end

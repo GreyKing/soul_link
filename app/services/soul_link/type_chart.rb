@@ -164,7 +164,7 @@ module SoulLink
           offensive_gaps: TYPES.dup,
           shared_weaknesses: [],
           type_distribution: [],
-          balance_notes: [{ level: :info, message: "Add Pokémon to your team to see type analysis." }]
+          balance_notes: [ { level: :info, message: "Add Pokémon to your team to see type analysis." } ]
         }
       end
     end

@@ -13,9 +13,9 @@ class DashboardController < ApplicationController
 
     run = if params[:run_id].present?
             @all_runs.find_by(id: params[:run_id])
-          else
+    else
             @all_runs.active.first
-          end
+    end
 
     unless run
       redirect_to login_path, alert: "No active Soul Link run found."
@@ -67,7 +67,7 @@ class DashboardController < ApplicationController
 
     # Current progression segment for recent routes
     segments = @progression["segments"] || []
-    @current_segment_index = [@gyms_defeated, segments.size - 1].min
+    @current_segment_index = [ @gyms_defeated, segments.size - 1 ].min
     @current_segment = segments[@current_segment_index]
 
     # Calculator team quick-pick data

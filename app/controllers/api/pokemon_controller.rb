@@ -15,7 +15,7 @@ module Api
       render json: {
         species: base_stat.species,
         sprite_url: sprite_url,
-        types: [base_stat.type1, base_stat.type2].compact,
+        types: [ base_stat.type1, base_stat.type2 ].compact,
         stats: {
           hp: base_stat.hp, atk: base_stat.atk, def: base_stat.def_stat,
           spa: base_stat.spa, spd: base_stat.spd, spe: base_stat.spe

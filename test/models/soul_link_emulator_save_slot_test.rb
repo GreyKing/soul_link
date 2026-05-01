@@ -229,5 +229,8 @@ class SoulLinkEmulatorSaveSlotTest < ActiveSupport::TestCase
     @session.update_column(:active_save_slot, 1)
     rendered = ApplicationController.render(partial: "emulator/run_sidebar_card", locals: { s: @session.reload })
     assert_includes rendered, @session.seed
+    # The YOU-marker Stimulus controller (Step 10) selects on this
+    # attribute. Guard against the partial accidentally dropping it.
+    assert_includes rendered, "data-discord-user-id="
   end
 end

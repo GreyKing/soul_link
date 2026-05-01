@@ -43,7 +43,7 @@
         </div>
         <div class="gb-nav-right">
           <% if current_avatar_url %>
-            <img src="<%= current_avatar_url %>" class="gb-nav-avatar" alt="avatar">
+            <img src="<%= current_avatar_url %>" class="gb-nav-avatar" alt="<%= current_username %>'s avatar">
           <% end %>
           <span class="gb-nav-user"><%= current_username %></span>
           <%= button_to "Logout", logout_path, method: :delete, class: "gb-nav-logout" %>
