@@ -11,16 +11,59 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** *None — awaiting next brief.*
-**Last committed:** `29186e6` — 2026-04-30 (Step 3: Save Slots, 5 per session)
-**Pending deploy:** NO — deployed via GitHub Actions run 25193821050 (test + deploy both green).
+**Active step:** Step 4 — Build All Missing FactoryBot Factories. **Awaiting review.**
+**Last committed:** `a3cf783` — 2026-04-30 (Step 3 logging follow-up)
+**Pending deploy:** N/A — Step 4 is test-only (no app code, no migration).
 
-**Parked plan:** FactoryBot conversion. Inventory + ordering at `handoff/parked-plans/factorybot-conversion.md`.
+**Parked plan:** FactoryBot conversion. Phases 1+2 land in this step (Step 4); Phase 3+ in Steps 5–6. See `handoff/parked-plans/factorybot-conversion.md`.
 
 ---
 
 ## Step History
 *Session-scoped.*
+
+### Step 4 — Build All Missing FactoryBot Factories — 2026-04-30
+**Status:** Awaiting review.
+
+**Files created (6, all under `test/factories/`):**
+- `soul_link_pokemon_groups.rb` — base factory + 6 named traits (`:route201`–`:route206`). Each trait sets `nickname`/`location`/`status` via attribute assignment and uses `after(:create) update_columns(position:, caught_at:)` to **override** the model's `before_create :set_position` and `:set_caught_at` callbacks (fixtures bypass these via raw SQL; the override reproduces fixture state exactly).
+- `soul_link_pokemon.rb` — base factory + **24 metaprogrammed traits** (`:route201_grey`, `:route201_aratypuss`, …, `:route206_zealous`). Inner loop closes over a per-iteration `trait_species`/`trait_uid`/`trait_location` to avoid late-binding bugs. Data tables (`SOUL_LINK_POKEMON_PLAYERS`, `SOUL_LINK_POKEMON_ROUTES`) sit at top of file as constants for parity with the fixture's ERB shape.
+- `soul_link_teams.rb` — base factory + `:grey_team` trait. Base uses `sequence(:discord_user_id)` to dodge the `(soul_link_run_id, discord_user_id)` uniqueness constraint when tests build multiple teams.
+- `soul_link_team_slots.rb` — `:slot_1` / `:slot_2` traits only. **No association defaults** — the brief specifies callers pass `soul_link_team:` and `soul_link_pokemon_group:` explicitly (`create(:soul_link_team_slot, :slot_1, soul_link_team: t, soul_link_pokemon_group: g)`).
+- `gym_drafts.rb` — base factory + `:lobby` trait. Both pin `status: "lobby"`, `current_round: 0`, `current_player_index: 0`, `pick_order: []`, `state_data: { ready_players, first_pick_votes, picks }` to match fixture and the model's `after_initialize :set_defaults` shape.
+- `gym_results.rb` — base factory only (fixture is empty). `sequence(:gym_number) { |n| ((n - 1) % 8) + 1 }` cycles 1..8 to honor the `(soul_link_run_id, gym_number)` uniqueness constraint without colliding for the first 8 calls per run.
+
+**Files modified:** none. Per the brief, Step 4 is purely additive — fixtures, tests, and app code are all left untouched. Step 5 will convert tests; Step 6 deletes fixtures.
+
+**Key decisions:**
+- **Pokemon factory metaprogramming pattern.** 24 traits hardcoded would be unreadable. Used a nested `each_with_index` loop, captured each trait's bindings into local variables (`trait_species`, `trait_uid`, `trait_location`) BEFORE entering the trait block to avoid the classic Ruby-closure late-binding bug where every trait would resolve to the final loop iteration's data.
+- **Group factory's `after(:create) update_columns` is intentional.** The model has `before_create :set_position` (assigns max+1) and `before_create :set_caught_at` (assigns Time.current). Without `update_columns`, calling `create(:soul_link_pokemon_group, :route201)` would produce a record whose `position` reflects creation order, not the fixture's hardcoded `1`. `update_columns` skips callbacks/validations and writes raw — the same effect fixtures achieve via raw SQL INSERT.
+- **Gym draft trait redundant with base.** Both base factory and `:lobby` trait set the same five attributes. The brief said "the trait pins those values explicitly to keep the trait's intent self-documenting"; followed verbatim. Future Step 5 conversions will likely call `create(:gym_draft, :lobby)` — the trait surfaces intent at the call site even when the values match the default.
+- **Team slot factory has no association defaults.** Brief decision: caller-provided is correct because slot rows only make sense when bound to a specific team and group already constructed in the test's setup. A factory default would either create orphan associations or shadow the test's intended team/group references.
+- **`gym_result.gym_number` sequence wraps modulo 8.** Strictly the model only requires `inclusion: { in: 1..8 }`; a sequence that never wraps would still satisfy validity for one call. But cycling lets a single test create multiple results within the same run — useful for "all 8 gyms beaten" scenarios in Step 5 conversions — without each call needing an explicit `gym_number:` override.
+
+**Tests:** 305/305 still passing — no regressions. Fixtures untouched, so legacy fixture-based tests continue to pull from YAML; new factory files are inert (FactoryBot loads them at boot but no test uses them yet).
+
+**Spot-check:** Wrote `/tmp/factory_smoke.rb` (Rails runner) that creates one record per factory and trait, asserting field-by-field match against the fixture data. All 32 records (6 group traits + 24 pokemon traits + 1 grey_team + 2 slots + 1 lobby_draft + 1 gym_result) build successfully and match the corresponding fixture row exactly. Output:
+
+```
+OK group :route201 → ROY / route_201 / pos 1
+OK group :route202 → TOMMY / route_202 / pos 2
+OK group :route203 → RACHEL / route_203 / pos 3
+OK group :route204 → SPIKE / route_204 / pos 4
+OK group :route205 → LUNA / route_205 / pos 5
+OK group :route206 → BLAZE / route_206 / pos 6
+OK 24 pokemon traits each match fixture (species/uid/location/status/name)
+OK team :grey_team → uid 153665622641737728
+OK team_slot :slot_1 → pos 1, :slot_2 → pos 2
+OK gym_draft :lobby → state matches fixture
+OK gym_result → gym_number 1, beaten_at <ts>
+ALL FACTORY SMOKE CHECKS PASSED
+```
+
+**Lint:** `bundle exec rubocop` clean on all 6 files.
+
+---
 
 ### Step 3 — Save Slots (5 per session) — 2026-04-30
 **Status:** Complete, committed `29186e6`, deployed to `4luckyclovers.com`
