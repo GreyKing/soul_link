@@ -1,4 +1,4 @@
-# Review Feedback — Step 6
+# Review Feedback — Step 7
 Date: 2026-04-30
 Status: APPROVED
 
@@ -12,51 +12,56 @@ None.
 
 ## Cleared
 
-Reviewed Step 6 (Convert 8 Controller Tests + 1 Missed Model Test) end-to-end: the 9 converted test files plus the handoff updates. Diff scope matches the brief — only `test/models/soul_link_pokemon_group_test.rb` + 7 controller files (modified) plus `handoff/*.md`. No app/test/fixture/factory/test_helper/channel-test changes.
+Reviewed Step 7 (Convert Channel Test from Fixtures to FactoryBot) end-to-end: the 1 converted test file plus the handoff updates. Diff scope matches the brief — only `test/channels/gym_draft_channel_test.rb` (modified) plus `handoff/*.md`. No app/test/fixture/factory/test_helper/other-test changes.
 
 Verifications performed (independently of Bob's claims):
 
-- **Test count + name preservation (Architect focus #1).** Per-file `grep -c "^  test "` results: 7 / 44 / 33 / 5 / 6 / 5 / 6 / 5 = 111 across the 8 modified test classes. Architect brief preliminary counts undercounted emulator (said 36, actually 44) and teams (said 5, actually 6) — verified via `git show HEAD:<file> | grep -c "^  test "` that these were always 44/6 pre-conversion. No tests added or removed. No test renames in this step (unlike Step 5's `"fixture pokemon is valid"` → `"factory pokemon is valid"` rename).
+- **Test count + name preservation (Architect focus #1).** `grep -c "^  test " test/channels/gym_draft_channel_test.rb` returns 9. Comparing against pre-conversion via `git show HEAD:<file>`: same 9 names, same order:
+  - "subscribes and streams for draft"
+  - "subscribes and broadcasts initial state"
+  - "ready action marks player ready"
+  - "ready action broadcasts state update"
+  - "vote action records vote"
+  - "pick action records pick in drafting phase"
+  - "nominate action creates nomination"
+  - "vote_nomination action records vote"
+  - "wrong phase action transmits error"
+  No renames. No additions. No removals.
 
-- **`soul_link_pokemon_group:` keyword on every `create(:soul_link_pokemon, ...)` (Architect focus #2).** Grep across the 9 converted files: 7 calls total. All 7 have `soul_link_pokemon_group:` in the kwargs:
-  - `soul_link_pokemon_group_test.rb:9-11` — 4 calls inside the trait loop, all pass `soul_link_pokemon_group: @group`
-  - `species_assignments_controller_test.rb:35` — passes `soul_link_pokemon_group: group`
-  - `teams_controller_test.rb:30` — passes `soul_link_pokemon_group: group`
-  - `pokemon_controller_test.rb:30` — passes `soul_link_pokemon_group: group`
-  - `pokemon_controller_test.rb:46` — passes `soul_link_pokemon_group: group`
-  Zero orphan-association cases.
+- **Setup pattern matches Step 5's `gym_draft_test.rb` (Architect focus #2).** Verified line-by-line:
+  - `@run = create(:soul_link_run)` ✓
+  - `@groups = %i[route201 route202 route203 route204 route205 route206].map { |trait| create(:soul_link_pokemon_group, trait, soul_link_run: @run) }` ✓ (identical to Step 5)
+  - `@draft = create(:gym_draft, :lobby, soul_link_run: @run)` ✓ (identical to Step 5)
+  - `stub_connection(current_user_id: GREY)` ✓ (channel-specific, retained at end of setup)
+  Order is correct: run → groups → draft → stub_connection.
 
-- **The "complete?" + "species_for" tests in soul_link_pokemon_group_test.rb actually have 4 player pokemon (Architect focus #3).** Setup loops `%i[route201_grey route201_aratypuss route201_scythe461 route201_zealous].each` and creates 4 pokemon attached to `@group`. Each trait sets the appropriate discord_user_id matching one of the 4 GameState player_ids. The `complete?` test asserts `@group.complete?` which checks `(player_ids - assigned_ids).empty?` — all 4 player_ids in `@group.soul_link_pokemon.pluck(:discord_user_id)`, so the diff is empty. The `species_for(GREY)` test passes because Grey's pokemon (route201_grey trait) is in @group.
+- **`@groups` array order (Architect focus #3).** Trait list `%i[route201 route202 route203 route204 route205 route206]` produces array indexed 0-5 with route201 at [0] and route206 at [5]. Each trait sets `position: N` via `after(:create) update_columns`. Test references:
+  - Line 64: `@draft.picks.first["group_id"]` should equal `@groups[0].id` (route201) — pick test pushes `@groups[0]`. ✓
+  - Line 70: `@draft.current_nomination["group_id"]` should equal `@groups[4].id` (route205) — nominate test passes `@groups[4]`. ✓
+  - Line 78: `@draft.submit_nomination!(first_nominator, @groups[4].id)` — vote_nomination test seeds `@groups[4]`. ✓
 
-- **The "duplicate user in group" tests (species_assignments + pokemon) seed Grey's pokemon BEFORE the controller call (Architect focus #4).**
-  - `species_assignments_controller_test.rb` "rejects duplicate user in group": seeds at line 35 (`create(:soul_link_pokemon, :route201_grey, ..., soul_link_pokemon_group: group)`) BEFORE the patch at line 36. ✓
-  - `pokemon_controller_test.rb` "rejects duplicate user in group": seeds at line 30 BEFORE the post at line 31. ✓
-  Both tests then attempt to assign a duplicate Grey pokemon to the same group, and the controller correctly returns 422.
+- **Channel-test machinery unchanged (Architect focus #4).** Verified by reading every test body: `stub_connection`, `subscribe(draft_id: @draft.id)`, `perform :ready`, `perform :vote, { "voted_for" => ARATY }`, `perform :pick, { "group_id" => @groups[0].id }`, `perform :nominate, { "group_id" => @groups[4].id }`, `perform :vote_nomination, { "approve" => true }`, `assert_broadcasts(@draft, 1) { ... }`, `assert_has_stream_for @draft`, `subscription.confirmed?`, `transmissions.last`. All Action Cable test helpers retained verbatim.
 
-- **The "update_slots saves valid group ids" test seeds Grey's pokemon into the group (Architect focus #5).** `teams_controller_test.rb:29-30` seeds `create(:soul_link_pokemon, :route201_grey, ..., soul_link_pokemon_group: group)` so the controller's `allowed_ids` filter includes group.id. Without this seeding, the patch would still 200 but with `replace_slots!([])` — wrong-reason pass. Bob's seeding makes the test honest.
+- **Private helpers unchanged (Architect focus #5).** `move_to_voting!`, `move_to_drafting!(first_picker:)`, `move_to_nominating!` bodies are byte-identical to pre-conversion. They reference `@run`, `@draft`, `@groups`, `ALL_PLAYERS` — all of which exist post-conversion. The only line in scope to change was `ALL_PLAYERS = [GREY, ARATY, SCYTHE, ZEALOUS].freeze` on line 8 (rubocop fix), which is a constant declaration, not a helper.
 
-- **The "update_slots rejects more than 6" test seeds 7 groups but only 6 with grey-pokemon (Architect focus #6 — modified).** Brief recommended seeding 7 groups all with grey-pokemon; that broke because the controller correctly returns 422 when `allowed_ids.length > MAX_SLOTS`. Bob's fix: seed 6 groups with grey-pokemon + 1 group without — `allowed_ids` filter trims to 6, controller returns 200. Preserves the fixture-era invariant (where `.limit(7).pluck(:id)` returned only 6 fixture groups, all with grey-pokemon, total 6 ≤ MAX_SLOTS). Test name is mildly misleading ("rejects more than 6" but asserts success); the spirit is "controller silently caps via filter" — both pre- and post-conversion test exercise that behavior. Acceptable.
+- **No `destroy_all` guild guard cargo-culted (Architect focus #6).** Verified `grep -n "destroy_all" test/channels/gym_draft_channel_test.rb` returns no matches. The architect brief explicitly forbade adding it because channel tests bypass HTTP. Bob complied.
 
-- **Zero fixture-helper calls remaining in 9 converted files (Architect focus #7).** `grep -nE "soul_link_pokemon\(|soul_link_runs\(|soul_link_pokemon_groups\(|soul_link_teams\(|soul_link_team_slots\(|gym_drafts\(|gym_results\(" <9 files>` returns zero matches. Step 6's scope is satisfied.
+- **Pre-existing rubocop offense fixed (Architect focus #7).** Line 8 changed from `ALL_PLAYERS = [GREY, ARATY, SCYTHE, ZEALOUS].freeze` to `ALL_PLAYERS = [ GREY, ARATY, SCYTHE, ZEALOUS ].freeze`. Same `Layout/SpaceInsideArrayLiteralBrackets` cop. Same fix Bob applied to `gym_draft_test.rb` in Step 5. 2-character whitespace change, no semantic impact.
 
-- **`grep -rln <patterns> test/`** across the entire test/ tree returns ONLY `test/channels/gym_draft_channel_test.rb` post-Step-6 — confirming Step 6 cleared everything except the explicit Step 7 target.
+- **Zero fixture-helper calls remaining in this file (Architect focus #8).** `grep -nE "soul_link_pokemon\(|soul_link_runs\(|soul_link_pokemon_groups\(|soul_link_teams\(|soul_link_team_slots\(|gym_drafts\(|gym_results\(" test/channels/gym_draft_channel_test.rb` returns no matches.
 
-- **Diff scope (Architect focus #8).** `git status --short` shows: 9 test files modified + 4 handoff files (ARCHITECT-BRIEF, BUILD-LOG, REVIEW-REQUEST, REVIEW-FEEDBACK). App code, fixtures, factories, test_helper.rb, and channel test all untouched.
+- **Across `test/`, ZERO files now use fixture helpers.** `grep -rln <patterns> test/` returns nothing. The test-side conversion is functionally complete. Step 8's role is purely mechanical: delete `test/fixtures/*.yml`, drop `fixtures :all` from `test_helper.rb`, update `CLAUDE.md`, run a flake check.
 
-- **gym_drafts_controller "show loads type analysis" picks order (Architect focus #10).** Seed order: `%i[route201 route202 route203 route204 route205 route206].map` produces groups in route201..route206 order. The picks JSON `groups.each_with_index.map { |g, i| { "round" => i + 1, "group_id" => g.id, "picked_by" => GREY } }` puts route201's id at round 1 and route206's id at round 6. Each group has the `:route20N` trait setting `position: N`, so the IDs are assigned in DB-insertion order. Test asserts `assert_response :success` only (no ordering assertion), so order is incidental but correct.
+- **Diff scope (Architect focus #9).** `git status --short` shows 1 test file + 4 handoff files modified. App code, fixtures, factories, test_helper.rb, all other test files untouched.
 
-- **Discovered constraint handling (the destroy_all pattern).** Bob found that fixture's `active_run` (guild 999...) coexists with factory `@run` because `fixtures :all` still loads. Two active runs share a guild; tests that deactivate `@run` and expect "no active run" fall back to the fixture instead. Fix: `SoulLinkRun.where(guild_id: LoginHelper::GUILD_ID).destroy_all` in every controller test's setup BEFORE `create(:soul_link_run)`. Each test runs in a transaction so the destroy_all only affects the current test. Step 8 will make this destroy_all a no-op when fixtures are removed. Sound discovery + fix; documented in BUILD-LOG. The model test (`soul_link_pokemon_group_test`) doesn't make HTTP requests so it doesn't need this guard.
+- **Test pass verification.** Ran `bin/rails test test/channels/gym_draft_channel_test.rb` locally: 9/9 passing. Full `bin/rails test`: 305/305 passing, 0 failures, 0 errors. Matches Bob's claims.
 
-- **Test runtime delta (Architect focus #9).** Per-file: pokemon_group ~0.2s, emulator ~1s, save_slots ~1.2s, others <0.5s each. Full suite ~30s — within noise. The destroy_all + create_all pattern adds 1-2 SQL queries per controller test; with parallelization the wall-clock impact is negligible.
+- **Rubocop verification.** Ran `bundle exec rubocop test/channels/gym_draft_channel_test.rb` locally: clean.
 
-- **One pre-existing rubocop offense fixed** at `teams_controller_test.rb:65` (`Layout/SpaceInsideArrayLiteralBrackets`). Same Step 5 lesson — fix to satisfy "rubocop clean" acceptance criterion. Single-line whitespace change on `[orphan_group.id]` → `[ orphan_group.id ]`. Pre-existing offenses elsewhere in the suite remain (the Known Gap from Step 1 stands).
+- **Factory call shape consistency.** All `create(:foo, :trait, soul_link_run: @run, ...)` calls use the keyword-style association passing. No `let`/`subject`/RSpec idioms.
 
-- **Test pass verification.** Ran `bin/rails test` locally: 305/305 passing, 0 failures, 0 errors. Each file individually green during conversion (per Bob's per-file run reports). Per-file file-level runs reproduced post-conversion.
+- **Setup/teardown integrity.** No teardown blocks added. Setup constructs dependencies in valid order (run → groups → draft → stub_connection). Transactional fixtures + factory rollback handle cleanup automatically.
 
-- **Rubocop verification.** Ran `bundle exec rubocop` on all 8 modified files (model + 7 controllers) — clean. (The model test file, soul_link_pokemon_group_test.rb, was originally clean and Bob's edit didn't introduce new offenses; verified independently.)
+Bob converted exactly what the brief specified. The four self-review items (no guild guard, setup pattern parity, rubocop fix scope, helper preservation) are all consistent with the brief. No deviations. Ships as-is.
 
-- **Factory call shape consistency.** All `create(:foo, :trait, soul_link_run: @run, ...)` calls use the keyword-style association passing (per brief preference). Inline `@run.soul_link_pokemon_groups.create!(...)` chains used only in `teams_controller_test.rb`'s "rejects more than 6" 7-group seeding (where the brief explicitly allowed it because no `:route207` trait exists). No `let`/`subject`/RSpec idioms.
-
-- **Setup/teardown integrity.** No teardown blocks added. Each test's setup constructs dependencies in valid order: destroy fixture → create run → (optional) create dependents. Transactional fixtures + factory rollback handle cleanup automatically.
-
-Bob converted exactly what the brief specified, plus discovered and correctly addressed the fixture-coexistence constraint that would have failed the conversion otherwise. The six flagged self-review items (destroy_all guard, "rejects more than 6" semantic preservation, rubocop fix scope, set_position invariant, brief's count discrepancies, save_data DELETE test interaction) are all well-reasoned and consistent with the brief's intent. No deviations from the brief's spirit. Ships as-is.
+**Note for the next session (Step 8):** The `fixtures :all` line in `test/test_helper.rb` is now confirmed unnecessary — no test in the suite references any fixture by name. Step 8 can drop it cleanly. The `test/fixtures/*.yml` files are similarly orphaned. The Step 6 `SoulLinkRun.where(guild_id: ...).destroy_all` defensive lines in 7 controller test setups become dead code once the fixture is gone — Step 8's sweep should remove them too (Builder discovery noted in Step 6 BUILD-LOG).

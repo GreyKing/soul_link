@@ -11,11 +11,11 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 6 — Convert 8 Controller Tests + 1 Missed Model Test. **Awaiting review.**
-**Last committed:** Step 5 (`efcc659`) shipped + merged to `main`. Step 6 not yet committed.
-**Pending deploy:** N/A — Step 6 is test-only.
+**Active step:** Step 7 — Convert Channel Test from Fixtures to FactoryBot. **Awaiting review.**
+**Last committed:** Step 6 (`f7203b0`) shipped + merged to `main`. Step 7 not yet committed.
+**Pending deploy:** N/A — Step 7 is test-only.
 
-**Parked plan:** FactoryBot conversion. After Step 6: only Step 7 (channel test) and Step 8 (fixture deletion + sweep) remain.
+**Parked plan:** FactoryBot conversion. **After Step 7, the conversion is functionally complete** — zero files in `test/` reference fixtures by name. Only Step 8 (mechanical: delete YAMLs, drop `fixtures :all`, update CLAUDE.md, flake-check sweep) remains.
 
 **Parked plan:** FactoryBot conversion. Phases 1+2 land in this step (Step 4); Phase 3+ in Steps 5–6. See `handoff/parked-plans/factorybot-conversion.md`.
 
@@ -23,6 +23,33 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 7 — Convert Channel Test from Fixtures to FactoryBot — 2026-04-30
+**Status:** Awaiting review.
+
+**Files modified (1):**
+- `test/channels/gym_draft_channel_test.rb` — setup replaced with the proven Step 5 pattern: `@run = create(:soul_link_run)`, `@groups = %i[route201..route206].map { |t| create(:soul_link_pokemon_group, t, soul_link_run: @run) }`, `@draft = create(:gym_draft, :lobby, soul_link_run: @run)`. The channel-specific `stub_connection(current_user_id: GREY)` line stays at the end of setup. All 9 test bodies + 3 private helpers (`move_to_voting!` / `move_to_drafting!` / `move_to_nominating!`) unchanged. Also fixed 1 pre-existing rubocop offense on line 8 (`Layout/SpaceInsideArrayLiteralBrackets` on `ALL_PLAYERS = [GREY, ARATY, SCYTHE, ZEALOUS]`). Test count: 9 (unchanged).
+
+**Files modified (handoff):**
+- `handoff/ARCHITECT-BRIEF.md` — Step 7 brief (overwritten from Step 6)
+- `handoff/BUILD-LOG.md` — this entry
+- `handoff/REVIEW-REQUEST.md` — Step 7 review request
+- `handoff/REVIEW-FEEDBACK.md` — Reviewer's Step 7 verdict
+
+**Key decisions:**
+- **No `destroy_all` guild guard.** Channel tests bypass HTTP — `stub_connection(current_user_id: GREY)` sets the connection identifier directly, the channel looks up the draft via `params[:draft_id]`, never goes through `SoulLinkRun.current(guild_id)`. The Step 6 controller-coexistence guard would be cargo-cult here. Architect brief explicitly forbade it; Builder verified by running the test green without it.
+- **Setup pattern is identical to Step 5's `gym_draft_test.rb`** (the model unit test for the same draft state machine). Only difference is the trailing `stub_connection` line. This matches the architect's "channel tests have a distinct subscribe + perform setup" guidance — the data setup is the same, only the channel test machinery differs.
+- **Pre-existing rubocop fix.** `ALL_PLAYERS = [GREY, ARATY, SCYTHE, ZEALOUS].freeze` → `[ GREY, ARATY, SCYTHE, ZEALOUS ]`. Same offense + same fix as Step 5's `gym_draft_test.rb`. Two-character whitespace change.
+
+**Tests:** 305/305 passing across the full suite. Per-file: 9/9 (unchanged). 0 failures, 0 errors.
+
+**Lint:** `bundle exec rubocop test/channels/gym_draft_channel_test.rb` clean.
+
+**Diff scope:** 1 test file + 4 handoff files. App code, fixtures, factories, test_helper.rb, all other test files untouched.
+
+**Fixture-helper grep verification:** zero matches in the converted file. **Across the entire `test/` tree, ZERO files use fixture helpers** — Step 7 closes out the test-side conversion. Step 8 is now purely mechanical: delete `test/fixtures/*.yml`, drop `fixtures :all` from `test_helper.rb`, update `CLAUDE.md`'s testing convention section, run a flake check.
+
+---
 
 ### Step 6 — Convert 8 Controller Tests + 1 Missed Model Test — 2026-04-30
 **Status:** Awaiting review.
