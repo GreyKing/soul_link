@@ -11,11 +11,11 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 5 — Convert Model Unit Tests from Fixtures to FactoryBot. **Awaiting review.**
-**Last committed:** Step 4 (`6e2c8c8` + log `856d898`) shipped + merged to `main`. Step 5 not yet committed.
-**Pending deploy:** N/A — Step 5 is test-only.
+**Active step:** Step 6 — Convert 8 Controller Tests + 1 Missed Model Test. **Awaiting review.**
+**Last committed:** Step 5 (`efcc659`) shipped + merged to `main`. Step 6 not yet committed.
+**Pending deploy:** N/A — Step 6 is test-only.
 
-**Parked plan:** FactoryBot conversion. Step 5 covers the 3 model unit tests (Phase 3); Step 6 (deferred to fresh session) handles controller/channel tests + fixture deletion.
+**Parked plan:** FactoryBot conversion. After Step 6: only Step 7 (channel test) and Step 8 (fixture deletion + sweep) remain.
 
 **Parked plan:** FactoryBot conversion. Phases 1+2 land in this step (Step 4); Phase 3+ in Steps 5–6. See `handoff/parked-plans/factorybot-conversion.md`.
 
@@ -23,6 +23,41 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 6 — Convert 8 Controller Tests + 1 Missed Model Test — 2026-04-30
+**Status:** Awaiting review.
+
+**Files modified (9):**
+- `test/models/soul_link_pokemon_group_test.rb` — setup creates `@run`, `@group` (route201 trait), and 4 player pokemon (`:route201_grey/aratypuss/scythe461/zealous`). Required for `species_for` and `complete?` tests. 7 tests, unchanged.
+- `test/controllers/emulator_controller_test.rb` — setup destroys fixture run for guild + creates factory run. 44 tests, unchanged. Heaviest controller file by test count.
+- `test/controllers/save_slots_controller_test.rb` — same destroy-then-create setup pattern. 33 tests, unchanged.
+- `test/controllers/species_assignments_controller_test.rb` — setup pattern + inline seed of route201 group + grey-pokemon in the duplicate-rejection test. 5 tests, unchanged.
+- `test/controllers/teams_controller_test.rb` — setup pattern + inline group/pokemon seeds in `update_slots saves valid group ids` and `update_slots rejects more than 6`. The "rejects more than 6" test seeds 6 groups with grey-pokemon + 1 group without (so the 7th gets filtered by `allowed_ids`, mirroring the fixture-era invariant where `.limit(7).pluck(:id)` returned 6). Also fixed 1 pre-existing rubocop offense on a non-touched line for acceptance criterion. 6 tests, unchanged.
+- `test/controllers/pokemon_controller_test.rb` — setup pattern + inline route201 group + grey/aratypuss seeds in two tests. 5 tests, unchanged.
+- `test/controllers/pokemon_groups_controller_test.rb` — setup pattern + inline route206 group in two tests. 6 tests, unchanged.
+- `test/controllers/gym_drafts_controller_test.rb` — setup builds `@run`, `@draft` from `:lobby` trait; "type analysis" test seeds 6 groups via `%i[route201..route206].map`. Same pattern as Step 5's gym_draft model test. 5 tests, unchanged.
+
+**Files modified (handoff):**
+- `handoff/ARCHITECT-BRIEF.md` — Step 6 brief (overwritten from Step 5)
+- `handoff/BUILD-LOG.md` — this entry
+- `handoff/REVIEW-REQUEST.md` — Step 6 review request
+- `handoff/REVIEW-FEEDBACK.md` — Reviewer's Step 6 verdict
+
+**Key decisions:**
+- **Discovered constraint: fixture run still loads via `fixtures :all` and shares guild_id with the factory.** Two `active: true` runs for guild 999... coexist; `SoulLinkRun.current(guild_id)` orders by `run_number desc` and returns the factory run (run_number 1000+n) by default — but tests that deactivate `@run` and expect "no active run" fall back to the fixture (run_number 1) instead. Fix applied in every controller test's setup: `SoulLinkRun.where(guild_id: LoginHelper::GUILD_ID).destroy_all` before `create(:soul_link_run)`. Step 8 deletes the fixtures and the destroy_all becomes a no-op. The model test (`soul_link_pokemon_group_test`) doesn't go through HTTP, so it doesn't need this guard.
+- **`teams_controller_test` "update_slots rejects more than 6" test honesty.** The original fixture-era test asserted SUCCESS while named "rejects more than 6" — relying on the fact that `.limit(7).pluck(:id)` returned only 6 IDs (only 6 groups existed) and thus passed under MAX_SLOTS. Direct conversion (seeding 7 groups with grey-pokemon) made `allowed_ids` = 7 and the controller correctly returned 422. Fixed by seeding 6 groups with grey-pokemon + 1 group without — the 7th gets filtered by `allowed_ids`, leaving 6 valid IDs that fit under MAX_SLOTS. Preserves test name, assertion, and intent (the controller silently caps via filter, not 422).
+- **`soul_link_pokemon_group_test`'s `set_position auto-increments` test** asserts `g2.position > g1.position`. Pre-conversion the run had 6 fixture groups so the new ones got positions 7+8. Post-conversion only @group exists (position 1) so the new ones get positions 2+3. Assertion `3 > 2` still holds.
+- **One pre-existing rubocop offense fixed** in `teams_controller_test.rb:65` (`Layout/SpaceInsideArrayLiteralBrackets`). Same lesson as Step 5 — fix to satisfy "rubocop clean" acceptance criterion. Documented as 2-character whitespace change.
+
+**Tests:** 305/305 passing across the full suite. Per-file: 7 / 44 / 33 / 5 / 6 / 5 / 6 / 5 = 111 across the 8 controller/model files (the brief's preliminary counts undercounted emulator at 36 and teams at 5; actuals are 44 and 6 respectively, both unchanged from pre-conversion). 0 failures, 0 errors.
+
+**Lint:** `bundle exec rubocop` clean on all 8 modified files (model + 7 controllers).
+
+**Diff scope:** 9 test files + 4 handoff files. App code, fixtures, factories, test_helper.rb, channel test all untouched.
+
+**Fixture-helper grep verification:** zero matches in the 9 converted files. After Step 6, the only remaining fixture-helper user in `test/` is `test/channels/gym_draft_channel_test.rb` (Step 7 target).
+
+---
 
 ### Step 5 — Convert Model Unit Tests from Fixtures to FactoryBot — 2026-04-30
 **Status:** Awaiting review.

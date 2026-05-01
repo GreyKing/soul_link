@@ -5,7 +5,8 @@ class PokemonControllerTest < ActionDispatch::IntegrationTest
   ARATY = 600802903967531093
 
   setup do
-    @run = soul_link_runs(:active_run)
+    SoulLinkRun.where(guild_id: LoginHelper::GUILD_ID).destroy_all
+    @run = create(:soul_link_run)
   end
 
   test "create requires login" do
@@ -26,8 +27,9 @@ class PokemonControllerTest < ActionDispatch::IntegrationTest
 
   test "create rejects duplicate user in group" do
     login_as(GREY)
-    group = soul_link_pokemon_groups(:group_route201)
-    # Grey already has a pokemon in this group via fixtures
+    group = create(:soul_link_pokemon_group, :route201, soul_link_run: @run)
+    # Grey already has a pokemon in this group
+    create(:soul_link_pokemon, :route201_grey, soul_link_run: @run, soul_link_pokemon_group: group)
     post pokemon_index_path, params: { group_id: group.id, species: "Bidoof" }, as: :json
     assert_response :unprocessable_entity
   end
@@ -41,7 +43,8 @@ class PokemonControllerTest < ActionDispatch::IntegrationTest
 
   test "update rejects other players pokemon" do
     login_as(GREY)
-    araty_pokemon = soul_link_pokemon(:pkmn_route201_aratypuss)
+    group = create(:soul_link_pokemon_group, :route201, soul_link_run: @run)
+    araty_pokemon = create(:soul_link_pokemon, :route201_aratypuss, soul_link_run: @run, soul_link_pokemon_group: group)
     patch pokemon_path(araty_pokemon), params: { species: "Hacked" }, as: :json
     assert_response :forbidden
   end

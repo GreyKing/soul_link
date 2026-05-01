@@ -4,8 +4,11 @@ class SoulLinkPokemonGroupTest < ActiveSupport::TestCase
   GREY = 153665622641737728
 
   setup do
-    @run = soul_link_runs(:active_run)
-    @group = soul_link_pokemon_groups(:group_route201)
+    @run = create(:soul_link_run)
+    @group = create(:soul_link_pokemon_group, :route201, soul_link_run: @run)
+    %i[route201_grey route201_aratypuss route201_scythe461 route201_zealous].each do |trait|
+      create(:soul_link_pokemon, trait, soul_link_run: @run, soul_link_pokemon_group: @group)
+    end
   end
 
   test "requires nickname and location" do

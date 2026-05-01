@@ -4,8 +4,9 @@ class GymDraftsControllerTest < ActionDispatch::IntegrationTest
   GREY = 153665622641737728
 
   setup do
-    @run = soul_link_runs(:active_run)
-    @draft = gym_drafts(:lobby_draft)
+    SoulLinkRun.where(guild_id: LoginHelper::GUILD_ID).destroy_all
+    @run = create(:soul_link_run)
+    @draft = create(:gym_draft, :lobby, soul_link_run: @run)
   end
 
   test "create requires login" do
@@ -46,18 +47,13 @@ class GymDraftsControllerTest < ActionDispatch::IntegrationTest
 
   test "show loads type analysis for complete draft" do
     login_as(GREY)
-    groups = [
-      soul_link_pokemon_groups(:group_route201),
-      soul_link_pokemon_groups(:group_route202),
-      soul_link_pokemon_groups(:group_route203),
-      soul_link_pokemon_groups(:group_route204),
-      soul_link_pokemon_groups(:group_route205),
-      soul_link_pokemon_groups(:group_route206)
-    ]
+    groups = %i[route201 route202 route203 route204 route205 route206].map do |trait|
+      create(:soul_link_pokemon_group, trait, soul_link_run: @run)
+    end
 
     @draft.update!(
       status: "complete",
-      pick_order: [GREY],
+      pick_order: [ GREY ],
       state_data: {
         "ready_players" => [],
         "first_pick_votes" => {},

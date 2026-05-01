@@ -4,7 +4,8 @@ class TeamsControllerTest < ActionDispatch::IntegrationTest
   GREY = 153665622641737728
 
   setup do
-    @run = soul_link_runs(:active_run)
+    SoulLinkRun.where(guild_id: LoginHelper::GUILD_ID).destroy_all
+    @run = create(:soul_link_run)
   end
 
   test "show requires login" do
@@ -24,17 +25,27 @@ class TeamsControllerTest < ActionDispatch::IntegrationTest
 
   test "update_slots saves valid group ids" do
     login_as(GREY)
-    group = soul_link_pokemon_groups(:group_route201)
-    patch update_slots_team_path, params: { group_ids: [group.id] }, as: :json
+    group = create(:soul_link_pokemon_group, :route201, soul_link_run: @run)
+    create(:soul_link_pokemon, :route201_grey, soul_link_run: @run, soul_link_pokemon_group: group)
+    patch update_slots_team_path, params: { group_ids: [ group.id ] }, as: :json
     assert_response :success
   end
 
   test "update_slots rejects more than 6" do
     login_as(GREY)
+    # Seed 6 groups (one per route) with Grey-pokemon. The 7th group has no
+    # Grey-pokemon so allowed_ids filters it out — 6 valid ids remain, fitting
+    # under MAX_SLOTS. Mirrors the fixture-era invariant where .limit(7)
+    # returned 6 and the controller capped silently.
+    6.times do |i|
+      g = @run.soul_link_pokemon_groups.create!(nickname: "G#{i}", location: "route_20#{i + 1}", status: "caught")
+      @run.soul_link_pokemon.create!(soul_link_pokemon_group: g, discord_user_id: GREY,
+                                     species: "Bulbasaur", name: "G#{i}", location: g.location, status: "caught")
+    end
+    @run.soul_link_pokemon_groups.create!(nickname: "G6", location: "route_201", status: "caught")
     groups = @run.soul_link_pokemon_groups.limit(7).pluck(:id)
     patch update_slots_team_path, params: { group_ids: groups }, as: :json
-    # Even if 7 sent, allowed_ids filters to only groups where Grey has pokemon
-    # and replace_slots! caps at MAX_SLOTS
+    # 7 sent, 1 filtered (no Grey pokemon), 6 remain → success
     assert_response :success
   end
 
@@ -51,7 +62,7 @@ class TeamsControllerTest < ActionDispatch::IntegrationTest
       status: "caught"
     )
 
-    patch update_slots_team_path, params: { group_ids: [orphan_group.id] }, as: :json
+    patch update_slots_team_path, params: { group_ids: [ orphan_group.id ] }, as: :json
     assert_response :success
     team = @run.soul_link_teams.find_by(discord_user_id: GREY)
     # Orphan group should have been filtered out

@@ -5,7 +5,8 @@ class SaveSlotsControllerTest < ActionDispatch::IntegrationTest
   ARATY = 600802903967531093
 
   setup do
-    @run = soul_link_runs(:active_run)
+    SoulLinkRun.where(guild_id: LoginHelper::GUILD_ID).destroy_all
+    @run = create(:soul_link_run)
     @sess = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
   end
 

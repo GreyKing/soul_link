@@ -4,7 +4,8 @@ class PokemonGroupsControllerTest < ActionDispatch::IntegrationTest
   GREY = 153665622641737728
 
   setup do
-    @run = soul_link_runs(:active_run)
+    SoulLinkRun.where(guild_id: LoginHelper::GUILD_ID).destroy_all
+    @run = create(:soul_link_run)
   end
 
   test "create requires login" do
@@ -39,7 +40,7 @@ class PokemonGroupsControllerTest < ActionDispatch::IntegrationTest
 
   test "update to dead cascades status" do
     login_as(GREY)
-    group = soul_link_pokemon_groups(:group_route206)
+    group = create(:soul_link_pokemon_group, :route206, soul_link_run: @run)
     patch pokemon_group_path(group), params: { status: "dead" }, as: :json
     assert_response :success
     group.reload
@@ -48,7 +49,7 @@ class PokemonGroupsControllerTest < ActionDispatch::IntegrationTest
 
   test "destroy removes group" do
     login_as(GREY)
-    group = soul_link_pokemon_groups(:group_route206)
+    group = create(:soul_link_pokemon_group, :route206, soul_link_run: @run)
     assert_difference "SoulLinkPokemonGroup.count", -1 do
       delete pokemon_group_path(group), as: :json
     end

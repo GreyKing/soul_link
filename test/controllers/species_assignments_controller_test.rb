@@ -4,7 +4,8 @@ class SpeciesAssignmentsControllerTest < ActionDispatch::IntegrationTest
   GREY = 153665622641737728
 
   setup do
-    @run = soul_link_runs(:active_run)
+    SoulLinkRun.where(guild_id: LoginHelper::GUILD_ID).destroy_all
+    @run = create(:soul_link_run)
   end
 
   test "show requires login" do
@@ -29,8 +30,9 @@ class SpeciesAssignmentsControllerTest < ActionDispatch::IntegrationTest
 
   test "assign_from_pokedex rejects duplicate user in group" do
     login_as(GREY)
-    group = soul_link_pokemon_groups(:group_route201)
+    group = create(:soul_link_pokemon_group, :route201, soul_link_run: @run)
     # Grey already has pokemon in this group
+    create(:soul_link_pokemon, :route201_grey, soul_link_run: @run, soul_link_pokemon_group: group)
     patch assign_from_pokedex_species_path, params: { species_name: "Bidoof", group_id: group.id }, as: :json
     assert_response :unprocessable_entity
   end
