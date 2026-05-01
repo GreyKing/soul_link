@@ -13,4 +13,16 @@ module EmulatorHelper
     minutes = (s % 3600) / 60
     "#{hours}h #{minutes}m"
   end
+
+  # Formats a Pokémon Platinum map header ID as a human-readable name
+  # for the run-roster + slot-card surfaces. Returns nil for nil input
+  # (callers gate with `if format_map_name(...).present?` or render
+  # conditionally on `parsed_map_id.present?`), the canonical name when
+  # SoulLink::GameState knows the ID, or a "Map #N" fallback when not —
+  # informative enough for v1, and a signal to extend
+  # config/soul_link/maps.yml as new IDs are observed in real saves.
+  def format_map_name(map_id)
+    return nil if map_id.nil?
+    SoulLink::GameState.map_name(map_id) || "Map ##{map_id}"
+  end
 end

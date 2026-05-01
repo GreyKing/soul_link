@@ -4,240 +4,292 @@
 
 ---
 
-## Step 11 — Enforce "One Active SoulLinkRun Per Guild" Invariant
+## Step 12 — KG-6: Map ID → Name Lookup (SRAM Phase 1 finish)
 
 ### Context
 
-`SoulLinkRun.current(guild_id)` lacks a hard invariant. Today, the model relies on `start_run` flows always deactivating the previous active run before creating a new one — a soft contract that:
+The SRAM parser populates `SoulLinkEmulatorSaveSlot#parsed_map_id` (a `uint16`) for active save slots, but no UI surface ever renders it. PROJECT-REVIEW-2026-04-30.md flagged this as KG-6 — "sidebar shows 'Eterna City' instead of `426`". The architect estimated ~1 hour and called it the finish line for SRAM Phase 1's user-visible work.
 
-- The Step 6 fixture-coexistence pain (`SoulLinkRun.where(guild_id: ...).destroy_all` in 7 controller test setups) was a direct symptom: two active runs sharing a guild produced silent fallback behavior in `current(guild_id)`.
-- A race in `RunChannel#start_run` between two parallel WS messages could leak a second active row.
-- Manual DB tampering / direct `update!(active: true)` on an inactive run while another is active would silently break the invariant.
+**Pre-flight scope correction:** during target-file reads I verified that `parsed_map_id` is currently NOT rendered in any view (grep across `app/views/` returns zero hits). It's stored in the DB and exposed via `slot_payload` JSON (`save_slots_controller.rb:127`), but no template displays it. So Step 12 actually does TWO things:
+1. Builds the lookup infrastructure (so when an ID flows in, we can name it).
+2. Wires the field into the existing run-roster + slot-card surfaces (where the other parsed_* fields already render).
 
-Step 11 closes this with a real database constraint. After this step, no path — application or otherwise — can produce two active runs for the same guild.
+The infrastructure side is straightforward; the UI wire-up should mirror how `parsed_trainer_name` / `parsed_money` / `parsed_play_seconds` / `parsed_badges` are already rendered in `_run_sidebar_card.html.erb` and `_save_slots_sidebar.html.erb`.
 
-The PROJECT-REVIEW (Soft Point #3) flagged this as a Tier-1-adjacent risk. It's not a refactor (no behavior change in the happy path); it's a guardrail against a known failure mode.
+**Important caveat (KG-7 dependency):** the `MAP_ID_OFFSET = 0x1234` constant in `SoulLink::SaveParser` is documented as the "least-confident placeholder" — it's never been validated against a real `.sav` file. Until the offset is verified (separate Known Gap KG-7), the integer IDs we'll see in production may not match what's in our `maps.yml`. That's OK — the fallback handles unknown IDs gracefully ("Map #N"). When real-save validation happens, we'll confirm both the offset and the ID-to-name mapping in one pass, and adjust `maps.yml` if needed.
 
 ### Project Owner decisions (locked)
 
-- **Auto-accept mode for this work.** Bob can act decisively; Reviewer + tests + the migration's backfill check are the backstops.
-- **MySQL 8.0 virtual generated column + unique index.** Postgres has partial unique indexes (`UNIQUE INDEX ... WHERE active = true`); MySQL doesn't. The cleanest equivalent on MySQL 8 is a virtual generated column whose value is `guild_id` when `active = true` and `NULL` otherwise, plus a regular unique index on it. NULLs don't conflict in unique indexes, so multiple inactive runs per guild remain fine.
-- **Backfill check is a hard fail.** If the migration finds a guild with multiple active runs, it must `raise ActiveRecord::IrreversibleMigration` with a clear remediation message — not silently coerce. The Project Owner's main instance has 4 trusted players; this should never trip in practice, but the safety belt matters.
-- **No changes to the `start_run` flow.** The deactivate-then-create pattern in `RunChannel#start_run` (and the equivalent in `discord_bot.rb` and `lib/tasks/soul_link.rake`) already produces the right outcome on the happy path. Adding a transaction wrapper or an advisory lock is out of scope; the new DB constraint is what catches the rare race.
+- **Auto-accept mode for this work.** Bob can act decisively; Reviewer + tests are the backstop.
+- **YAML in `config/soul_link/maps.yml`.** Matches the existing project pattern (`locations.yml`, `gym_info.yml`, etc.). Keep it human-editable; no generated/binary format.
+- **`SoulLink::GameState.map_name(map_id)` is the lookup API.** Mirrors the existing `location_name(key)` shape. Returns the name when known, `nil` when not.
+- **`EmulatorHelper#format_map_name(map_id)` is the view formatter.** Returns the name for known IDs, `"Map ##{id}"` fallback for unknown IDs (so the player sees a numeric placeholder, not silence — also flags us to extend the YAML), and `nil` for nil input (so views can short-circuit).
+- **Render the field on both surfaces** (`_run_sidebar_card.html.erb` and `_save_slots_sidebar.html.erb`). Slot the new line between `Money` and `Badges` to match the chronological "what's the player doing in-game right now" flow.
+- **Don't rebuild the YAML from a generated dataset.** Hand-curate ~50 entries covering the Sinnoh region cities + early routes + key story dungeons. When real saves flow in, extend incrementally.
+- **The integer IDs in `maps.yml` are best-effort, NOT validated.** Document this explicitly in the YAML's header comment, citing KG-7 as the validation step. The fallback is the safety net.
 
 ### Implementation
 
-#### 1. Migration: virtual generated column + unique index
+#### 1. `config/soul_link/maps.yml` (new file)
 
-New file `db/migrate/<timestamp>_enforce_single_active_run_per_guild.rb`:
+```yaml
+# config/soul_link/maps.yml
+#
+# Pokemon Platinum map header IDs → human-readable names.
+# Loaded by SoulLink::GameState.map_name(id); rendered via
+# EmulatorHelper#format_map_name in run-roster + slot-card surfaces.
+#
+# Source: pret/pokeplatinum disassembly (`include/constants/map.h`)
+# header IDs in canonical Sinnoh region order. IDs in this file are
+# best-effort and have NOT been validated against a real `.sav` —
+# the parser's MAP_ID_OFFSET = 0x1234 is also unvalidated (KG-7).
+# Both validations should happen together when a real save is
+# available. Until then, unknown IDs surface as "Map #N" via the
+# helper's fallback, which is informative enough for v1.
+#
+# Format: integer ID → { name: "Display Name" }. The hash shape
+# leaves room for future fields (e.g. region:, dungeon: bool) without
+# breaking the API.
 
-```ruby
-class EnforceSingleActiveRunPerGuild < ActiveRecord::Migration[8.1]
-  def up
-    # Backfill check — abort if production data already violates the
-    # invariant. The Architect's expectation is that this never trips
-    # (the `start_run` flow always deactivates first), but raw DB
-    # tampering or a never-tested race could have left dupes. Better to
-    # raise loudly than to silently coerce.
-    duplicate_guilds = SoulLinkRun.where(active: true)
-                                  .group(:guild_id)
-                                  .having("COUNT(*) > 1")
-                                  .count
+# ── Towns & Cities ──
+1:  { name: "Twinleaf Town" }
+2:  { name: "Sandgem Town" }
+3:  { name: "Floaroma Town" }
+4:  { name: "Solaceon Town" }
+5:  { name: "Celestic Town" }
+6:  { name: "Jubilife City" }
+7:  { name: "Oreburgh City" }
+8:  { name: "Eterna City" }
+9:  { name: "Hearthome City" }
+10: { name: "Pastoria City" }
+11: { name: "Canalave City" }
+12: { name: "Sunyshore City" }
+13: { name: "Veilstone City" }
+14: { name: "Snowpoint City" }
+15: { name: "Pokémon League" }
+16: { name: "Fight Area" }
+17: { name: "Survival Area" }
+18: { name: "Resort Area" }
 
-    if duplicate_guilds.any?
-      detail = duplicate_guilds.map { |g, n| "guild_id=#{g}: #{n} active runs" }.join("; ")
-      raise ActiveRecord::IrreversibleMigration, <<~MSG.squish
-        Cannot enforce one-active-run-per-guild: #{detail}.
-        Deactivate the extras manually before re-running:
-        SoulLinkRun.where(guild_id: <id>, active: true).order(:run_number).limit(N-1).update_all(active: false)
-      MSG
-    end
+# ── Routes 201-218 (early-mid game; common in the 4-player
+#    soul-link runs the project tracks) ──
+30: { name: "Route 201" }
+31: { name: "Route 202" }
+32: { name: "Route 203" }
+33: { name: "Route 204" }
+34: { name: "Route 205" }
+35: { name: "Route 206" }
+36: { name: "Route 207" }
+37: { name: "Route 208" }
+38: { name: "Route 209" }
+39: { name: "Route 210" }
+40: { name: "Route 211" }
+41: { name: "Route 212" }
+42: { name: "Route 213" }
+43: { name: "Route 214" }
+44: { name: "Route 215" }
+45: { name: "Route 216" }
+46: { name: "Route 217" }
+47: { name: "Route 218" }
 
-    # MySQL 8 virtual generated column. Value is guild_id when active is
-    # true, NULL otherwise. NULLs don't conflict in unique indexes, so
-    # multiple inactive runs per guild remain fine. The unique index on
-    # this column enforces the invariant at the storage layer.
-    add_column :soul_link_runs, :active_guild_id, :bigint,
-               as: "(CASE WHEN active = 1 THEN guild_id END)"
+# ── Dungeons / story locations (common encounter points) ──
+80: { name: "Oreburgh Mine" }
+81: { name: "Eterna Forest" }
+82: { name: "Old Chateau" }
+83: { name: "Mt. Coronet" }
+84: { name: "Lost Tower" }
+85: { name: "Solaceon Ruins" }
+86: { name: "Wayward Cave" }
+87: { name: "Iron Island" }
+88: { name: "Lake Verity" }
+89: { name: "Lake Valor" }
+90: { name: "Lake Acuity" }
+91: { name: "Spear Pillar" }
+92: { name: "Distortion World" }
+93: { name: "Stark Mountain" }
+94: { name: "Victory Road" }
 
-    add_index :soul_link_runs, :active_guild_id, unique: true,
-              name: "index_soul_link_runs_on_active_guild_id"
-  end
-
-  def down
-    remove_index :soul_link_runs, name: "index_soul_link_runs_on_active_guild_id"
-    remove_column :soul_link_runs, :active_guild_id
-  end
-end
+# ── Indoor / overworld special ──
+100: { name: "Pokémon Center" }
+101: { name: "Trainers' School" }
 ```
 
 Notes:
-- The column type is `:bigint` because `guild_id` is `:bigint` (it's a Discord snowflake).
-- Default storage for MySQL generated columns in Rails 8.1 is VIRTUAL. No `stored:` arg → virtual. We don't need it materialized; the unique index gets recomputed on writes.
-- `db/schema.rb` will dump this as `t.virtual "active_guild_id", type: :bigint, as: "..."`. Rails 8.1's schema dumper handles virtual columns natively.
-- The CASE expression uses `active = 1` (not `active = true`) because MySQL stores BOOLEAN as TINYINT.
+- The integer IDs above are CANONICAL ORDER references from pret/pokeplatinum. Whether the SRAM stores those exact integers vs. a remapped subset depends on offset validation. Either way, the YAML is the source of truth — adjust integers if KG-7 reveals different mappings.
+- `Pokémon` (not `Pokemon`) is intentional — the `é` is the canonical brand spelling and matches existing strings elsewhere in the codebase. Make sure the YAML is saved as UTF-8 (it should be by default).
 
-#### 2. Model: validation + `current(guild_id)` refactor
+#### 2. `app/services/soul_link/game_state.rb` additions
 
-Update `app/models/soul_link_run.rb`:
+Add the constant + accessor + reload hook:
 
-**Add validation:**
 ```ruby
-validate :no_other_active_run_for_guild, if: -> { active? }
+MAPS_PATH = Rails.root.join('config', 'soul_link', 'maps.yml')
 
-private
+def maps
+  @maps ||= File.exist?(MAPS_PATH) ? (YAML.load_file(MAPS_PATH) || {}) : {}
+end
 
-def no_other_active_run_for_guild
-  scope = self.class.where(guild_id: guild_id, active: true)
-  scope = scope.where.not(id: id) if persisted?
-  return unless scope.exists?
-  errors.add(:active, "another run is already active for this guild")
+# Returns the human-readable name for a map ID, or nil if unknown.
+# The caller (typically EmulatorHelper#format_map_name) decides what
+# to render for nil — usually a "Map #N" fallback.
+def map_name(map_id)
+  return nil if map_id.nil?
+  maps.dig(map_id.to_i, "name")
 end
 ```
 
-The `if: -> { active? }` gate is critical: validations only run when this row IS (or is becoming) active. Updating an inactive run's other fields shouldn't trigger the check. The `where.not(id: id) if persisted?` excludes self so an already-active row can be saved (e.g., updating `gyms_defeated`).
-
-**Simplify `current`:**
+Update `reload!` to clear the maps cache:
 ```ruby
-def self.current(guild_id)
-  find_by(guild_id: guild_id, active: true)
+def reload!
+  @gym_info = nil
+  @locations = nil
+  @settings = nil
+  @pokedex = nil
+  @maps = nil          # ← new
+  @map_coordinates = nil
+  @progression = nil
+  @pokemon_types = nil
+  @pokemon_abilities = nil
+  @evolutions = nil
+  @cheats = nil
 end
 ```
 
-Drops the `order(run_number: :desc).first` defensive ordering. With the invariant, there's at most one active row per guild — `find_by` is exact. The existing `(guild_id, active)` index covers this query.
+Place the new methods between `location_name` and `players` (groups thematically with location lookup, NOT with `map_coordinates` which is the dashboard map's pixel-coordinates dataset — different concern despite the similar name).
 
-#### 3. Tests
+#### 3. `app/helpers/emulator_helper.rb` additions
 
-New tests in `test/models/soul_link_run_test.rb`:
+Add the formatter alongside `format_play_time`:
 
 ```ruby
-# ── one-active-run invariant ─────────────────────────────────────────────
+# Formats a Pokemon Platinum map header ID as a human-readable name
+# for the run-roster + slot-card surfaces. Returns nil for nil input
+# (callers should gate on this with `if format_map_name(...).present?`),
+# the canonical name when SoulLink::GameState knows the ID, or a
+# "Map ##{id}" fallback when not — informative enough for v1, and
+# also a signal to extend config/soul_link/maps.yml as new IDs are
+# observed in real saves.
+def format_map_name(map_id)
+  return nil if map_id.nil?
+  SoulLink::GameState.map_name(map_id) || "Map ##{map_id}"
+end
+```
 
-test "validates only one active run per guild" do
-  # @run from setup is already active, guild=999...
-  duplicate = build(:soul_link_run, guild_id: @run.guild_id, run_number: @run.run_number + 1)
-  assert_not duplicate.valid?
-  assert_includes duplicate.errors[:active], "another run is already active for this guild"
+#### 4. View edits
+
+**`app/views/emulator/_run_sidebar_card.html.erb`** — between the Money block and the Badges block:
+
+```erb
+<% if active_slot&.parsed_map_id %>
+  <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
+    Map: <%= format_map_name(active_slot.parsed_map_id) %>
+  </div>
+<% end %>
+```
+
+Place this after the existing `parsed_money` block (around line 75-79) and before the `parsed_trainer_name` gate that wraps the badges line.
+
+**`app/views/emulator/_save_slots_sidebar.html.erb`** — between Money (~line 83-87) and Badges (~89-93):
+
+```erb
+<% if slot.parsed_map_id %>
+  <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
+    Map: <%= format_map_name(slot.parsed_map_id) %>
+  </div>
+<% end %>
+```
+
+Same gate semantic: render only when a non-nil parsed_map_id exists. Today this means the line never renders (parser returns nil from `safe_map_id` whenever the byte is 0, which is everything until KG-7 validates the offset). When a real save flows through, the line lights up.
+
+#### 5. Tests
+
+**Add `test/services/soul_link/game_state_maps_test.rb`** (new file). Mirrors the test setup of `game_state_cheats_test.rb` (write a temp yaml, point GameState's MAPS_PATH at it, hermetic setup/teardown). Cover:
+
+- `map_name(id)` returns the canonical name for a known ID (use a known entry from the seeded yaml — e.g., `8` → `"Eterna City"`).
+- `map_name(id)` returns `nil` for an ID that's not in the file.
+- `map_name(nil)` returns `nil` (no exceptions).
+- `map_name("8")` returns `"Eterna City"` (string→int coercion via `.to_i`).
+- `maps` returns `{}` if the file is missing.
+
+The test setup pattern from cheats:
+```ruby
+setup do
+  SoulLink::GameState.instance_variable_set(:@maps, nil)
+  @real_maps_path = SoulLink::GameState::MAPS_PATH
 end
 
-test "allows a second run for the same guild after deactivating the first" do
-  @run.deactivate!
-  next_run = build(:soul_link_run, guild_id: @run.guild_id, run_number: @run.run_number + 1)
-  assert next_run.valid?
-end
-
-test "allows runs in different guilds to be simultaneously active" do
-  other = build(:soul_link_run, guild_id: @run.guild_id + 1, run_number: 1)
-  assert other.valid?
-end
-
-test "allows updating an already-active run without self-conflict" do
-  @run.update!(gyms_defeated: 3)
-  assert @run.persisted?
-  assert_equal 3, @run.reload.gyms_defeated
-end
-
-test "DB-level unique index catches a race that bypassed validation" do
-  # Simulate a TOCTOU race: validate against a snapshot that's about to
-  # become stale, then INSERT directly via raw SQL skipping validations.
-  # The DB constraint must catch it.
-  @run.update_column(:active, false) # bypass validation cleanly
-  first_active = create(:soul_link_run, guild_id: @run.guild_id, run_number: @run.run_number + 1)
-  # First active row exists. Now insert a second via raw SQL bypassing AR.
-  assert_raises(ActiveRecord::RecordNotUnique) do
-    SoulLinkRun.connection.execute(<<~SQL)
-      INSERT INTO soul_link_runs (guild_id, run_number, active, gyms_defeated, created_at, updated_at)
-      VALUES (#{first_active.guild_id}, #{first_active.run_number + 1}, 1, 0, NOW(), NOW())
-    SQL
+teardown do
+  SoulLink::GameState.instance_variable_set(:@maps, nil)
+  if @real_maps_path && SoulLink::GameState::MAPS_PATH != @real_maps_path
+    SoulLink::GameState.send(:remove_const, :MAPS_PATH)
+    SoulLink::GameState.const_set(:MAPS_PATH, @real_maps_path)
   end
 end
-
-# ── current(guild_id) ────────────────────────────────────────────────────
-
-test "current returns the single active run for a guild" do
-  assert_equal @run, SoulLinkRun.current(@run.guild_id)
-end
-
-test "current returns nil when no active run exists for guild" do
-  @run.deactivate!
-  assert_nil SoulLinkRun.current(@run.guild_id)
-end
-
-test "current returns nil for an unknown guild" do
-  assert_nil SoulLinkRun.current(@run.guild_id + 999)
-end
 ```
 
-The "DB-level unique index" test exercises the constraint directly via raw SQL — Bob should verify the test passes (the INSERT raises `RecordNotUnique`).
+Each test writes a small YAML fixture with `Tempfile.create(["maps", ".yml"])` and re-`const_set`s `MAPS_PATH` to the temp path. Read `game_state_cheats_test.rb` for the exact pattern; use it.
 
-#### 4. Schema.rb dump
+**Add `test/helpers/emulator_helper_test.rb`** (new file). Cover:
 
-After running the migration, `db/schema.rb` will pick up:
-```ruby
-t.virtual "active_guild_id", type: :bigint, as: "(case when `active` = 1 then `guild_id` end)"
-t.index ["active_guild_id"], name: "index_soul_link_runs_on_active_guild_id", unique: true
-```
+- `format_play_time(...)` — port the existing inline doc-comment examples to real test cases. (5 tests: nil, 0, 3660, 45_780, negative-clamps-to-zero.)
+- `format_map_name(nil)` returns `nil`.
+- `format_map_name(known_id)` — stub `SoulLink::GameState.map_name` to return `"Eterna City"`, assert.
+- `format_map_name(unknown_id)` — stub `SoulLink::GameState.map_name` to return `nil`, assert `"Map #99999"` is returned.
 
-The exact `as:` SQL string may vary based on MySQL's normalization (backticks, casing). Bob should commit whatever Rails dumps — don't hand-edit.
+Use Minitest's `Minitest::Mock` or just the `stub` pattern (`SoulLink::GameState.stub(:map_name, "Eterna City") { ... }`). The stub pattern is cleaner and matches what `emulator_controller_test.rb` already uses for `GameState.cheats`.
+
+**Test count delta:** +5 (game_state_maps) + ~7 (emulator_helper, including the play_time backfill) ≈ 318 → ~330. Bob has discretion on the exact count.
 
 ### Out of Scope (do NOT expand)
 
-- Wrapping `start_run` in an explicit transaction (the DB constraint catches the rare race; an explicit txn is a possible follow-up but adds review surface for no behavior change in the happy path)
-- Advisory locking on guild_id during run creation (same reasoning)
-- Refactoring `discord_bot.rb` create-run flow (Tier-1 work — fresh-session candidate)
-- Refactoring `lib/tasks/soul_link.rake` create-run flows (low-risk, defer)
-- Adding a Ruby-level "deactivate-then-create" helper (`SoulLinkRun.start_for_guild!(guild_id)`) — would be cleaner but expands scope
-- Touching the `(guild_id, active)` composite index — it's still useful for listing past runs in `history`
-- Postgres-specific paths (the project is MySQL-only per `config/database.yml`)
-- Adding a CHECK constraint that `run_number > 0` or similar — separate cleanup
-- Production data inspection — the migration's backfill check is the verification
+- Changing `MAP_ID_OFFSET` in `SaveParser` or any parser-side validation (KG-7 territory; needs a real `.sav`).
+- Backfilling `parsed_map_id` for existing slots — the parse job's normal flow handles future saves; old slots just have nil and the UI omits the line.
+- A rake task to list "unknown map IDs we've seen in production" — would be useful for iterating maps.yml, but adds scope. Future polish.
+- Discord bot rendering of map names (the bot uses Discord embeds, separate UX surface).
+- Refactoring `EmulatorHelper` beyond adding `format_map_name`.
+- Touching `_save_slots_sidebar.html.erb`'s slot-card structure beyond the new line.
+- Tier-1 refactors (god-object decomp, presenter extraction). Fresh-session candidates.
+- Adding region grouping or dungeon flags to maps.yml — keep `{ name: "..." }` minimal.
+- Validation that `map_name` always returns a string (the helper handles the `nil` case explicitly).
 
 ### Constraints / Flags
 
-- **Sequence the work**: write the migration first, run `db:migrate` locally + verify in `db/schema.rb`. THEN add the model validation + simplify `current`. THEN add tests. Run tests against the new constraint. The order matters because the model validation tests presume the migration's column exists.
-- **310/310 must still pass** after the migration + model change. The 7 controller tests that previously had `destroy_all` lines (removed in Step 8) MUST keep passing — the new validation catches what the destroy_all used to clean up. If any test fails because two `create(:soul_link_run)` calls happen in the same transaction, Bob should investigate (likely a test that needs `active: false` on one of the creates) and fix at the test site.
-- **Migration backfill check must NOT auto-fix data.** If duplicate active runs exist, raise. The Project Owner is the only one who decides which to keep. Document the manual cleanup query in the raise message.
-- **`active?` predicate.** Rails generates `active?` automatically from a boolean column (it's the same as `active`). Use `active?` in the validation guard for readability.
-- **Don't change the existing `(guild_id, active)` index.** It's used by `history` and other queries. The new unique index on `active_guild_id` is a separate index with a different shape.
-- **Verify the schema.rb dump committed** is reproducible — running `db:migrate` from scratch should produce the same schema.rb. If Rails picks weird capitalization/quoting in the `as:` string, that's the dumper's choice — don't fight it.
-- **Pre-existing rubocop offenses on lines Bob touches** — fix them. Step 10's KG-5 sweep brought the codebase to 0 offenses; Step 11 should keep it that way.
+- **Sequence the work**: `maps.yml` first → GameState methods → helper method → view edits (only after the helper exists, so the view doesn't error mid-edit) → tests last.
+- **318/318 must still pass** after all edits. New tests bring the count up.
+- **Rubocop must stay clean** (Step 11's end state: 0 offenses, 145 files). New helper methods follow existing style.
+- **Don't introduce new YAML schema patterns** — the `{name: "..."}` hash shape matches existing files. If Bob feels tempted to use a flat `id: name` form, don't — the hash leaves room for `region:` or `dungeon: bool` later without breaking callers.
+- **The `Pokémon` accent character matters.** The existing strings in the codebase use the accented form; `maps.yml` should too. Save as UTF-8.
+- **Don't ship without the safety belt comment** in `maps.yml`. The header should explicitly note the IDs need real-save validation alongside KG-7.
+- **Helper fallback string is `"Map ##{id}"`** — short, clear, matches the codebase's brevity. NOT `"Unknown map (##{id})"` (verbose) or just `"##{id}"` (ambiguous).
 
 ### Acceptance Criteria
 
-- New migration `db/migrate/<timestamp>_enforce_single_active_run_per_guild.rb` exists.
-- `bin/rails db:migrate` runs cleanly on the dev DB; schema.rb updates with the virtual column + unique index.
-- The migration's backfill check raises a clear error if duplicate-active-runs exist (verified by manually creating dupes via `update_column(:active, true)` on an inactive run, attempting migrate, observing the raise, then cleaning up — Bob does this once locally to verify the safety belt works, then reverts the test data).
-- Model `SoulLinkRun` has the new `validate :no_other_active_run_for_guild` and the simplified `find_by`-based `current` method.
-- New tests in `test/models/soul_link_run_test.rb` covering: validation rejects duplicate active, validation accepts after deactivate, validation accepts different guilds, validation allows self-update, DB constraint catches raw-SQL bypass, `current` returns the single active, `current` returns nil for no-active, `current` returns nil for unknown guild. **8 new tests total.**
-- Full suite green: 310 + 8 = **318/318** passing, 0 failures, 0 errors.
-- `bundle exec rubocop` clean (0 offenses, same as Step 10's end state).
-- Diff scope: 1 new migration, 1 model edit, 1 test file edit, 1 schema.rb update, 4 handoff files. Anything else is a Reviewer Condition.
-
-### Approval-needed checkpoint
-
-If the migration's backfill check finds violating data on **the dev DB** during local testing, that's expected (Bob is artificially creating dupes to verify the safety belt). Just clean up and re-run.
-
-If the same check finds violating data on **production** (via the deploy script's `db:migrate`), the migration aborts the deploy. That's the desired behavior — it's the Project Owner's call which run to keep. **Do NOT auto-resolve in code.** A manual rake task or console session is the right cleanup path, decided by the Project Owner.
-
-For Step 11's purposes (local dev + test): Bob assumes no prod-data interference. The Project Owner runs the deploy and gets the constraint or the loud abort.
+- New file `config/soul_link/maps.yml` with header comment + ~50 seed entries.
+- New `SoulLink::GameState.map_name(id)` method + `MAPS_PATH` constant + `maps` accessor + `reload!` hook for `@maps`.
+- New `EmulatorHelper#format_map_name(map_id)` method.
+- View additions in `_run_sidebar_card.html.erb` and `_save_slots_sidebar.html.erb`, gated on `parsed_map_id.present?`.
+- New tests in `test/services/soul_link/game_state_maps_test.rb` and `test/helpers/emulator_helper_test.rb`.
+- Full suite green (318 → 318+N where N ≈ 12).
+- `bundle exec rubocop` clean (0 offenses).
+- Manual smoke test (Bob): `Rails.console` → `SoulLink::GameState.map_name(8)` returns `"Eterna City"`; `format_map_name(99999)` returns `"Map #99999"`; `format_map_name(nil)` returns `nil`.
+- Diff scope: 1 new YAML, 1 model edit (game_state), 1 helper edit, 2 view edits, 2 new test files, 4 handoff files. Anything else is a Reviewer Condition.
 
 ### Files Bob Should Read
 
-- `app/models/soul_link_run.rb` (entire file — small)
-- `db/schema.rb` lines around `create_table "soul_link_runs"` (verify column types, existing indexes)
-- `app/channels/run_channel.rb` `start_run` method (sanity-check the existing flow plays nice with the new constraint)
-- `app/services/soul_link/discord_bot.rb` lines 235-285 (the bot's create-run flow — same sanity check)
-- `lib/tasks/soul_link.rake` lines 35-55, 305-320 (rake tasks — same sanity check)
-- `test/models/soul_link_run_test.rb` (entire file — to know where new tests slot in)
-- `test/factories/soul_link_runs.rb` (to know the factory's defaults — guild_id is constant 999..., not a sequence)
-- One existing migration in `db/migrate/` for the file-naming + style reference
+- `app/services/soul_link/game_state.rb` (entire — small)
+- `test/services/soul_link/game_state_cheats_test.rb` (test pattern reference)
+- `app/helpers/emulator_helper.rb` (existing; small)
+- `app/views/emulator/_run_sidebar_card.html.erb` (where to add the new line)
+- `app/views/emulator/_save_slots_sidebar.html.erb` (where to add the same line)
+- `config/soul_link/locations.yml` (yaml comment style + structure reference — first 20 lines)
+- `app/services/soul_link/save_parser.rb` lines 240-264 (`safe_map_id` is the source of `parsed_map_id`; understand that 0 → nil)
 
-DO NOT load the full app/services or app/controllers — no business logic changes.
+DO NOT load app/controllers, channels, or other models — no business-logic changes.
 
 ### Files Bob Should Update at the End
 
 - `handoff/REVIEW-REQUEST.md` — files-changed table, self-review answers, open questions, `Ready for Review: YES`
-- `handoff/BUILD-LOG.md` — Step 11 history entry. **Update Architecture Decisions § Carried over** to add: "One active SoulLinkRun per guild is enforced by a virtual-column unique index on `soul_link_runs.active_guild_id` (added in Step 11). DB-level constraint catches any path that bypasses `RunChannel#start_run`'s deactivate-then-create flow."
+- `handoff/BUILD-LOG.md` — Step 12 history entry. **Update Known Gaps**: KG-6 closed (move to Closed section). KG-7 (real-save offset verification) STILL OPEN — note that map IDs in `maps.yml` are also pending validation alongside it.
 
 ---
 
@@ -245,24 +297,24 @@ DO NOT load the full app/services or app/controllers — no business logic chang
 
 When this lands on your desk, focus on:
 
-1. **Migration backfill check actually raises** on duplicate data. Bob should describe in REVIEW-REQUEST his local test of this safety belt (artificially create dupes via `update_column`, run migrate, see the raise, clean up).
+1. **`maps.yml` header comment is present and explicit.** It must say IDs are unvalidated and tie that to KG-7. Without this comment, future readers will assume the IDs are correct.
 
-2. **The virtual column expression is correct.** `(CASE WHEN active = 1 THEN guild_id END)` — when active is true, returns guild_id; when false, returns NULL (CASE without ELSE returns NULL). NULLs don't conflict in unique indexes. Multiple inactive rows for the same guild work.
+2. **The hash shape `{ name: "..." }` is preserved consistently** across all entries. No flat `id: "Twinleaf Town"` style; that closes off future extension.
 
-3. **Schema.rb dump is committed.** Running `db:rollback && db:migrate` should produce no diff. Bob should describe this verification.
+3. **`map_name(map_id)` handles string + integer + nil inputs.** The `.to_i` coercion is there for cases where the param comes from JSON/params (string). nil short-circuits without an exception.
 
-4. **Validation gate `if: -> { active? }`** is correct. Inactive→inactive updates should not trigger the validation. Active→active updates (e.g., bumping gyms_defeated) should pass via `where.not(id: id)`.
+4. **`format_map_name` fallback is `"Map #N"` exactly, not a variant.** Don't accept "Unknown #N" or "Map ID N" — the brief specifies the precise string for consistency.
 
-5. **The "DB constraint catches raw-SQL bypass" test** actually exercises the constraint, not just the validation. If Bob's test only triggers the validation (e.g., via `create!` with a duplicate active row), it doesn't prove the DB constraint works. The test should use `connection.execute` to bypass AR.
+5. **Both view surfaces render the field.** Manually inspect `_run_sidebar_card.html.erb` and `_save_slots_sidebar.html.erb` — the new line is placed between Money and Badges in both, with the same `parsed_map_id.present?` (or `&.parsed_map_id`) gate.
 
-6. **`current(guild_id)` returns at most one row.** With `find_by(guild_id:, active: true)`, two-active-rows is now impossible. Drop the defensive `order(run_number: :desc).first`.
+6. **`reload!` clears `@maps`.** Without this, calling `GameState.reload!` would leave stale map data in memory if the YAML was edited. Verify in the diff.
 
-7. **No regression on `RunChannel#start_run`, `discord_bot.rb`, or `lib/tasks/soul_link.rake`.** Their deactivate-then-create flow still works because the deactivate updates `active_guild_id` to NULL before the new INSERT. Walk one path manually to confirm.
+7. **Tests cover the empty-file case.** If `MAPS_PATH` doesn't exist (e.g., a hypothetical fork without the YAML), `maps` should return `{}` and `map_name` should return `nil` — never crash.
 
-8. **No regression on Step 9's broadcast tests.** `SoulLinkEmulatorSaveSlot` broadcasts to `[run, :emulator]`. The run reference is unchanged. Tests should pass without modification.
+8. **No regression on `SaveParser` or the parse job.** They write `parsed_map_id` from the SRAM byte; that flow doesn't touch any of the new code. Run the parser test file independently to confirm.
 
-9. **No changes to the controller tests' setup blocks.** The Step 8 sweep removed `destroy_all` lines; they were redundant. With Step 11's constraint, even if they came back, they'd still work — but they're not needed.
+9. **No regression on Step 9 broadcasts.** The roster card partial gained one new line; `data-discord-user-id` stays on the outer card div; Step 9's broadcast tests should pass without modification.
 
-10. **The factory's static `guild_id { 999... }` is unchanged.** Tests that need a different guild explicitly pass it; the constraint catches any test that accidentally creates two active runs in the same guild (which would be a test bug, not a constraint flaw).
+10. **Rubocop stays at 0 offenses across 145 files.** New code follows existing style; the new test files don't introduce any new violations.
 
 Out-of-scope items found during review → BUILD-LOG Known Gaps. Do not bundle.

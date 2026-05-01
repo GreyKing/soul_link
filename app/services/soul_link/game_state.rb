@@ -5,6 +5,7 @@ module SoulLink
     LOCATIONS_PATH = Rails.root.join('config', 'soul_link', 'locations.yml')
     SETTINGS_PATH = Rails.root.join('config', 'soul_link', 'settings.yml')
     POKEDEX_PATH = Rails.root.join('config', 'soul_link', 'pokedex.yml')
+    MAPS_PATH = Rails.root.join('config', 'soul_link', 'maps.yml')
     MAP_COORDINATES_PATH = Rails.root.join('config', 'soul_link', 'map_coordinates.yml')
     PROGRESSION_PATH = Rails.root.join('config', 'soul_link', 'progression.yml')
     TYPES_PATH = Rails.root.join('config', 'soul_link', 'types.yml')
@@ -66,6 +67,23 @@ module SoulLink
 
       def location_name(key)
         locations.dig(key.to_s, 'name') || key.to_s.titleize
+      end
+
+      # Pokémon Platinum SRAM-parsed map header IDs (integer) →
+      # `{ name: "..." }` hashes. Loaded from config/soul_link/maps.yml;
+      # see that file's header for the source + validation status.
+      # Returns {} if the file is missing.
+      def maps
+        @maps ||= File.exist?(MAPS_PATH) ? (YAML.load_file(MAPS_PATH) || {}) : {}
+      end
+
+      # Returns the human-readable name for a map ID, or nil if the ID
+      # is unknown or nil. Callers typically use EmulatorHelper#
+      # format_map_name to get a "Map #N" fallback for unknown IDs.
+      # Accepts integer or numeric-string input (coerced via to_i).
+      def map_name(map_id)
+        return nil if map_id.nil?
+        maps.dig(map_id.to_i, "name")
       end
 
       # Player management for multi-player species tracking
@@ -139,6 +157,7 @@ module SoulLink
         @locations = nil
         @settings = nil
         @pokedex = nil
+        @maps = nil
         @map_coordinates = nil
         @progression = nil
         @pokemon_types = nil

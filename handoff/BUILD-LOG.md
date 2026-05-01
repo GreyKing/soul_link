@@ -11,11 +11,11 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 11 — Enforce "One Active SoulLinkRun Per Guild" Invariant. **Awaiting review.**
-**Last committed:** Step 10 (`7d24b08`) shipped + merged to `main`. Step 11 not yet committed.
-**Pending deploy:** Step 11 contains a migration. Deploy script's `bin/rails db:migrate` runs it; the migration's backfill check raises a clear error if production data has dupe active runs (expectation: it doesn't).
+**Active step:** Step 12 — KG-6: Map ID → Name Lookup. **Awaiting review.**
+**Last committed:** Step 11 (`63ebac1`) shipped + merged to `main`. Step 12 not yet committed.
+**Pending deploy:** N/A — Step 12 is YAML + helper + view + tests only. No migration, no infra change.
 
-**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — closes Soft Point #3 (no hard "one active per guild" invariant). The other 19 soft points + Tier-1 refactors await a fresh main-checkout session.
+**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — closes KG-6 (Map ID → name lookup). KG-7 (real-save offset verification) STILL OPEN; map IDs in `config/soul_link/maps.yml` are best-effort pending validation alongside the parser's `MAP_ID_OFFSET`.
 
 **Parked plan:** FactoryBot conversion. Phases 1+2 land in this step (Step 4); Phase 3+ in Steps 5–6. See `handoff/parked-plans/factorybot-conversion.md`.
 
@@ -23,6 +23,40 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 12 — KG-6: Map ID → Name Lookup (SRAM Phase 1 finish) — 2026-05-01
+**Status:** Awaiting review.
+
+Closes Knowledge Gap KG-6 from `handoff/PROJECT-REVIEW-2026-04-30.md`: render human-readable map names ("Eterna City") wherever the SRAM-parsed `parsed_map_id` surfaces in the UI. The architect estimated ~1 hour and called it the finish line for SRAM Phase 1's user-visible work.
+
+**Pre-flight scope correction:** target-file reads revealed `parsed_map_id` is currently NOT rendered in any view (`grep -rn parsed_map_id app/views/` returns zero). It's stored in the DB and exposed via `slot_payload` JSON, but no template displays it. So Step 12 actually does both: (a) builds the lookup infrastructure and (b) wires the field into the existing run-roster + slot-card surfaces. Documented in REVIEW-REQUEST.
+
+**Files created (3):**
+- `config/soul_link/maps.yml` — Pokémon Platinum map header IDs → `{ name: "..." }` hashes. Header comment cites pret/pokeplatinum disassembly as the source and explicitly notes the IDs are unvalidated against a real `.sav` (KG-7 territory). 51 seed entries: 18 cities/towns, 18 routes (201-218), 15 dungeons/story locations, 2 special.
+- `test/services/soul_link/game_state_maps_test.rb` — 8 tests using the same `Tempfile + with_maps_path` hermetic setup pattern as `game_state_cheats_test.rb`. Covers known/unknown/nil lookups, string→int coercion, missing-file fallback to `{}`, memoization (counted via `File.exist?` stub since Bootsnap intercepts `YAML.load_file`), `reload!` cache clear, and a sanity check that the real `maps.yml` ships with at least the gym towns (8 → "Eterna City", 7 → "Oreburgh City", 14 → "Snowpoint City").
+- `test/helpers/emulator_helper_test.rb` — 9 tests. 5 backfill the existing `format_play_time` doc-comment examples as real assertions (including the negative-clamp-to-zero case that wasn't covered). 4 cover the new `format_map_name`: nil input, known ID via `GameState.stub`, unknown ID falls back to "Map #N", and the fallback works with small integer IDs.
+
+**Files modified (4):**
+- `app/services/soul_link/game_state.rb` — added `MAPS_PATH` constant alongside the others; added `maps` (file-existence-gated YAML loader) and `map_name(map_id)` (returns name or nil; coerces input via `to_i`); extended `reload!` to clear `@maps`. Methods placed between `location_name` and `players` to group thematically with location lookup.
+- `app/helpers/emulator_helper.rb` — added `format_map_name(map_id)` next to `format_play_time`. Returns nil for nil input, the canonical name for known IDs, and `"Map ##{id}"` for unknown — informative enough for v1, also signals which entries to add to `maps.yml` as new IDs surface.
+- `app/views/emulator/_run_sidebar_card.html.erb` — new "Map: <name>" line slotted between Money and Badges, gated on `active_slot&.parsed_map_id`. Renders only when the parser populated the field (currently never, until KG-7 validates the offset).
+- `app/views/emulator/_save_slots_sidebar.html.erb` — same line in the slot card body, between Money and Badges, gated on `slot.parsed_map_id`.
+
+**Key decisions:**
+- **YAML hash shape `{ name: "..." }` over flat `id: name`.** The hash leaves room for future fields (`region:`, `dungeon: bool`) without breaking the API. Mirrors `locations.yml` and `gym_info.yml`.
+- **Place lookup in `EmulatorHelper`, not in views directly.** Views call `format_map_name(slot.parsed_map_id)`; the helper handles nil, canonical name, and fallback in one place. Tests can stub `GameState.map_name` and exercise all branches.
+- **Fallback string `"Map #N"`** — short, clear, matches the codebase's brevity (Badges shows as "Badges: 4 / 8", Money as "₱12,345"). Not "Unknown map (N)" (verbose) or just "#N" (ambiguous).
+- **`maps.yml` IDs are best-effort, not authoritative.** The header comment ties this to KG-7 (real-save offset verification). When KG-7 lands, both validations happen together; until then, the fallback gracefully handles ID mismatches.
+- **`map_name(map_id)` accepts integer or numeric-string input.** `.to_i` coercion handles JSON/params cases. Tests cover this.
+- **Memoize test uses `File.exist?` counting**, not `YAML.load_file` counting. Bootsnap's `CompileCache::YAML::Psych4::Patch` is `prepend`ed onto `Psych`, intercepting `YAML.load_file` ahead of any singleton-class stub. Same workaround as `game_state_cheats_test.rb`. Documented inline.
+
+**Tests:** 318 → 335 (+17). 0 failures, 0 errors.
+
+**Lint:** `bundle exec rubocop` clean (0 offenses across 147 files). Same end state as Step 11 plus the new test files and the new helper method.
+
+**Diff scope:** 1 new YAML, 1 model edit, 1 helper edit, 2 view edits, 2 new test files, 4 handoff files. Matches the brief.
+
+---
 
 ### Step 11 — Enforce "One Active SoulLinkRun Per Guild" Invariant — 2026-05-01
 **Status:** Awaiting review.
@@ -444,13 +478,15 @@ ALL FACTORY SMOKE CHECKS PASSED
 ## Known Gaps
 *Durable. Items logged here instead of expanding the current step. Persists across sessions until addressed.*
 
-### Closed in Steps 9-10 (2026-04-30)
+### Closed in Steps 9-12 (2026-04-30 → 2026-05-01)
 - ~~**KG-1: No real-time updates on the run roster sidebar**~~ — closed in Step 9 (targeted frame replacement on save-slot parsed_* updates)
 - ~~**KG-2: No real-time broadcast of species change to other players' dashboards**~~ — closed in Step 9 (`broadcasts_refreshes_to` on `SoulLinkPokemon` + `SoulLinkPokemonGroup`)
 - ~~**KG-3: No loading state on EVOLVE button**~~ — closed in Step 9 (button disable + "EVOLVING..." text)
 - ~~**KG-4: `#d4b14a` amber color inline**~~ — closed in Step 9 (promoted to `--amber` palette token)
-- ~~**KG-5: 133 pre-existing rubocop offenses**~~ — closed in Step 10 (`rubocop -a` autocorrect; codebase now 0 offenses across 144 files)
+- ~~**KG-5: 133 pre-existing rubocop offenses**~~ — closed in Step 10 (`rubocop -a` autocorrect; codebase now 0 offenses across 147 files)
+- ~~**KG-6: Map ID → name lookup**~~ — closed in Step 12 (`config/soul_link/maps.yml` + `SoulLink::GameState.map_name` + `EmulatorHelper#format_map_name` + view edits in run-roster + slot-card surfaces)
 - ~~**YOU-badge restoration follow-up (logged in Step 9)**~~ — closed in Step 10 (new `roster_you_marker_controller.js` decorates the matching `[data-discord-user-id]` card on `connect()` + `turbo:before-stream-render`)
+- ~~**Soft Point #3: SoulLinkRun.current(guild_id) lacks a hard invariant**~~ — closed in Step 11 (DB-level virtual-column unique index on `active_guild_id`)
 - ~~**Convert legacy fixture-based tests to FactoryBot**~~ — closed in Steps 4-8 (FactoryBot conversion shipped)
 
 ### From earlier work (Evolve Button feature)

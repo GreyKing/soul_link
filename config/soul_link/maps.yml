@@ -1,0 +1,80 @@
+# config/soul_link/maps.yml
+#
+# Pokémon Platinum map header IDs → human-readable names.
+# Loaded by SoulLink::GameState.map_name(id); rendered via
+# EmulatorHelper#format_map_name in run-roster + slot-card surfaces.
+#
+# Source: pret/pokeplatinum disassembly (`include/constants/map.h`)
+# header IDs in canonical Sinnoh region order. **The integer IDs in
+# this file are best-effort and have NOT been validated against a
+# real `.sav`** — the parser's MAP_ID_OFFSET = 0x1234 is also
+# unvalidated (see BUILD-LOG Known Gap KG-7). Both validations
+# should happen together when a real save is available. Until then,
+# unknown IDs surface as "Map #N" via the helper's fallback, which
+# is informative enough for v1 and signals which entries need to be
+# added or corrected.
+#
+# Format: integer ID → { name: "Display Name" }. The hash shape
+# leaves room for future fields (e.g. region:, dungeon: bool)
+# without breaking the API.
+
+# ── Towns & Cities ──
+1:  { name: "Twinleaf Town" }
+2:  { name: "Sandgem Town" }
+3:  { name: "Floaroma Town" }
+4:  { name: "Solaceon Town" }
+5:  { name: "Celestic Town" }
+6:  { name: "Jubilife City" }
+7:  { name: "Oreburgh City" }
+8:  { name: "Eterna City" }
+9:  { name: "Hearthome City" }
+10: { name: "Pastoria City" }
+11: { name: "Canalave City" }
+12: { name: "Sunyshore City" }
+13: { name: "Veilstone City" }
+14: { name: "Snowpoint City" }
+15: { name: "Pokémon League" }
+16: { name: "Fight Area" }
+17: { name: "Survival Area" }
+18: { name: "Resort Area" }
+
+# ── Routes 201-218 (early-mid game; common in soul-link runs) ──
+30: { name: "Route 201" }
+31: { name: "Route 202" }
+32: { name: "Route 203" }
+33: { name: "Route 204" }
+34: { name: "Route 205" }
+35: { name: "Route 206" }
+36: { name: "Route 207" }
+37: { name: "Route 208" }
+38: { name: "Route 209" }
+39: { name: "Route 210" }
+40: { name: "Route 211" }
+41: { name: "Route 212" }
+42: { name: "Route 213" }
+43: { name: "Route 214" }
+44: { name: "Route 215" }
+45: { name: "Route 216" }
+46: { name: "Route 217" }
+47: { name: "Route 218" }
+
+# ── Dungeons / story locations (common encounter points) ──
+80: { name: "Oreburgh Mine" }
+81: { name: "Eterna Forest" }
+82: { name: "Old Chateau" }
+83: { name: "Mt. Coronet" }
+84: { name: "Lost Tower" }
+85: { name: "Solaceon Ruins" }
+86: { name: "Wayward Cave" }
+87: { name: "Iron Island" }
+88: { name: "Lake Verity" }
+89: { name: "Lake Valor" }
+90: { name: "Lake Acuity" }
+91: { name: "Spear Pillar" }
+92: { name: "Distortion World" }
+93: { name: "Stark Mountain" }
+94: { name: "Victory Road" }
+
+# ── Indoor / overworld special ──
+100: { name: "Pokémon Center" }
+101: { name: "Trainers' School" }

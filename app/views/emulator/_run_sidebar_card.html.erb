@@ -80,6 +80,12 @@
     </div>
   <% end %>
 
+  <% if active_slot&.parsed_map_id %>
+    <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
+      Map: <%= format_map_name(active_slot.parsed_map_id) %>
+    </div>
+  <% end %>
+
   <% if active_slot&.parsed_trainer_name.present? %>
     <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
       Badges: <%= active_slot.parsed_badges %> / 8
