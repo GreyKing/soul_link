@@ -11,11 +11,7 @@ module ActiveSupport
     # Run tests in parallel with specified workers
     parallelize(workers: :number_of_processors)
 
-    # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
-    fixtures :all
-
-    # FactoryBot short syntax (`create`, `build`) for new test code.
-    # Legacy fixture-based tests are unaffected — both styles coexist.
+    # FactoryBot short syntax (`create`, `build`) for test code.
     include FactoryBot::Syntax::Methods
 
     # Add more helper methods to be used by all tests here...
@@ -37,7 +33,7 @@ module LoginHelper
     # Stub the Faraday guild API call made by SessionsController#create.
     # Use a lambda so Minitest calls it (handling the block Faraday.get yields)
     # instead of trying to return a static value that ignores the block.
-    fake_response = Struct.new(:body).new([{ "id" => guild_id.to_s }].to_json)
+    fake_response = Struct.new(:body).new([ { "id" => guild_id.to_s } ].to_json)
     stub_get = lambda { |_url, &_block| fake_response }
     Faraday.stub(:get, stub_get) do
       get "/auth/discord/callback"

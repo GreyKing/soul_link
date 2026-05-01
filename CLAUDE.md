@@ -52,6 +52,5 @@ For detailed documentation, see `.claude/documents/`:
 
 ### Testing conventions
 
-- **New tests** use FactoryBot factories from `test/factories/`.
-- **Legacy tests** use fixtures from `test/fixtures/`. Do not convert without an explicit step.
+- All tests use FactoryBot factories from `test/factories/`. Fixtures (`test/fixtures/*.yml`) were removed during the 2026-04-30 conversion sweep.
 - Factories should be minimum-viable — just enough to satisfy validations and associations. Don't add fields the test doesn't need.

@@ -4,7 +4,6 @@ class GymDraftsControllerTest < ActionDispatch::IntegrationTest
   GREY = 153665622641737728
 
   setup do
-    SoulLinkRun.where(guild_id: LoginHelper::GUILD_ID).destroy_all
     @run = create(:soul_link_run)
     @draft = create(:gym_draft, :lobby, soul_link_run: @run)
   end

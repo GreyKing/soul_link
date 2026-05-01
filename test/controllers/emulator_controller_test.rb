@@ -6,11 +6,6 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
   SCYTHE = 189518174125817856
 
   setup do
-    # `fixtures :all` still loads test/fixtures/soul_link_runs.yml's active_run
-    # (guild_id 999...). Without removing it, tests that deactivate @run and
-    # expect "no active run" fall back to the fixture instead. Step 8 deletes
-    # the fixtures and this becomes a no-op.
-    SoulLinkRun.where(guild_id: LoginHelper::GUILD_ID).destroy_all
     @run = create(:soul_link_run)
   end
 

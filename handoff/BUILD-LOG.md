@@ -11,11 +11,11 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 7 — Convert Channel Test from Fixtures to FactoryBot. **Awaiting review.**
-**Last committed:** Step 6 (`f7203b0`) shipped + merged to `main`. Step 7 not yet committed.
-**Pending deploy:** N/A — Step 7 is test-only.
+**Active step:** Step 8 — Final Sweep: Delete Fixtures + Drop Hybrid Convention. **Awaiting review.**
+**Last committed:** Step 7 (`a18a27f`) shipped + merged to `main`. Step 8 not yet committed.
+**Pending deploy:** N/A — Step 8 is test/docs only.
 
-**Parked plan:** FactoryBot conversion. **After Step 7, the conversion is functionally complete** — zero files in `test/` reference fixtures by name. Only Step 8 (mechanical: delete YAMLs, drop `fixtures :all`, update CLAUDE.md, flake-check sweep) remains.
+**Parked plan:** Archived to `handoff/archive/2026-04-30-factorybot-conversion.md` with COMPLETE status marker. The FactoryBot conversion is fully done — Steps 4-8.
 
 **Parked plan:** FactoryBot conversion. Phases 1+2 land in this step (Step 4); Phase 3+ in Steps 5–6. See `handoff/parked-plans/factorybot-conversion.md`.
 
@@ -23,6 +23,60 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 8 — Final Sweep: Delete Fixtures + Drop Hybrid Convention — 2026-04-30
+**Status:** Awaiting review.
+
+**Files deleted (7 fixture YAMLs):**
+- `test/fixtures/gym_drafts.yml`
+- `test/fixtures/gym_results.yml`
+- `test/fixtures/soul_link_pokemon.yml`
+- `test/fixtures/soul_link_pokemon_groups.yml`
+- `test/fixtures/soul_link_runs.yml`
+- `test/fixtures/soul_link_team_slots.yml`
+- `test/fixtures/soul_link_teams.yml`
+
+`test/fixtures/files/` (ActiveStorage attachment dir) preserved.
+
+**Files modified:**
+- `test/test_helper.rb` — dropped the `fixtures :all` line + the comment block above it; updated the FactoryBot-syntax comment to no longer mention "Legacy fixture-based tests" coexistence (no longer true). Also fixed 1 pre-existing rubocop offense on line 36 (`Layout/SpaceInsideArrayLiteralBrackets` on the Faraday stub `fake_response` line) to satisfy the touched-files-clean acceptance criterion.
+- `CLAUDE.md` — Testing-conventions section: replaced the 2-bullet "New tests / Legacy tests" hybrid note with a single bullet "All tests use FactoryBot factories from `test/factories/`. Fixtures (`test/fixtures/*.yml`) were removed during the 2026-04-30 conversion sweep." Factories-minimum-viable bullet preserved.
+- `handoff/BUILD-LOG.md` — durable § Architecture Decisions § Carried over: replaced the legacy-fixture line with "All tests use FactoryBot factories from `test/factories/`. Fixtures and the `fixtures :all` test_helper line were removed in Step 8 (2026-04-30)."
+- 7 controller tests (`emulator`, `save_slots`, `species_assignments`, `teams`, `pokemon`, `pokemon_groups`, `gym_drafts`) — removed the dead `SoulLinkRun.where(guild_id: LoginHelper::GUILD_ID).destroy_all` line from each setup. Removed the explanatory 4-line comment block from `emulator_controller_test.rb`. Also removed the dead in-test `SoulLinkTeam.where(discord_user_id: GREY).destroy_all` line + comment from `teams_controller_test.rb`'s "show creates team if none exists" test.
+
+**Files renamed:**
+- `handoff/parked-plans/factorybot-conversion.md` → `handoff/archive/2026-04-30-factorybot-conversion.md` via `git mv`. Added `> Status: COMPLETE` marker at top with commit references for Steps 4-8. The original discovery-doc body is preserved as historical record. `handoff/parked-plans/` is now empty.
+
+**Files modified (handoff):**
+- `handoff/ARCHITECT-BRIEF.md` — Step 8 brief (overwritten from Step 7)
+- `handoff/REVIEW-REQUEST.md` — Step 8 review request
+- `handoff/REVIEW-FEEDBACK.md` — Reviewer's Step 8 verdict
+
+**Key decisions:**
+- **`git mv` for the parked-plan archive** so the move shows as a rename in `git log --follow`. Matches the existing archive convention (`2026-04-12-pixeldex-calculator.md`, `2026-04-29-emulator-deploy-and-polish.md`) — date-prefixed, descriptive filename.
+- **Pre-existing rubocop offense in `test_helper.rb:36` fixed.** Same lesson as Step 5/6/7 — when a file is touched, fix any rubocop offenses surfaced on it. Pre-existing offenses outside touched files remain (Known Gap from Step 1).
+- **Bulk fixture deletion via `git rm`** so the deletions show as deletions in the diff (vs untracked-removal). User explicitly OK'd these — "the fixture deletions are bulk file removals from a versioned directory — that IS the work, not a destructive accident."
+- **`parallelize(workers: :number_of_processors)` preserved** in test_helper. The Step 5/6/7/8 conversion work doesn't change parallelization semantics; only fixture loading was removed.
+- **`test/fixtures/files/.keep` preserved.** Standard Rails ActiveStorage attachment fixture dir; unrelated to the YAML conversion.
+
+**Tests:** 305/305 passing. Per-file counts unchanged from Step 7.
+
+**Flake check:** 20 reps total. 19 clean reps, 1 transient failure on the very first rep (seed 13579) that did not reproduce when re-run with the same seed or across 19 subsequent runs (5 fresh + 10 more + 5 more). The lost stacktrace prevented identifying the specific test, but the failure-rate dropped to 0/19 ≈ 0% post-discovery, suggesting a one-time timing artifact (possibly fresh-cache or disk contention from the earlier rubocop run / file-write boundary) rather than a systemic race. The `parallelize(workers: :number_of_processors)` setup uses Rails' default per-worker test database isolation, so cross-fork uniqueness conflicts on `(guild_id, run_number)` shouldn't manifest. Documented for transparency; not a Condition.
+
+**Lint:** `bundle exec rubocop` clean on all 8 touched test files (test_helper.rb + 7 controller tests). The pre-existing offense in test_helper.rb:36 was fixed (4-character whitespace change).
+
+**Diff scope:** 7 controller test files modified, `test/test_helper.rb` modified, 7 fixture YAMLs deleted, `CLAUDE.md` modified, `handoff/BUILD-LOG.md` modified (durable section + Step 8 entry), `handoff/REVIEW-REQUEST.md` modified, `handoff/REVIEW-FEEDBACK.md` modified, `handoff/ARCHITECT-BRIEF.md` modified, parked plan moved from `handoff/parked-plans/` to `handoff/archive/2026-04-30-factorybot-conversion.md`. App code, factories, channel test, ActiveStorage `files/` dir all untouched.
+
+**Conversion summary:** Steps 4-8 converted the entire test suite from fixture-based to FactoryBot:
+- Step 4 (`6e2c8c8`): built 6 missing factories with traits matching every fixture row
+- Step 5 (`efcc659`): converted 3 model unit tests (gym_draft, gym_result, soul_link_pokemon)
+- Step 6 (`f7203b0`): converted 8 controller tests + 1 missed model test (soul_link_pokemon_group); discovered + handled the fixture-coexistence constraint
+- Step 7 (`a18a27f`): converted 1 channel test (gym_draft_channel)
+- Step 8 (this commit): deleted fixtures, dropped `fixtures :all`, updated CLAUDE.md + durable BUILD-LOG decision, removed dead defensive code from Step 6, archived parked plan, ran 20-rep flake check
+
+305/305 tests pass; suite is FactoryBot-only.
+
+---
 
 ### Step 7 — Convert Channel Test from Fixtures to FactoryBot — 2026-04-30
 **Status:** Awaiting review.
@@ -302,4 +356,4 @@ ALL FACTORY SMOKE CHECKS PASSED
 
 ### Carried over (still load-bearing)
 - Discord user IDs are `bigint` in DB columns, `String` in Stimulus values, coerced at the controller boundary
-- New tests use FactoryBot factories from `test/factories/`; legacy tests stay on fixtures from `test/fixtures/`; do not convert legacy without an explicit step
+- All tests use FactoryBot factories from `test/factories/`. Fixtures and the `fixtures :all` test_helper line were removed in Step 8 (2026-04-30).

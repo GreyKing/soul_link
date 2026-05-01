@@ -4,7 +4,6 @@ class TeamsControllerTest < ActionDispatch::IntegrationTest
   GREY = 153665622641737728
 
   setup do
-    SoulLinkRun.where(guild_id: LoginHelper::GUILD_ID).destroy_all
     @run = create(:soul_link_run)
   end
 
@@ -15,8 +14,6 @@ class TeamsControllerTest < ActionDispatch::IntegrationTest
 
   test "show creates team if none exists" do
     login_as(GREY)
-    # Destroy fixture team first
-    SoulLinkTeam.where(discord_user_id: GREY).destroy_all
     assert_difference "SoulLinkTeam.count", 1 do
       get team_path
     end

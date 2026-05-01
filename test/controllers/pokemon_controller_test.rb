@@ -5,7 +5,6 @@ class PokemonControllerTest < ActionDispatch::IntegrationTest
   ARATY = 600802903967531093
 
   setup do
-    SoulLinkRun.where(guild_id: LoginHelper::GUILD_ID).destroy_all
     @run = create(:soul_link_run)
   end
 

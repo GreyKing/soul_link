@@ -1,10 +1,11 @@
 # Parked Plan — FactoryBot Conversion
 
-Status: **Parked.** Inventory complete. Conversion deferred until SRAM Phase 1 ships.
+> **Status:** COMPLETE — landed via Steps 4-8 (commits `6e2c8c8`, `efcc659`, `f7203b0`, `a18a27f`, plus the Step 8 sweep). Archived 2026-04-30. The body below is the original discovery doc preserved as historical record; live conversion steps are in `handoff/BUILD-LOG.md` Step History.
+
 Origin: Project Owner asked to begin the rewrite on 2026-04-29; chose to ship SRAM Phase 1 first.
 Discovery agent run: 2026-04-29.
 
-This document is the single source of truth for the conversion plan. When ready to execute, the Architect should use this to write step-by-step briefs.
+This document was the single source of truth for the conversion plan during execution. The Architect used it as the basis for the Step 4-8 briefs. After Step 8, the actual scope landed exceeded the original 5-7 step estimate (took 5 TMT steps: 4 = factories, 5 = 3 model tests, 6 = 8 controllers + 1 missed model test, 7 = 1 channel test, 8 = sweep + flake-check).
 
 ---
 
