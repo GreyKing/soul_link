@@ -72,7 +72,11 @@ class GymDraftsController < ApplicationController
 
     draft = run.gym_drafts.find_by(id: params[:id])
     unless draft&.complete?
-      redirect_to gym_drafts_path, alert: "Draft is not complete."
+      # `gym_drafts_path` (the previous target) has no GET handler — only
+      # POST :create lives at /gym_drafts — so a redirect there hits a
+      # routing error. Send the user back to the dashboard's Gyms tab,
+      # the same surface MARK BEATEN was launched from.
+      redirect_to root_path(anchor: "gyms"), alert: "Draft is not complete."
       return
     end
 
@@ -97,7 +101,7 @@ class GymDraftsController < ApplicationController
     )
     run.update!(gyms_defeated: gym_number)
 
-    redirect_to root_path, notice: "Gym #{gym_number} marked as beaten!"
+    redirect_to root_path(anchor: "gyms"), notice: "Gym #{gym_number} marked as beaten!"
   rescue ActiveRecord::RecordNotUnique
     redirect_to gym_draft_path(draft), alert: "Gym #{gym_number} already marked as beaten."
   end

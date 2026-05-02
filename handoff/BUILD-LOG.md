@@ -11,8 +11,8 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 14.1 — Hotfix shipped on top of Step 14 (gym_progress redirect + Gyms-tab anchor persistence). Awaiting next direction.
-**Last committed:** Step 14.1 about to ship on top of Step 14 (`141e706`, shipped + merged).
+**Active step:** Step 14.2 — Sweep hotfix: remaining Gyms-tab anchor losses + unrouted-redirect fix. About to ship on top of Step 14.1 (`6d8e403`).
+**Last committed:** Step 14.1 (`6d8e403`) shipped + merged.
 **Pending deploy:** Step 14 ships 2 migrations (`add_player_avatars_to_soul_link_runs`, `cleanup_current_nomination_from_inflight_drafts`) — both run in pre-deploy. The cleanup migration is idempotent (guarded by `next unless data.key?("current_nomination")`).
 
 **Should Fix items resolved inline post-review:**
@@ -29,6 +29,32 @@ Full suite still 370/370 after the two edits; rubocop still clean (152 files, 0 
 
 ## Step History
 *Session-scoped.*
+
+### Step 14.2 — Hotfix sweep: remaining Gyms-tab anchor losses + unrouted-redirect fix — 2026-05-02
+**Status:** Shipped + merged to main.
+
+Diagnosis: `handoff/2026-05-02-dashboard-route-audit.md` — full dashboard route + action audit done first; this commit applies the four 🟡 findings as a single sweep. No separate brief; the audit IS the brief.
+
+**Files modified (4):**
+- `app/controllers/gym_drafts_controller.rb:75` — replaced `redirect_to gym_drafts_path` (which has no GET handler — `resources :gym_drafts, only: [:create, :show, :destroy]`, no `:index`) with `redirect_to root_path(anchor: "gyms")`. Was a real routing-error dead-end on direct curl / stale form submissions to the not-yet-complete-draft branch.
+- `app/controllers/gym_drafts_controller.rb:100` — `redirect_to root_path` → `redirect_to root_path(anchor: "gyms")` so completing a draft + marking the gym beaten lands on the Gyms tab instead of the default PC BOX.
+- `app/javascript/controllers/dashboard_controller.js` — `confirmResetDraft` sets `window.location.hash = "gyms"` before `window.location.reload()` so the Gyms tab survives the post-reset reload.
+- `app/javascript/controllers/gym_backfill_controller.js` — same hash-set-before-reload pattern in the `save` action so the + ADD TEAM backfill flow preserves the Gyms tab.
+
+**Files added (none).**
+
+**Tests modified (1):**
+- `test/controllers/gym_drafts_controller_test.rb` — 2 new tests: `mark_beaten on complete draft redirects to dashboard Gyms tab` (asserts the success-path anchor) and `mark_beaten on incomplete draft redirects to dashboard Gyms tab (not to unrouted gym_drafts_path)` (locks in the fix for the previously-broken error branch).
+
+**Tests:** 371 → 373 (+2). 0 failures, 0 errors.
+
+**Lint:** rubocop clean (152 files, 0 offenses).
+
+**Reviewer skim (lightweight, in-thread):** both controller redirects updated symmetrically, both JS reloads use the same hash-set pattern with inline references to the Step 14.1 `applyHashTab()` mechanism, no regressions in the wider suite. No TMT round trip needed for this scale.
+
+**Diff scope:** 2 controller edits + 2 JS edits + 1 test file extension + 1 BUILD-LOG entry. Single commit, FF-merged.
+
+---
 
 ### Step 14.1 — Hotfix: Mark Beaten redirect + Gyms-tab persistence — 2026-05-02
 **Status:** Shipped + merged to main.

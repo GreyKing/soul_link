@@ -90,6 +90,9 @@ export default class extends Controller {
     })
 
     if (response.ok) {
+      // Preserve the Gyms tab across the reload — pixeldex#applyHashTab
+      // (added in Step 14.1) re-selects the matching tab on connect.
+      window.location.hash = "gyms"
       window.location.reload()
     }
   }
