@@ -18,6 +18,10 @@ class GymProgressController < ApplicationController
       existing.destroy!
       new_max = run.gym_results.maximum(:gym_number) || 0
       run.update!(gyms_defeated: new_max)
+      # Manual UNMARK creates a per-(run, gym) suppression so save-data
+      # auto-detection won't immediately re-fire on the next parse.
+      # `find_or_create_by!` keeps double-clicks idempotent.
+      run.gym_auto_mark_suppressions.find_or_create_by!(gym_number: gym_number)
       notice = "Gym #{gym_number} unmarked."
     else
       run.gym_results.create!(
@@ -25,6 +29,9 @@ class GymProgressController < ApplicationController
         beaten_at: Time.current
       )
       run.update!(gyms_defeated: [ run.gyms_defeated, gym_number ].max)
+      # Manual MARK BEATEN clears any suppression for this gym so
+      # auto-detection can resume after a re-engagement.
+      run.gym_auto_mark_suppressions.where(gym_number: gym_number).destroy_all
       notice = "Gym #{gym_number} marked beaten."
     end
 

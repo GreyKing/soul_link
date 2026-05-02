@@ -10,7 +10,16 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_01_192917) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_02_191439) do
+  create_table "gym_auto_mark_suppressions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "gym_number", null: false
+    t.bigint "soul_link_run_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["soul_link_run_id", "gym_number"], name: "idx_on_soul_link_run_id_gym_number_7a662a4460", unique: true
+    t.index ["soul_link_run_id"], name: "index_gym_auto_mark_suppressions_on_soul_link_run_id"
+  end
+
   create_table "gym_drafts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "current_player_index", default: 0, null: false
@@ -232,6 +241,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_01_192917) do
     t.index ["soul_link_run_id"], name: "index_soul_link_teams_on_soul_link_run_id"
   end
 
+  add_foreign_key "gym_auto_mark_suppressions", "soul_link_runs"
   add_foreign_key "gym_drafts", "soul_link_runs"
   add_foreign_key "gym_results", "gym_drafts"
   add_foreign_key "gym_results", "soul_link_runs"

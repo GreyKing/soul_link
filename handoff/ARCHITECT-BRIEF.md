@@ -4,581 +4,319 @@
 
 ---
 
-## Step 14 — Gym Draft Final-2 Picks: Unified Nominate-or-Endorse Model
+## Step 15 — SaveDiff Infrastructure + Category 1 (Gyms-Beaten Auto-Detection)
 
 ### Context
 
-Following the Step 13 ship + the Project Owner's review of `handoff/2026-05-01-gym-draft-audit.md`, we're rewiring the **nominating phase** of gym drafts. Path B (re-spec) was chosen, with an elegant simplification proposed by the Project Owner:
+Following the SRAM auto-tracking audit (`handoff/2026-05-02-sram-auto-tracking-audit.md`, committed to main as `b8a769e`), the Project Owner picked **option (b)**: a gym auto-marks beaten **only when all 4 players' active save slots show that badge**, with manual MARK BEATEN as the override and manual UNMARK creating a per-gym suppression so auto-detect doesn't re-fire.
 
-> **Nomination IS the vote.** Each of the 4 players, in pick order, makes one pick during the nominating phase. The pick is either: (a) a NEW pokemon (creates a new candidate) or (b) an endorsement of an already-nominated candidate (adds the player to that candidate's voter list). After all 4 picks, the **top 2 most-endorsed candidates** fill slots 5+6.
+This step builds the **shared `SaveDiff` infrastructure** the audit prescribed for all three SRAM auto-tracking categories, then ships **category 1 (gyms beaten)** on top of it. Categories 2 and 3 (gym battle teams, catches+routes) are out of scope for this step — they need the Gen-IV PKM decryption work, which is its own much larger surface and rolls under the future KG-11/KG-12 design phase.
 
-This collapses the old "round-robin nominate → up/down vote → resolve" loop into a single 4-pick pass. Pure plurality voting; ties become first-class. The "captain has more weight" Path A narrative is **gone** — every player has equal weight here.
-
-**Audit reference:** see `handoff/2026-05-01-gym-draft-audit.md` for the underlying bug catalog (Bug 1 rejection-loop, Bug 2 skip-auth, Bug 3 vote-feedback, Bug 5 voting-tiebreak silence). All four are closed by Step 14.
+The audit also called out **KG-13** (a pre-existing bug: parse-failure path zeros `parsed_badges`, which would cause spurious badge-loss events under the new diff system). KG-13 is folded into this step as a prerequisite — without it, the diff fires garbage events every time a CRC-failed save lands between two valid ones.
 
 ### Project Owner decisions (locked)
 
-1. **Unified pick action.** Each player makes exactly one pick during the nominating phase. Channel API: a single `nominate(group_id)` action — if `group_id` is already a candidate, the picker is added to that candidate's voter list (endorsement); otherwise a new candidate is created. The legacy `vote_nomination` channel action is **removed**.
-2. **State machine names unchanged.** `lobby → voting → drafting → nominating → complete`. Only the **inner mechanics** of `nominating` change.
-3. **Resolution: top-2 by voter count.** After all 4 players have made their nomination-phase pick, sort candidates by voter count desc; top 2 fill slots 5+6. Ties at the threshold (positions 1-2 boundary) trigger the coin-flip modal.
-4. **Coin flip uses the Pokémon TCG coin aesthetic.** Reference: the small circular metal coins that ship with the Pokémon Trading Card Game and that the digital TCG apps animate in 3D — gold edge, two distinct faces (pokéball one side, a character face the other), `rotateY` 3D flip with satisfying physics easing, ~1.5-2.5s reveal. Server-side outcome is `Array#sample` (random); the modal is presentation only.
+1. **All-4-players AND-gate.** Auto-mark fires only when every emulator session in the run has `parsed_badges >= gym_number`. While 1-3 players have it: gym stays in its current state. No partial UI signal in scope ("3/4 have it" indicator deferred).
+2. **Manual MARK BEATEN bypasses the all-4 check.** It works exactly as today — direct create of `gym_results`. Bypass is implicit (it goes through a different controller, doesn't hit the coordinator).
+3. **Manual UNMARK creates a suppression record.** Subsequent save-parses do NOT re-auto-mark a suppressed `(run, gym_number)`. Suppression persists until the user explicitly re-engages by manually MARK-BEATEN-ing that gym (which clears the suppression).
+4. **Down events are no-ops.** A player loading an older save state produces a `BadgeLost` diff event; coordinator ignores it (logs at `info` level for traceability). No auto-unmark.
+5. **Multi-bit jumps are processed sequentially.** A save that jumps 0→2 badges produces two `BadgeGained` events (gym 1, then gym 2); each runs through the all-4 check independently.
+6. **`SaveDiff` is a pure function.** Operates on plain values (badge counts) — no AR coupling. The audit's architectural call. Future categories (catches, evolutions) extend the same Result struct without rewriting the consumers.
+7. **Per-bit semantics use the count.** In legitimate Platinum play, `parsed_badges >= N` is equivalent to "has badge N" because the in-game badge bitfield is monotonically progressive. PKHeX edits that violate this assumption are out of scope. **No new column** for the raw bitfield byte.
+8. **Baseline rule (audit Section 1).** A slot's first-ever successful parse triggers no events. Implementation: gate the diff dispatch on `slot.parsed_at` being non-nil **before** the current parse runs. If nil → record the parse, skip the diff.
+9. **KG-13 fix.** On parse failure, only `parsed_at` updates. All other `parsed_*` fields are left at their prior value. Documented in the parser job + a regression test.
 
-   **Time-box: ~30 minutes of CSS/SVG craft.** If reproducing the TCG-coin look gets fiddly past that, fall back to a **simple 3D coin-flip styled "in-universe"** — gold/red/pokéball palette, two-face round, same `rotateY` animation, just less detail. Either way the modal framing must feel Pokémon-themed: header copy like "WILD COIN APPEARED!" (or similar in-universe phrasing), pokéball-red accent on the modal chrome, GameBoy palette tokens for the rest. Bob's call between TCG-faithful and simple-fallback once he sees how the SVG/CSS plays out.
-5. **Skip semantics: 60s grace.** Until 60s have elapsed since the current nominator's turn began, ONLY that nominator can skip themselves. After 60s, ANY player can skip. The skip button shows a visible countdown to the grace deadline. Channel-side auth check enforces both rules.
-6. **Equal weight.** No captain-decides anything in nominating. The captain marker (first-pick winner) still applies in drafting but has no special role in the new nominating phase.
-7. **Edge case: 1-candidate consensus.** If all 4 players nominate/endorse the same pokemon (single candidate, 4 voters), slot 5 fills with that candidate, slot 6 stays empty. Team is 5 strong. Document in tests; do NOT add a "redo round" or other recovery path. (Rare in practice; explicit decision.)
-8. **Avatar pile on candidate cards.** Each candidate card shows a horizontal stack of Discord profile pictures — one per voter (nominator + endorsers), with overlap. See "Avatar caching layer" below for the data approach.
-9. **Q5 sweep: button weight on draft-complete page.** While the area is open, de-emphasise "BACK TO GYM READY" so the destructive "MARK GYM N AS BEATEN" CTA is the visual primary. (`gym_drafts/show.html.erb:158-168`.)
+### Architecture
 
-### State Model
+#### Layer A — pure diff (`app/services/soul_link/save_diff.rb`)
 
-#### New `state_data` shape (during nominating)
-```json
-{
-  "ready_players": [...],
-  "first_pick_votes": {...},
-  "picks": [{"round": 1, "group_id": 123, "picked_by": 111}, ...],
-  "candidates": [
-    {"group_id": 123, "voters": [111, 222]},
-    {"group_id": 456, "voters": [333]}
-  ],
-  "current_turn_started_at": "2026-05-01T18:42:13Z",
-  "tiebreak": null
-}
-```
-
-- **`candidates`** — array of `{ group_id, voters }`. `voters[0]` is the nominator (the player who created the candidate); subsequent voters are endorsers. A "voter" is any player whose pick landed on this candidate. Voters list is stable order (append-only).
-- **`current_turn_started_at`** — ISO8601 timestamp; set when the turn changes (initial transition into nominating, or after each pick that didn't terminate the phase). Drives the 60s grace.
-- **`tiebreak`** — populated transiently during the resolution flow when a tie needs a coin flip. Shape: `{ "type": "second_place" | "n_way", "tied_group_ids": [int, int, ...], "winners": [int, ...] }`. The server picks the `winners` (random) before broadcasting; the client uses `tied_group_ids` to drive the animation, then reveals `winners`. Cleared on transition to `complete`.
-
-#### Removed fields (cleanup)
-- `state_data["current_nomination"]` — gone. The `current_nomination` model accessor goes too (`gym_draft.rb:38-40`).
-- `submit_nomination!` model method — gone. Folded into the new `nominate!` action.
-- `vote_on_nomination!` model method — gone.
-- `resolve_nomination!` model method — gone. Replaced by `resolve_nominations!` (plural).
-
-#### Channel actions (final)
-| Action | Behavior |
-|---|---|
-| `ready` | unchanged |
-| `vote` | unchanged (first-pick voting phase) |
-| `pick` | unchanged (drafting phase, individual picks) |
-| `nominate(group_id)` | **NEW SEMANTICS** — current nominator picks; auto-detects new vs endorsement |
-| `vote_nomination` | **REMOVED** |
-| `skip` | **AUTH UPDATED** — current nominator OR (60s elapsed since `current_turn_started_at`) |
-
-### Implementation
-
-#### 1. Model — `app/models/gym_draft.rb`
-
-**Add constants:**
 ```ruby
-NOMINATION_GRACE_SECONDS = 60
-NOMINATION_FINAL_SLOTS = 2  # how many slots the nominating phase fills (5 and 6)
-```
+module SoulLink
+  module SaveDiff
+    BadgeGained = Struct.new(:gym_number, keyword_init: true)
+    BadgeLost   = Struct.new(:gym_number, keyword_init: true)
 
-**Replace `current_nomination` with `candidates`:**
-```ruby
-def candidates
-  data["candidates"] || []
-end
+    Result = Struct.new(:badge_events, keyword_init: true) do
+      def empty?
+        badge_events.empty?
+      end
+    end
 
-def current_turn_started_at
-  ts = data["current_turn_started_at"]
-  ts.present? ? Time.zone.parse(ts) : nil
-end
-
-def grace_elapsed?
-  return true if current_turn_started_at.nil?
-  Time.current - current_turn_started_at >= NOMINATION_GRACE_SECONDS
-end
-
-def current_nominator_id
-  return nil unless nominating?
-  pick_order[current_player_index % pick_order.size]
-end
-
-def nomination_picks_made
-  candidates.flat_map { |c| c["voters"] }.size
-end
-```
-
-**Replace `submit_nomination!` + `vote_on_nomination!` with a single action:**
-```ruby
-def nominate!(picker_uid, group_id)
-  raise "Not in nominating phase" unless nominating?
-  raise "Not your turn to nominate" unless current_nominator_id == picker_uid.to_i
-  raise "That pokemon has already been picked" if picks.any? { |p| p["group_id"] == group_id.to_i }
-
-  cands = candidates.map(&:deep_dup)
-  existing = cands.find { |c| c["group_id"] == group_id.to_i }
-  if existing
-    raise "You already endorsed this nomination" if existing["voters"].include?(picker_uid.to_i)
-    existing["voters"] << picker_uid.to_i
-  else
-    cands << { "group_id" => group_id.to_i, "voters" => [picker_uid.to_i] }
-  end
-
-  next_index = current_player_index + 1
-  total_picks_after = cands.flat_map { |c| c["voters"] }.size
-
-  if total_picks_after >= pick_order.size
-    # All 4 players have made their nomination-phase pick → resolve
-    update!(state_data: data.merge(
-      "candidates" => cands,
-      "current_turn_started_at" => nil
-    ).as_json)
-    self.reload
-    resolve_nominations!
-  else
-    update!(
-      current_player_index: next_index,
-      state_data: data.merge(
-        "candidates" => cands,
-        "current_turn_started_at" => Time.current.iso8601
-      ).as_json
-    )
-  end
-end
-```
-
-**New resolution algorithm:**
-```ruby
-def resolve_nominations!
-  cands = candidates
-  # Sort by voter count desc; preserve nomination order as stable secondary
-  ranked = cands.each_with_index.sort_by { |c, i| [-c["voters"].size, i] }.map(&:first)
-
-  winners = []
-  tiebreak_payload = nil
-
-  remaining_slots = NOMINATION_FINAL_SLOTS
-  i = 0
-  while i < ranked.size && remaining_slots > 0
-    same_count_group = ranked[i..].take_while { |c| c["voters"].size == ranked[i]["voters"].size }
-    if same_count_group.size <= remaining_slots
-      winners.concat(same_count_group)
-      remaining_slots -= same_count_group.size
-      i += same_count_group.size
-    else
-      # Tie at the threshold — pick `remaining_slots` of `same_count_group` randomly
-      chosen = same_count_group.shuffle.first(remaining_slots)
-      tiebreak_payload = {
-        "type" => same_count_group.size == cands.size ? "n_way" : "second_place",
-        "tied_group_ids" => same_count_group.map { |c| c["group_id"] },
-        "winners" => chosen.map { |c| c["group_id"] }
-      }
-      winners.concat(chosen)
-      remaining_slots = 0
+    # @param prev_badges [Integer, nil] previous parsed_badges count (nil = no prior baseline)
+    # @param curr_badges [Integer, nil] current parsed_badges count (nil = parse failed)
+    # @return [Result] always; badge_events is [] if either side is nil or if values are equal
+    def self.between(prev_badges:, curr_badges:)
+      events = []
+      if !prev_badges.nil? && !curr_badges.nil? && prev_badges != curr_badges
+        if curr_badges > prev_badges
+          ((prev_badges + 1)..curr_badges).each { |n| events << BadgeGained.new(gym_number: n) }
+        else
+          ((curr_badges + 1)..prev_badges).each { |n| events << BadgeLost.new(gym_number: n) }
+        end
+      end
+      Result.new(badge_events: events)
     end
   end
-
-  new_picks = picks.dup
-  winners.each_with_index do |c, idx|
-    new_picks << {
-      "round" => picks.size + idx + 1,
-      "group_id" => c["group_id"],
-      "picked_by" => c["voters"].first  # nominator
-    }
-  end
-
-  update!(
-    status: "complete",
-    current_round: new_picks.size,
-    state_data: data.merge(
-      "picks" => new_picks,
-      "tiebreak" => tiebreak_payload
-    ).as_json
-  )
 end
 ```
 
-**Update `skip_turn!`:**
-```ruby
-def skip_turn!(requester_uid)
-  raise "Can only skip during drafting or nominating" unless drafting? || nominating?
+The `Result` struct is the extension point. Future categories add `catch_events:` / `evolution_events:` as new keyword fields. Existing call sites that only care about badges keep working.
 
-  if drafting?
-    raise "Not your turn" unless current_drafter_id == requester_uid.to_i
-    next_index = current_player_index + 1
-    if next_index >= pick_order.size
-      update!(current_player_index: 0, status: "nominating",
-              state_data: data.merge("current_turn_started_at" => Time.current.iso8601).as_json)
-    else
-      update!(current_player_index: next_index)
+#### Layer B — coordinator (`app/services/soul_link/gym_beaten_coordinator.rb`)
+
+```ruby
+module SoulLink
+  class GymBeatenCoordinator
+    # @param slot [SoulLinkEmulatorSaveSlot] the slot whose parse just produced events
+    # @param events [Array<SaveDiff::BadgeGained, SaveDiff::BadgeLost>] from SaveDiff.between
+    def self.process(slot, events)
+      run = slot.soul_link_emulator_session&.soul_link_run
+      return if run.nil? || !run.active?
+
+      events.each do |event|
+        case event
+        when SoulLink::SaveDiff::BadgeGained
+          attempt_auto_mark(run, event.gym_number)
+        when SoulLink::SaveDiff::BadgeLost
+          Rails.logger.info(
+            "GymBeatenCoordinator: BadgeLost gym_number=#{event.gym_number} " \
+            "run=#{run.id} session=#{slot.soul_link_emulator_session_id} — no auto-unmark"
+          )
+        end
+      end
     end
-  else
-    # Nominating phase — auth: current nominator OR grace elapsed
-    is_current = current_nominator_id == requester_uid.to_i
-    raise "Not your turn (skip available to others after 60s)" unless is_current || grace_elapsed?
 
-    next_index = (current_player_index + 1) % pick_order.size
-    update!(
-      current_player_index: next_index,
-      state_data: data.merge("current_turn_started_at" => Time.current.iso8601).as_json
-    )
+    def self.attempt_auto_mark(run, gym_number)
+      return if run.gym_results.exists?(gym_number: gym_number)            # already marked
+      return if run.gym_auto_mark_suppressions.exists?(gym_number: gym_number)  # suppressed
+      return unless all_players_have_badge?(run, gym_number)
+
+      run.gym_results.create!(gym_number: gym_number, beaten_at: Time.current)
+      run.update!(gyms_defeated: [run.gyms_defeated, gym_number].max)
+    end
+
+    def self.all_players_have_badge?(run, gym_number)
+      sessions = run.soul_link_emulator_sessions.includes(:save_slots)
+      return false if sessions.empty?
+      sessions.all? { |s| s.active_slot&.parsed_badges.to_i >= gym_number }
+    end
   end
 end
 ```
 
-**Update `make_pick!` (transition into nominating):** when transitioning to nominating, set `current_turn_started_at` in state_data. Currently lines 101-108. Add `"current_turn_started_at" => Time.current.iso8601` to the merged state.
+**Design notes:**
+- Pure-static service (no AR ancestry, no instance state). Same shape as `SoulLink::SaveParser`.
+- `attempt_auto_mark` runs all three guards in priority order: idempotency → suppression → all-4 gate. Each early-returns silently.
+- The all-4 check uses **all sessions in the run**, not just sessions belonging to a specific guild user. If a run has 3 sessions instead of 4 (e.g., player hasn't generated their ROM yet), the check returns false until the 4th joins and saves with the badge.
+- `gyms_defeated` bump matches the manual `mark_beaten` controller's semantics (`[current, gym_number].max`) so auto-mark doesn't accidentally regress the counter if events arrive out of order.
+- Wraps the `gym_results.create!` and `gyms_defeated` update in a single AR transaction — both succeed or both roll back. Use `run.transaction { ... }`. (Existing manual paths don't bother because they're sequential controller actions, but the coordinator's call is atomic by intent.)
 
-**Update `broadcast_state`:** drop `current_nomination`, add `candidates`, add `current_nominator_id`, add `current_turn_started_at` (as ISO string), add `tiebreak`. Also include a derived `nomination_picks_remaining` for view convenience. Players' `discord_user_id` already stringified — keep that pattern. Voters lists need stringification too.
+#### Layer C — dispatch from the parse job
 
-**Pseudocode for the new broadcast_state additions:**
+`app/jobs/soul_link/parse_save_data_job.rb` is the only call site. Modify `perform` to:
+
+1. Capture `prev_parsed_at = slot.parsed_at` AND `prev_badges = slot.parsed_badges` BEFORE writing the new parse result.
+2. Run `SaveParser.parse` as today.
+3. Build `attrs`:
+   - **On success:** all five `parsed_*` fields + `parsed_at: Time.current` (unchanged from today).
+   - **On failure (KG-13 fix):** **only** `parsed_at: Time.current`. Do NOT zero or nil any other `parsed_*` field. Use `slot.update_columns(parsed_at: Time.current)` and skip the rest.
+4. After `update_columns`, run the diff IFF `prev_parsed_at.present?`:
+   ```ruby
+   if prev_parsed_at.present?
+     diff = SoulLink::SaveDiff.between(prev_badges: prev_badges, curr_badges: result&.badges_count)
+     SoulLink::GymBeatenCoordinator.process(slot, diff.badge_events) unless diff.empty?
+   end
+   ```
+5. Result struct accessor: today's `Result.badges_count` is the integer count — that's what `SaveDiff.between` consumes. No parser changes needed.
+
+**Why dispatch lives in the job (not a separate job):** the job already owns the "after-parse" lifecycle and has both prev and curr values in scope. A separate job would need to re-fetch the slot and either capture prev via params (race-prone) or re-derive from previous_changes (which the job's own `update_columns` writes don't populate the way callbacks do). Keeping it in-job is simpler. The diff itself is pure and test-isolated; the coordinator is a separate service that's also unit-testable in isolation. The pattern is `(parse → write → dispatch)` mirroring the `(parse → return Result)` purity split the existing parser uses.
+
+#### Layer D — suppression record
+
+**New table:**
 ```ruby
-candidates: candidates.map { |c| { "group_id" => c["group_id"],
-                                   "voters" => c["voters"].map(&:to_s) } },
-current_nominator_id: current_nominator_id&.to_s,
-current_turn_started_at: data["current_turn_started_at"],
-nomination_picks_remaining: pick_order.size - nomination_picks_made,
-tiebreak: data["tiebreak"]&.merge(
-  "tied_group_ids" => data["tiebreak"]["tied_group_ids"],
-  "winners" => data["tiebreak"]["winners"]
-)
-```
-
-#### 2. Channel — `app/channels/gym_draft_channel.rb`
-
-**Remove** the `vote_nomination` action.
-
-**Update** the `nominate` action to call `@draft.nominate!(current_user_id, data["group_id"])`. (The model now handles both new-and-endorse semantics inside.)
-
-**Update** the `skip` action to pass `current_user_id`:
-```ruby
-def skip(_data)
-  @draft.reload
-  @draft.skip_turn!(current_user_id)
-  broadcast_state
-rescue => e
-  transmit({ error: e.message })
-end
-```
-
-The model's auth check raises with a clear message that the channel surfaces.
-
-#### 3. Avatar caching layer
-
-**Why:** the candidate card needs Discord profile pics for ALL 4 players. Today only the *logged-in* user's avatar URL lives on session. We need a small persistence layer so the view can look up any registered player's avatar.
-
-**Approach:** add a `player_avatars` JSON column to `SoulLinkRun`. On every login (after Discord OAuth succeeds), upsert `current_user_id → current_avatar_url` to the run's `player_avatars` for the user's guild.
-
-**Migration:**
-```ruby
-class AddPlayerAvatarsToSoulLinkRuns < ActiveRecord::Migration[8.1]
+class CreateGymAutoMarkSuppressions < ActiveRecord::Migration[8.1]
   def change
-    add_column :soul_link_runs, :player_avatars, :json
-  end
-end
-```
-
-**Helper on `SoulLinkRun`:**
-```ruby
-def avatar_for(discord_user_id)
-  (player_avatars || {})[discord_user_id.to_s]
-end
-
-def upsert_avatar!(discord_user_id, url)
-  return if discord_user_id.blank?
-  current = (player_avatars || {}).dup
-  if url.present?
-    return if current[discord_user_id.to_s] == url
-    current[discord_user_id.to_s] = url
-  else
-    return unless current.key?(discord_user_id.to_s)
-    current.delete(discord_user_id.to_s)
-  end
-  update!(player_avatars: current)
-end
-```
-
-**Wire into login:** in `app/controllers/sessions_controller.rb` (find `create` action), after the session is set, look up the active run for the guild and call `run.upsert_avatar!(discord_user_id, avatar_url)`. Skip if no active run for the guild — no error.
-
-**Fallback in view:** when the avatar is missing for a player, render a colored circle with the player's display_name initial. Helper in `application_helper.rb` or `gym_draft_helper.rb`:
-```ruby
-def player_avatar_image(run, discord_user_id, size: 32)
-  url = run.avatar_for(discord_user_id)
-  if url.present?
-    image_tag url, class: "gb-avatar gb-avatar--#{size}", alt: SoulLink::GameState.player_name(discord_user_id)
-  else
-    initial = SoulLink::GameState.player_name(discord_user_id).to_s[0]&.upcase || "?"
-    color_index = discord_user_id.to_i % 4
-    content_tag :span, initial, class: "gb-avatar gb-avatar--#{size} gb-avatar--initial gb-avatar--c#{color_index}"
-  end
-end
-```
-
-The CSS classes (`.gb-avatar`, `.gb-avatar--32`, `.gb-avatar--initial`, `.gb-avatar--c0..c3`) are NEW. Add them to `pixeldex.css` near the other `.gb-*` tokens. 32px round-ish (matches GB pixel aesthetic — square with `border-radius: 50%` is fine; OR a hexagon for character. Bob's call). Four distinct pastel colors for `c0..c3`.
-
-#### 4. View — `app/views/gym_drafts/show.html.erb`
-
-The nominating panel needs a complete rewrite. Other phases are mostly untouched (with the one Q5 fix on the complete panel).
-
-**Replace the nominating panel structure** (currently lines 102-141). New layout:
-
-```erb
-<%# ── NOMINATING PHASE — UNIFIED PICK MODEL ── %>
-<div data-gym-draft-target="nominatingPanel" class="hidden">
-  <div class="gb-card" style="padding: 16px; margin-bottom: 12px;">
-    <div style="font-size: 13px; text-align: center; margin-bottom: 12px;">TEAM SLOTS</div>
-    <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;" data-gym-draft-target="nomTeamSlots">
-      <% 6.times do |i| %>
-        <div class="gb-drag-zone" style="text-align: center; min-height: 70px; display: flex; align-items: center; justify-content: center;"
-             data-slot-index="<%= i %>">
-          <span style="font-size: 10px; color: var(--d2);">#<%= i + 1 %></span>
-        </div>
-      <% end %>
-    </div>
-  </div>
-
-  <%# Pick-order strip — who's nominated, who's up next %>
-  <div data-gym-draft-target="nomOrderStrip" style="margin-bottom: 12px;"></div>
-
-  <%# Status line + grace countdown %>
-  <div style="text-align: center; margin-bottom: 12px;">
-    <span data-gym-draft-target="nomStatus" style="font-size: 11px; color: var(--d1);"></span>
-    <span data-gym-draft-target="nomGraceCountdown" style="font-size: 10px; color: var(--d2); margin-left: 8px;"></span>
-    <div data-gym-draft-target="nomSkipButton" class="hidden" style="margin-top: 8px;"></div>
-  </div>
-
-  <%# Live candidates row %>
-  <div class="gb-card" style="padding: 10px; margin-bottom: 12px;">
-    <div style="font-size: 11px; color: var(--d2); margin-bottom: 8px;">CANDIDATES</div>
-    <div data-gym-draft-target="nomCandidatesList" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
-  </div>
-
-  <%# Pokemon grid for the current nominator's pick %>
-  <div class="gb-card" style="padding: 10px;">
-    <div style="font-size: 11px; color: var(--d2); margin-bottom: 8px;">YOUR PICK (click to nominate or endorse)</div>
-    <div class="gb-grid-4" data-gym-draft-target="nomPokemonGrid"></div>
-  </div>
-</div>
-```
-
-**Add the TCG coin-flip modal** AFTER the nominating panel (still inside the `data-controller="gym-draft"` wrapper):
-
-```erb
-<%# ── TCG COIN-FLIP MODAL — tiebreak reveal ── %>
-<div data-gym-draft-target="coinFlipModal"
-     class="hidden"
-     style="position: fixed; inset: 0; z-index: 70;">
-  <div style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.92);"></div>
-  <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
-    <div class="gb-modal" style="max-width: 480px; text-align: center; border-color: #c0392b;"> <%# pokéball-red accent %>
-      <div class="gb-modal-title" style="color: #c0392b;">★ WILD COIN APPEARED! ★</div>
-      <div style="padding: 16px;">
-        <div data-gym-draft-target="coinFlipMessage" style="font-size: 11px; color: var(--d1); margin-bottom: 16px;">
-          A tied vote — the coin decides...
-        </div>
-        <div class="tcg-coin-stage" style="perspective: 800px; height: 120px; display: flex; align-items: center; justify-content: center;">
-          <div data-gym-draft-target="coinFlipCoin" class="tcg-coin">
-            <div class="tcg-coin__face tcg-coin__face--pokeball"></div>
-            <div class="tcg-coin__face tcg-coin__face--character"></div>
-          </div>
-        </div>
-        <div data-gym-draft-target="coinFlipResult" class="hidden" style="margin-top: 16px; font-size: 12px; color: var(--amber);"></div>
-      </div>
-    </div>
-  </div>
-</div>
-```
-
-**TCG coin styling — primary attempt (~30 minute budget).** The `.tcg-coin` is a new CSS component, ~80px circular with `transform-style: preserve-3d`, two `.tcg-coin__face` children absolutely positioned with `backface-visibility: hidden`, one face rotated 180° on Y. Each face is gold-edged (`box-shadow: inset 0 0 0 4px #d4a444, 0 4px 12px rgba(0,0,0,0.4)`). The `--pokeball` face draws a pokéball — easiest with a radial-gradient or a tiny inline SVG (top half red `#ee1515`, bottom half white-ish `#f0f0f0`, black equator stripe, central black-rimmed white circle). The `--character` face shows a Pikachu silhouette, lightning bolt, or just the Pokémon League logo — whatever's cleanest in inline SVG; this face is decorative-only since the result text appears below.
-
-Animation: a CSS keyframe `@keyframes tcgCoinFlip` that rotates `rotateY(0)` → `rotateY(1980deg)` over 1.8s with `cubic-bezier(0.2, 0.8, 0.4, 1.0)` easing. The final stop angle is 1980deg = 5.5 rotations + 180° (lands on the OPPOSITE face every time, regardless of the result — the result is text-only below the coin). Add a slight `translateY` bounce in the last 200ms for "settle" feel.
-
-**Fallback if the TCG-coin look is fiddly past 30 minutes.** Drop the `.tcg-coin__face--character` and replace with a generic gold-edged second face (just a textured gold circle with a small "?"). Keep all the same animation, palette, and modal framing. The brief authorizes this as Bob's escape hatch — write a `# TCG-coin fallback used; see brief Q4 escape hatch` comment near the CSS so the call is documented, and note it in REVIEW-REQUEST.
-
-Add the CSS to `pixeldex.css`. Bob's discretion on the exact SVG; the test only asserts the modal opens, animates, and closes — not the visual fidelity.
-
-**Q5 fix — complete panel** (currently lines 158-169):
-- Make "BACK TO GYM READY" use `gb-btn` (not `gb-btn-primary`) and put it AFTER MARK BEATEN (current order has BACK below but they're equally weighted).
-- Keep "MARK GYM N AS BEATEN" as `gb-btn-primary`.
-
-#### 5. Stimulus — `app/javascript/controllers/gym_draft_controller.js`
-
-**Remove:**
-- `approveNomination` action
-- `rejectNomination` action
-
-**Replace `nominatePokemon`** with a unified `nominateOrEndorse(event)` that just performs `subscription.perform("nominate", { group_id })` — the server figures out new-vs-endorse. Update the action handler in the JS that's bound to the pokemon grid card click.
-
-**Add new render branches:**
-- `renderNomOrderStrip()` — same horizontal pick-order chip pattern that drafting uses (not yet implemented in current code; Bob can write a shared helper for both).
-- `renderCandidates()` — for each candidate in `state.candidates`, render a card showing:
-  - Pokemon nickname (large)
-  - Species name (small)
-  - Avatar pile: stacked `<img>` (or initial-circle div) for each voter, with `margin-left: -8px` overlap on all but the first
-  - Voter count badge (e.g., `★ 3`)
-  - Highlight ring on the leading candidate(s)
-- `renderNomGraceCountdown()` — compute `60 - elapsed` from `state.current_turn_started_at`, update text every 1s. When elapsed ≥ 60, swap the text to "SKIP AVAILABLE" and reveal the skip button to non-current-nominator viewers.
-- `renderCoinFlipModal()` — when `state.tiebreak` is non-null AND `state.status === "complete"`, show the modal:
-  1. Set message: `"Slot 6 was tied between {N} candidates"` (or 4-way variant — "All four picks were unique. The coin chooses 2.").
-  2. Trigger the TCG-coin CSS animation by adding/re-adding the `.tcg-coin--flipping` class to the coin element (force keyframe restart with `void coin.offsetWidth` trick).
-  3. After ~1.8s (matching the keyframe duration), populate `coinFlipResult` with the winner names from `tiebreak.winners` (looked up via `findGroupById`).
-  4. Auto-close after another 2s, then the complete panel renders normally.
-  
-  IMPORTANT: only show the modal once per state — track a flag `this.coinFlipShownFor = JSON.stringify(state.tiebreak)` to dedupe across `render()` calls. The tiebreak field stays populated in `state_data` (historical record) but the modal must not re-fire on every subsequent state update.
-
-**Update `renderNominating()`:** call the new render helpers (`renderNomOrderStrip`, `renderCandidates`, `renderNomGraceCountdown`); render the pokemon grid such that already-nominated candidates show "ENDORSE" label instead of "NOMINATE".
-
-**Update `startSkipTimer`** logic: still 30s default to show the skip button, BUT the button's visibility for non-current-nominators is gated on `state.current_turn_started_at` + 60s grace. Easier: drop the local `skipTurnTimer` setTimeout pattern entirely; instead, drive skip-button visibility from the per-second grace countdown render.
-
-#### 6. CSS additions — `app/assets/stylesheets/pixeldex.css`
-
-- `.gb-avatar`, `.gb-avatar--32`, `.gb-avatar--initial`, `.gb-avatar--c0..c3` — avatar circle styles (initial fallback colors).
-- `.gb-avatar-pile` — wrapper that lays out a row of avatars with `-8px` margin-left overlap.
-- `.tcg-coin` + `.tcg-coin__face` + `.tcg-coin__face--pokeball` + `.tcg-coin__face--character` — TCG-coin component with `transform-style: preserve-3d`, two-face composition, gold-edged shadow. `@keyframes tcgCoinFlip` (1.8s rotateY 0→1980deg + small translateY bounce). Fallback escape hatch documented above if SVG craft overruns the 30-min budget.
-- `.gb-candidate-card` — candidate card layout (40-60 LOC of CSS).
-- Reuse existing `.gb-modal` for the coin-flip modal wrapper.
-
-#### 7. Tests — full coverage of the new logic
-
-**Model tests (`test/models/gym_draft_test.rb`)** — REMOVE the now-stale tests:
-- "submit_nomination creates nomination with nominator auto-vote"
-- "submit_nomination raises for already picked group"
-- "submit_nomination raises when nomination is pending"
-- "vote_on_nomination records vote"
-- "nomination approved with majority adds pick"
-- "nomination rejected clears nomination without adding pick"
-
-**Add new tests** (these are mandatory, not optional):
-1. **Nominate creates a new candidate** — `@draft.nominate!(GREY, group)` → `candidates.size == 1`, `voters == [GREY]`, advances `current_player_index`.
-2. **Endorsement adds voter to existing candidate** — same group_id used twice → `candidates.size == 1`, `voters == [GREY, ARATY]`.
-3. **Cannot nominate already-picked individual group** — raises.
-4. **Cannot endorse twice** — `nominate!(GREY, X)` then `nominate!(GREY, X)` → raises "You already endorsed this nomination" (same player can't double-vote even though `current_player_index` would advance; but this case shouldn't happen since you only get one turn — keep the guard for safety).
-5. **Not your turn** — `nominate!(ARATY, X)` when GREY is up → raises.
-6. **Tally edge case 3/1** — 3 voters on candidate A, 1 voter on candidate B → status `complete`, picks 5+6 are A and B.
-7. **Tally edge case 2/2** — 2 voters each on A and B → status complete, picks 5+6 are A and B (no tiebreak needed).
-8. **Tally edge case 2/1/1** — A has 2, B and C each 1 → status complete, A definitely in picks; one of B/C in picks; `tiebreak.type == "second_place"`, `tied_group_ids == [B.id, C.id]`.
-9. **Tally edge case 1/1/1/1** — 4 unique candidates, 1 voter each → 2 picked (random), `tiebreak.type == "n_way"`, `tied_group_ids` has all 4, `winners` has 2.
-10. **Tally edge case 1-candidate consensus (4/0)** — all 4 endorse the same → 1 pick (slot 5), slot 6 stays empty (`picks.size == 5`, status `complete`).
-11. **`current_turn_started_at` is set on transition into nominating** — after the 4th individual draft pick, `state_data["current_turn_started_at"]` is present.
-12. **`current_turn_started_at` advances on each nominate** — record timestamp before/after; assert it changes.
-13. **`grace_elapsed?` returns true when 60s+ have passed** — stub `Time.current` via `Time.zone.now` or `freeze_time`.
-14. **`skip_turn!(requester)` raises if requester is not current nominator and grace not elapsed.**
-15. **`skip_turn!(requester)` succeeds if requester IS current nominator** (any time).
-16. **`skip_turn!(requester)` succeeds for non-nominator after grace** — set `current_turn_started_at` to 65 seconds ago, non-current-nominator can skip.
-17. **`tiebreak` is nil in state_data when no tie occurred** — 3/1 case asserts this.
-
-**Channel tests (`test/channels/gym_draft_channel_test.rb`)** — REMOVE legacy `vote_nomination` tests. Add:
-1. **`nominate` creates new candidate** — perform with new group_id, assert state broadcasts include the candidate.
-2. **`nominate` endorses existing candidate** — second player nominates same group_id, voter list grows.
-3. **`skip` rejected for non-nominator before grace** — stub `current_user_id`, assert `transmit` receives `{error: ...}`.
-4. **`skip` allowed for non-nominator after grace** — set `current_turn_started_at` 65s ago, non-current-nominator's skip succeeds.
-5. **`vote_nomination` action removed** — assert calling it via `perform` raises `NoMethodError` or returns gracefully (Bob's call on assertion shape; the action just shouldn't exist on the channel).
-
-**Helper tests** for `player_avatar_image` — initial fallback when no URL, image tag when URL present.
-
-**Test count delta:** ~17 new model tests + ~5 new channel tests + helper tests = +25 to +30 tests. Step 13 ended at 343. Step 14 should land somewhere in the 365-375 range. If lower, Bob is under-testing edge cases.
-
-#### 8. Migrations + backfill
-
-**One migration:** add `player_avatars` JSON column to `soul_link_runs`.
-
-**Backfill for in-flight nominating drafts:**
-```ruby
-class CleanupCurrentNominationFromInflightDrafts < ActiveRecord::Migration[8.1]
-  def up
-    GymDraft.where(status: "nominating").find_each do |draft|
-      data = draft.state_data || {}
-      next unless data.key?("current_nomination")
-      data.delete("current_nomination")
-      data["candidates"] ||= []
-      data["current_turn_started_at"] = Time.current.iso8601
-      draft.update_columns(state_data: data)
+    create_table :gym_auto_mark_suppressions do |t|
+      t.references :soul_link_run, null: false, foreign_key: true
+      t.integer :gym_number, null: false
+      t.timestamps
     end
-  end
-
-  def down
-    # No-op; data is gone.
+    add_index :gym_auto_mark_suppressions, [:soul_link_run_id, :gym_number], unique: true
   end
 end
 ```
 
-This is the second migration. Two total: avatars + cleanup. Both very small.
+**New model `app/models/gym_auto_mark_suppression.rb`:**
+```ruby
+class GymAutoMarkSuppression < ApplicationRecord
+  belongs_to :soul_link_run
 
-The Project Owner can `RESET DRAFT` (Step 13 affordance) on any draft that gets weird state.
+  validates :gym_number, presence: true,
+            inclusion: { in: 1..8 },
+            uniqueness: { scope: :soul_link_run_id }
+end
+```
+
+**Wire `has_many` on `SoulLinkRun`:**
+```ruby
+has_many :gym_auto_mark_suppressions, dependent: :destroy
+```
+
+#### Layer E — UNMARK / MARK BEATEN integration
+
+`GymProgressController#update` (`app/controllers/gym_progress_controller.rb`) is the existing dashboard mark/unmark toggle. Two integration points:
+
+- **Unmark branch (line 23, the `existing.destroy!` path):** after destroy + `gyms_defeated` recompute, also create the suppression record:
+  ```ruby
+  run.gym_auto_mark_suppressions.find_or_create_by!(gym_number: gym_number)
+  ```
+  `find_or_create_by!` makes it idempotent against double-clicks.
+
+- **Mark branch (line 28, the `gym_results.create!` path):** after the create, also clear any matching suppression:
+  ```ruby
+  run.gym_auto_mark_suppressions.where(gym_number: gym_number).destroy_all
+  ```
+
+**`GymDraftsController#mark_beaten` (line 92)** is the post-draft mark path. **Same change:** clear any matching suppression after `gym_results.create!`. (Future-proof: if the gym was somehow auto-suppressed before the draft completed, completing the draft is an explicit re-engagement signal.)
+
+#### Layer F — real-time dashboard refresh
+
+Today, `GymResult` does NOT broadcast. The dashboard re-renders from `@gym_results = run.gym_results.index_by(&:gym_number)` on each page render but doesn't auto-update. After this step, a player saves their game → coordinator creates a `gym_results` row in the background → other players' open dashboards must see the gym update without a full reload.
+
+**Add to `GymResult` (mirrors the Step 9 KG-2 pattern on `SoulLinkPokemon`):**
+```ruby
+broadcasts_refreshes_to ->(record) { [record.soul_link_run, :dashboard] }
+```
+
+Manual mark/unmark via `GymProgressController` already triggers this (because the controller calls `create!`/`destroy!`). Auto-mark from the coordinator goes through the same `create!`, so the broadcast covers both paths.
 
 ### Out of Scope (do NOT expand)
 
-- **Captain-decides anything in nominating.** The Path A captain-tiebreak narrative is gone. Don't sneak it back.
-- **Path A surface-level UX (LED row, yes/no per-voter cells).** Replaced by the candidate-card avatar pile.
-- **Real-time avatar refresh.** When a player updates their Discord avatar, our cache won't update until they next log in. Acceptable.
-- **Avatar caching for non-active runs.** Only the active run for the user's guild gets the avatar cached. Past archived runs get nothing. Acceptable.
-- **Cross-guild avatar sharing.** Each run carries its own avatar map. Acceptable.
-- **Discord bot integration of the new draft state.** The bot doesn't surface drafts today; out of scope.
-- **Refactoring `gym_draft_controller.js` Tailwind drift.** The audit's G6/G7 — fix only the lines you're touching. Don't sweep.
-- **A new mockup before building.** The Project Owner explicitly said "no mockup needed first" — work from the audit + this brief.
-- **Migration for `picks` round numbers** — the existing `round` field can keep counting up; don't try to renumber.
-- **Soft-delete of dropped-from-tiebreak candidates** — they stay in `candidates` array but are simply not in `picks`. The data is intact for any future audit UI.
-- **Helper extraction for the avatar pile** beyond `player_avatar_image`. Pile rendering is in the Stimulus controller (JS). The helper is for ERB-rendered surfaces only.
-- **Tests for the coin-flip CSS animation timing.** JS timing assertions are flaky; assert the modal opens + closes only.
-- **Stalemate handling beyond the 1-candidate edge case.** Ties are resolved by `Array#sample`; that's the policy.
+- **Categories 2 (gym battle teams) and 3 (catches+routes).** Both require Gen-IV PKM decryption (PID-shuffle + LCG XOR). Not this step. Not even partial scaffolding.
+- **A "3/4 players have it" UI indicator.** PO explicitly said "no UI flicker, no premature mark." Gym stays in current state until all-4 condition is met.
+- **Auto-unmark.** `BadgeLost` events log only. The PO will design the un-detection flow later if it ever matters.
+- **Per-player auto-mark tracking** (e.g., showing "Player A has the badge, Players B/C/D do not"). Decision was option (b), not option (c) — no per-player schema additions.
+- **Re-engaging auto-tracking via a button.** Manual MARK BEATEN is the re-engagement signal. No separate "clear suppression" UI affordance.
+- **Time-based suppression expiry.** Suppression persists indefinitely until a manual MARK BEATEN clears it.
+- **Migration to make `parsed_badges` nullable.** Decision 7+9 means the existing `default: 0, null: false` schema stays. Diff baseline is gated by `parsed_at`.
+- **Adding `parsed_badge_bits` raw-bitfield column.** Per decision 7, count semantics suffice for legitimate play.
+- **Refactoring `parse_save_data_job.rb`'s failure-path attribute hash.** KG-13 fix is targeted: replace the failure branch with a one-line `update_columns(parsed_at: Time.current)`. Do not "improve" the success branch's hash structure while you're in there.
+- **Tests for `parse_save_data_job` race conditions** (concurrent slot updates). The existing parse job has no concurrency tests; staying within that envelope. Document as a known concern in BUILD-LOG if you discover anything surprising in testing.
+- **Logging infrastructure beyond `Rails.logger.info` for BadgeLost.** No new structured logging, no telemetry hooks, no metric counters.
+- **Bot integration of auto-mark events.** The Discord bot doesn't surface auto-mark today; out of scope.
+- **Backfill on existing data.** Existing slots have `parsed_at` set + `parsed_badges = 0` from prior runs. The `parsed_at.present?` gate means their NEXT parse will run the diff against `prev_badges = 0`. If a save with N>0 badges lands, that fires N events. **Acceptable**: any existing run is either (a) freshly imported with 0 badges, in which case 0 is correct, or (b) already mid-run with auto-detection wanted. The PO can RESET DRAFT or manually unmark if a spurious event lands. Document this as a one-time migration consideration in BUILD-LOG.
 
 ### Constraints / Flags
 
-- **State data backwards compatibility is broken.** A draft mid-nominating-phase under the OLD code will NOT work under the new code. The cleanup migration handles this. Bob: do NOT add a runtime fallback for `current_nomination` data — it's a migrated-once-and-gone field.
-- **Time handling:** use `Time.current` and ISO8601 strings consistently. Test with `freeze_time` from ActiveSupport::Testing::TimeHelpers (already used in some Soul Link tests; check `test_helper.rb`). Don't introduce `Timecop`.
-- **Server is the source of truth for tiebreak.** The client renders the animation using `state.tiebreak.tied_group_ids` and `state.tiebreak.winners`, both populated server-side at resolution. The client never picks the winner.
-- **`Array#sample` is the resolution policy.** Don't get fancy with weighted shuffles or seeded RNG. Keep it simple; `sample` is uniform-random and self-documenting.
-- **Avatar URLs from Discord OAuth are the only source.** Don't introduce avatar uploads, gravatar, or any other source.
-- **Coin-flip modal blocks user interaction** — overlay covers the page during the animation. Don't let the underlying complete panel render until the modal closes.
-- **Voters list is INTEGER user IDs in state_data** (matches existing `picks[].picked_by` shape). Stringification happens in `broadcast_state` only. Tests assert integer storage, string broadcast.
+- **`parsed_badges` count semantics, not raw bits.** Bob: do not introduce a `parsed_badge_bits` column. Use `>= gym_number` for "has the badge" check.
+- **`SaveDiff` stays pure.** No `Rails.logger`, no AR access, no `Time.current`. Pure function on integers + nils. The coordinator does the side effects.
+- **Coordinator is a static service.** No instance state, no class instance vars. Mirrors `SaveParser`.
+- **Transaction wraps the auto-mark.** `run.transaction { create! gym_results; update! gyms_defeated }`. Single atomic unit.
+- **Suppression check is a `WHERE EXISTS` lookup, not loaded relation.** Use `run.gym_auto_mark_suppressions.exists?(gym_number: N)` to avoid loading the whole collection on every event.
+- **`prev_parsed_at` capture is BEFORE `update_columns`.** Easy to get wrong — capture must read the DB-current value, not the about-to-be-written one.
+- **KG-13 fix branches on `result.nil?`** in the parse job, not on `attrs.values.any?(&:nil?)` or anything fragile. The parser's contract is "Result on success, nil on failure" — branch on that exactly.
+- **Idempotency:** `gym_results.exists?(gym_number: N)` check is the first guard in `attempt_auto_mark`. Critical — without it, every save event re-fires `create!` and bombs on the unique index.
 - **No new gems.** All requirements satisfied by existing dependencies.
-- **Rubocop must stay clean** (Step 13 ended at 0 offenses, 148 files).
+- **Rubocop must stay clean** (Step 14 ended at 152 files, 0 offenses).
 - **`bundle exec rubocop` AND `bin/rails test`** must both be clean before signaling Ready for Review.
-- **Bob: read the audit before coding.** `handoff/2026-05-01-gym-draft-audit.md` has the bug catalog and the rationale; this brief is the spec.
+- **Bob: read the audit before coding.** `handoff/2026-05-02-sram-auto-tracking-audit.md` has the full architectural rationale; this brief is the spec for Step 15 specifically.
 
 ### Acceptance Criteria
 
-- New migrations: `add_player_avatars_to_soul_link_runs`, `cleanup_current_nomination_from_inflight_drafts`.
-- `SoulLinkRun#avatar_for(uid)` + `SoulLinkRun#upsert_avatar!(uid, url)` defined and tested.
-- `app/controllers/sessions_controller.rb` `create` action upserts the avatar after auth.
-- `GymDraft` model: `current_nomination` / `submit_nomination!` / `vote_on_nomination!` / `resolve_nomination!` removed. `candidates` / `current_turn_started_at` / `current_nominator_id` / `grace_elapsed?` / `nomination_picks_made` / `nominate!` / `resolve_nominations!` (plural) added. `skip_turn!` takes `requester_uid` and enforces the new auth.
-- `GymDraftChannel`: `vote_nomination` action removed; `nominate` calls `nominate!`; `skip` passes `current_user_id`.
-- `gym_drafts/show.html.erb`: nominating panel rewritten with candidate cards + grace countdown + skip slot. Coin-flip modal added. Q5 button-weight fix applied.
-- `gym_draft_controller.js`: legacy approve/reject removed; new render branches for candidates, order strip, grace countdown, coin-flip modal.
-- New helper `player_avatar_image(run, uid)` in an appropriate helper file.
-- New CSS classes for `.gb-avatar` family + `.coin-flip-pokeball` keyframe.
-- Tests cover all 5 tally splits (3/1, 2/2, 2/1/1, 1/1/1/1, 1-candidate consensus), grace skip auth, avatar upsert, helper rendering. ~25-30 new tests.
-- 343 + ~25 = ~368-375 tests passing, 0 failures.
-- `bundle exec rubocop` clean.
-- Manual smoke (Bob, in `bin/dev` if it works in your sandbox; otherwise harness against test infra and document the gap):
-  1. Run `bin/rails db:migrate`.
-  2. Walk lobby → voting → drafting → nominating → complete with all 4 players.
-  3. Test all 5 tally splits with manually-crafted state in `rails console` or test fixtures.
-  4. Confirm coin-flip modal renders for tiebreak cases; auto-closes; complete panel shows.
-  5. Confirm avatar pile shows real avatars where cached, initial circles otherwise.
-  6. Confirm 60s grace skip: only nominator can skip in first 60s, anyone after.
-- Diff scope: 1 model + 1 channel + 1 controller (sessions) + 2 views (1 minor: complete-panel button weight; 1 major: nominating panel) + 1 stylesheet + 1 helper + 1 Stimulus + 2 migrations + 4 test files + 4 handoff files. ~13 source files + 2 migrations + 4 handoff. Anything else is a Reviewer Condition.
+- New migration: `create_gym_auto_mark_suppressions`.
+- New model: `app/models/gym_auto_mark_suppression.rb`.
+- New service: `app/services/soul_link/save_diff.rb` — pure function with `Result` struct + `BadgeGained` / `BadgeLost` event classes.
+- New service: `app/services/soul_link/gym_beaten_coordinator.rb` — static class with `.process(slot, events)` + `.attempt_auto_mark(run, gym_number)` + `.all_players_have_badge?(run, gym_number)`.
+- `app/jobs/soul_link/parse_save_data_job.rb`:
+  - Captures `prev_parsed_at` and `prev_badges` before update.
+  - Failure branch only updates `parsed_at` (KG-13 fix).
+  - After update, calls `SaveDiff.between` and `GymBeatenCoordinator.process` if `prev_parsed_at.present?`.
+- `app/models/gym_result.rb`: `broadcasts_refreshes_to ->(record) { [record.soul_link_run, :dashboard] }` added.
+- `app/models/soul_link_run.rb`: `has_many :gym_auto_mark_suppressions, dependent: :destroy` added.
+- `app/controllers/gym_progress_controller.rb`:
+  - Unmark branch creates `find_or_create_by!` suppression after destroy.
+  - Mark branch destroys matching suppression after create.
+- `app/controllers/gym_drafts_controller.rb#mark_beaten`: destroys matching suppression after create.
+
+**Tests (mandatory, not optional):**
+
+1. **`SaveDiff.between` — nil prev → empty.** `SaveDiff.between(prev_badges: nil, curr_badges: 5).badge_events == []`.
+2. **`SaveDiff.between` — nil curr → empty.** Same shape.
+3. **`SaveDiff.between` — equal → empty.** `(prev: 3, curr: 3).badge_events == []`.
+4. **`SaveDiff.between` — +1 badge → 1 BadgeGained.** `(prev: 3, curr: 4)` → `[BadgeGained(gym_number: 4)]`.
+5. **`SaveDiff.between` — +2 badges → 2 BadgeGained, sequential.** `(prev: 3, curr: 5)` → `[BadgeGained(4), BadgeGained(5)]` in order.
+6. **`SaveDiff.between` — -1 badge → 1 BadgeLost.** `(prev: 5, curr: 4)` → `[BadgeLost(5)]`.
+7. **`SaveDiff.between` — full reset (prev: 8, curr: 0) → 8 BadgeLost events.** Sequential gyms 1..8 in BadgeLost order. (The order doesn't strictly matter for behavior but the test pins it.)
+8. **`SaveDiff.between` — full claim (prev: 0, curr: 8) → 8 BadgeGained events.** Same shape, opposite direction.
+
+9. **`GymBeatenCoordinator.process` — BadgeGained, 4/4 players have it, no suppression, no existing → creates `gym_results` and bumps `gyms_defeated`.** Use factories to set up the run with 4 sessions, each with a slot at `parsed_badges = 4`.
+10. **`GymBeatenCoordinator.process` — 3/4 players have it → no `gym_results` created.** Assert count unchanged.
+11. **`GymBeatenCoordinator.process` — 4/4 but `gym_results` already exists → no-op.** Idempotent.
+12. **`GymBeatenCoordinator.process` — 4/4 but suppression exists → no-op.** Suppression respected.
+13. **`GymBeatenCoordinator.process` — BadgeLost → no `gym_results` mutation.** Assert no create, no destroy. Optionally assert log line emitted (use `assert_logs` helper if present, else skip the log assertion).
+14. **`GymBeatenCoordinator.process` — inactive run → no-op.** Defensive guard.
+15. **`GymBeatenCoordinator.process` — 0 sessions → no-op (cannot satisfy all-4 with empty set).** Edge case from `sessions.empty?` guard.
+16. **`GymBeatenCoordinator.attempt_auto_mark` — wraps create+update in a transaction.** Stub `gyms_defeated` update to raise; assert `gym_results` count unchanged after rescue.
+17. **`GymBeatenCoordinator.process` — multi-event sequence (gym 1 then gym 2).** When the same player's save jumps 0→2, two events run; both are auto-marked if all-4 satisfy. Assert two `gym_results` rows.
+
+18. **`ParseSaveDataJob` — first-ever parse (`parsed_at` was nil) → no diff dispatch.** Assert `GymBeatenCoordinator.process` is NOT called. Use mocha or assert_no_difference on `gym_results.count`.
+19. **`ParseSaveDataJob` — subsequent successful parse, badges unchanged → diff dispatched but events empty → coordinator no-op.** Assert no `gym_results` change.
+20. **`ParseSaveDataJob` — subsequent parse, badges +1, 4/4 satisfy → `gym_results` row created.** Integration test through the job.
+21. **`ParseSaveDataJob` — KG-13: parse failure leaves `parsed_badges` and other parsed_* alone, only updates `parsed_at`.** Set up a slot with parsed_badges=5; stub `SaveParser.parse` to return nil; assert `parsed_badges` is still 5 after, but `parsed_at` is fresh.
+22. **`ParseSaveDataJob` — KG-13: parse failure → no diff dispatch (because event would be spurious).** Or equivalently, the failure path skips the diff entirely. Test for no `gym_results` change.
+
+23. **`GymProgressController#update` — unmark creates suppression.** Existing test should still pass for unmark behavior; add assertion that `gym_auto_mark_suppressions.count` increases by 1.
+24. **`GymProgressController#update` — mark clears matching suppression.** Set up a suppression for gym N; mark gym N; assert suppression is gone.
+25. **`GymDraftsController#mark_beaten` — clears matching suppression.** Same shape.
+
+26. **Integration / system test — 4 player saves landing in sequence, 4th triggers the auto-mark.** Set up a run with 4 sessions + 4 slots all at `parsed_badges = 0` and `parsed_at = 1.minute.ago`. Update each slot's `save_data` with a fixture (or stub SaveParser to return badges_count=1) ONE AT A TIME, calling `ParseSaveDataJob.perform_now(slot)` after each. Assert: after slots 1, 2, 3 → no `gym_results`. After slot 4 → `gym_results.count == 1, gym_number: 1`.
+
+**~26 new tests.** Step 14 ended at 370 tests. Step 15 should land somewhere in the 395-405 range. If lower, Bob is under-testing edge cases.
+
+**Diff scope:**
+- 1 migration (suppressions table)
+- 1 new model (`gym_auto_mark_suppression.rb`)
+- 1 new service (`save_diff.rb`)
+- 1 new service (`gym_beaten_coordinator.rb`)
+- 1 modified job (`parse_save_data_job.rb`)
+- 1 modified model (`gym_result.rb` for broadcasts_refreshes_to)
+- 1 modified model (`soul_link_run.rb` for has_many)
+- 2 modified controllers (`gym_progress_controller.rb`, `gym_drafts_controller.rb`)
+- 4 new test files: `save_diff_test.rb`, `gym_beaten_coordinator_test.rb`, additions to `parse_save_data_job_test.rb`, additions to `gym_progress_controller_test.rb` + `gym_drafts_controller_test.rb`
+- 1 factory (`gym_auto_mark_suppressions.rb` for FactoryBot)
+- 4 handoff files (REVIEW-REQUEST, BUILD-LOG, ARCHITECT-BRIEF stays this content, SESSION-CHECKPOINT)
+
+Anything else is a Reviewer Condition.
 
 ### Files Bob Should Read
 
-- `handoff/2026-05-01-gym-draft-audit.md` — full read; this is the rationale.
-- `app/models/gym_draft.rb` — full (will be substantially rewritten).
-- `app/channels/gym_draft_channel.rb` — full (small).
-- `app/javascript/controllers/gym_draft_controller.js` — full (will be substantially rewritten).
-- `app/views/gym_drafts/show.html.erb` — full.
-- `app/controllers/sessions_controller.rb` — to wire avatar upsert.
-- `app/controllers/concerns/discord_authentication.rb` — confirm session keys.
-- `test/models/gym_draft_test.rb` — full (existing patterns + private helpers).
-- `test/channels/gym_draft_channel_test.rb` — full.
-- `test/factories/gym_drafts.rb` — full (small).
-- `app/services/soul_link/game_state.rb` — first 110 lines (player_ids, players, player_name).
-- `app/assets/stylesheets/pixeldex.css` — grep for `.gb-modal`, `.gb-card`, `.gb-btn-*` to match style; don't read the whole file.
+- `handoff/2026-05-02-sram-auto-tracking-audit.md` — full read; this is the architectural rationale.
+- `app/services/soul_link/save_parser.rb` — full (the pattern to mirror for SaveDiff/coordinator purity).
+- `app/jobs/soul_link/parse_save_data_job.rb` — full (will be modified).
+- `app/models/soul_link_emulator_save_slot.rb` — full (the after_update_commit lifecycle).
+- `app/models/soul_link_emulator_session.rb` — first 110 lines (`active_slot`, save_slots relation).
+- `app/models/soul_link_run.rb` — full (has_many wiring + `current` scope + `active?`).
+- `app/models/gym_result.rb` — full.
+- `app/controllers/gym_progress_controller.rb` — full.
+- `app/controllers/gym_drafts_controller.rb` — first 110 lines (the `mark_beaten` action + neighbors).
+- `db/schema.rb` — grep the existing `gym_*` and `soul_link_emulator_*` tables; check the `parsed_*` columns on `soul_link_emulator_save_slots`.
+- `test/jobs/soul_link/parse_save_data_job_test.rb` — full (existing patterns).
+- `test/factories/soul_link_emulator_save_slots.rb` — full.
+- `test/controllers/save_slots_controller_test.rb` — first 60 lines (factory usage patterns for slots).
+- One existing service test like `test/services/soul_link/save_parser_test.rb` — first 80 lines (the static-method test pattern).
 
 DO NOT load:
-- The Path A mockup HTML (`handoff/2026-05-01-gym-draft-redesign.html`) — design has shifted; mockup is historical.
-- The Discord bot code (`lib/tasks/soul_link.rake`, `app/services/soul_link_bot/`) — out of scope.
-- The dashboard views (Step 13 territory).
-- The emulator/save-slot flow.
-- The strategy-panel / type-chart code on draft show.
+- The Gen-IV PKM decryption references — out of scope for this step.
+- The gym-draft model/channel/views — out of scope this step.
+- The Discord bot code.
+- The dashboard view layouts beyond what `gym_results` rendering requires.
+- The emulator/save-slot UPLOAD flow (controllers/save_slots_controller.rb beyond factory patterns).
 
 ### Files Bob Should Update at the End
 
-- `handoff/REVIEW-REQUEST.md` — files-changed table, self-review answers covering EVERY constraint flag above plus the 17 reviewer focus areas in the Notes section, open questions if any, `Ready for Review: YES`.
-- `handoff/BUILD-LOG.md` — Step 14 history entry following Step 11/12/13 structure. Note: the avatar caching layer + 60s skip grace + coin-flip modal are NEW SURFACES introduced this step; call them out.
+- `handoff/REVIEW-REQUEST.md` — files-changed table, self-review answers covering EVERY constraint flag above plus the 12 reviewer focus areas in the Notes section, open questions if any, `Ready for Review: YES`.
+- `handoff/BUILD-LOG.md` — Step 15 history entry following Step 12-14 structure. Note: `SaveDiff` + `GymBeatenCoordinator` + `GymAutoMarkSuppression` are NEW SURFACES introduced this step; call them out as architecture decisions in the durable section since they shape categories 2 and 3 down the road.
 
 ---
 
@@ -586,38 +324,28 @@ DO NOT load:
 
 When this lands on your desk, focus on:
 
-1. **Tally algorithm correctness on all 5 splits.** Walk `resolve_nominations!` mentally for 3/1, 2/2, 2/1/1, 1/1/1/1, and 1-candidate. The greedy-fill loop is subtle; confirm tests cover each split exactly once with the expected `tiebreak` payload.
+1. **`SaveDiff` is genuinely pure.** No `Rails.logger`, no AR queries, no `Time.current` calls. Single integer-arithmetic function. Grep `app/services/soul_link/save_diff.rb` for `Time`, `logger`, `find`, `where`, `update`, `create` — all should be ZERO hits.
 
-2. **`tiebreak.winners` is set server-side, not by the client.** Critical security/correctness. The client must NOT pick winners via JS — animation only.
+2. **All-4 check guards against both empty sessions and missing `active_slot`.** `sessions.empty?` returns false from `all?`, but if a session has no `active_slot` (player generated ROM but never saved), `s.active_slot&.parsed_badges.to_i` is `0`, which fails the `>= gym_number` check correctly. Confirm this branch is tested.
 
-3. **No `current_nomination` references survive.** Grep for `current_nomination` across the codebase post-merge. Should be ZERO hits in `app/`. Tests may reference it in setup/teardown to assert removal.
+3. **Idempotency guards execute in priority order.** The order is (a) gym already marked, (b) suppression exists, (c) all-4 satisfy. Reordering changes behavior — confirm the implementation matches the brief's listed order.
 
-4. **Skip auth enforces both branches.** Inside-grace: only nominator. After-grace: anyone. Test that BOTH branches raise/succeed correctly for the right caller.
+4. **Transaction wraps the create + update.** Look for `run.transaction do ... end` or equivalent in `attempt_auto_mark`. If `gyms_defeated` update fails for any reason, the `gym_results` row should NOT persist. Test 16 covers this.
 
-5. **`current_turn_started_at` is updated on every turn change.** Confirm the model writes it on: transition into nominating (from drafting), each `nominate!` that doesn't terminate, each `skip_turn!`. Missing one breaks the grace logic.
+5. **`parsed_at` baseline gate is BEFORE the parse runs, not after.** Easy mistake: capturing `prev_parsed_at` after the new parse has updated it would always make `prev_parsed_at` non-nil, defeating the first-parse skip. Test 18 covers this.
 
-6. **Endorsement on already-endorsed-by-self raises.** A safety belt — even though `current_player_index` should prevent this naturally, the guard is there for races.
+6. **KG-13 fix is precise.** On parse failure, `parse_save_data_job.rb` calls `slot.update_columns(parsed_at: Time.current)` and nothing else. Specifically, `parsed_badges` is NOT touched, NOT zeroed, NOT nil-ed. Test 21 covers this.
 
-7. **Avatar upsert handles missing run gracefully.** Login when no active run for the guild → no error, no upsert. Test this.
+7. **No spurious `BadgeLost` events from the failure path.** Failure path skips the diff dispatch entirely (because there's no curr value to diff against). Alternatively, the diff is called but with `curr_badges: nil` which short-circuits to `[]`. Either implementation is acceptable; test 22 confirms behavior.
 
-8. **Avatar fallback color is deterministic per discord_user_id.** Same user always renders same initial color. Helper must be pure.
+8. **Suppression is keyed on `(run_id, gym_number)`, unique index enforces it.** Test 23 should rely on this — `find_or_create_by!` is the right primitive; `create!` would raise on the second invocation.
 
-9. **The cleanup migration is idempotent.** If run twice, no error. The `next unless data.key?("current_nomination")` guard handles this.
+9. **`GymResult.broadcasts_refreshes_to` mirrors the Step 9 KG-2 pattern.** Same callable-form lambda, same `:dashboard` channel. Confirm the auto-mark path actually triggers the broadcast — there's a Turbo::Streams test pattern for this in the existing codebase.
 
-10. **`gym_draft_test.rb` legacy tests for `submit_nomination!` and `vote_on_nomination!` are GONE.** If they're still there, Bob forgot to clean up. Should NOT just rename to skip.
+10. **The down-event log line is at `info` level, not `warn` or `error`.** This is normal user behavior (loading an older save state); not a problem to surface to ops.
 
-11. **Coin-flip modal dedupes across `render()` calls.** Stimulus `render()` fires on every state update; the modal must not re-trigger every time. Look for `coinFlipShownFor` or equivalent flag.
+11. **Coordinator dispatch is wrapped in the parse job's existing rescue/return-nil pattern.** If the coordinator raises (e.g., a stale `gyms_defeated` race), the parse job should still complete successfully — the parse data itself is already written via `update_columns` before the dispatch runs. Confirm the parse job doesn't bubble coordinator exceptions in a way that retries the parse work.
 
-12. **`Q5` is applied surgically.** Only the complete-panel buttons. Not a sweep of every primary button on the page.
-
-13. **Stimulus targets array is updated.** New targets: `nomOrderStrip`, `nomGraceCountdown`, `nomSkipButton`, `nomCandidatesList`, `coinFlipModal`, `coinFlipMessage`, `coinFlipCoin`, `coinFlipResult`. Removed targets: `nomVoteArea`, `nomVotePrompt`. If the array doesn't match, Stimulus throws at runtime.
-
-14. **`broadcast_state` includes `candidates`, `current_turn_started_at`, `current_nominator_id`, `tiebreak`.** And does NOT include `current_nomination`. Walk the broadcast_state output by inspecting one of the new model tests.
-
-15. **CSS additions don't conflict with existing tokens.** New classes are namespaced (`.gb-avatar`, `.gb-candidate-card`, `.coin-flip-*`). No bare `.avatar` or `.candidate` that could collide.
-
-16. **The 1-candidate edge case (4/0)** results in `picks.size == 5` and status `complete`. The team having 5 instead of 6 is intentional — flag if the implementation tries to "fix" this.
-
-17. **Manual smoke must be documented in REVIEW-REQUEST.** If `bin/dev` doesn't work in Bob's sandbox (foreman/tailwind-v4 quirk that surfaced in Step 13), Bob falls back to a render-condition harness AND documents which user flows were NOT exercised in a real browser. Decide if that's acceptable for this step's surface area (modal animations, real-time grace countdown — these may genuinely need browser eyeballing).
+12. **Diff scope holds.** No category-2 or category-3 scaffolding sneaks in — no `met_locations.yml`, no PartyParser stub, no PKM decryption code. If Bob "while I'm here"-d any of those, flag it.
 
 Out-of-scope items found during review → BUILD-LOG Known Gaps. Do not bundle.

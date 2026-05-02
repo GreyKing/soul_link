@@ -63,4 +63,30 @@ class GymProgressControllerTest < ActionDispatch::IntegrationTest
     assert_equal({ "gyms_defeated" => 1 }, response.parsed_body)
     assert_equal 1, @run.reload.gyms_defeated
   end
+
+  # --- Step 15: suppression integration -----------------------------------
+
+  test "unmark beaten creates a gym_auto_mark_suppression for that gym" do
+    login_as(GREY)
+    @run.gym_results.create!(gym_number: 1, beaten_at: Time.current)
+    @run.update!(gyms_defeated: 1)
+
+    assert_difference "@run.gym_auto_mark_suppressions.count", 1 do
+      patch gym_progress_path(gym_number: 1)
+    end
+    assert_redirected_to root_path(anchor: "gyms")
+    assert @run.gym_auto_mark_suppressions.exists?(gym_number: 1)
+  end
+
+  test "mark beaten clears any matching gym_auto_mark_suppression" do
+    login_as(GREY)
+    @run.gym_auto_mark_suppressions.create!(gym_number: 3)
+
+    assert_difference "@run.gym_auto_mark_suppressions.count", -1 do
+      patch gym_progress_path(gym_number: 3)
+    end
+    assert_redirected_to root_path(anchor: "gyms")
+    assert_not @run.gym_auto_mark_suppressions.exists?(gym_number: 3)
+    assert @run.gym_results.exists?(gym_number: 3)
+  end
 end

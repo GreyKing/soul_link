@@ -6,37 +6,43 @@
 
 ## Where We Stopped
 
-Step 14 (Gym Draft — Path B unified nominate-or-endorse model) shipped + FF-merged to `main` + pushed. Awaiting next brief from Project Owner.
+Step 15 (SaveDiff infrastructure + Category 1 gyms-beaten auto-detection + KG-13 fix) shipped + pushed to `main`. Awaiting next brief from Project Owner.
 
 ---
 
 ## What Was Built
 
-**Step 14 — Path B: unified nominate-or-endorse + avatar caching + 60s skip grace + TCG-coin tiebreak.**
+**Step 15 — SaveDiff Infrastructure + Category 1 (Gyms-Beaten Auto-Detection) + KG-13 fix.**
 
-The nominating phase of gym drafts was rewired from "submit nomination → up/down vote → resolve" round-robin into a single 4-pick "nominate or endorse" pass. Each of the 4 players makes exactly one pick during nominating; the model auto-detects whether the picked group is a NEW candidate (creates one) or an ENDORSEMENT (adds picker to existing candidate's voters list). After all 4 picks, top-2 by voter count fill slots 5+6. Tied at the slot boundary → server randomly picks winners + populates a `tiebreak` payload; the client animates a TCG-coin flip modal during the reveal.
+Per the SRAM auto-tracking audit (`handoff/2026-05-02-sram-auto-tracking-audit.md`, on main as `b8a769e`), and the Project Owner's option-(b) decision (gym auto-marks beaten only when all 4 players' active save slots show that badge, with manual MARK BEATEN bypass and manual UNMARK creating per-gym suppression).
 
-**Also shipped:**
-- Avatar caching layer (`SoulLinkRun#player_avatars` JSON column, upserted on login, helper for rendering with initial-circle fallback).
-- 60s skip grace (timer in `state_data`, model + channel auth: nominator-only inside grace, anyone after).
-- Q5 button-weight fix on the draft-complete page (BACK TO GYM READY no longer competes with MARK BEATEN).
+**Surfaces introduced:**
+- `SoulLink::SaveDiff` — pure function diff layer (`app/services/soul_link/save_diff.rb`). Takes two `parsed_badges` snapshots, returns a `Result` of `BadgeGained` / `BadgeLost` events. No AR, no logger, no `Time.current`. Extension point for categories 2/3 (add `catch_events:` / `evolution_events:` keyword fields without rewriting consumers).
+- `SoulLink::GymBeatenCoordinator` — static-method service (`app/services/soul_link/gym_beaten_coordinator.rb`) wrapping the all-4 AND-gate. Three guards in priority order: gym already marked → suppression exists → all-4 satisfy. Auto-mark wraps `gym_results.create!` + `gyms_defeated` update in a `run.transaction { }`.
+- `GymAutoMarkSuppression` model + table — per-`(run, gym_number)` unique row. Created on UNMARK in `GymProgressController#update`; cleared by both `GymProgressController#update` mark branch AND `GymDraftsController#mark_beaten`.
+- `ParseSaveDataJob` rewired: captures `prev_parsed_at` + `prev_badges` BEFORE update_columns, dispatches `SaveDiff` + `GymBeatenCoordinator` only if `prev_parsed_at.present?` (baseline rule).
+- `GymResult.broadcasts_refreshes_to ->(record) { [record.soul_link_run, :dashboard] }` — auto-mark surfaces in real-time on open dashboards via the same Step-9 KG-2 pattern.
+- KG-13 fix: parse-failure path went from 7 lines (zeroing every parsed_*) to 1 line (`update_columns(parsed_at: Time.current)` + `return`). Eliminates spurious BadgeLost events from CRC-failed saves.
 
-**Counts:** 343 → 370 tests (+27). Rubocop clean (152 files, 0 offenses). 2 migrations.
+**Counts:** 370 → 397 tests (+27). Rubocop clean (152 → 159 files, 0 offenses). 1 migration.
 
-**TCG-coin path:** primary (not the fallback). Two-face 3D coin: pokeball face via radial+linear gradients (red top / white bottom / black equator / central button), character face as gold disc with star glyph (deliberate simplification within the 30-min time-box). 1.8s rotateY 0→1980deg + cubic-bezier easing + 12px translateY settle bounce.
+**Review:** 0 Must Fix, 3 Should Fix. Two resolved inline post-review (transaction-rollback test stubbed wrong exception; missing retry-idempotency regression). Third (BadgeLost log-level not asserted in tests) accepted as-is per Richard's recommendation — code inspection covers focus area #10.
 
 ---
 
 ## What Was Decided This Session
 
-- **Path B chosen over Path A** after reading the gym-draft audit (`handoff/2026-05-01-gym-draft-audit.md`). Project Owner unified Path B's two phases (nominate + rank) into a single pass via the "endorsement" affordance.
-- **Captain has no special role in nominating.** All 4 players have equal weight; tiebreaks are uniform-random (Array#sample). The Path A captain-tiebreak narrative was discarded.
-- **Edge case "1-candidate consensus"** (all 4 endorse same group) → team has 5 picks, slot 6 stays empty. Explicit decision; do not "fix" by re-running a round.
-- **Skip auth: 60s grace.** Nominator-only inside; anyone after. Visible per-second countdown in UI.
-- **TCG-coin > pokéball.** Pokémon-themed but specifically the trading-card-game metal coin aesthetic with 3D rotateY animation. Modal copy: "★ WILD COIN APPEARED! ★". Server picks winners; client only animates.
-- **Avatar caching via JSON column on SoulLinkRun.** Upserted on login. No new table, no Discord API hits beyond OAuth.
-- **`current_turn_started_at` lives in state_data**, not as a column. Avoids a third migration.
-- **Path A mockup left in `handoff/`** as historical record (not archived). The user explicitly approved leaving it.
+- **Option (b) AND-gate.** Gym auto-marks only when all 4 players' active slots show `parsed_badges >= gym_number`. While 1-3 players have it, gym stays in current state — no UI flicker.
+- **Manual MARK BEATEN bypasses the AND-gate** (different controller action, never hits the coordinator).
+- **Manual UNMARK creates a suppression record** persisting until next manual MARK BEATEN clears it.
+- **Down events (`BadgeLost`) are no-ops** — coordinator logs at `info` level, no auto-unmark. PO will design un-detection later if needed.
+- **Multi-bit jumps process sequentially.** `0→2 badges` produces two `BadgeGained` events; each runs the all-4 check independently.
+- **`SaveDiff` is genuinely pure** (no AR / logger / clock). Coordinator does the side effects. Pattern mirrors `SoulLink::SaveParser`.
+- **`parsed_badges` count semantics, not raw bits.** No `parsed_badge_bits` column. `parsed_badges >= N` is equivalent to "has badge N" in legitimate Platinum play (in-game bitfield is monotonically progressive).
+- **Baseline rule:** diff dispatch is gated on `slot.parsed_at` being non-nil BEFORE the current parse runs. First-ever successful parse is silent (importing a save with N badges doesn't spam N events).
+- **KG-13 fix shape:** failure branch only updates `parsed_at`. Doesn't touch any other `parsed_*`. Branches on `result.nil?` (parser's contract), not on hash-value inspection.
+- **Suppression as a separate table** (not a JSON column, not a flag on `gym_results`). Clean relational model, unique index, `find_or_create_by!` against the index for double-click idempotency.
+- **Categories 2 (gym battle teams) and 3 (catches+routes) explicitly deferred** to a future step. They both need Gen-IV PKM decryption (PID-shuffle + LCG XOR), which is its own design phase. Audit logged KG-11 (party block offset verification) and KG-12 (met-location → route name table) as the prerequisites for that future step.
 
 ---
 
@@ -44,9 +50,11 @@ The nominating phase of gym drafts was rewired from "submit nomination → up/do
 
 *See `handoff/BUILD-LOG.md` Known Gaps — running list maintained there.*
 
-Step 14 logged one new gap: **in-browser smoke deferred** for the TCG-coin animation visual fidelity, the per-second grace countdown tick, and the avatar-pile image-vs-initial branch (only rendered with real Discord URLs in the wild). Continuation of the Step 13 environmental quirk (`bin/dev` / foreman / tailwind-v4 collision in the sandbox). Pick up next dashboard- or draft-touching step that gets a real browser. All algorithmic + payload-shape correctness is test-covered.
+Step 15 closed KG-13 (parse-failure zeros parsed_badges). Logged two new gaps from the audit: KG-11 (Gen-IV party block offset within the SRAM slot not yet pinned to a credible source — projectpokemon's Platinum doc has 0xA0 but is "under construction"; need pret/pokeplatinum `SaveData` cross-reference) and KG-12 (Platinum met-location ID → route-name table not yet sourced; different enum from `maps.yml`'s map-header IDs). Both are design-phase prerequisites for the future categories-2/3 step.
 
-KG-7 (real-save offset verification) still open from Step 12.
+KG-7 (real-save offset verification for `MAP_ID_OFFSET`) still open from Step 12.
+
+In-browser smoke deferred this step (parse-job + service code, no new UI). The `broadcasts_refreshes_to` wiring on `GymResult` mirrors the Step 9 KG-2 pattern; no dedicated test (matches KG-2's missing test, accepted by Richard as pattern-parity).
 
 ---
 

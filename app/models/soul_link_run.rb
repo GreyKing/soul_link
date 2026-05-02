@@ -5,6 +5,7 @@ class SoulLinkRun < ApplicationRecord
   has_many :gym_drafts, dependent: :destroy
   has_many :gym_schedules, dependent: :destroy
   has_many :gym_results, dependent: :destroy
+  has_many :gym_auto_mark_suppressions, dependent: :destroy
   has_many :soul_link_emulator_sessions, dependent: :destroy
 
   validates :run_number, presence: true, uniqueness: { scope: :guild_id }

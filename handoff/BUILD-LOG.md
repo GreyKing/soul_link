@@ -11,17 +11,20 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 14.2 — Sweep hotfix: remaining Gyms-tab anchor losses + unrouted-redirect fix. About to ship on top of Step 14.1 (`6d8e403`).
-**Last committed:** Step 14.1 (`6d8e403`) shipped + merged.
-**Pending deploy:** Step 14 ships 2 migrations (`add_player_avatars_to_soul_link_runs`, `cleanup_current_nomination_from_inflight_drafts`) — both run in pre-deploy. The cleanup migration is idempotent (guarded by `next unless data.key?("current_nomination")`).
+**Active step:** Step 15 — SaveDiff Infrastructure + Category 1 (Gyms-Beaten Auto-Detection) + KG-13 fix. **Reviewed + cleared by Richard (0 Must Fix, 3 Should Fix — 2 addressed inline post-review, 1 accepted as-is per Richard's own recommendation). Rebased onto main (which advanced past Step 14 with hotfixes 14.1 / 14.2 / `b8a769e` audit / `23253e1` YAML+SRAM-expansion); ready to commit + push.**
+**Last committed:** Parallel main advanced through `23253e1` (YAML data fixes + SRAM expansion brainstorm). Step 15 lands on top.
+**Pending deploy:** Step 15 ships 1 migration (`create_gym_auto_mark_suppressions`). Pre-deploy safe — additive table, no data backfill, no breaking schema changes.
 
 **Should Fix items resolved inline post-review:**
-1. `gym_draft_test.rb:405` — renamed test from "broadcast_state stores voter ids as integers in state_data" to "voter ids are stored as integers in state_data" (the body asserts on the underlying `state_data`, not on `broadcast_state`).
-2. `gym_draft.rb:191` — `next_index = current_player_index + 1` now wraps with `% pick_order.size` for symmetry with `skip_turn!` (line 248). Safe before, fragile against future changes.
+1. `test/services/soul_link/gym_beaten_coordinator_test.rb:111-130` — transaction-rollback test was stubbing `update!` to raise `ActiveRecord::Rollback`, which is silently swallowed by `transaction { }`. Test passed but the wrapping `begin/rescue` was dead code AND the test would have passed even without the transaction wrapper. Switched the stub to raise `RuntimeError` (propagates through `transaction`) and replaced the dead rescue with `assert_raises(RuntimeError)`. Now correctly proves the transaction wraps both writes — without the wrap, the test would fail because `create!` would have completed before `update!` raised.
+2. `test/jobs/soul_link/parse_save_data_job_test.rb` — added a "retry-safety" regression test (~50 lines) that pins reviewer focus area #11 (coordinator raise on first run does not double-fire on retry). Stubs `GymBeatenCoordinator.process` with a closure that raises once and `flunk`s on a second invocation; asserts the retry attempt completes silently (because `prev_badges == curr_badges` after the first job's `update_columns` write, the diff is empty, and the dispatch line short-circuits before the coordinator is re-invoked).
 
-Full suite still 370/370 after the two edits; rubocop still clean (152 files, 0 offenses).
+**Accepted as-is (Richard's own recommendation):**
+3. BadgeLost log-level not asserted in tests — Richard noted "the focus-area requirement is met by code inspection of `gym_beaten_coordinator.rb:36`" (`Rails.logger.info` is plainly visible). No `assert_logs` helper exists in the project; introducing one is out of scope for Step 15.
 
-**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — KG-7 (real-save offset verification) STILL OPEN; map IDs in `config/soul_link/maps.yml` are best-effort pending validation alongside the parser's `MAP_ID_OFFSET`.
+Full suite at 397/397 (370 → 397, +27); rubocop clean (152 → 159 files, 0 offenses).
+
+**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — KG-7 (real-save offset verification) STILL OPEN; map IDs in `config/soul_link/maps.yml` are best-effort pending validation alongside the parser's `MAP_ID_OFFSET`. KG-13 (parse-failure zeroes parsed_badges) **CLOSED** in this step.
 
 **Parked plan:** FactoryBot conversion fully shipped through Step 8.
 
@@ -29,6 +32,73 @@ Full suite still 370/370 after the two edits; rubocop still clean (152 files, 0 
 
 ## Step History
 *Session-scoped.*
+
+### Step 15 — SaveDiff Infrastructure + Category 1 (Gyms-Beaten Auto-Detection) + KG-13 fix — 2026-05-02
+**Status:** Shipped + pushed to main.
+
+Ships the shared `SoulLink::SaveDiff` pure-function diff layer plus `SoulLink::GymBeatenCoordinator` (the all-4 AND-gate dispatcher) on top of it, wires the dispatch into `ParseSaveDataJob`, adds a `gym_auto_mark_suppressions` table for the manual-UNMARK escape hatch, and folds the KG-13 prerequisite (parse-failure path zeroing `parsed_badges`) into the same pass. This is category 1 of the SRAM auto-tracking audit (`handoff/2026-05-02-sram-auto-tracking-audit.md`); categories 2 (gym battle teams) and 3 (catches+routes) are deferred to a future step that pays the Gen-IV PKM decryption cost.
+
+**New surfaces introduced this step (durable architecture — see § Architecture Decisions):**
+- **`SoulLink::SaveDiff`** — pure function (`app/services/soul_link/save_diff.rb`) that turns two `parsed_badges` snapshots into a structured `Result` of `BadgeGained` / `BadgeLost` events. No AR, no logger, no `Time.current`. Extension point for categories 2 (`catch_events:`) and 3 (`evolution_events:`) — they add keyword fields without rewriting consumers.
+- **`SoulLink::GymBeatenCoordinator`** — pure-static service (`app/services/soul_link/gym_beaten_coordinator.rb`) that consumes `SaveDiff` events for one slot, runs the all-4 AND-gate, respects per-gym suppressions, and creates `gym_results` + bumps `gyms_defeated` in a single transaction. Three guards in priority order: (a) `gym_results.exists?` (idempotency), (b) `gym_auto_mark_suppressions.exists?` (suppression), (c) `all_players_have_badge?` (the AND-gate). BadgeLost events log at info level and are no-ops (no auto-unmark — manual policy).
+- **`GymAutoMarkSuppression`** — new table (`gym_auto_mark_suppressions`) + model. Per-(run, gym) record created when a player manually UNMARK-s a gym from the dashboard. While present, blocks auto-mark for that gym. Cleared by a manual MARK BEATEN on that same gym, or by completing a draft for that gym number. Unique index on `(soul_link_run_id, gym_number)`.
+
+**Migrations (1):**
+- `db/migrate/20260502191439_create_gym_auto_mark_suppressions.rb` — creates the suppressions table with the unique composite index. Additive; no backfill needed.
+
+**Files modified (5):**
+- `app/jobs/soul_link/parse_save_data_job.rb` — KG-13 fix: failure branch now updates ONLY `parsed_at` (was: zeroing every other parsed_*). Added: capture `prev_parsed_at` and `prev_badges` before update; after success, build `SaveDiff.between(prev, curr)` and dispatch to `GymBeatenCoordinator.process(slot, events)` IFF `prev_parsed_at.present?` (baseline rule — first-ever parse is silent so importing a save doesn't fire N events).
+- `app/models/gym_result.rb` — added `broadcasts_refreshes_to ->(record) { [ record.soul_link_run, :dashboard ] }` so manual mark/unmark, post-draft mark-beaten, and the new auto-mark path all broadcast a Turbo refresh to other open dashboards in the run.
+- `app/models/soul_link_run.rb` — added `has_many :gym_auto_mark_suppressions, dependent: :destroy`.
+- `app/controllers/gym_progress_controller.rb` — UNMARK branch now creates the suppression via `find_or_create_by!` (idempotent against double-clicks); MARK branch now destroys any matching suppression after the create. Stacks cleanly on top of Step 14.1's content-type branching (`json_request?` / `respond_with_error`); the suppression touchpoints sit between the existing `existing.destroy!` / `gym_results.create!` lines and the `notice = ...` line.
+- `app/controllers/gym_drafts_controller.rb` — `mark_beaten` now destroys any matching suppression after creating the `gym_results` row (completing a draft is an explicit re-engagement signal). Stacks on top of Step 14.2's `redirect_to root_path(anchor: "gyms")` change.
+
+**Files created (5):**
+- `app/models/gym_auto_mark_suppression.rb` — minimal AR model. `belongs_to :soul_link_run`, validates gym_number presence + 1..8 + uniqueness scoped to run.
+- `app/services/soul_link/save_diff.rb` — the pure diff function + `Result`/`BadgeGained`/`BadgeLost` structs.
+- `app/services/soul_link/gym_beaten_coordinator.rb` — the static coordinator with `.process`, `.attempt_auto_mark`, `.all_players_have_badge?`.
+- `test/factories/gym_auto_mark_suppressions.rb` — minimum-viable factory; cycles `gym_number` 1..8.
+- `test/services/soul_link/save_diff_test.rb` — 8 tests covering nil prev, nil curr, equal values, +1, +2 sequential, -1, full reset (8 BadgeLost), full claim (8 BadgeGained).
+- `test/services/soul_link/gym_beaten_coordinator_test.rb` — 10 tests covering 4/4 satisfy → create, 3/4 satisfy → no-op, idempotency, suppression respected, BadgeLost no-op, inactive run guard, 0-sessions guard, missing-active-slot guard, transaction wrapping, multi-event sequence (gym 1 then gym 2 in one process call).
+
+**Tests modified:**
+- `test/jobs/soul_link/parse_save_data_job_test.rb` — REPLACED the stale "writes nil-attrs and parsed_at when parser returns nil" test (which asserted the OLD KG-13-bug behavior) with the new KG-13 contract: parse failure leaves every parsed_* alone and only stamps `parsed_at`. ADDED 5 new tests: KG-13 no-spurious-diff dispatch on failure, first-ever-parse skip (baseline rule), badges-unchanged → no auto-mark, badges-+1-with-4/4 → 1 gym_results row, end-to-end integration (4 player saves landing in sequence; 4th triggers exactly 1 auto-mark).
+- `test/controllers/gym_progress_controller_test.rb` — ADDED 2 tests: unmark creates a suppression row, mark clears any matching suppression. Both tests use `as: :json` since Step 14.1's JSON contract is what these new assertions extend; the HTML redirect path remains tested by Step 14.1's existing assertions.
+- `test/controllers/gym_drafts_controller_test.rb` — ADDED 1 test: `mark_beaten` clears matching suppression after creating the gym_results row. Sits alongside Step 14.2's two new anchor-redirect tests; total of 3 new tests in this file across 14.2 + 15.
+
+**Post-review test additions (Should Fix resolutions, see Current Status above):**
+- `test/services/soul_link/gym_beaten_coordinator_test.rb` — REWORKED the transaction-rollback test to stub `update!` raising `RuntimeError` (propagates through `transaction`) instead of `ActiveRecord::Rollback` (silently swallowed); replaced the dead `begin/rescue ActiveRecord::Rollback` with `assert_raises(RuntimeError)`. Now correctly proves the transaction wraps both writes — the test would fail if the implementation did `create!; update!` outside a transaction block.
+- `test/jobs/soul_link/parse_save_data_job_test.rb` — ADDED 1 retry-safety regression test (~50 lines) pinning reviewer focus area #11. Stubs `GymBeatenCoordinator.process` to raise on first call and `flunk` on a second; asserts the retry attempt completes silently because `prev_badges == curr_badges` after the first job's `update_columns` write makes the diff empty before the dispatch line.
+
+**Tests:** Step 15 added +27 over its base. Pre-rebase the base was 370 (post-Step 14); the parallel hotfix sweeps (14.1 +1, 14.2 +2) advanced it to 373 on main. Post-rebase, the suite count is 373 + 27 = 400. 0 failures, 0 errors at commit time.
+
+**Lint:** `bundle exec rubocop` clean (0 offenses). New file count: 152 (post-Step 14) + 7 (Step 15: 1 migration + 1 model + 1 factory + 2 services + 2 service-test files) = 159.
+
+**KG-13 fix surface:** the failure branch went from 7 lines (zeroing every parsed_* field) to 1 line (`slot.update_columns(parsed_at: Time.current)` + `return`). Per the brief's constraint flag, the failure branch now branches on `result.nil?` (not `attrs.values.any?(&:nil?)` or anything fragile). The `Result.nil?` branch returns immediately so the diff dispatch never runs on a parse failure — both the KG-13 contract AND reviewer focus area #7 (no spurious BadgeLost from the failure path) are covered.
+
+**Idempotency walk:** `attempt_auto_mark` runs guards in the brief's exact priority order: (a) `gym_results.exists?(gym_number: N)`, (b) `gym_auto_mark_suppressions.exists?(gym_number: N)`, (c) `all_players_have_badge?(run, N)`. Each early-returns. The `gym_results.exists?` guard means even if every save fires N events, the `create!` only ever runs once per (run, gym) — and the unique index on `(soul_link_run_id, gym_number)` is the belt-and-suspenders if guard (a) somehow races.
+
+**Transaction walk:** `attempt_auto_mark` wraps `gym_results.create!` + `run.update!(gyms_defeated: ...)` in `run.transaction`. If the counter bump raises (stale-run race, validation flake, anything), the `gym_results` row is rolled back too — no half-applied state. Test 16 (`attempt_auto_mark wraps create + counter bump in a transaction`) stubs `update!` to raise `RuntimeError` (post-review fix from `ActiveRecord::Rollback`, which `transaction { }` silently swallows) and asserts no `gym_results` row persists.
+
+**All-4 gate semantics:** `all_players_have_badge?` calls `sessions.all? { |s| s.active_slot&.parsed_badges.to_i >= gym_number }`. The `&.` chain handles "session has no active_slot set yet" → `nil.to_i = 0`, which fails the `>= gym_number` check correctly for any gym ≥ 1. The `sessions.empty?` short-circuit at the top returns false (so a 0-session run never triggers — `.all?` on `[]` returns true, which is the wrong default here). Reviewer focus area #2 covers both branches with explicit tests (`session with no active_slot → all_players_have_badge? returns false` and `0 sessions → all_players_have_badge? returns false (no auto-mark)`).
+
+**One-time backfill consideration (per brief Out-of-Scope):** existing slots in production already have `parsed_at` set + `parsed_badges = 0` (because nobody has played far enough yet). Their NEXT parse will run the diff against `prev_badges = 0`. If a save with N>0 badges lands, that fires N events through the all-4 gate. This is the expected migration behavior and matches the audit's analysis: any in-flight run is either (a) freshly imported with 0 badges (correct) or (b) already mid-run with auto-detection wanted (also correct). The PO can RESET DRAFT or manually UNMARK to recover from any spurious event. No backfill code added.
+
+**Manual smoke:** the parse-job integration test (`integration: 4 player saves landing in sequence, 4th triggers the auto-mark`) is the live-fire end-to-end harness — it stands up 4 sessions + 4 slots, walks each one through `ParseSaveDataJob.perform_now` with the parser stubbed to return `badges_count: 1`, and asserts:
+- after slot 1 parses → 0 gym_results
+- after slot 2 parses → 0 gym_results
+- after slot 3 parses → 0 gym_results
+- after slot 4 parses → 1 gym_results (gym_number: 1) + `gyms_defeated == 1`
+
+This exercises the full chain: parse job → SaveDiff.between → GymBeatenCoordinator.process → all-4 gate → gym_results.create! → run.update!. No browser flow needed for this step — the surface is server-side detection, not UI.
+
+**Diff scope:** 1 migration + 1 new model + 2 new services + 1 modified job + 2 modified models + 2 modified controllers + 1 new factory + 2 new test files + 3 modified test files + 4 handoff files. Inside the brief's stated diff scope.
+
+**Rebase note:** branch was based on Step 14 (`141e706`); main advanced through hotfixes 14.1 / 14.2, the SRAM auto-tracking audit (`b8a769e`), and the YAML+SRAM-expansion commit (`23253e1`) before Step 15 landed. Rebase resolved two trivial conflicts: `gym_progress_controller.rb` (Step 15 suppression touchpoints stacked cleanly on top of Step 14.1's content-type branching), and `BUILD-LOG.md` (Step 15's Current Status replaced the stale Step 14.2 status; Step History entries from main are preserved below).
+
+**Known Gaps logged this step:** none. Categories 2 and 3 of the audit remain deferred — they're future-step territory, not gaps from this step.
+
+---
 
 ### YAML data fixes + SRAM scope expansion brainstorm — 2026-05-02
 **Status:** Shipped to main.
@@ -652,13 +722,14 @@ ALL FACTORY SMOKE CHECKS PASSED
 ## Known Gaps
 *Durable. Items logged here instead of expanding the current step. Persists across sessions until addressed.*
 
-### Closed in Steps 9-12 (2026-04-30 → 2026-05-01)
+### Closed in Steps 9-15 (2026-04-30 → 2026-05-02)
 - ~~**KG-1: No real-time updates on the run roster sidebar**~~ — closed in Step 9 (targeted frame replacement on save-slot parsed_* updates)
 - ~~**KG-2: No real-time broadcast of species change to other players' dashboards**~~ — closed in Step 9 (`broadcasts_refreshes_to` on `SoulLinkPokemon` + `SoulLinkPokemonGroup`)
 - ~~**KG-3: No loading state on EVOLVE button**~~ — closed in Step 9 (button disable + "EVOLVING..." text)
 - ~~**KG-4: `#d4b14a` amber color inline**~~ — closed in Step 9 (promoted to `--amber` palette token)
 - ~~**KG-5: 133 pre-existing rubocop offenses**~~ — closed in Step 10 (`rubocop -a` autocorrect; codebase now 0 offenses across 147 files)
 - ~~**KG-6: Map ID → name lookup**~~ — closed in Step 12 (`config/soul_link/maps.yml` + `SoulLink::GameState.map_name` + `EmulatorHelper#format_map_name` + view edits in run-roster + slot-card surfaces)
+- ~~**KG-13: Parse-failure path zeroes parsed_badges**~~ — closed in Step 15 (`ParseSaveDataJob` failure branch now updates ONLY `parsed_at`; every other parsed_* field keeps its prior value, so a CRC-bad save sandwiched between two good ones never produces spurious BadgeLost events through the new `SaveDiff` pipeline)
 - ~~**YOU-badge restoration follow-up (logged in Step 9)**~~ — closed in Step 10 (new `roster_you_marker_controller.js` decorates the matching `[data-discord-user-id]` card on `connect()` + `turbo:before-stream-render`)
 - ~~**Soft Point #3: SoulLinkRun.current(guild_id) lacks a hard invariant**~~ — closed in Step 11 (DB-level virtual-column unique index on `active_guild_id`)
 - ~~**Convert legacy fixture-based tests to FactoryBot**~~ — closed in Steps 4-8 (FactoryBot conversion shipped)
@@ -714,7 +785,17 @@ ALL FACTORY SMOKE CHECKS PASSED
 - **Subprocess pattern: `Process.spawn` + `waitpid(WNOHANG)` poll loop + TERM→KILL on deadline.** `Open3.capture3 + Timeout.timeout` is banned (raises in calling thread but leaves child Java running — zombie leak).
 - **`emulator_session.rom_path` is server-derived** — only ever set by `RomRandomizer` via `Pathname#relative_path_from(Rails.root)` of a path constructed under `OUTPUT_DIR`. Never user input. If a future writer changes this, `EmulatorController#rom`'s `send_file` becomes a file-read-anywhere primitive and needs an explicit `path.start_with?(OUTPUT_DIR)` guard.
 
+### SRAM auto-tracking (locked 2026-05-02)
+- **Two-layer dispatch pattern.** SRAM-derived state changes flow through (a) `SoulLink::SaveDiff` (pure function on parsed values, returns a structured `Result`) and (b) a category-specific coordinator (`SoulLink::GymBeatenCoordinator` for category 1; future `SoulLink::CatchDetectionCoordinator` etc. for categories 2/3). The diff layer NEVER touches AR, `Rails.logger`, or `Time.current`; the coordinator owns all side effects. This separation mirrors the existing `SoulLink::SaveParser` purity contract and makes the diff layer testable in pure isolation.
+- **`SaveDiff::Result` is the extension point for categories 2 and 3.** Future categories add new keyword fields to the Result struct (`catch_events:`, `evolution_events:`) WITHOUT rewriting existing call sites. Existing consumers that only read `badge_events` keep working untouched. This is the architectural promise from the SRAM auto-tracking audit (`handoff/2026-05-02-sram-auto-tracking-audit.md` § 4).
+- **All-4 AND-gate is the auto-mark policy for category 1.** `GymBeatenCoordinator.all_players_have_badge?(run, gym_number)` returns true only when `run.soul_link_emulator_sessions.all? { |s| s.active_slot&.parsed_badges.to_i >= gym_number }` AND the session set is non-empty. Manual MARK BEATEN bypasses this entirely (different controller path, never hits the coordinator). PO decision (option (b) from audit § 1) — locked.
+- **`gym_auto_mark_suppressions` is the manual-UNMARK escape hatch.** When a player UNMARK-s a gym from the dashboard, `GymProgressController#update` creates a `(soul_link_run_id, gym_number)` row via `find_or_create_by!`. While that row exists, `GymBeatenCoordinator.attempt_auto_mark` refuses to re-mark, even when the all-4 gate would otherwise pass. Suppression clears on (a) manual MARK BEATEN of the same gym, (b) post-draft `GymDraftsController#mark_beaten` (explicit re-engagement signal). Unique index on `(soul_link_run_id, gym_number)` enforces single-row-per-gym at the DB level.
+- **Down events (`BadgeLost`) log only.** A player loading an older save state produces BadgeLost events through `SaveDiff.between`; the coordinator logs at info level (for traceability — this is normal user behavior, not an error) and never auto-unmarks. PO decision — no auto-unmark policy until/unless explicitly designed.
+- **Baseline rule: first-ever parse skips the diff dispatch entirely.** `ParseSaveDataJob` captures `prev_parsed_at` BEFORE writing the new parse, then gates the dispatch on `prev_parsed_at.present?`. A slot whose first-ever successful parse lands with N>0 badges does NOT fire N gym-beaten events (which would be wrong for a mid-run save import). Only diffs against a known prior baseline count.
+- **KG-13 fix: parse-failure path updates ONLY `parsed_at`.** Every other parsed_* field keeps its prior value. This prevents a CRC-bad save from appearing as "lost all badges" to the diff layer. The slot card still renders the most recently successful parse (no UI regression). The failure path also skips the diff dispatch entirely (returns immediately after `update_columns(parsed_at: ...)`).
+
 ### Carried over (still load-bearing)
 - Discord user IDs are `bigint` in DB columns, `String` in Stimulus values, coerced at the controller boundary
 - All tests use FactoryBot factories from `test/factories/`. Fixtures and the `fixtures :all` test_helper line were removed in Step 8 (2026-04-30).
 - **One active SoulLinkRun per guild** is enforced by a virtual-column unique index on `soul_link_runs.active_guild_id` (added in Step 11, 2026-05-01). The column is `(CASE WHEN active = 1 THEN guild_id END)` — value is `guild_id` on active rows, NULL on inactive rows. NULLs don't conflict in unique indexes; multiple inactive runs per guild remain fine. The DB constraint catches any path (controller, channel, raw SQL, manual tampering) that produces a second active run for a guild. `SoulLinkRun.current(guild_id)` is a `find_by` lookup that relies on this invariant.
+- **`GymResult` broadcasts a Turbo refresh on every change** (`broadcasts_refreshes_to ->(record) { [ record.soul_link_run, :dashboard ] }`, added Step 15). Covers manual MARK/UNMARK via `GymProgressController`, post-draft mark-beaten via `GymDraftsController#mark_beaten`, and the new auto-mark path from `SoulLink::GymBeatenCoordinator` — all three create through `gym_results.create!` so the broadcast covers every path uniformly. Mirrors the Step 9 KG-2 pattern on `SoulLinkPokemon` and `SoulLinkPokemonGroup`.

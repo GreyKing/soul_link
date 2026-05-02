@@ -125,4 +125,32 @@ class GymDraftsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
     assert GymDraft.exists?(other_draft.id)
   end
+
+  # --- Step 15: mark_beaten clears matching suppression ----------------------
+
+  test "mark_beaten clears any matching gym_auto_mark_suppression" do
+    login_as(GREY)
+    groups = %i[route201 route202 route203 route204 route205 route206].map do |trait|
+      create(:soul_link_pokemon_group, trait, soul_link_run: @run)
+    end
+    @draft.update!(
+      status: "complete",
+      pick_order: [ GREY ],
+      state_data: {
+        "ready_players" => [],
+        "first_pick_votes" => {},
+        "picks" => groups.each_with_index.map { |g, i|
+          { "round" => i + 1, "group_id" => g.id, "picked_by" => GREY }
+        }
+      }
+    )
+
+    @run.gym_auto_mark_suppressions.create!(gym_number: 1)
+
+    assert_difference "@run.gym_auto_mark_suppressions.count", -1 do
+      post mark_beaten_gym_draft_path(@draft)
+    end
+    assert_not @run.gym_auto_mark_suppressions.exists?(gym_number: 1)
+    assert @run.gym_results.exists?(gym_number: 1)
+  end
 end

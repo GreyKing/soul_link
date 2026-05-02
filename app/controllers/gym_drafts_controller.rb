@@ -100,6 +100,10 @@ class GymDraftsController < ApplicationController
       team_snapshot: snapshot
     )
     run.update!(gyms_defeated: gym_number)
+    # Completing a draft for this gym is an explicit re-engagement
+    # signal — clear any auto-mark suppression so future save parses
+    # can flow through `GymBeatenCoordinator` again.
+    run.gym_auto_mark_suppressions.where(gym_number: gym_number).destroy_all
 
     redirect_to root_path(anchor: "gyms"), notice: "Gym #{gym_number} marked as beaten!"
   rescue ActiveRecord::RecordNotUnique

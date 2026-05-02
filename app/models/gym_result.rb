@@ -7,6 +7,16 @@ class GymResult < ApplicationRecord
             uniqueness: { scope: :soul_link_run_id }
   validates :beaten_at, presence: true
 
+  # Real-time UX: dashboard pages subscribed to the run-scoped
+  # :dashboard stream get a Turbo refresh broadcast on
+  # create/update/destroy, so other players' open dashboards see the
+  # gym change without a manual reload. Mirrors the Step 9 KG-2
+  # pattern on `SoulLinkPokemon`. Covers manual MARK/UNMARK,
+  # post-draft mark-beaten, and the auto-mark path from
+  # `SoulLink::GymBeatenCoordinator` — all three create through
+  # `gym_results.create!`.
+  broadcasts_refreshes_to ->(record) { [ record.soul_link_run, :dashboard ] }
+
   def self.snapshot_from_groups(groups)
     players = SoulLink::GameState.players
     {
