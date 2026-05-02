@@ -30,6 +30,25 @@ Full suite still 370/370 after the two edits; rubocop still clean (152 files, 0 
 ## Step History
 *Session-scoped.*
 
+### YAML data fixes + SRAM scope expansion brainstorm — 2026-05-02
+**Status:** Shipped to main.
+
+Architect-phase deliverable. PO asked: any reference-data mismatches in the YAML files (especially gym names + level caps), and what else in the `.sav` is worth surfacing beyond the three categories the prior audit (`b8a769e`) covered? Full report in `handoff/2026-05-02-yml-and-sram-expansion.md`.
+
+**Files modified (1):**
+- `config/soul_link/gym_info.yml` — fixed `second_gym.name` (`"Eterna City Gym"` → `"Eterna Gym"` to match in-game sign + the rest of the file's `"<City> Gym"` pattern). Corrected six `max_level` values to canonical Platinum aces: gym 3 (26→32), gym 4 (32→37), gym 5 (37→40), gym 6 (41→39), gym 7 (44→42), gym 8 (50→49). Added `ace: "<species>"` field per entry as documentation-as-data (not consumed by any view today). Added file-header comment explaining `max_level` semantics. Cross-referenced against pret/pokeplatinum trainer data; six unambiguous data fixes, zero ambiguous-style judgment calls deferred to PO.
+
+**Files added (1):**
+- `handoff/2026-05-02-yml-and-sram-expansion.md` — three-section report: § Half 1 YAML audit findings (locations.yml / maps.yml / progression.yml clean; gym_info.yml fixes detailed); § Half 2 level-cap placement decision (folded into existing `max_level`, no new file); § Half 3 SRAM expansion candidates (15 fields catalogued by trainer-block / item-bag / party-PKM tier, with offset citations and S/M/L effort + KG-14, KG-15 noted as speculative offsets pending real-save validation).
+
+**No code paths touched.** Step 15 (SaveDiff + auto-mark) on parallel worktree is uninterrupted. No tests changed (no test asserts a specific `max_level` integer; verified via `grep "max_level" test/`). No view templates changed; corrected values render automatically on next page load via existing `gym["max_level"]` reads.
+
+**Recommended Step 16 follow-on (per § Recommendations of the report):** bundle Hall of Fame detection + TID/SID surfacing + Pokédex counter into a single non-decryption-gated step on top of Step 15's SaveDiff pattern. Decryption-gated items (held items / IVs / nature) wait for Step 17+.
+
+**Diff scope:** 1 YAML edit + 1 new handoff doc + this BUILD-LOG entry. Single commit, FF-merged.
+
+---
+
 ### Step 14.2 — Hotfix sweep: remaining Gyms-tab anchor losses + unrouted-redirect fix — 2026-05-02
 **Status:** Shipped + merged to main.
 
