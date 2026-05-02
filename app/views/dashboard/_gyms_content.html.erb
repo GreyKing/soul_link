@@ -3,6 +3,16 @@
   <span style="display: flex; align-items: center; gap: 8px;">
     <span class="panel-header-sub"><%= @gyms_defeated %>/8 BADGES</span>
     <%= button_to "START GYM DRAFT", gym_drafts_path, method: :post, class: "gb-btn-primary gb-btn-sm", style: "font-size: 9px; padding: 3px 8px;" %>
+    <% if @active_draft %>
+      <button type="button"
+              class="gb-btn-danger gb-btn-sm"
+              style="font-size: 9px; padding: 3px 8px;"
+              data-action="click->dashboard#openResetDraftModal"
+              data-draft-id="<%= @active_draft.id %>"
+              data-draft-status="<%= @active_draft.status %>">
+        RESET DRAFT
+      </button>
+    <% end %>
   </span>
 </div>
 <div class="panel-body">
@@ -50,7 +60,16 @@
           <span class="gym-check">&#9733;</span>
           <%= gym["leader"]&.upcase %>
           <span class="type-text"><%= PixeldexHelper::TYPE_ABBREVIATIONS[gym["type"]] || gym["type"] %></span>
-          <span style="margin-left: auto; font-size: 9px; color: var(--d2);">Lv. <%= gym["max_level"] %></span>
+          <% if num == @gyms_defeated %>
+            <%= button_to "UNMARK", gym_progress_path(gym_number: num),
+                method: :patch, class: "gb-btn gb-btn-sm",
+                style: "font-size: 8px; padding: 2px 6px; margin-left: auto;",
+                data: { turbo: false },
+                title: "Removes the star and decrements the badge count" %>
+            <span style="margin-left: 6px; font-size: 9px; color: var(--d2);">Lv. <%= gym["max_level"] %></span>
+          <% else %>
+            <span style="margin-left: auto; font-size: 9px; color: var(--d2);">Lv. <%= gym["max_level"] %></span>
+          <% end %>
         </div>
         <% result = @gym_results[num] %>
         <% if result %>

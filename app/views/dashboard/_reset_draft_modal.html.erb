@@ -1,0 +1,54 @@
+<%# Reset Gym Draft confirmation modal — mirrors `_mark_dead_modal.html.erb`
+    structurally. Resetting destroys 4-6 rounds of player picks held in the
+    draft's `state_data` JSON; the modal makes the destructive action
+    explicit with two clearly-distinct buttons. CONFIRM RESET is the
+    destructive path (gb-btn-danger); CANCEL is the safe out (default).
+
+    Wired by `dashboard` Stimulus controller:
+    - `openResetDraftModal(event)` populates + shows
+    - `confirmResetDraft()` fires the DELETE
+    - `closeResetDraftModal()` hides without firing
+    - The RESET DRAFT button in the gyms-tab panel header calls
+      `dashboard#openResetDraftModal`. %>
+<div data-dashboard-target="resetDraftModal"
+     class="hidden"
+     style="position: fixed; inset: 0; z-index: 60;">
+  <div data-action="click->dashboard#closeResetDraftModal"
+       style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.85);"></div>
+
+  <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
+    <div class="gb-modal" style="max-width: 440px;">
+      <div class="gb-modal-title">
+        RESET GYM DRAFT
+        <button data-action="click->dashboard#closeResetDraftModal"
+                class="gb-modal-close"
+                aria-label="Close modal">&times;</button>
+      </div>
+
+      <div style="padding: 12px 4px 4px;">
+        <div style="font-size: 14px; margin-bottom: 10px;">
+          <span data-dashboard-target="resetDraftStatus" style="color: #e8a0a0;"></span>
+        </div>
+
+        <div style="font-size: 11px; color: var(--d2); line-height: 1.6; margin-bottom: 16px;">
+          This deletes the current draft and all picks. You can start a new draft from the Gyms tab afterward.
+        </div>
+
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+          <button type="button"
+                  data-action="click->dashboard#closeResetDraftModal"
+                  class="gb-btn gb-btn-sm">
+            CANCEL
+          </button>
+          <button type="button"
+                  data-action="click->dashboard#confirmResetDraft"
+                  class="gb-btn-danger gb-btn-sm">
+            CONFIRM RESET
+          </button>
+        </div>
+      </div>
+
+      <input type="hidden" data-dashboard-target="resetDraftId">
+    </div>
+  </div>
+</div>

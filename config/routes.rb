@@ -33,7 +33,7 @@ Rails.application.routes.draw do
 
   # Gym readiness analysis + gym draft
   resource :gym_ready, only: [ :show ], controller: "gym_ready"
-  resources :gym_drafts, only: [ :create, :show ] do
+  resources :gym_drafts, only: [ :create, :show, :destroy ] do
     member { post :mark_beaten }
   end
   resources :gym_results, only: [ :update ]

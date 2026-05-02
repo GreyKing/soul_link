@@ -65,4 +65,31 @@ class GymDraftsControllerTest < ActionDispatch::IntegrationTest
     get gym_draft_path(@draft)
     assert_response :success
   end
+
+  test "destroy active draft removes it" do
+    login_as(GREY)
+
+    delete gym_draft_path(@draft)
+    assert_response :success
+    assert_not GymDraft.exists?(@draft.id)
+  end
+
+  test "destroy complete draft is rejected (status guard)" do
+    login_as(GREY)
+    @draft.update!(status: "complete")
+
+    delete gym_draft_path(@draft)
+    assert_response :unprocessable_entity
+    assert GymDraft.exists?(@draft.id)
+  end
+
+  test "destroy returns 404 for cross-guild access" do
+    login_as(GREY)
+    other_run = create(:soul_link_run, guild_id: 111111111111111111, active: false)
+    other_draft = create(:gym_draft, :lobby, soul_link_run: other_run)
+
+    delete gym_draft_path(other_draft)
+    assert_response :not_found
+    assert GymDraft.exists?(other_draft.id)
+  end
 end

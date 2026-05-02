@@ -102,6 +102,21 @@ class GymDraftsController < ApplicationController
     redirect_to gym_draft_path(draft), alert: "Gym #{gym_number} already marked as beaten."
   end
 
+  def destroy
+    run = current_run
+    return render(json: { error: "No active run" }, status: :not_found) unless run
+
+    draft = run.gym_drafts.find_by(id: params[:id])
+    return render(json: { error: "Draft not found" }, status: :not_found) unless draft
+
+    unless draft.status.in?(%w[lobby voting drafting nominating])
+      return render(json: { error: "Draft is no longer active and cannot be reset" }, status: :unprocessable_entity)
+    end
+
+    draft.destroy!
+    render json: { ok: true }
+  end
+
   private
 
   def current_run

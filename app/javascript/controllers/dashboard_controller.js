@@ -3,7 +3,8 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   static targets = [
     "catchModal", "catchNickname", "catchLocation", "catchSpecies", "catchStatus",
-    "markDeadModal", "markDeadNickname", "markDeadGroupId"
+    "markDeadModal", "markDeadNickname", "markDeadGroupId",
+    "resetDraftModal", "resetDraftStatus", "resetDraftId"
   ]
   static values = {
     groupsUrl: String,
@@ -121,6 +122,55 @@ export default class extends Controller {
     } catch (error) {
       alert("Network error")
       this.closeMarkDeadModal()
+    }
+  }
+
+  // ── Reset Gym Draft ──
+  //
+  // Mirrors the Mark Dead pattern: open with pre-filled status, CONFIRM
+  // RESET fires a DELETE to /gym_drafts/:id, CANCEL hides without firing.
+  // Resetting destroys all picks made during the draft — the modal makes
+  // the action explicit, mirroring the mark-dead UX for permadeath.
+
+  openResetDraftModal(event) {
+    const draftId = event.currentTarget.dataset.draftId
+    const status = event.currentTarget.dataset.draftStatus || "active"
+    if (!draftId) return
+
+    this.resetDraftIdTarget.value = draftId
+    this.resetDraftStatusTarget.textContent = status.toUpperCase()
+    this.resetDraftModalTarget.classList.remove("hidden")
+  }
+
+  closeResetDraftModal() {
+    if (!this.hasResetDraftModalTarget) return
+    this.resetDraftModalTarget.classList.add("hidden")
+    this.resetDraftIdTarget.value = ""
+  }
+
+  async confirmResetDraft() {
+    const draftId = this.resetDraftIdTarget.value
+    if (!draftId) return
+
+    try {
+      const response = await fetch(`/gym_drafts/${draftId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": this.csrfValue
+        }
+      })
+
+      if (response.ok) {
+        window.location.reload()
+      } else {
+        const data = await response.json().catch(() => ({}))
+        alert(data.error || "Failed to reset draft")
+        this.closeResetDraftModal()
+      }
+    } catch (error) {
+      alert("Network error")
+      this.closeResetDraftModal()
     }
   }
 }

@@ -6,30 +6,32 @@
 
 ## Where We Stopped
 
-Step 3 (Save Slots, 5 per session) shipped via commit `29186e6` and deployed to `4luckyclovers.com` via GitHub Actions run 25193821050. Slot column on the LEFT, run roster on the RIGHT, canvas in the middle. Awaiting next brief from Project Owner.
+Step 13 (Undo Affordances on Gyms Tab — UNMARK + RESET DRAFT) shipped + FF-merged to `main` + pushed. Awaiting next brief from Project Owner.
 
 ---
 
 ## What Was Built
 
-**Step 3 — Save Slots (5 per session).** New `SoulLinkEmulatorSaveSlot` 1-to-many under `SoulLinkEmulatorSession`. Replaces the single-`save_data`-per-session model with five numbered slots (1-5). New `SaveSlotsController` exposes RESTful slot management; the EmulatorJS "Save File" button POSTs to `/emulator/save_slots` and the server picks the first empty slot or returns 409 with slot metadata when all 5 are full. Slot column on the page enters overwrite-pending mode on 409 — clicking a slot card PATCHes that slot with fresh `getSaveFile()` bytes (Approach 2: stateless, no JS-side stash).
+**Step 13 — UNMARK + RESET DRAFT.** Two "let me undo a mistake" affordances on the dashboard's Gyms tab:
 
-Layout changed from 2-column to 3-column: `[280px slot column] [1fr canvas] [280px run roster]`. Per-slot UI: parsed in-game info (name / time / money / badges), ACTIVE badge, Download / Make Active / Delete actions, Clear All at bottom.
+- **UNMARK** button on the highest defeated gym row in `_gyms_content.html.erb`. Reuses the existing `GymProgressController#update` endpoint (which already toggles based on `GymResult` existence and guards "highest gym only"). No backend change. Lightweight, no confirm modal — Project Owner's pain was *that mistakes are unfixable*; reintroducing friction would defeat the point.
+- **RESET DRAFT** button in the Gyms-tab panel header, alongside START GYM DRAFT, gated on `@active_draft.present?` (status in `lobby/voting/drafting/nominating`). Opens a confirm modal mirroring `_mark_dead_modal.html.erb` byte-for-byte (overlay, gb-modal, close-X, backdrop click). CONFIRM RESET fires DELETE /gym_drafts/:id; page reloads. New `GymDraftsController#destroy` has belt-and-suspenders status guard + auth scoping via `run.gym_drafts.find_by(id:)` to prevent cross-guild bypass.
 
-Migration preserved existing save_data byte-for-byte via raw-SQL `INSERT ... SELECT` into slot 1 with `active_save_slot = 1`. Old per-session save_data + parsed_* columns dropped.
+New file: `_reset_draft_modal.html.erb`. Three new Stimulus actions on `dashboard_controller.js` (`openResetDraftModal`, `closeResetDraftModal`, `confirmResetDraft`) mirroring the Mark Dead pattern. Routes gain `:destroy` on gym_drafts.
 
-305/305 tests pass; deploy verified green.
+Tests: 335 → 343 (+8). New `test/controllers/gym_progress_controller_test.rb` (closes pre-existing test gap — covers mark, unmark, reject-non-highest, reject-invalid-num). Extended `gym_drafts_controller_test.rb` with destroy / destroy-complete-rejected / destroy-cross-guild-404. Rubocop clean (0 offenses across 148 files).
 
 ---
 
 ## What Was Decided This Session
 
-- **Slot model is the new source of truth.** `save_data` and `parsed_*` columns no longer exist on the session — they live on `SoulLinkEmulatorSaveSlot` rows. Sessions point at one via `active_save_slot`.
-- **Authorization model: own-only.** `SaveSlotsController#set_session` resolves only the player's own session via `current_user_id`. Cross-player URL manipulation always returns 404. Tests cover index/PATCH/DELETE/restore/download.
-- **Modal-less overwrite picker.** When all 5 slots are full and the player tries to save, the slot column on the LEFT enters "overwrite-pending" mode and any slot card click PATCHes that slot. No modal.
-- **Approach 2 for the 409 round-trip.** Slot Stimulus controller calls `window.EJS_emulator.gameManager.getSaveFile()` at click time to grab fresh bytes for the PATCH. Stateless, in-game drift on overwrite-click accepted.
-- **Make Active = pointer change only.** No byte mutation when restoring a slot — just updates `active_save_slot`. Player must hard-refresh for the emulator to boot from the new active slot.
-- **`after_create_commit` AND `after_update_commit` on the slot model.** Without the create hook, `@session.save_slots.create!(...)` in the controller wouldn't enqueue a parse on first-time saves. Both fire mutually exclusively per record event — no double-parse risk.
+- **UNMARK gets no confirm modal.** The Project Owner explicitly chose lightweight — recovering from an accidental mark-beaten shouldn't require another step. Title attr is the only "are you sure?" hint.
+- **RESET DRAFT gets the full Mark Dead modal pattern.** Resetting destroys 4-6 rounds of player picks (held in `state_data` JSON); that's real crafted data. Mirroring the existing Mark Dead UX keeps modal UX consistent across the dashboard.
+- **Reset = destroy, not "back to lobby".** Matches the user's mental model ("reset = start over"). After destroy, the user clicks START GYM DRAFT again (the existing button creates fresh).
+- **Reset condition is `status in [lobby, voting, drafting, nominating]`** — same set as `GymDraftsController#create`'s reuse logic. `complete` drafts are intentionally NOT resettable from the dashboard (out of scope; the user marks-beaten or accepts).
+- **Belt-and-suspenders gating.** View gates via `@active_draft` (only loads non-complete); controller gates via `status.in?(...)`. Both must hold; direct-curl bypass returns 422.
+- **No new turbo broadcasts on `GymDraft`.** Reset action returns JSON `{ ok: true }` and the JS reloads. Same model as `GymDraftsController#mark_beaten`. Real-time draft state already flows through the WebSocket channel for the draft show page; the dashboard's gyms tab doesn't need it.
+- **No changes to `GymProgressController`.** The unmark path already works. The pre-existing JSON-response-on-HTML-form quirk stays — it's pre-Step-13 territory and the user has been using MARK BEATEN successfully despite it.
 
 ---
 
@@ -37,7 +39,11 @@ Migration preserved existing save_data byte-for-byte via raw-SQL `INSERT ... SEL
 
 *See `handoff/BUILD-LOG.md` Known Gaps — running list maintained there.*
 
-Project Owner hasn't yet smoke-tested slot UI on prod. Recommended next-session action: hard-refresh `/emulator`, confirm slot 1 shows the migrated save with parsed metadata + ACTIVE badge, save in-game → click "Save File" → confirm slot 2 fills, exercise Make Active / Delete / Download paths.
+Four new gaps logged in this step:
+1. `test/controllers/dashboard_controller_test.rb` does not exist — render-condition tests for the Gyms tab partial were optional per the brief and deferred.
+2. `broadcasts_refreshes_to` not added to `GymDraft` — page-reload after reset is sufficient for v1.
+3. Pre-existing JSON-response-on-HTML-form quirk in `GymProgressController#update` — explicitly forbidden to fix in Step 13.
+4. RESET DRAFT only on the dashboard's Gyms tab, not on `gym_drafts/show.html.erb` — out of scope per the brief; can be added if the user reports the in-draft-page absence as friction.
 
 ---
 

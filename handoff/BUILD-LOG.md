@@ -11,9 +11,9 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 12 — KG-6: Map ID → Name Lookup. **Awaiting review.**
-**Last committed:** Step 11 (`63ebac1`) shipped + merged to `main`. Step 12 not yet committed.
-**Pending deploy:** N/A — Step 12 is YAML + helper + view + tests only. No migration, no infra change.
+**Active step:** Step 13 — Undo Affordances on Gyms Tab (UNMARK + RESET DRAFT). **Reviewed + cleared by Richard (0 Must Fix, 0 Should Fix). Ready to commit + merge to main.**
+**Last committed:** Step 12 (`0a37184`) shipped + merged. Step 13 about to ship.
+**Pending deploy:** N/A — Step 13 is view + 2 controllers + 1 route + JS + 2 tests. No migration, no infra change.
 
 **Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — closes KG-6 (Map ID → name lookup). KG-7 (real-save offset verification) STILL OPEN; map IDs in `config/soul_link/maps.yml` are best-effort pending validation alongside the parser's `MAP_ID_OFFSET`.
 
@@ -23,6 +23,46 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 13 — Undo Affordances on Gyms Tab: UNMARK + RESET DRAFT — 2026-05-01
+**Status:** Awaiting review.
+
+Two related "let me undo a mistake" affordances on the dashboard's Gyms tab:
+- **UNMARK** button on the highest defeated gym row — backend was already in `GymProgressController#update` (toggles based on `GymResult` existence with a "highest only" guard). Step 13 is purely the UI surface.
+- **RESET DRAFT** button in the Gyms-tab panel header (gated on an active draft) plus a confirmation modal mirroring `_mark_dead_modal.html.erb`. Backend is greenfield: new `GymDraftsController#destroy` with status guard + auth scoping via `run.gym_drafts.find_by(id:)`.
+
+**Files created (3):**
+- `app/views/dashboard/_reset_draft_modal.html.erb` — overlay + gb-modal scaffold byte-for-byte mirroring `_mark_dead_modal.html.erb`. Only copy + button labels + Stimulus action names + targets differ. Body copy is calm (matter-of-fact "This deletes the current draft and all picks") because the action is recoverable, unlike permadeath.
+- `test/controllers/gym_progress_controller_test.rb` — NEW file (closes a pre-existing test gap; the controller had zero coverage). 5 tests: requires-login, mark gym beaten, unmark beaten, unmark-non-highest rejected, invalid gym number rejected. Same `login_as(GREY)` setup pattern as the rest of `test/controllers/`.
+
+**Files modified (6):**
+- `app/views/dashboard/_gyms_content.html.erb` — RESET DRAFT button in panel header gated on `@active_draft.present?`; UNMARK button on the defeated gym row gated on `num == @gyms_defeated` (the only gym the controller permits unmarking). Layout conditional: when UNMARK shows, the `Lv.` span uses `margin-left: 6px` so UNMARK eats the auto-margin slot; otherwise `Lv.` keeps `margin-left: auto`.
+- `app/views/dashboard/show.html.erb` — one-line addition rendering the new modal partial.
+- `app/controllers/dashboard_controller.rb` — load `@active_draft` next to other gym data (`@gym_results`). Same query as `GymDraftsController#create`: `run.gym_drafts.where(status: %w[lobby voting drafting nominating]).first`.
+- `app/controllers/gym_drafts_controller.rb` — new `destroy` action. Auth via `run.gym_drafts.find_by(id:)` (mirrors `mark_beaten`). Status guard: `draft.status.in?(%w[lobby voting drafting nominating])`. Returns JSON `{ ok: true }` on success; 404 for missing/cross-guild; 422 for complete drafts.
+- `app/javascript/controllers/dashboard_controller.js` — added 3 targets (`resetDraftModal`, `resetDraftStatus`, `resetDraftId`) and 3 methods (`openResetDraftModal`, `closeResetDraftModal`, `confirmResetDraft`). Mirrors the Mark Dead block byte-for-byte structurally; only the URL is hardcoded to `/gym_drafts/${draftId}` (no Stimulus value pre-wired for this single endpoint, and adding one would be over-engineering for a stable Rails convention).
+- `config/routes.rb` — `:destroy` added to `resources :gym_drafts`. The `member { post :mark_beaten }` block stays unchanged.
+- `test/controllers/gym_drafts_controller_test.rb` — extended with 3 new tests: destroy active draft (success), destroy complete draft (status guard 422), destroy cross-guild draft (404 via `run.gym_drafts.find_by` scoping).
+
+**Key decisions (locked by Architect, executed verbatim):**
+- **No confirm modal on UNMARK.** Light affordance; the action is recoverable (just re-mark beaten). Title attr is the only "are you sure?" hint.
+- **RESET DRAFT uses `gb-btn-danger`** because destroying 4-6 rounds of picks is real data; the modal's CONFIRM RESET also uses `gb-btn-danger` to mirror the Mark Dead pattern.
+- **UNMARK uses `gb-btn`** (default), not danger. Recoverable action — not signaling permadeath.
+- **Status guard is belt-and-suspenders.** View gates via `@active_draft` (non-complete only); controller gates via `status.in?(%w[lobby voting drafting nominating])`. Both must remain — direct-curl bypass on a complete draft would otherwise nullify the `gym_results` foreign key.
+- **Page reload after destroy, not turbo-stream.** Reset is a one-shot user action; full page reload picks up `@active_draft = nil` cleanly. `broadcasts_refreshes_to` on `GymDraft` is logged as future work, not Step 13 scope.
+- **GymProgressController NOT modified.** The unmark backend already exists and is correct. The brief explicitly forbade touching it. The pre-existing JSON-response-on-HTML-form quirk (Mark Beaten returning `{"gyms_defeated":N}` rendered as a page in some browsers) is also out of scope per the brief.
+
+**Tests:** 335 → 343 (+8). 0 failures, 0 errors. New tests:
+- 5 in `gym_progress_controller_test.rb` (NEW file)
+- 3 in `gym_drafts_controller_test.rb` (extension)
+
+**Lint:** `bundle exec rubocop` clean (0 offenses across 148 files; +1 file = the new test file).
+
+**Manual smoke:** verified all four flow steps via an ad-hoc render-condition harness (login + integration session + render at multiple data states). [A] 1 defeated → UNMARK appears on gym 1 row, no RESET DRAFT button, modal partial in DOM ready to open. [B] 2 defeated → UNMARK appears exactly once, positioned after GARDENIA's row marker (the gym 2 leader, not gym 1 ROARK). [C] lobby draft created → RESET DRAFT button appears in panel header with `data-draft-id` and `data-draft-status="lobby"` correctly populated. [D] draft set to complete → RESET DRAFT button disappears (the `@active_draft` view gate working). Backend behavior verified by the new controller tests; the JS reload-on-success path is covered by the response status (200 OK on destroy → `window.location.reload()` in the Stimulus action).
+
+**Diff scope:** 1 new view, 1 new test file, 3 modified views, 2 modified controllers, 1 modified route, 1 modified JS, 1 extended test file, 4 handoff files. Matches the brief's stated diff scope exactly.
+
+---
 
 ### Step 12 — KG-6: Map ID → Name Lookup (SRAM Phase 1 finish) — 2026-05-01
 **Status:** Awaiting review.
@@ -497,6 +537,12 @@ ALL FACTORY SMOKE CHECKS PASSED
 - **`window.alert()` for Tier-A error toasts** (Step 9). Smallest user-facing change that closed the silent-failure gap; a styled toast component (matching the `gb-flash gb-flash-alert` palette) would be cleaner. Track if alerts feel intrusive in real use.
 - **Bot-process broadcasts not yet supported.** The async cable adapter is in-process; Discord modal updates (which run in the bot process via `rake soul_link:bot`) don't propagate to web clients in real time. Switching to a redis cable adapter would unlock this.
 - **Pre-existing soft points from `handoff/PROJECT-REVIEW-2026-04-30.md`** — 20 items, ranked by ROI in that document. Top-priority structural cleanups: (1) `discord_bot.rb` god-object decomposition; (2) zero test coverage on services/channels; (3) `SoulLinkRun.current(guild_id)` lacks a hard "one active per guild" invariant; (4) `DashboardController#show` needs presenter extraction; (5) `SoulLinkEmulatorSession::GzipCoder` should move to a concern. None of these are urgent — Tier-1 refactor work, fresh-session candidate.
+
+### New — From Step 13 (2026-05-01)
+- **`test/controllers/dashboard_controller_test.rb` does not exist.** The Step 13 brief listed render-condition tests (UNMARK button visibility, RESET DRAFT button gating) as *optional* and explicitly said "creating the whole controller test file from scratch is scope expansion — log as Known Gap." Manual render-smoke verified all four data states ([A] 1 defeated, [B] 2 defeated, [C] lobby draft, [D] complete draft) but the assertions were not committed to a permanent test file. A future step that stands up `dashboard_controller_test.rb` should fold these in.
+- **`broadcasts_refreshes_to` on `GymDraft` not added.** Step 13 uses page-reload-after-Stimulus-fetch for the reset flow. A future step could broadcast on draft create/destroy so other open dashboards in the run pick up the state change in real time. Not urgent; cross-player draft real-time already flows through `GymDraftChannel` (the WebSocket) for the draft show page itself.
+- **Pre-existing JSON-response-on-HTML-form quirk in `GymProgressController#update`.** When MARK BEATEN or UNMARK fires from the dashboard via `data: { turbo: false }`, Rails renders the JSON `{"gyms_defeated":N}` as a page (the user sees raw JSON briefly until they hit back). The user has been working with this for MARK BEATEN successfully; UNMARK inherits the same wiring. Brief explicitly forbade touching this in Step 13. Future step: respond with `respond_to do |format|` and a `redirect_back` for HTML, or convert the buttons to Stimulus fetch + reload (mirrors mark-dead/reset-draft).
+- **Reset-draft surface only on the dashboard's Gyms tab.** A reset button on `gym_drafts/show.html.erb` would be redundant per the brief and would need different Stimulus controller scope. If users discover the gyms-tab path is non-obvious during a stuck draft, consider exposing it on the draft show page in a follow-up.
 
 ### New — From Step 10 (2026-04-30)
 - **Visual indentation in a few autocorrected files is awkward.** `Layout/EndAlignment` autocorrect fixed `else`/`end` alignment to match the `if` opener but didn't reindent the bodies between them — for `<var> = if cond \n  body \n else \n  body \n end` patterns the body is now visibly under-aligned vs. the keywords. Specific spots: `app/services/soul_link/discord_bot.rb` lines around 251-261, 353-369, 383-394. Code is correct, tests pass — purely cosmetic. A 5-minute manual cleanup pass would resolve.
