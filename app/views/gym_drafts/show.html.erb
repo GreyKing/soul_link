@@ -7,6 +7,7 @@
      data-gym-draft-draft-id-value="<%= @draft.id %>"
      data-gym-draft-user-id-value="<%= current_user_id %>"
      data-gym-draft-players-value="<%= @players.map { |p| p.merge('discord_user_id' => p['discord_user_id'].to_s) }.to_json %>"
+     data-gym-draft-player-avatars-value="<%= (@draft.soul_link_run.player_avatars || {}).to_json %>"
      data-gym-draft-player-groups-value="<%= @player_groups.transform_keys(&:to_s).transform_values { |groups|
        groups.map { |g|
          {
@@ -98,7 +99,7 @@
     </div>
   </div>
 
-  <%# ── NOMINATING PHASE ── %>
+  <%# ── NOMINATING PHASE — UNIFIED PICK MODEL (Step 14) ── %>
   <div data-gym-draft-target="nominatingPanel" class="hidden">
     <div class="gb-card" style="padding: 16px; margin-bottom: 12px;">
       <div style="font-size: 13px; text-align: center; margin-bottom: 12px;">TEAM SLOTS</div>
@@ -112,31 +113,26 @@
       </div>
     </div>
 
+    <%# Pick-order strip — who's nominated, who's up next %>
+    <div data-gym-draft-target="nomOrderStrip" style="margin-bottom: 12px;"></div>
+
+    <%# Status line + grace countdown + skip button %>
     <div style="text-align: center; margin-bottom: 12px;">
       <span data-gym-draft-target="nomStatus" style="font-size: 11px; color: var(--d1);"></span>
-      <div data-gym-draft-target="skipButton" class="hidden" style="margin-top: 8px;"></div>
+      <span data-gym-draft-target="nomGraceCountdown" style="font-size: 10px; color: var(--d2); margin-left: 8px;"></span>
+      <div data-gym-draft-target="nomSkipButton" class="hidden" style="margin-top: 8px;"></div>
     </div>
 
-    <div data-gym-draft-target="nomVoteArea" class="hidden" style="text-align: center; margin-bottom: 12px;">
-      <div data-gym-draft-target="nomVotePrompt" style="font-size: 11px; margin-bottom: 8px;"></div>
-      <div style="display: flex; justify-content: center; gap: 8px;">
-        <button type="button"
-                data-action="click->gym-draft#approveNomination"
-                class="gb-btn-primary gb-btn-sm">
-          AGREE
-        </button>
-        <button type="button"
-                data-action="click->gym-draft#rejectNomination"
-                class="gb-btn-danger gb-btn-sm">
-          DISAGREE
-        </button>
-      </div>
+    <%# Live candidates row %>
+    <div class="gb-card" style="padding: 10px; margin-bottom: 12px;">
+      <div style="font-size: 11px; color: var(--d2); margin-bottom: 8px;">CANDIDATES</div>
+      <div data-gym-draft-target="nomCandidatesList" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
     </div>
 
+    <%# Pokemon grid for the current nominator's pick %>
     <div class="gb-card" style="padding: 10px;">
-      <div style="font-size: 11px; color: var(--d2); margin-bottom: 8px;">NOMINATE A POKEMON (click to nominate)</div>
-      <div class="gb-grid-4" data-gym-draft-target="nomPokemonGrid">
-      </div>
+      <div style="font-size: 11px; color: var(--d2); margin-bottom: 8px;">YOUR PICK (click to nominate or endorse)</div>
+      <div class="gb-grid-4" data-gym-draft-target="nomPokemonGrid"></div>
     </div>
   </div>
 
@@ -155,6 +151,8 @@
         <% end %>
       </div>
 
+      <%# Q5 fix: MARK BEATEN is the visual primary; BACK TO GYM READY
+          drops to the secondary `gb-btn` weight and lives below it. %>
       <% if @draft.complete? && !@gym_already_marked && @next_gym_number.between?(1, 8) %>
         <div style="text-align: center; margin-top: 12px;">
           <%= button_to "MARK GYM #{@next_gym_number} — #{@next_gym_info&.[]('leader')&.upcase} AS BEATEN",
@@ -164,8 +162,32 @@
         </div>
       <% end %>
 
-      <div style="text-align: center;">
-        <%= link_to "BACK TO GYM READY", gym_ready_path, class: "gb-btn-primary" %>
+      <div style="text-align: center; margin-top: 12px;">
+        <%= link_to "BACK TO GYM READY", gym_ready_path, class: "gb-btn" %>
+      </div>
+    </div>
+  </div>
+
+  <%# ── TCG COIN-FLIP MODAL — tiebreak reveal (Step 14) ── %>
+  <div data-gym-draft-target="coinFlipModal"
+       class="hidden"
+       style="position: fixed; inset: 0; z-index: 70;">
+    <div style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.92);"></div>
+    <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
+      <div class="gb-modal" style="max-width: 480px; text-align: center; border-color: #c0392b;">
+        <div class="gb-modal-title" style="color: #c0392b;">★ WILD COIN APPEARED! ★</div>
+        <div style="padding: 16px;">
+          <div data-gym-draft-target="coinFlipMessage" style="font-size: 11px; color: var(--d1); margin-bottom: 16px;">
+            A tied vote — the coin decides...
+          </div>
+          <div class="tcg-coin-stage">
+            <div data-gym-draft-target="coinFlipCoin" class="tcg-coin">
+              <div class="tcg-coin__face tcg-coin__face--pokeball"></div>
+              <div class="tcg-coin__face tcg-coin__face--character"></div>
+            </div>
+          </div>
+          <div data-gym-draft-target="coinFlipResult" class="hidden" style="margin-top: 16px; font-size: 12px; color: var(--amber);"></div>
+        </div>
       </div>
     </div>
   </div>

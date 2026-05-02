@@ -7,15 +7,18 @@ export default class extends Controller {
     "lobbyPanel", "readyGrid", "readyButton",
     "votingPanel", "voteGrid", "voteStatus",
     "draftingPanel", "teamSlots", "turnIndicator", "myPokemonGrid",
-    "nominatingPanel", "nomTeamSlots", "nomStatus", "nomVoteArea", "nomVotePrompt", "nomPokemonGrid",
+    "nominatingPanel", "nomTeamSlots", "nomStatus", "nomOrderStrip",
+    "nomGraceCountdown", "nomSkipButton", "nomCandidatesList", "nomPokemonGrid",
     "completePanel", "finalTeamSlots",
-    "skipButton"
+    "skipButton",
+    "coinFlipModal", "coinFlipMessage", "coinFlipCoin", "coinFlipResult"
   ]
   static values = {
     draftId: Number,
     userId: String,
     players: Array,
-    playerGroups: Object
+    playerGroups: Object,
+    playerAvatars: Object
   }
 
   connect() {
@@ -27,10 +30,15 @@ export default class extends Controller {
     )
     this.state = null
     this.skipTurnTimer = null
+    this.graceTickTimer = null
+    this.coinFlipShownFor = null
+    this.coinFlipTimers = []
   }
 
   disconnect() {
     this.clearSkipTimer()
+    this.clearGraceTick()
+    this.clearCoinFlipTimers()
     if (this.subscription) {
       this.subscription.unsubscribe()
     }
@@ -67,7 +75,6 @@ export default class extends Controller {
     this.subscription.perform("ready")
     this.readyButtonTarget.disabled = true
     this.readyButtonTarget.textContent = "Waiting..."
-    this.readyButtonTarget.classList.replace("bg-green-600", "bg-gray-600")
   }
 
   vote(event) {
@@ -87,20 +94,12 @@ export default class extends Controller {
     this.disablePokemonCards(this.myPokemonGridTarget)
   }
 
-  nominatePokemon(event) {
+  // Step 14: unified action — server picks new-vs-endorse based on
+  // whether the group_id is already a candidate.
+  nominateOrEndorse(event) {
     const groupId = parseInt(event.currentTarget.dataset.groupId)
     this.subscription.perform("nominate", { group_id: groupId })
     this.disablePokemonCards(this.nomPokemonGridTarget)
-  }
-
-  approveNomination() {
-    this.subscription.perform("vote_nomination", { approve: true })
-    this.nomVoteAreaTarget.querySelectorAll("button").forEach(btn => { btn.disabled = true })
-  }
-
-  rejectNomination() {
-    this.subscription.perform("vote_nomination", { approve: false })
-    this.nomVoteAreaTarget.querySelectorAll("button").forEach(btn => { btn.disabled = true })
   }
 
   disablePokemonCards(grid) {
@@ -118,9 +117,12 @@ export default class extends Controller {
     const { status } = this.state
     this.phaseLabelTarget.textContent = this.phaseDisplayName(status)
 
-    // Clear skip timer — drafting/nominating renderers will restart it
-    if (status !== "drafting" && status !== "nominating") {
+    // Clear timers — drafting/nominating renderers will restart what they need.
+    if (status !== "drafting") {
       this.clearSkipTimer()
+    }
+    if (status !== "nominating") {
+      this.clearGraceTick()
     }
 
     // Show/hide panels
@@ -137,6 +139,10 @@ export default class extends Controller {
       case "nominating": this.renderNominating(); break
       case "complete": this.renderComplete(); break
     }
+
+    // Coin flip is a complete-phase concern but the modal lives outside
+    // the panel toggles so it can overlay the page during the reveal.
+    this.maybeShowCoinFlip()
   }
 
   renderLobby() {
@@ -148,17 +154,14 @@ export default class extends Controller {
       const statusEl = card.querySelector(".ready-status")
       if (statusEl) {
         statusEl.textContent = isReady ? "Ready!" : "Not ready"
-        statusEl.className = `text-xs mt-1 ready-status ${isReady ? "text-green-400" : "text-gray-500"}`
+        statusEl.style.color = isReady ? "var(--amber)" : "var(--l1)"
       }
-      card.classList.toggle("border-green-600", isReady)
-      card.classList.toggle("border-gray-700", !isReady)
     })
 
     const myReady = readyPlayers.includes(this.userIdValue)
     if (myReady) {
       this.readyButtonTarget.disabled = true
       this.readyButtonTarget.textContent = "Waiting..."
-      this.readyButtonTarget.classList.replace("bg-green-600", "bg-gray-600")
     }
 
     this.phaseInfoTarget.textContent = `${readyPlayers.length}/${(this.state.player_ids || []).length} ready`
@@ -196,66 +199,274 @@ export default class extends Controller {
       ? "It's your turn! Pick a pokemon."
       : `Waiting for ${currentPlayer?.display_name || "..."} to pick...`
 
-    this.phaseInfoTarget.textContent = `Round ${this.state.picks.length + 1}/6`
+    this.phaseInfoTarget.textContent = `Round ${this.state.picks.length + 1}/4`
 
     // Render my pokemon as pickable cards
     this.renderPokemonGrid(this.myPokemonGridTarget, isMyTurn, "pick")
 
-    this.startSkipTimer("drafting")
+    this.startSkipTimer()
   }
 
   renderNominating() {
     this.fillTeamSlots(this.nomTeamSlotsTarget, this.state.picks)
 
-    const nomination = this.state.current_nomination
-    const slotsRemaining = 6 - this.state.picks.length
-
-    this.phaseInfoTarget.textContent = `${slotsRemaining} slot${slotsRemaining > 1 ? "s" : ""} remaining`
-
-    if (nomination) {
-      const nominator = this.findPlayer(nomination.nominator_id)
-      const group = this.findGroupById(nomination.group_id)
-      const groupName = group ? group.nickname : `Group #${nomination.group_id}`
-
-      this.nomStatusTarget.textContent = `${nominator?.display_name} nominated "${groupName}"`
-
-      // Show vote buttons for non-nominators
-      const isNominator = String(nomination.nominator_id) === this.userIdValue
-      const hasVoted = nomination.votes && nomination.votes[this.userIdValue] !== undefined
-
-      if (!isNominator && !hasVoted) {
-        this.nomVoteAreaTarget.classList.remove("hidden")
-        this.nomVoteAreaTarget.classList.remove("opacity-50")
-        this.nomVotePromptTarget.textContent = `Do you agree with "${groupName}"?`
-      } else {
-        this.nomVoteAreaTarget.classList.add("hidden")
-      }
-    } else {
-      const currentNominatorId = this.state.pick_order
-        ? this.state.pick_order[this.state.current_player_index % this.state.pick_order.length]
-        : null
-      const isMyTurnToNominate = String(currentNominatorId) === this.userIdValue
-      const currentNominator = this.findPlayer(currentNominatorId)
-      this.nomStatusTarget.textContent = isMyTurnToNominate
-        ? "Your turn to nominate a pokemon!"
-        : `Waiting for ${currentNominator?.display_name || "..."} to nominate...`
-      this.nomVoteAreaTarget.classList.add("hidden")
-    }
-
-    // Render pokemon grid for nomination
-    const currentNominatorId = this.state.pick_order
-      ? this.state.pick_order[this.state.current_player_index % this.state.pick_order.length]
-      : null
+    const currentNominatorId = this.state.current_nominator_id
     const isMyTurnToNominate = String(currentNominatorId) === this.userIdValue
-    const canNominate = !nomination && isMyTurnToNominate
-    this.renderPokemonGrid(this.nomPokemonGridTarget, canNominate, "nominate")
+    const currentPlayer = this.findPlayer(currentNominatorId)
 
-    this.startSkipTimer("nominating")
+    const remaining = this.state.nomination_picks_remaining ?? 0
+    this.phaseInfoTarget.textContent = `${remaining} pick${remaining === 1 ? "" : "s"} left`
+    this.nomStatusTarget.textContent = isMyTurnToNominate
+      ? "Your turn — pick a pokemon to nominate or endorse."
+      : `Waiting for ${currentPlayer?.display_name || "..."} to pick...`
+
+    this.renderNomOrderStrip()
+    this.renderCandidates()
+    this.renderNomPokemonGrid(isMyTurnToNominate)
+    this.renderNomGraceCountdown()
   }
 
   renderComplete() {
     this.fillTeamSlots(this.finalTeamSlotsTarget, this.state.picks)
     this.phaseInfoTarget.textContent = "Team drafted!"
+  }
+
+  // ── Nominating helpers (Step 14) ──
+
+  renderNomOrderStrip() {
+    const order = this.state.pick_order || []
+    const made = (this.state.candidates || []).flatMap(c => c.voters || []).map(String)
+    const currentNomId = String(this.state.current_nominator_id)
+
+    this.nomOrderStripTarget.replaceChildren()
+    const wrap = document.createElement("div")
+    wrap.style.display = "flex"
+    wrap.style.justifyContent = "center"
+    wrap.style.gap = "8px"
+    wrap.style.flexWrap = "wrap"
+
+    order.forEach(uid => {
+      const pid = String(uid)
+      const player = this.findPlayer(pid)
+      const hasPicked = made.includes(pid)
+      const isCurrent = pid === currentNomId
+
+      const chip = document.createElement("div")
+      chip.style.padding = "6px 10px"
+      chip.style.fontSize = "10px"
+      chip.style.border = "2px solid var(--d1)"
+      chip.style.background = hasPicked ? "var(--d2)" : "var(--l1)"
+      chip.style.color = hasPicked ? "var(--l2)" : "var(--d1)"
+      chip.style.fontFamily = "'Press Start 2P', monospace"
+      if (isCurrent) {
+        chip.style.borderColor = "var(--amber)"
+        chip.style.boxShadow = "0 0 0 2px var(--amber)"
+      }
+      const prefix = hasPicked ? "✓ " : (isCurrent ? "▶ " : "")
+      chip.textContent = `${prefix}${player?.display_name || pid}`
+      wrap.appendChild(chip)
+    })
+
+    this.nomOrderStripTarget.appendChild(wrap)
+  }
+
+  renderCandidates() {
+    const candidates = this.state.candidates || []
+    const list = this.nomCandidatesListTarget
+    list.replaceChildren()
+
+    if (candidates.length === 0) {
+      const empty = document.createElement("div")
+      empty.style.fontSize = "10px"
+      empty.style.color = "var(--d2)"
+      empty.textContent = "No nominations yet."
+      list.appendChild(empty)
+      return
+    }
+
+    const maxCount = Math.max(...candidates.map(c => (c.voters || []).length))
+
+    candidates.forEach(cand => {
+      const group = this.findGroupById(cand.group_id)
+      const card = document.createElement("div")
+      card.className = "gb-candidate-card"
+      const voters = cand.voters || []
+      if (voters.length === maxCount) {
+        card.classList.add("gb-candidate-card--leading")
+      }
+
+      const name = document.createElement("div")
+      name.className = "gb-candidate-card__name"
+      name.textContent = group?.nickname || `#${cand.group_id}`
+      card.appendChild(name)
+
+      // First pokemon's species as a representative label
+      const speciesText = group?.pokemon?.[0]?.species || ""
+      if (speciesText) {
+        const species = document.createElement("div")
+        species.className = "gb-candidate-card__species"
+        species.textContent = speciesText
+        card.appendChild(species)
+      }
+
+      const row = document.createElement("div")
+      row.className = "gb-candidate-card__row"
+
+      const pile = document.createElement("div")
+      pile.className = "gb-avatar-pile"
+      voters.forEach(uid => pile.appendChild(this.buildAvatar(uid)))
+      row.appendChild(pile)
+
+      const count = document.createElement("div")
+      count.className = "gb-candidate-card__count"
+      count.textContent = `★ ${voters.length}`
+      row.appendChild(count)
+
+      card.appendChild(row)
+      list.appendChild(card)
+    })
+  }
+
+  renderNomPokemonGrid(canPick) {
+    const candidateGroupIds = new Set((this.state.candidates || []).map(c => c.group_id))
+    this.renderPokemonGrid(this.nomPokemonGridTarget, canPick, "nominate", {
+      labelForGroup: (group) => candidateGroupIds.has(group.id) ? "ENDORSE" : "NOMINATE"
+    })
+  }
+
+  renderNomGraceCountdown() {
+    this.clearGraceTick()
+    const ts = this.state.current_turn_started_at
+    if (!ts) {
+      this.nomGraceCountdownTarget.textContent = ""
+      this.hideNomSkipButton()
+      return
+    }
+
+    const tick = () => {
+      const startedAt = Date.parse(ts)
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000)
+      const remaining = 60 - elapsed
+      const isMyTurn = String(this.state.current_nominator_id) === this.userIdValue
+
+      if (remaining > 0) {
+        this.nomGraceCountdownTarget.textContent = `(grace ${remaining}s)`
+        // Only the current nominator can skip during grace.
+        if (isMyTurn) {
+          this.showNomSkipButton(`SKIP MY TURN (${remaining}s)`)
+        } else {
+          this.hideNomSkipButton()
+        }
+      } else {
+        this.nomGraceCountdownTarget.textContent = "(skip available)"
+        // After grace, anyone may skip.
+        this.showNomSkipButton(isMyTurn ? "SKIP MY TURN" : "SKIP STALLED TURN")
+      }
+    }
+
+    tick()
+    this.graceTickTimer = setInterval(tick, 1000)
+  }
+
+  showNomSkipButton(label) {
+    const target = this.nomSkipButtonTarget
+    target.classList.remove("hidden")
+    if (target.dataset.currentLabel !== label || target.children.length === 0) {
+      target.replaceChildren()
+      const btn = document.createElement("button")
+      btn.type = "button"
+      btn.className = "gb-btn gb-btn-sm"
+      btn.textContent = label
+      btn.addEventListener("click", () => {
+        this.subscription.perform("skip")
+        btn.disabled = true
+        btn.textContent = "Skipping..."
+      })
+      target.appendChild(btn)
+      target.dataset.currentLabel = label
+    }
+  }
+
+  hideNomSkipButton() {
+    this.nomSkipButtonTarget.classList.add("hidden")
+    this.nomSkipButtonTarget.replaceChildren()
+    delete this.nomSkipButtonTarget.dataset.currentLabel
+  }
+
+  clearGraceTick() {
+    if (this.graceTickTimer) {
+      clearInterval(this.graceTickTimer)
+      this.graceTickTimer = null
+    }
+    this.hideNomSkipButton()
+  }
+
+  // ── Coin-flip modal (Step 14) ──
+
+  maybeShowCoinFlip() {
+    if (!this.hasCoinFlipModalTarget) return
+    const tb = this.state?.tiebreak
+    const status = this.state?.status
+
+    // Modal only shows for completed drafts that recorded a tiebreak.
+    if (status !== "complete" || !tb) {
+      this.coinFlipModalTarget.classList.add("hidden")
+      return
+    }
+
+    // Dedupe: render() fires on every state update, the modal must
+    // animate exactly once per resolution. Key on the JSON shape so a
+    // second tiebreak (impossible today, but defensive) would re-fire.
+    const key = JSON.stringify(tb)
+    if (this.coinFlipShownFor === key) return
+    this.coinFlipShownFor = key
+
+    this.runCoinFlipAnimation(tb)
+  }
+
+  runCoinFlipAnimation(tiebreak) {
+    this.clearCoinFlipTimers()
+    const modal = this.coinFlipModalTarget
+    const message = this.coinFlipMessageTarget
+    const coin = this.coinFlipCoinTarget
+    const result = this.coinFlipResultTarget
+
+    const tied = tiebreak.tied_group_ids || []
+    const winners = (tiebreak.winners || []).map(id => {
+      const g = this.findGroupById(id)
+      return g?.nickname || `#${id}`
+    })
+
+    if (tiebreak.type === "n_way") {
+      message.textContent = `All ${tied.length} picks were unique. The coin chooses ${winners.length}.`
+    } else {
+      message.textContent = `Slot 6 was tied between ${tied.length} candidates.`
+    }
+
+    // Hide stale result, show the modal, restart the keyframe.
+    result.classList.add("hidden")
+    result.textContent = ""
+    modal.classList.remove("hidden")
+    coin.classList.remove("tcg-coin--flipping")
+    void coin.offsetWidth
+    coin.classList.add("tcg-coin--flipping")
+
+    this.coinFlipTimers.push(setTimeout(() => {
+      result.textContent = `Winner${winners.length === 1 ? "" : "s"}: ${winners.join(" + ")}`
+      result.classList.remove("hidden")
+    }, 1900))
+
+    this.coinFlipTimers.push(setTimeout(() => {
+      modal.classList.add("hidden")
+      coin.classList.remove("tcg-coin--flipping")
+    }, 4000))
+  }
+
+  clearCoinFlipTimers() {
+    if (this.coinFlipTimers) {
+      this.coinFlipTimers.forEach(t => clearTimeout(t))
+    }
+    this.coinFlipTimers = []
   }
 
   // ── Helpers ──
@@ -292,11 +503,11 @@ export default class extends Controller {
     })
   }
 
-  renderPokemonGrid(container, interactive, actionType) {
+  renderPokemonGrid(container, interactive, actionType, opts = {}) {
     const myUid = this.userIdValue
     const allGroups = this.playerGroupsValue[myUid] || []
     const pickedGroupIds = (this.state.picks || []).map(p => p.group_id)
-    const action = actionType === "pick" ? "click->gym-draft#pickPokemon" : "click->gym-draft#nominatePokemon"
+    const action = actionType === "pick" ? "click->gym-draft#pickPokemon" : "click->gym-draft#nominateOrEndorse"
 
     container.replaceChildren()
 
@@ -343,10 +554,40 @@ export default class extends Controller {
         locationDiv.textContent = group.location
 
         card.append(nameDiv, speciesDiv, locationDiv)
+
+        if (opts.labelForGroup) {
+          const tag = document.createElement("div")
+          tag.className = "text-[10px]"
+          tag.style.color = "var(--amber)"
+          tag.style.marginTop = "4px"
+          tag.textContent = opts.labelForGroup(group)
+          card.appendChild(tag)
+        }
       }
 
       container.appendChild(card)
     })
+  }
+
+  buildAvatar(uid) {
+    const pid = String(uid)
+    const url = (this.playerAvatarsValue || {})[pid]
+    if (url) {
+      const img = document.createElement("img")
+      img.src = url
+      img.alt = ""
+      img.className = "gb-avatar gb-avatar--24"
+      return img
+    }
+    const span = document.createElement("span")
+    const player = this.findPlayer(pid)
+    const name = player?.display_name || pid
+    const initial = (name[0] || "?").toUpperCase()
+    const colorIndex = (parseInt(pid, 10) || 0) % 4
+    span.className = `gb-avatar gb-avatar--24 gb-avatar--initial gb-avatar--c${colorIndex}`
+    span.textContent = initial
+    span.title = name
+    return span
   }
 
   clearSkipTimer() {
@@ -360,18 +601,18 @@ export default class extends Controller {
     })
   }
 
-  startSkipTimer(phase) {
+  startSkipTimer() {
+    // Drafting-only legacy skip surface — kept simple, 30s passive
+    // delay then a button. The nominating-phase skip is driven by the
+    // grace countdown render.
     this.clearSkipTimer()
-    const targetEl = phase === "drafting"
-      ? this.skipButtonTargets.find(el => this.draftingPanelTarget.contains(el))
-      : this.skipButtonTargets.find(el => this.nominatingPanelTarget.contains(el))
-
+    const targetEl = this.skipButtonTargets.find(el => this.draftingPanelTarget.contains(el))
     if (!targetEl) return
 
     this.skipTurnTimer = setTimeout(() => {
       const btn = document.createElement("button")
       btn.type = "button"
-      btn.className = "gb-btn-danger gb-btn-sm"
+      btn.className = "gb-btn gb-btn-sm"
       btn.textContent = "SKIP TURN"
       btn.addEventListener("click", () => {
         this.subscription.perform("skip")

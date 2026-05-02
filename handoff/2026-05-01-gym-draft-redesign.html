@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Gym Draft Redesign — Final 2 Picks</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --d0: #0a1a0a;
+    --d1: #1a2e1a;
+    --d2: #3a5a3a;
+    --l1: #8a9e6a;
+    --l2: #9aae7a;
+    --white: #c0d0a0;
+    --amber: #d4b14a;
+    --crimson: #c75a5a;
+    --green-glow: #5fd45f;
+    --border: 3px solid var(--d1);
+    --border-thin: 2px solid var(--d1);
+    --border-double: 4px double var(--d1);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background: var(--d0);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(154, 174, 122, 0.025) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse at top, #142214 0%, #0a1a0a 70%);
+    color: var(--white);
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    line-height: 1.4;
+    min-height: 100vh;
+  }
+
+  /* ──── Page chrome ──── */
+
+  .page {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 32px 16px 96px;
+  }
+
+  .page-banner {
+    border: var(--border);
+    background: var(--d1);
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    position: relative;
+  }
+  .page-banner::before {
+    content: "";
+    position: absolute;
+    top: 4px; left: 4px; right: 4px; bottom: 4px;
+    border: 1px solid var(--d2);
+    pointer-events: none;
+  }
+  .page-banner h1 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 18px;
+    color: var(--white);
+    margin: 0 0 8px;
+    letter-spacing: 1px;
+  }
+  .page-banner .sub {
+    color: var(--l1);
+    font-size: 16px;
+  }
+
+  .legend {
+    background: var(--d1);
+    border: var(--border-thin);
+    padding: 14px 18px;
+    margin-bottom: 32px;
+    color: var(--l2);
+    font-size: 16px;
+  }
+  .legend strong { color: var(--amber); }
+  .legend ul { margin: 6px 0 0; padding-left: 20px; }
+  .legend li { margin: 2px 0; }
+
+  /* ──── Section header ──── */
+
+  .section-anchor {
+    margin: 64px 0 16px;
+    border-top: 1px dashed var(--d2);
+    padding-top: 24px;
+  }
+  .section-anchor:first-of-type { margin-top: 0; border-top: none; padding-top: 0; }
+  .section-tag {
+    display: inline-block;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: var(--d0);
+    background: var(--amber);
+    padding: 4px 8px;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+  .section-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px;
+    color: var(--white);
+    margin: 0 0 4px;
+  }
+  .section-note {
+    color: var(--l1);
+    font-size: 16px;
+    margin-bottom: 18px;
+    max-width: 640px;
+  }
+
+  /* ──── Generic GB panel ──── */
+
+  .gb-panel {
+    background: var(--d1);
+    border: var(--border);
+    padding: 18px;
+    position: relative;
+    margin-bottom: 16px;
+  }
+
+  .gb-panel.glow {
+    box-shadow: 0 0 0 1px var(--green-glow), 0 0 16px rgba(95, 212, 95, 0.18);
+  }
+
+  .gb-card {
+    background: var(--d2);
+    border: var(--border-thin);
+    padding: 12px;
+  }
+  .gb-card.dim { opacity: 0.4; }
+
+  .h-bar {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 14px;
+  }
+  .phase-pill {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: var(--d0);
+    background: var(--white);
+    padding: 4px 8px;
+    letter-spacing: 1px;
+  }
+  .phase-pill.amber { background: var(--amber); }
+  .phase-pill.green { background: var(--green-glow); color: var(--d0); }
+
+  .h-bar .info {
+    color: var(--l1);
+    font-size: 16px;
+  }
+
+  /* ──── Player Roster Bar (lobby + drafting + nominating) ──── */
+
+  .roster {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .roster .seat {
+    background: var(--d2);
+    border: var(--border-thin);
+    padding: 10px 8px;
+    text-align: center;
+    position: relative;
+  }
+  .roster .seat .name {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    color: var(--l2);
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+  }
+  .roster .seat .badge {
+    font-size: 14px;
+    color: var(--l1);
+  }
+  .roster .seat.ready  { border-color: var(--green-glow); }
+  .roster .seat.ready .badge { color: var(--green-glow); }
+  .roster .seat.not-ready .badge { color: var(--d2); }
+  .roster .seat.you::after {
+    content: "YOU";
+    position: absolute;
+    top: -8px; right: -6px;
+    background: var(--amber);
+    color: var(--d0);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    padding: 2px 4px;
+    letter-spacing: 0.5px;
+  }
+  .roster .seat.captain::before {
+    content: "★";
+    position: absolute;
+    top: -10px; left: 50%;
+    transform: translateX(-50%);
+    color: var(--amber);
+    font-size: 16px;
+    text-shadow: 0 0 4px rgba(212, 177, 74, 0.6);
+  }
+
+  /* ──── Picks track ──── */
+
+  .picks-track {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+  }
+  .picks-track .slot {
+    background: var(--d2);
+    border: 2px dashed var(--l1);
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 4px;
+    text-align: center;
+    position: relative;
+  }
+  .picks-track .slot.filled {
+    border: var(--border-thin);
+    background: var(--d1);
+  }
+  .picks-track .slot.filled.individual { border-color: var(--l1); }
+  .picks-track .slot.filled.nominated { border-color: var(--amber); }
+  .picks-track .slot.pending {
+    border: 2px dashed var(--amber);
+    animation: pulseAmber 1.6s ease-in-out infinite;
+  }
+  @keyframes pulseAmber {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(212, 177, 74, 0.3); }
+    50%      { box-shadow: 0 0 0 4px rgba(212, 177, 74, 0); }
+  }
+  .picks-track .slot .num {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: var(--l1);
+    position: absolute; top: 4px; left: 4px;
+  }
+  .picks-track .slot .nick {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: var(--white);
+    margin-top: 4px;
+    word-break: break-word;
+  }
+  .picks-track .slot .who {
+    font-size: 13px;
+    color: var(--l1);
+    margin-top: 2px;
+  }
+  .picks-track .slot.pending .empty-label {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: var(--amber);
+    text-align: center;
+  }
+
+  /* ──── Pick-order track (drafting) ──── */
+
+  .order-track {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0;
+    flex-wrap: wrap;
+  }
+  .order-track .seat-mini {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 4px;
+  }
+  .order-track .seat-mini .num {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: var(--l1);
+  }
+  .order-track .seat-mini .chip {
+    background: var(--d2);
+    border: var(--border-thin);
+    padding: 6px 10px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    color: var(--l2);
+  }
+  .order-track .seat-mini.done .chip { background: var(--d1); color: var(--d2); border-color: var(--d2); text-decoration: line-through; }
+  .order-track .seat-mini.active .chip { background: var(--amber); color: var(--d0); border-color: var(--amber); animation: blink 1s steps(2) infinite; }
+  .order-track .seat-mini.upcoming .chip { background: var(--d1); color: var(--l1); }
+  .order-track .arrow { color: var(--d2); font-size: 22px; }
+  @keyframes blink { 50% { opacity: 0.55; } }
+
+  /* ──── Nominee card ──── */
+
+  .nominee-card {
+    background: var(--d0);
+    border: var(--border-double);
+    padding: 22px 18px;
+    text-align: center;
+    margin: 18px 0 16px;
+    position: relative;
+  }
+  .nominee-card .label {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: var(--amber);
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .nominee-card .nominee-nick {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 18px;
+    color: var(--white);
+    margin: 6px 0 4px;
+  }
+  .nominee-card .nominee-species {
+    color: var(--l2);
+    font-size: 18px;
+    margin-bottom: 6px;
+  }
+  .nominee-card .nominator {
+    color: var(--l1);
+    font-size: 15px;
+  }
+  .nominee-card .nominator strong { color: var(--amber); }
+
+  /* ──── Vote panel (LED row, 1 cell per player) ──── */
+
+  .vote-panel {
+    background: var(--d2);
+    border: var(--border-thin);
+    padding: 14px 12px;
+    margin-bottom: 14px;
+  }
+  .vote-panel .label {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: var(--l1);
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+  .vote-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .vote-cell {
+    background: var(--d0);
+    border: var(--border-thin);
+    padding: 10px 6px;
+    text-align: center;
+    position: relative;
+  }
+  .vote-cell .who {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: var(--l2);
+    margin-bottom: 6px;
+  }
+  .vote-cell .led {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    margin: 0 auto;
+    background: var(--d2);
+    border: 2px solid var(--d1);
+  }
+  .vote-cell.nominator .led {
+    background: var(--green-glow);
+    box-shadow: 0 0 8px rgba(95, 212, 95, 0.6);
+  }
+  .vote-cell.nominator::after {
+    content: "AUTO";
+    position: absolute;
+    top: -6px; right: 4px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 6px;
+    color: var(--d0);
+    background: var(--amber);
+    padding: 1px 3px;
+  }
+  .vote-cell.yes .led {
+    background: var(--green-glow);
+    box-shadow: 0 0 8px rgba(95, 212, 95, 0.6);
+  }
+  .vote-cell.no .led {
+    background: var(--crimson);
+    box-shadow: 0 0 8px rgba(199, 90, 90, 0.6);
+  }
+  .vote-cell.pending .led {
+    background: var(--d2);
+    animation: pendingPulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pendingPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(154, 174, 122, 0.5); }
+    50%      { box-shadow: 0 0 0 6px rgba(154, 174, 122, 0); }
+  }
+  .vote-cell .verdict {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    color: var(--l1);
+    margin-top: 6px;
+    letter-spacing: 0.5px;
+  }
+  .vote-cell.yes .verdict { color: var(--green-glow); }
+  .vote-cell.no .verdict { color: var(--crimson); }
+  .vote-cell.pending .verdict { color: var(--d2); }
+  .vote-cell.captain::before {
+    content: "★";
+    position: absolute;
+    top: -10px; left: 50%;
+    transform: translateX(-50%);
+    color: var(--amber);
+    font-size: 14px;
+  }
+
+  .tally-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--d0);
+    border: var(--border-thin);
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+  }
+  .tally-bar .count {
+    display: flex; align-items: center; gap: 14px;
+  }
+  .tally-bar .count span { color: var(--l2); }
+  .tally-bar .count .y { color: var(--green-glow); }
+  .tally-bar .count .n { color: var(--crimson); }
+  .tally-bar .threshold { color: var(--l1); }
+
+  /* ──── Vote buttons ──── */
+
+  .vote-actions {
+    display: flex; gap: 10px; justify-content: center;
+    margin-top: 6px;
+  }
+  .gb-btn-stub {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    border: var(--border-thin);
+    padding: 10px 16px;
+    cursor: pointer;
+    background: var(--d2);
+    color: var(--white);
+    letter-spacing: 1px;
+  }
+  .gb-btn-stub.primary { background: var(--green-glow); color: var(--d0); border-color: var(--green-glow); }
+  .gb-btn-stub.danger { background: var(--crimson); color: var(--white); border-color: var(--crimson); }
+  .gb-btn-stub.amber { background: var(--amber); color: var(--d0); border-color: var(--amber); }
+  .gb-btn-stub.ghost { background: var(--d1); color: var(--l2); }
+  .gb-btn-stub:disabled, .gb-btn-stub.disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .pokemon-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .poke-card {
+    background: var(--d2);
+    border: var(--border-thin);
+    padding: 10px 8px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .poke-card:hover { border-color: var(--amber); }
+  .poke-card.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+  .poke-card .nick {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: var(--white);
+    margin-bottom: 4px;
+  }
+  .poke-card .species {
+    font-size: 14px;
+    color: var(--l1);
+  }
+  .poke-card .loc {
+    font-size: 12px;
+    color: var(--d2);
+    margin-top: 2px;
+  }
+
+  /* ──── Resolution banner ──── */
+
+  .resolution {
+    border: var(--border-double);
+    padding: 18px;
+    text-align: center;
+    margin: 16px 0;
+  }
+  .resolution.approved { border-color: var(--green-glow); background: rgba(95, 212, 95, 0.06); }
+  .resolution.rejected { border-color: var(--crimson); background: rgba(199, 90, 90, 0.06); }
+  .resolution.tied { border-color: var(--amber); background: rgba(212, 177, 74, 0.06); }
+
+  .resolution .verdict {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 16px;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+  .resolution.approved .verdict { color: var(--green-glow); }
+  .resolution.rejected .verdict { color: var(--crimson); }
+  .resolution.tied .verdict { color: var(--amber); }
+
+  .resolution .breakdown {
+    color: var(--l2);
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+  .resolution .next-up {
+    background: var(--d0);
+    border: var(--border-thin);
+    padding: 8px 12px;
+    margin-top: 12px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    color: var(--white);
+    display: inline-block;
+  }
+  .resolution .countdown {
+    color: var(--amber);
+    margin-left: 6px;
+  }
+
+  /* ──── Final reveal ──── */
+
+  .reveal-team {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .reveal-card {
+    background: var(--d1);
+    border: var(--border-thin);
+    padding: 10px 6px;
+    text-align: center;
+  }
+  .reveal-card.individual { border-color: var(--l1); }
+  .reveal-card.nominated { border-color: var(--amber); }
+  .reveal-card .badge {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .reveal-card.individual .badge { color: var(--l1); }
+  .reveal-card.nominated .badge { color: var(--amber); }
+  .reveal-card .nick {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    color: var(--white);
+    margin-bottom: 2px;
+  }
+  .reveal-card .species {
+    font-size: 13px;
+    color: var(--l2);
+    margin-bottom: 2px;
+  }
+  .reveal-card .who {
+    font-size: 12px;
+    color: var(--l1);
+  }
+
+  /* ──── Annotation callouts ──── */
+
+  .callout {
+    margin: 14px 0;
+    padding: 10px 14px;
+    border-left: 3px solid var(--amber);
+    background: rgba(212, 177, 74, 0.06);
+    color: var(--l2);
+    font-size: 16px;
+  }
+  .callout strong { color: var(--amber); }
+
+  .small-print {
+    color: var(--d2);
+    font-size: 13px;
+    text-align: right;
+    margin-top: 4px;
+  }
+
+  /* ──── State sub-headers (within a section) ──── */
+  .substate {
+    margin: 30px 0 8px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px;
+    color: var(--white);
+    border-left: 4px solid var(--green-glow);
+    padding-left: 10px;
+  }
+  .substate small { font-family: 'VT323', monospace; font-size: 14px; color: var(--l1); margin-left: 8px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ============================================================ -->
+<!-- HEADER + LEGEND                                              -->
+<!-- ============================================================ -->
+<div class="page-banner">
+  <h1>GYM DRAFT — REDESIGN MOCKUP</h1>
+  <div class="sub">2026-05-01 · Focus: final 2 picks (nominating phase) · Pair this file with handoff/2026-05-01-gym-draft-audit.md</div>
+</div>
+
+<div class="legend">
+  <strong>What's new (over the current implementation):</strong>
+  <ul>
+    <li><strong>Vote LED row</strong> — 1 cell per player, live yes / no / pending state. Replaces the silent "do you agree?" buttons.</li>
+    <li><strong>Live tally + threshold</strong> — "2 YES · 1 NO · 1 PENDING — needs 3/4 to pass."</li>
+    <li><strong>Tiebreak story</strong> — 2-2 ties give the deciding vote to the first-pick captain (★). Real rule, real UI.</li>
+    <li><strong>Rejection rotation</strong> — rejected nomination auto-advances to the next nominator with a visible breakdown (current code reuses the same nominator forever).</li>
+    <li><strong>Skip-turn restricted to current nominator</strong> — current code lets anyone skip anyone's turn (security/UX bug).</li>
+    <li><strong>Change-vote allowed pre-resolution</strong> — current JS disables vote buttons after click; the model permits a change but UI doesn't.</li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 1 — LOBBY                                            -->
+<!-- ============================================================ -->
+<div class="section-anchor">
+  <div class="section-tag">PHASE 1</div>
+  <div class="section-title">LOBBY · WAITING FOR PLAYERS</div>
+  <div class="section-note">
+    Improvement vs. current: explicit count, persistent "YOU" badge, distinct ready vs not-ready visual states,
+    one short-line description of what the phase resolves to.
+  </div>
+</div>
+
+<div class="gb-panel">
+  <div class="h-bar">
+    <span class="phase-pill">LOBBY</span>
+    <span class="info">3 / 4 ready · waiting on Glenn</span>
+  </div>
+
+  <div class="roster">
+    <div class="seat ready"><div class="name">Grey</div><div class="badge">▶ READY</div></div>
+    <div class="seat ready you"><div class="name">Glenn</div><div class="badge">… queued</div></div>
+    <div class="seat ready"><div class="name">Araty</div><div class="badge">▶ READY</div></div>
+    <div class="seat not-ready"><div class="name">Scythe</div><div class="badge">— not ready</div></div>
+  </div>
+
+  <div style="text-align: center; margin-top: 14px;">
+    <button class="gb-btn-stub primary">I'M READY</button>
+    <div class="small-print">All players must ready up before voting begins.</div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 2 — VOTING + DRAFTING (compact)                      -->
+<!-- ============================================================ -->
+<div class="section-anchor">
+  <div class="section-tag">PHASE 2</div>
+  <div class="section-title">VOTING · WHO PICKS FIRST?</div>
+  <div class="section-note">
+    Improvement vs. current: live LED row showing each player's vote-cast state, prominent "tiebreak coin flip" copy
+    so users understand why a tied vote silently "just works."
+  </div>
+</div>
+
+<div class="gb-panel">
+  <div class="h-bar">
+    <span class="phase-pill amber">VOTING</span>
+    <span class="info">3 / 4 votes cast · waiting on Scythe</span>
+  </div>
+
+  <div class="vote-panel">
+    <div class="label">FIRST-PICK VOTES</div>
+    <div class="vote-row">
+      <div class="vote-cell yes"><div class="who">Grey</div><div class="led"></div><div class="verdict">VOTED ARATY</div></div>
+      <div class="vote-cell yes"><div class="who">Glenn</div><div class="led"></div><div class="verdict">VOTED GREY</div></div>
+      <div class="vote-cell yes"><div class="who">Araty</div><div class="led"></div><div class="verdict">VOTED GREY</div></div>
+      <div class="vote-cell pending"><div class="who">Scythe</div><div class="led"></div><div class="verdict">PENDING</div></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>If tied:</strong> coin flip, surfaced via animated reveal (today the tie is resolved silently with <code>winners.sample</code>; users hit it and don't know why).
+  </div>
+</div>
+
+<div class="section-anchor">
+  <div class="section-tag">PHASE 3</div>
+  <div class="section-title">DRAFTING · 4 INDIVIDUAL PICKS</div>
+  <div class="section-note">
+    Improvement vs. current: pick-order strip showing past / current / upcoming turns. Today the controller only
+    shows "It's your turn" or "Waiting for X" — players have no idea who picks next.
+  </div>
+</div>
+
+<div class="gb-panel">
+  <div class="h-bar">
+    <span class="phase-pill green">DRAFTING</span>
+    <span class="info">round 3 / 4 · 30s skip in 0:18</span>
+  </div>
+
+  <div class="order-track">
+    <div class="seat-mini done"><div class="num">#1</div><div class="chip">GREY</div></div>
+    <span class="arrow">→</span>
+    <div class="seat-mini done"><div class="num">#2</div><div class="chip">ARATY</div></div>
+    <span class="arrow">→</span>
+    <div class="seat-mini active"><div class="num">#3</div><div class="chip">GLENN</div></div>
+    <span class="arrow">→</span>
+    <div class="seat-mini upcoming"><div class="num">#4</div><div class="chip">SCYTHE</div></div>
+  </div>
+
+  <div class="picks-track" style="margin-top: 6px;">
+    <div class="slot filled individual"><div class="num">1</div><div class="nick">DOLOR</div><div class="who">Grey</div></div>
+    <div class="slot filled individual"><div class="num">2</div><div class="nick">PIERROT</div><div class="who">Araty</div></div>
+    <div class="slot pending"><div class="num">3</div><div class="empty-label">YOUR<br/>TURN</div></div>
+    <div class="slot"><div class="num">4</div><div class="empty-label" style="color: var(--d2);">—</div></div>
+    <div class="slot"><div class="num">5</div><div class="empty-label" style="color: var(--d2);">NOM</div></div>
+    <div class="slot"><div class="num">6</div><div class="empty-label" style="color: var(--d2);">NOM</div></div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 3 — NOMINATING (the meat)                            -->
+<!-- ============================================================ -->
+<div class="section-anchor">
+  <div class="section-tag">PHASE 4 · FINAL 2 PICKS</div>
+  <div class="section-title">NOMINATING · TWO COLLABORATIVE PICKS</div>
+  <div class="section-note">
+    The redesign focus. Each of the four players takes a turn to nominate one of their pokemon for slot 5 or 6;
+    the other three vote yes/no on it; the nominator's auto-yes counts. New rule:
+    <strong>3/4 yes = approved · 2/4 = tied (captain decides) · 0–1/4 = rejected (rotate to next nominator).</strong>
+  </div>
+</div>
+
+<!-- 3a. Waiting for current nominator -->
+<div class="substate">3A · WAITING FOR CURRENT NOMINATOR <small>— show pick-order, not just "Waiting for X to nominate"</small></div>
+
+<div class="gb-panel">
+  <div class="h-bar">
+    <span class="phase-pill amber">NOMINATING</span>
+    <span class="info">slot 5 of 6 · Glenn to nominate</span>
+  </div>
+
+  <div class="roster">
+    <div class="seat captain"><div class="name">Grey</div><div class="badge">★ CAPTAIN</div></div>
+    <div class="seat you"><div class="name">Glenn</div><div class="badge">▶ NOMINATING…</div></div>
+    <div class="seat"><div class="name">Araty</div><div class="badge">— waiting</div></div>
+    <div class="seat"><div class="name">Scythe</div><div class="badge">— waiting</div></div>
+  </div>
+
+  <div class="picks-track" style="margin-top: 4px;">
+    <div class="slot filled individual"><div class="num">1</div><div class="nick">DOLOR</div><div class="who">Grey</div></div>
+    <div class="slot filled individual"><div class="num">2</div><div class="nick">PIERROT</div><div class="who">Araty</div></div>
+    <div class="slot filled individual"><div class="num">3</div><div class="nick">RUSALKA</div><div class="who">Glenn</div></div>
+    <div class="slot filled individual"><div class="num">4</div><div class="nick">QUARK</div><div class="who">Scythe</div></div>
+    <div class="slot pending"><div class="num">5</div><div class="empty-label">YOUR<br/>NOM</div></div>
+    <div class="slot"><div class="num">6</div><div class="empty-label" style="color: var(--d2);">NOM</div></div>
+  </div>
+
+  <div class="callout"><strong>Pokemon grid (your caught groups, click to nominate):</strong></div>
+  <div class="pokemon-grid">
+    <div class="poke-card disabled"><div class="nick">DOLOR</div><div class="species">Onix</div><div class="loc">picked</div></div>
+    <div class="poke-card disabled"><div class="nick">PIERROT</div><div class="species">Cleffa</div><div class="loc">picked</div></div>
+    <div class="poke-card disabled"><div class="nick">RUSALKA</div><div class="species">Buizel</div><div class="loc">picked</div></div>
+    <div class="poke-card disabled"><div class="nick">QUARK</div><div class="species">Pichu</div><div class="loc">picked</div></div>
+    <div class="poke-card"><div class="nick">SAMSARA</div><div class="species">Roselia</div><div class="loc">Eterna Forest</div></div>
+    <div class="poke-card"><div class="nick">VESPER</div><div class="species">Bronzor</div><div class="loc">Mt. Coronet</div></div>
+    <div class="poke-card"><div class="nick">YONAH</div><div class="species">Zubat</div><div class="loc">Oreburgh Mine</div></div>
+    <div class="poke-card"><div class="nick">EBON</div><div class="species">Murkrow</div><div class="loc">Eterna Forest</div></div>
+  </div>
+
+  <div style="text-align: right; margin-top: 12px;">
+    <button class="gb-btn-stub ghost">SKIP MY TURN</button>
+    <span class="small-print" style="display: inline-block; margin-left: 8px;">Only the current nominator sees this.</span>
+  </div>
+</div>
+
+<!-- 3b. Nomination submitted, votes coming in -->
+<div class="substate">3B · NOMINATION SUBMITTED · LIVE VOTE TRACKING <small>— this is the showcase; current code shows nothing of this</small></div>
+
+<div class="gb-panel glow">
+  <div class="h-bar">
+    <span class="phase-pill amber">NOMINATING · VOTE OPEN</span>
+    <span class="info">slot 5 of 6 · 2 / 3 of remaining votes in</span>
+  </div>
+
+  <div class="nominee-card">
+    <div class="label">NOMINATED FOR SLOT 5</div>
+    <div class="nominee-nick">SAMSARA</div>
+    <div class="nominee-species">Roselia · Eterna Forest</div>
+    <div class="nominator">Nominated by <strong>Glenn</strong></div>
+  </div>
+
+  <div class="vote-panel">
+    <div class="label">LIVE VOTE TALLY</div>
+    <div class="vote-row">
+      <div class="vote-cell yes captain"><div class="who">Grey</div><div class="led"></div><div class="verdict">★ YES</div></div>
+      <div class="vote-cell nominator"><div class="who">Glenn</div><div class="led"></div><div class="verdict">YES</div></div>
+      <div class="vote-cell no"><div class="who">Araty</div><div class="led"></div><div class="verdict">NO</div></div>
+      <div class="vote-cell pending"><div class="who">Scythe</div><div class="led"></div><div class="verdict">…PENDING</div></div>
+    </div>
+  </div>
+
+  <div class="tally-bar">
+    <div class="count">
+      <span class="y">YES · 2</span>
+      <span class="n">NO · 1</span>
+      <span>PENDING · 1</span>
+    </div>
+    <div class="threshold">NEEDS 3/4 TO PASS</div>
+  </div>
+
+  <div class="vote-actions">
+    <span style="font-size: 16px; color: var(--l1); align-self: center;">You voted: <strong style="color: var(--green-glow);">YES</strong></span>
+    <button class="gb-btn-stub ghost">CHANGE VOTE</button>
+  </div>
+  <div class="small-print">Votes can be changed until the last vote arrives.</div>
+</div>
+
+<!-- 3c. Resolution: APPROVED -->
+<div class="substate">3C · RESOLUTION · APPROVED <small>— animated reveal when the last vote crosses the threshold</small></div>
+
+<div class="gb-panel">
+  <div class="resolution approved">
+    <div class="verdict">★ APPROVED ★</div>
+    <div class="breakdown">SAMSARA joins the team for slot 5. <br/>Final tally: 3 YES · 1 NO.</div>
+  </div>
+
+  <div class="picks-track">
+    <div class="slot filled individual"><div class="num">1</div><div class="nick">DOLOR</div><div class="who">Grey</div></div>
+    <div class="slot filled individual"><div class="num">2</div><div class="nick">PIERROT</div><div class="who">Araty</div></div>
+    <div class="slot filled individual"><div class="num">3</div><div class="nick">RUSALKA</div><div class="who">Glenn</div></div>
+    <div class="slot filled individual"><div class="num">4</div><div class="nick">QUARK</div><div class="who">Scythe</div></div>
+    <div class="slot filled nominated"><div class="num">5</div><div class="nick">SAMSARA</div><div class="who">Glenn-nom</div></div>
+    <div class="slot pending"><div class="num">6</div><div class="empty-label">ARATY UP NEXT</div></div>
+  </div>
+</div>
+
+<!-- 3d. Resolution: REJECTED with rotation -->
+<div class="substate">3D · RESOLUTION · REJECTED → AUTO-ROTATE <small>— current code re-runs the same nominator; this is the bug fix</small></div>
+
+<div class="gb-panel">
+  <div class="resolution rejected">
+    <div class="verdict">REJECTED</div>
+    <div class="breakdown">VESPER did not pass. Final tally: 1 YES · 3 NO.</div>
+    <div class="next-up">NEXT NOMINATOR <span class="countdown">→ ARATY · 0:03</span></div>
+  </div>
+
+  <div class="vote-panel">
+    <div class="label">FINAL VOTE BREAKDOWN</div>
+    <div class="vote-row">
+      <div class="vote-cell no captain"><div class="who">Grey</div><div class="led"></div><div class="verdict">★ NO</div></div>
+      <div class="vote-cell nominator"><div class="who">Glenn</div><div class="led"></div><div class="verdict">YES</div></div>
+      <div class="vote-cell no"><div class="who">Araty</div><div class="led"></div><div class="verdict">NO</div></div>
+      <div class="vote-cell no"><div class="who">Scythe</div><div class="led"></div><div class="verdict">NO</div></div>
+    </div>
+  </div>
+
+  <div class="callout"><strong>Behaviour change:</strong> rejection rotates the nominator to the next pick-order seat instead of letting the same player cycle forever. Each player gets one nomination per slot; if all four reject, the slot escalates (see 3F).</div>
+</div>
+
+<!-- 3e. Tiebreak (2-2) -->
+<div class="substate">3E · TIE · CAPTAIN DECIDES <small>— new rule, addresses the user's "ties not working" complaint</small></div>
+
+<div class="gb-panel">
+  <div class="resolution tied">
+    <div class="verdict">★ 2-2 TIE ★</div>
+    <div class="breakdown">Captain Grey holds the deciding vote. (Captain = first-pick winner.)</div>
+  </div>
+
+  <div class="vote-panel">
+    <div class="label">TIE-BREAK TALLY</div>
+    <div class="vote-row">
+      <div class="vote-cell yes captain"><div class="who">Grey</div><div class="led"></div><div class="verdict">★ DECIDES</div></div>
+      <div class="vote-cell nominator"><div class="who">Glenn</div><div class="led"></div><div class="verdict">YES</div></div>
+      <div class="vote-cell no"><div class="who">Araty</div><div class="led"></div><div class="verdict">NO</div></div>
+      <div class="vote-cell no"><div class="who">Scythe</div><div class="led"></div><div class="verdict">NO</div></div>
+    </div>
+  </div>
+
+  <div class="tally-bar">
+    <div class="count"><span class="y">YES · 2</span><span class="n">NO · 2</span><span>TIED</span></div>
+    <div class="threshold">CAPTAIN GREY ★ → DECIDING VOTE</div>
+  </div>
+
+  <div class="vote-actions">
+    <button class="gb-btn-stub primary">★ APPROVE</button>
+    <button class="gb-btn-stub danger">REJECT</button>
+  </div>
+  <div class="small-print">Only the captain sees these buttons. Other players see "Waiting for Grey's tiebreak ★".</div>
+</div>
+
+<!-- 3f. Stalemate fallback -->
+<div class="substate">3F · STALEMATE · ALL FOUR REJECT <small>— corner case: every player has nominated and every nomination failed</small></div>
+
+<div class="gb-panel">
+  <div class="resolution rejected">
+    <div class="verdict">STALEMATE</div>
+    <div class="breakdown">Every nominator's pick was rejected. The slot escalates to a captain pick — Grey ★ chooses unilaterally.</div>
+  </div>
+  <div class="callout"><strong>Why this matters:</strong> the current code can loop indefinitely on the same nominator. The redesign always terminates: 4 nominations max → captain pick → forward.</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 4 — COMPLETE                                         -->
+<!-- ============================================================ -->
+<div class="section-anchor">
+  <div class="section-tag">PHASE 5</div>
+  <div class="section-title">COMPLETE · TEAM REVEAL</div>
+  <div class="section-note">
+    Improvement vs. current: distinguish individual picks from nominated picks visually. Show provenance.
+  </div>
+</div>
+
+<div class="gb-panel">
+  <div class="h-bar">
+    <span class="phase-pill green">COMPLETE</span>
+    <span class="info">your gym 3 lineup is locked in</span>
+  </div>
+
+  <div class="reveal-team">
+    <div class="reveal-card individual"><div class="badge">PICK</div><div class="nick">DOLOR</div><div class="species">Onix</div><div class="who">Grey</div></div>
+    <div class="reveal-card individual"><div class="badge">PICK</div><div class="nick">PIERROT</div><div class="species">Cleffa</div><div class="who">Araty</div></div>
+    <div class="reveal-card individual"><div class="badge">PICK</div><div class="nick">RUSALKA</div><div class="species">Buizel</div><div class="who">Glenn</div></div>
+    <div class="reveal-card individual"><div class="badge">PICK</div><div class="nick">QUARK</div><div class="species">Pichu</div><div class="who">Scythe</div></div>
+    <div class="reveal-card nominated"><div class="badge">★ NOM</div><div class="nick">SAMSARA</div><div class="species">Roselia</div><div class="who">Glenn-nom</div></div>
+    <div class="reveal-card nominated"><div class="badge">★ NOM</div><div class="nick">EBON</div><div class="species">Murkrow</div><div class="who">Araty-nom</div></div>
+  </div>
+
+  <div style="text-align: center; margin-top: 14px;">
+    <button class="gb-btn-stub amber">MARK GYM 3 — GARDENIA AS BEATEN</button>
+    <div class="small-print">Same flow as today; redesign doesn't touch this CTA.</div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

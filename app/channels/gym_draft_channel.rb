@@ -33,9 +33,12 @@ class GymDraftChannel < ApplicationCable::Channel
     transmit({ error: e.message })
   end
 
+  # Step 14 unified action: model auto-detects "new candidate" vs.
+  # "endorsement" based on whether the group_id is already on the
+  # candidates list. The legacy `vote_nomination` action is gone.
   def nominate(data)
     @draft.reload
-    @draft.submit_nomination!(current_user_id, data["group_id"])
+    @draft.nominate!(current_user_id, data["group_id"])
     broadcast_state
   rescue => e
     transmit({ error: e.message })
@@ -43,15 +46,7 @@ class GymDraftChannel < ApplicationCable::Channel
 
   def skip(_data)
     @draft.reload
-    @draft.skip_turn!
-    broadcast_state
-  rescue => e
-    transmit({ error: e.message })
-  end
-
-  def vote_nomination(data)
-    @draft.reload
-    @draft.vote_on_nomination!(current_user_id, data["approve"])
+    @draft.skip_turn!(current_user_id)
     broadcast_state
   rescue => e
     transmit({ error: e.message })

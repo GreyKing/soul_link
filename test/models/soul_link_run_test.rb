@@ -1,6 +1,8 @@
 require "test_helper"
 
 class SoulLinkRunTest < ActiveSupport::TestCase
+  include ActiveSupport::Testing::TimeHelpers
+
   setup do
     @run = create(:soul_link_run)
   end
@@ -130,5 +132,43 @@ class SoulLinkRunTest < ActiveSupport::TestCase
 
   test ".current returns nil for an unknown guild" do
     assert_nil SoulLinkRun.current(@run.guild_id + 999)
+  end
+
+  # ── avatar caching (Step 14) ───────────────────────────────────────────
+
+  test "#avatar_for returns nil when no avatars are cached" do
+    assert_nil @run.avatar_for(123)
+  end
+
+  test "#upsert_avatar! stores a new URL keyed by stringified user id" do
+    @run.upsert_avatar!(123, "https://cdn.discord/abc.png")
+    assert_equal "https://cdn.discord/abc.png", @run.reload.avatar_for(123)
+    assert_equal "https://cdn.discord/abc.png", @run.player_avatars["123"]
+  end
+
+  test "#upsert_avatar! updates an existing URL" do
+    @run.upsert_avatar!(123, "https://cdn.discord/old.png")
+    @run.upsert_avatar!(123, "https://cdn.discord/new.png")
+    assert_equal "https://cdn.discord/new.png", @run.reload.avatar_for(123)
+  end
+
+  test "#upsert_avatar! is a no-op when URL is unchanged" do
+    @run.upsert_avatar!(123, "https://cdn.discord/abc.png")
+    before = @run.reload.updated_at
+    travel 1.second do
+      @run.upsert_avatar!(123, "https://cdn.discord/abc.png")
+    end
+    assert_equal before, @run.reload.updated_at
+  end
+
+  test "#upsert_avatar! with a blank URL deletes any existing entry" do
+    @run.upsert_avatar!(123, "https://cdn.discord/abc.png")
+    @run.upsert_avatar!(123, nil)
+    assert_nil @run.reload.avatar_for(123)
+  end
+
+  test "#upsert_avatar! returns silently for a blank user id" do
+    @run.upsert_avatar!(nil, "https://cdn.discord/abc.png")
+    assert_nil @run.player_avatars
   end
 end

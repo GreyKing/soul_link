@@ -1063,3 +1063,160 @@ body::after {
     grid-template-columns: 240px 1fr 260px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   GYM DRAFT — STEP 14 SURFACES
+   Avatar pile + candidate card + TCG coin-flip modal.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Avatars (cached on SoulLinkRun#player_avatars) ── */
+.gb-avatar {
+  display: inline-block;
+  border-radius: 50%;
+  border: 2px solid var(--d1);
+  background: var(--l1);
+  vertical-align: middle;
+  object-fit: cover;
+}
+
+.gb-avatar--32 {
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+  line-height: 28px;
+  text-align: center;
+}
+
+.gb-avatar--24 {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* Initial-letter fallback when no Discord avatar URL is cached. The
+   four pastel colors (--c0..--c3) are seeded from discord_user_id %% 4
+   so the same user always renders the same color across sessions. */
+.gb-avatar--initial {
+  font-family: 'Press Start 2P', monospace;
+  color: var(--d1);
+  letter-spacing: 0;
+}
+
+.gb-avatar--c0 { background: #f4cccc; }
+.gb-avatar--c1 { background: #c9daf8; }
+.gb-avatar--c2 { background: #d9ead3; }
+.gb-avatar--c3 { background: #fff2cc; }
+
+.gb-avatar-pile {
+  display: inline-flex;
+  align-items: center;
+}
+
+.gb-avatar-pile > .gb-avatar + .gb-avatar {
+  margin-left: -8px;
+}
+
+/* ── Candidate card (gym-draft nominating phase) ── */
+.gb-candidate-card {
+  background: var(--l1);
+  border: var(--border-thin);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+  position: relative;
+}
+
+.gb-candidate-card--leading {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px var(--amber);
+}
+
+.gb-candidate-card__name {
+  font-size: 12px;
+  color: var(--d1);
+  font-weight: bold;
+}
+
+.gb-candidate-card__species {
+  font-size: 10px;
+  color: var(--d2);
+}
+
+.gb-candidate-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gb-candidate-card__count {
+  font-size: 11px;
+  color: var(--d1);
+  font-family: 'Press Start 2P', monospace;
+}
+
+/* ── TCG coin-flip modal — tiebreak reveal ── */
+/* Primary attempt: pokeball / character two-face 3D coin. Fallback
+   (`# TCG-coin fallback used; see brief Q4 escape hatch`) drops the
+   character face for a generic gold "?" face — same animation. */
+.tcg-coin-stage {
+  perspective: 800px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tcg-coin {
+  width: 80px;
+  height: 80px;
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+.tcg-coin--flipping {
+  animation: tcgCoinFlip 1.8s cubic-bezier(0.2, 0.8, 0.4, 1.0) forwards;
+}
+
+.tcg-coin__face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  backface-visibility: hidden;
+  box-shadow:
+    inset 0 0 0 4px #d4a444,
+    0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.tcg-coin__face--pokeball {
+  background:
+    radial-gradient(circle at 50% 50%, #ffffff 0 8px, #1a1a1a 8px 12px, transparent 12px 100%),
+    linear-gradient(to bottom, #ee1515 0 50%, #1a1a1a 50% 54%, #f0f0f0 54% 100%);
+}
+
+.tcg-coin__face--character {
+  transform: rotateY(180deg);
+  background:
+    radial-gradient(circle at 50% 50%, #f7d358 0 30%, #d4a444 30% 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b3c0a;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 28px;
+  text-shadow: 1px 1px 0 #fff7d8;
+}
+
+.tcg-coin__face--character::before {
+  content: "★";
+}
+
+@keyframes tcgCoinFlip {
+  0%   { transform: rotateY(0deg) translateY(0); }
+  85%  { transform: rotateY(1980deg) translateY(-12px); }
+  100% { transform: rotateY(1980deg) translateY(0); }
+}

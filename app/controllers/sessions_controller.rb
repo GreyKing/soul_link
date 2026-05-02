@@ -40,6 +40,12 @@ class SessionsController < ApplicationController
     session[:discord_avatar_url] = avatar_url
     session[:guild_id] = run.guild_id
 
+    # Cache the user's Discord avatar URL on the active run for the
+    # guild so other surfaces (notably the gym-draft candidate cards)
+    # can render the user's avatar without re-hitting Discord. Skip
+    # silently if no avatar was returned by OAuth.
+    run.upsert_avatar!(discord_user_id, avatar_url) if avatar_url.present?
+
     redirect_to team_path, notice: "Welcome, #{username}!"
   end
 

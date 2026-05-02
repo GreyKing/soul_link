@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_01_064907) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_01_192917) do
   create_table "gym_drafts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "current_player_index", default: 0, null: false
@@ -201,6 +201,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_01_064907) do
     t.bigint "general_channel_id"
     t.bigint "guild_id", null: false
     t.integer "gyms_defeated", default: 0, null: false
+    t.json "player_avatars"
     t.integer "run_number", null: false
     t.datetime "updated_at", null: false
     t.index ["active"], name: "index_soul_link_runs_on_active"

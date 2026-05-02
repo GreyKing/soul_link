@@ -6,32 +6,37 @@
 
 ## Where We Stopped
 
-Step 13 (Undo Affordances on Gyms Tab — UNMARK + RESET DRAFT) shipped + FF-merged to `main` + pushed. Awaiting next brief from Project Owner.
+Step 14 (Gym Draft — Path B unified nominate-or-endorse model) shipped + FF-merged to `main` + pushed. Awaiting next brief from Project Owner.
 
 ---
 
 ## What Was Built
 
-**Step 13 — UNMARK + RESET DRAFT.** Two "let me undo a mistake" affordances on the dashboard's Gyms tab:
+**Step 14 — Path B: unified nominate-or-endorse + avatar caching + 60s skip grace + TCG-coin tiebreak.**
 
-- **UNMARK** button on the highest defeated gym row in `_gyms_content.html.erb`. Reuses the existing `GymProgressController#update` endpoint (which already toggles based on `GymResult` existence and guards "highest gym only"). No backend change. Lightweight, no confirm modal — Project Owner's pain was *that mistakes are unfixable*; reintroducing friction would defeat the point.
-- **RESET DRAFT** button in the Gyms-tab panel header, alongside START GYM DRAFT, gated on `@active_draft.present?` (status in `lobby/voting/drafting/nominating`). Opens a confirm modal mirroring `_mark_dead_modal.html.erb` byte-for-byte (overlay, gb-modal, close-X, backdrop click). CONFIRM RESET fires DELETE /gym_drafts/:id; page reloads. New `GymDraftsController#destroy` has belt-and-suspenders status guard + auth scoping via `run.gym_drafts.find_by(id:)` to prevent cross-guild bypass.
+The nominating phase of gym drafts was rewired from "submit nomination → up/down vote → resolve" round-robin into a single 4-pick "nominate or endorse" pass. Each of the 4 players makes exactly one pick during nominating; the model auto-detects whether the picked group is a NEW candidate (creates one) or an ENDORSEMENT (adds picker to existing candidate's voters list). After all 4 picks, top-2 by voter count fill slots 5+6. Tied at the slot boundary → server randomly picks winners + populates a `tiebreak` payload; the client animates a TCG-coin flip modal during the reveal.
 
-New file: `_reset_draft_modal.html.erb`. Three new Stimulus actions on `dashboard_controller.js` (`openResetDraftModal`, `closeResetDraftModal`, `confirmResetDraft`) mirroring the Mark Dead pattern. Routes gain `:destroy` on gym_drafts.
+**Also shipped:**
+- Avatar caching layer (`SoulLinkRun#player_avatars` JSON column, upserted on login, helper for rendering with initial-circle fallback).
+- 60s skip grace (timer in `state_data`, model + channel auth: nominator-only inside grace, anyone after).
+- Q5 button-weight fix on the draft-complete page (BACK TO GYM READY no longer competes with MARK BEATEN).
 
-Tests: 335 → 343 (+8). New `test/controllers/gym_progress_controller_test.rb` (closes pre-existing test gap — covers mark, unmark, reject-non-highest, reject-invalid-num). Extended `gym_drafts_controller_test.rb` with destroy / destroy-complete-rejected / destroy-cross-guild-404. Rubocop clean (0 offenses across 148 files).
+**Counts:** 343 → 370 tests (+27). Rubocop clean (152 files, 0 offenses). 2 migrations.
+
+**TCG-coin path:** primary (not the fallback). Two-face 3D coin: pokeball face via radial+linear gradients (red top / white bottom / black equator / central button), character face as gold disc with star glyph (deliberate simplification within the 30-min time-box). 1.8s rotateY 0→1980deg + cubic-bezier easing + 12px translateY settle bounce.
 
 ---
 
 ## What Was Decided This Session
 
-- **UNMARK gets no confirm modal.** The Project Owner explicitly chose lightweight — recovering from an accidental mark-beaten shouldn't require another step. Title attr is the only "are you sure?" hint.
-- **RESET DRAFT gets the full Mark Dead modal pattern.** Resetting destroys 4-6 rounds of player picks (held in `state_data` JSON); that's real crafted data. Mirroring the existing Mark Dead UX keeps modal UX consistent across the dashboard.
-- **Reset = destroy, not "back to lobby".** Matches the user's mental model ("reset = start over"). After destroy, the user clicks START GYM DRAFT again (the existing button creates fresh).
-- **Reset condition is `status in [lobby, voting, drafting, nominating]`** — same set as `GymDraftsController#create`'s reuse logic. `complete` drafts are intentionally NOT resettable from the dashboard (out of scope; the user marks-beaten or accepts).
-- **Belt-and-suspenders gating.** View gates via `@active_draft` (only loads non-complete); controller gates via `status.in?(...)`. Both must hold; direct-curl bypass returns 422.
-- **No new turbo broadcasts on `GymDraft`.** Reset action returns JSON `{ ok: true }` and the JS reloads. Same model as `GymDraftsController#mark_beaten`. Real-time draft state already flows through the WebSocket channel for the draft show page; the dashboard's gyms tab doesn't need it.
-- **No changes to `GymProgressController`.** The unmark path already works. The pre-existing JSON-response-on-HTML-form quirk stays — it's pre-Step-13 territory and the user has been using MARK BEATEN successfully despite it.
+- **Path B chosen over Path A** after reading the gym-draft audit (`handoff/2026-05-01-gym-draft-audit.md`). Project Owner unified Path B's two phases (nominate + rank) into a single pass via the "endorsement" affordance.
+- **Captain has no special role in nominating.** All 4 players have equal weight; tiebreaks are uniform-random (Array#sample). The Path A captain-tiebreak narrative was discarded.
+- **Edge case "1-candidate consensus"** (all 4 endorse same group) → team has 5 picks, slot 6 stays empty. Explicit decision; do not "fix" by re-running a round.
+- **Skip auth: 60s grace.** Nominator-only inside; anyone after. Visible per-second countdown in UI.
+- **TCG-coin > pokéball.** Pokémon-themed but specifically the trading-card-game metal coin aesthetic with 3D rotateY animation. Modal copy: "★ WILD COIN APPEARED! ★". Server picks winners; client only animates.
+- **Avatar caching via JSON column on SoulLinkRun.** Upserted on login. No new table, no Discord API hits beyond OAuth.
+- **`current_turn_started_at` lives in state_data**, not as a column. Avoids a third migration.
+- **Path A mockup left in `handoff/`** as historical record (not archived). The user explicitly approved leaving it.
 
 ---
 
@@ -39,11 +44,9 @@ Tests: 335 → 343 (+8). New `test/controllers/gym_progress_controller_test.rb` 
 
 *See `handoff/BUILD-LOG.md` Known Gaps — running list maintained there.*
 
-Four new gaps logged in this step:
-1. `test/controllers/dashboard_controller_test.rb` does not exist — render-condition tests for the Gyms tab partial were optional per the brief and deferred.
-2. `broadcasts_refreshes_to` not added to `GymDraft` — page-reload after reset is sufficient for v1.
-3. Pre-existing JSON-response-on-HTML-form quirk in `GymProgressController#update` — explicitly forbidden to fix in Step 13.
-4. RESET DRAFT only on the dashboard's Gyms tab, not on `gym_drafts/show.html.erb` — out of scope per the brief; can be added if the user reports the in-draft-page absence as friction.
+Step 14 logged one new gap: **in-browser smoke deferred** for the TCG-coin animation visual fidelity, the per-second grace countdown tick, and the avatar-pile image-vs-initial branch (only rendered with real Discord URLs in the wild). Continuation of the Step 13 environmental quirk (`bin/dev` / foreman / tailwind-v4 collision in the sandbox). Pick up next dashboard- or draft-touching step that gets a real browser. All algorithmic + payload-shape correctness is test-covered.
+
+KG-7 (real-save offset verification) still open from Step 12.
 
 ---
 

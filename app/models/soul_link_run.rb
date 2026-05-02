@@ -45,6 +45,38 @@ class SoulLinkRun < ApplicationRecord
     update!(active: false)
   end
 
+  # ── Discord avatar cache (Step 14) ──
+  #
+  # `player_avatars` is a JSON column mapping `discord_user_id` (string)
+  # → avatar URL (string). Populated on each successful login by
+  # `SessionsController#create` calling `upsert_avatar!` so that views
+  # (notably the gym-draft candidate-card avatar pile) can render any
+  # registered player's profile picture, not just the logged-in user's.
+
+  # Returns the cached avatar URL for the given discord_user_id, or nil
+  # if we haven't seen this user log in yet.
+  def avatar_for(discord_user_id)
+    (player_avatars || {})[discord_user_id.to_s]
+  end
+
+  # Idempotent upsert. Stores the URL keyed by stringified
+  # discord_user_id. A blank URL deletes any existing entry for the
+  # user (so we don't keep a stale URL after the user removes their
+  # Discord avatar). No-op when the URL is unchanged so we don't churn
+  # the row on every login.
+  def upsert_avatar!(discord_user_id, url)
+    return if discord_user_id.blank?
+    current = (player_avatars || {}).dup
+    if url.present?
+      return if current[discord_user_id.to_s] == url
+      current[discord_user_id.to_s] = url
+    else
+      return unless current.key?(discord_user_id.to_s)
+      current.delete(discord_user_id.to_s)
+    end
+    update!(player_avatars: current)
+  end
+
   def discord_channels_configured?
     category_id.present? && general_channel_id.present? &&
       catches_channel_id.present? && deaths_channel_id.present?

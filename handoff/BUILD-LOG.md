@@ -11,18 +11,89 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 13 — Undo Affordances on Gyms Tab (UNMARK + RESET DRAFT). **Reviewed + cleared by Richard (0 Must Fix, 0 Should Fix). Ready to commit + merge to main.**
-**Last committed:** Step 12 (`0a37184`) shipped + merged. Step 13 about to ship.
-**Pending deploy:** N/A — Step 13 is view + 2 controllers + 1 route + JS + 2 tests. No migration, no infra change.
+**Active step:** Step 14 — Gym Draft Final-2 Picks: Unified Nominate-or-Endorse Model. **Reviewed + cleared by Richard (0 Must Fix, 2 Should Fix — both addressed inline). Ready to commit + merge to main.**
+**Last committed:** Step 13 (`68dbeb1`) shipped + merged. Step 14 about to ship.
+**Pending deploy:** Step 14 ships 2 migrations (`add_player_avatars_to_soul_link_runs`, `cleanup_current_nomination_from_inflight_drafts`) — both run in pre-deploy. The cleanup migration is idempotent (guarded by `next unless data.key?("current_nomination")`).
 
-**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — closes KG-6 (Map ID → name lookup). KG-7 (real-save offset verification) STILL OPEN; map IDs in `config/soul_link/maps.yml` are best-effort pending validation alongside the parser's `MAP_ID_OFFSET`.
+**Should Fix items resolved inline post-review:**
+1. `gym_draft_test.rb:405` — renamed test from "broadcast_state stores voter ids as integers in state_data" to "voter ids are stored as integers in state_data" (the body asserts on the underlying `state_data`, not on `broadcast_state`).
+2. `gym_draft.rb:191` — `next_index = current_player_index + 1` now wraps with `% pick_order.size` for symmetry with `skip_turn!` (line 248). Safe before, fragile against future changes.
 
-**Parked plan:** FactoryBot conversion. Phases 1+2 land in this step (Step 4); Phase 3+ in Steps 5–6. See `handoff/parked-plans/factorybot-conversion.md`.
+Full suite still 370/370 after the two edits; rubocop still clean (152 files, 0 offenses).
+
+**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — KG-7 (real-save offset verification) STILL OPEN; map IDs in `config/soul_link/maps.yml` are best-effort pending validation alongside the parser's `MAP_ID_OFFSET`.
+
+**Parked plan:** FactoryBot conversion fully shipped through Step 8.
 
 ---
 
 ## Step History
 *Session-scoped.*
+
+### Step 14 — Gym Draft Final-2 Picks: Unified Nominate-or-Endorse Model — 2026-05-01
+**Status:** Awaiting review.
+
+Major rewire of the gym-draft nominating phase from the old "submit nomination → up/down vote → resolve" round-robin loop into a single 4-pick "nominate or endorse" pass. Each player makes exactly one pick; the pick is auto-detected as either a NEW candidate or an ENDORSEMENT of an existing candidate. After all 4 picks, the top-2 most-endorsed candidates fill slots 5 and 6, with a TCG-coin tiebreak modal driving the visual reveal when the slot boundary lands on a tie. Closes audit Bugs 1, 2, 3, and 5 in one shot.
+
+**New surfaces introduced this step:**
+- **Avatar caching layer.** `SoulLinkRun#player_avatars` JSON column maps `discord_user_id` → Discord CDN URL. `SessionsController#create` upserts on every successful login. View helper `player_avatar_image(run, uid)` renders `<img>` when cached, deterministic colored-initial fallback otherwise. Stimulus `buildAvatar(uid)` mirrors the helper for client-rendered piles.
+- **60-second skip grace.** `current_turn_started_at` ISO timestamp on `state_data` drives a per-second JS countdown. Inside grace: only the current nominator can skip themselves. Outside grace: any player may skip the stalled nominator. Channel-side `skip_turn!(requester_uid)` enforces both rules.
+- **TCG-coin tiebreak modal.** New `.tcg-coin` CSS component (preserve-3d with two faces, gold-edged shadow, `tcgCoinFlip` keyframe rotating `0deg → 1980deg` over 1.8s). Pokeball front face via radial+linear gradient. Animation modal blocks UI during the ~4s reveal then auto-closes. Server is the source of truth for tiebreak.winners; client only animates.
+
+**Migrations (2):**
+- `db/migrate/20260501192916_add_player_avatars_to_soul_link_runs.rb` — adds JSON column.
+- `db/migrate/20260501192917_cleanup_current_nomination_from_inflight_drafts.rb` — strips the now-defunct `current_nomination` JSON sub-key from any draft parked in `nominating`. Idempotent (the `next unless data.key?` guard makes a second run a no-op). Down is a documented no-op.
+
+**Files modified (8):**
+- `app/models/gym_draft.rb` — REMOVED `current_nomination` accessor, `submit_nomination!`, `vote_on_nomination!`, `resolve_nomination!` (singular). ADDED `candidates`, `tiebreak`, `current_turn_started_at`, `grace_elapsed?`, `current_nominator_id`, `nomination_picks_made`, `nominate!(picker_uid, group_id)` (unified action), `resolve_nominations!` (plural — greedy-fill voter-count-desc with same-count-group tiebreak detection). `make_pick!` and `skip_turn!` now seed/maintain `current_turn_started_at`. `skip_turn!` now takes a `requester_uid` and enforces nominator-OR-grace-elapsed. `broadcast_state` drops `current_nomination`, adds `candidates`/`current_nominator_id`/`current_turn_started_at`/`nomination_picks_remaining`/`tiebreak`.
+- `app/channels/gym_draft_channel.rb` — REMOVED `vote_nomination` action. `nominate` now calls `@draft.nominate!`. `skip` passes `current_user_id`.
+- `app/controllers/sessions_controller.rb` — calls `run.upsert_avatar!(discord_user_id, avatar_url)` after session is set, gated on `avatar_url.present?`.
+- `app/models/soul_link_run.rb` — adds `avatar_for(uid)` and `upsert_avatar!(uid, url)`. The upsert is idempotent (early return if URL unchanged) and treats blank URL as "delete entry."
+- `app/views/gym_drafts/show.html.erb` — nominating panel rewritten: pick-order strip, status + grace countdown line, candidates row, pokemon grid with NOMINATE/ENDORSE labels. TCG coin-flip modal added at bottom inside the controller wrapper. Q5 fix: complete-panel "BACK TO GYM READY" demoted to `gb-btn` (was `gb-btn-primary`); MARK BEATEN remains the single primary CTA.
+- `app/javascript/controllers/gym_draft_controller.js` — REMOVED `approveNomination`, `rejectNomination`, legacy `nominatePokemon`. ADDED `nominateOrEndorse`, `renderNomOrderStrip`, `renderCandidates`, `renderNomGraceCountdown`, `renderNomPokemonGrid`, `runCoinFlipAnimation`, `maybeShowCoinFlip`, `buildAvatar`. New targets: `nomOrderStrip`, `nomGraceCountdown`, `nomSkipButton`, `nomCandidatesList`, `coinFlipModal`, `coinFlipMessage`, `coinFlipCoin`, `coinFlipResult`. Removed targets: `nomVoteArea`, `nomVotePrompt`. New value: `playerAvatars: Object`. Coin flip dedupes via `coinFlipShownFor = JSON.stringify(state.tiebreak)` so it only animates once per resolution.
+- `app/assets/stylesheets/pixeldex.css` — adds `.gb-avatar` family (32/24, --initial, --c0..c3 deterministic palette), `.gb-avatar-pile`, `.gb-candidate-card` + `--leading` variant, `.tcg-coin` + faces + `tcgCoinFlip` keyframe.
+- `test/factories/gym_drafts.rb` — unchanged (existing `:lobby` trait covers all the new tests).
+
+**Files created (2):**
+- `app/helpers/gym_draft_helper.rb` — `player_avatar_image(run, uid, size: 32)` helper. Image-tag when URL cached, deterministic colored-initial circle (`uid % 4` → c0..c3) otherwise.
+- `test/helpers/gym_draft_helper_test.rb` — 5 helper tests (image branch, fallback branch, deterministic-color sanity check, nil-player_avatars handling, custom size).
+
+**Tests modified/created:**
+- `test/models/gym_draft_test.rb` — REMOVED 6 stale tests (`submit_nomination ...`, `vote_on_nomination records vote`, `nomination approved with majority`, `nomination rejected clears nomination ...`, `six total picks transitions to complete`). ADDED 17 new tests covering all 5 tally splits (3/1, 2/2, 2/1/1, 1/1/1/1, 4/0 consensus), the `current_turn_started_at` write on transitions + `nominate!`, the 60s grace authorization for `skip_turn!` (3 cases: pre-grace non-nominator raises, current nominator any time, post-grace non-nominator), endorsement / double-endorsement / not-your-turn / already-picked guards, and broadcast_state Step-14 fields + integer-storage assertion.
+- `test/channels/gym_draft_channel_test.rb` — REMOVED stale `vote_nomination action records vote` test. ADDED 5 new tests: nominate-creates-new-candidate, nominate-endorses-existing, skip-rejected-pre-grace, skip-allowed-post-grace, vote_nomination-action-removed (asserts via `GymDraftChannel.action_methods` because ActionCable's test perform silently no-ops on missing actions).
+- `test/models/soul_link_run_test.rb` — ADDED 6 new avatar-cache tests covering nil default, store-new, update-existing, no-op-on-unchanged-URL (`updated_at` doesn't churn), blank-URL-deletes-entry, and blank-uid-noop.
+
+**Tests:** 343 → 370 (+27). 0 failures, 0 errors. In the brief's 25-30 range.
+
+**Lint:** `bundle exec rubocop` clean (0 offenses across 152 files; +4 files = the 2 migrations + 1 helper + 1 helper test).
+
+**TCG-coin path:** Primary attempt landed within budget. The modal uses a real two-face 3D coin: pokeball-front via stacked radial + linear gradients (red top, white bottom, black equator + central button), gold-edged via inset box-shadow, character-back as a gold disc with a star glyph (didn't burn time on Pikachu SVG craft — the star reads in-universe and matches the GameBoy palette). 1.8s `rotateY 0 → 1980deg` keyframe with cubic-bezier easing and a 12px translateY bounce in the last 200ms. NOT the fallback escape hatch.
+
+**Manual smoke:** ran a `rails runner` harness (with `RAILS_ENV=test`) that walks lobby → voting → drafting → nominating → complete for all 5 tally splits using the real model methods. Output:
+- 3/1 → status=complete, picks=6, tiebreak=nil ✓
+- 2/2 → status=complete, picks=6, tiebreak=nil ✓
+- 2/1/1 → status=complete, picks=6, tiebreak={"type"=>"second_place", "tied_group_ids"=>[B,C], "winners"=>[one of B/C]} ✓
+- 1/1/1/1 → status=complete, picks=6, tiebreak={"type"=>"n_way", "tied_group_ids"=>[all 4], "winners"=>[2 of 4]} ✓
+- 4/0 consensus → status=complete, picks=5 (slot 6 empty by design), tiebreak=nil ✓
+- skip auth → non-nominator pre-grace raises with the expected message; current nominator and post-grace non-nominator both succeed (covered in unit tests too).
+- broadcast_state → keys include `:candidates`, `:current_nominator_id`, `:current_turn_started_at`, `:nomination_picks_remaining`, `:tiebreak`; voters are stringified; `:current_nomination` key gone.
+
+**Browser smoke gap (per Step 13 known issue):** `bin/dev` did not run cleanly in the sandbox (foreman/tailwind-v4 quirk that surfaced last step), so the live channel + JS + CSS animation was NOT exercised in a real browser this cycle. The TCG-coin animation, the per-second grace countdown tick, and the avatar pile image-vs-initial branch all benefit from browser eyeballing — Reviewer should flag whether this is acceptable for Step 14's surface area or whether an additional in-browser pass is required before merge. Coverage we DO have: the channel-test broadcast confirms the JSON shape the Stimulus controller depends on; the helper test confirms the server-rendered avatar HTML; the model tests confirm tiebreak payloads; the smoke harness confirms the resolution algorithm end-to-end.
+
+**Key decisions (locked by Architect, executed verbatim):**
+- **Unified `nominate!` action does both new-candidate and endorsement.** Server detects via `cands.find { |c| c["group_id"] == ... }`. Channel API takes only `{ group_id }`.
+- **`Array#sample` is the resolution policy.** No weighted shuffles or seeded RNG. Tests assert tiebreak.winners is a subset of tied_group_ids, not a specific value.
+- **1-candidate consensus (4/0) → 5-strong team intentionally.** Slot 6 stays empty. No "redo round" path.
+- **Voters stored as integers in state_data; stringified only in broadcast_state.** Test asserts both directions (`broadcast_state stores voter ids as integers in state_data`).
+- **Coin flip dedupes via `coinFlipShownFor`.** `render()` fires on every state update; the modal animates exactly once per resolution.
+- **Skip auth in BOTH branches.** Inside grace: only nominator. Outside grace: anyone. Test covers both.
+- **`current_turn_started_at` updated on every turn change.** `make_pick!` (transition into nominating), `nominate!` (each non-terminating call), `skip_turn!` (both drafting→nominating transition AND nominating-skip). Missing one breaks grace logic — verified in tests.
+
+**Diff scope:** 1 model + 1 channel + 1 controller + 2 view files (1 major rewrite, 1 minor Q5 fix in the same file — all in show.html.erb) + 1 stylesheet + 1 helper (NEW) + 1 Stimulus + 1 SoulLinkRun model + 2 migrations + 4 test files (2 modified, 1 extended, 1 NEW) + 4 handoff files. Matches the brief's stated scope.
+
+**Known Gaps logged this step:** none beyond the in-browser smoke gap above (which is a continuation of the Step 13 sandbox limitation, not a Step 14 regression).
+
+---
 
 ### Step 13 — Undo Affordances on Gyms Tab: UNMARK + RESET DRAFT — 2026-05-01
 **Status:** Awaiting review.
