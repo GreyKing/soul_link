@@ -16,7 +16,8 @@ class GymProgressControllerTest < ActionDispatch::IntegrationTest
     login_as(GREY)
 
     patch gym_progress_path(gym_number: 1)
-    assert_response :success
+    assert_redirected_to root_path(anchor: "gyms")
+    assert_equal "Gym 1 marked beaten.", flash[:notice]
     assert_equal 1, @run.reload.gyms_defeated
     assert @run.gym_results.exists?(gym_number: 1)
   end
@@ -27,7 +28,8 @@ class GymProgressControllerTest < ActionDispatch::IntegrationTest
     @run.update!(gyms_defeated: 1)
 
     patch gym_progress_path(gym_number: 1)
-    assert_response :success
+    assert_redirected_to root_path(anchor: "gyms")
+    assert_equal "Gym 1 unmarked.", flash[:notice]
     assert_equal 0, @run.reload.gyms_defeated
     assert_not @run.gym_results.exists?(gym_number: 1)
   end
@@ -39,7 +41,8 @@ class GymProgressControllerTest < ActionDispatch::IntegrationTest
     @run.update!(gyms_defeated: 2)
 
     patch gym_progress_path(gym_number: 1)
-    assert_response :unprocessable_entity
+    assert_redirected_to root_path(anchor: "gyms")
+    assert_equal "Can only unmark the most recent gym", flash[:alert]
     assert_equal 2, @run.reload.gyms_defeated
     assert @run.gym_results.exists?(gym_number: 1)
   end
@@ -48,6 +51,16 @@ class GymProgressControllerTest < ActionDispatch::IntegrationTest
     login_as(GREY)
 
     patch gym_progress_path(gym_number: 99)
-    assert_response :unprocessable_entity
+    assert_redirected_to root_path(anchor: "gyms")
+    assert_equal "Invalid gym number", flash[:alert]
+  end
+
+  test "JSON request returns gyms_defeated count without redirect" do
+    login_as(GREY)
+
+    patch gym_progress_path(gym_number: 1), as: :json
+    assert_response :success
+    assert_equal({ "gyms_defeated" => 1 }, response.parsed_body)
+    assert_equal 1, @run.reload.gyms_defeated
   end
 end

@@ -26,6 +26,21 @@ export default class extends Controller {
 
   connect() {
     this.#initSortables()
+    this.#applyHashTab()
+  }
+
+  // ── Hash-driven tab restore ──
+  //
+  // After a server redirect like `redirect_to root_path(anchor: "gyms")`,
+  // the page reloads on the default tab and loses the user's tab state.
+  // Reading window.location.hash on connect and clicking the matching
+  // tab button replays the existing switchTab flow without bespoke logic.
+
+  #applyHashTab() {
+    const hash = window.location.hash.replace(/^#/, "")
+    if (!hash) return
+    const btn = this.tabButtonTargets.find(b => b.dataset.tab === hash)
+    if (btn) btn.click()
   }
 
   // ── Sortable Initialization ──

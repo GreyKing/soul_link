@@ -11,8 +11,8 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 14 — Gym Draft Final-2 Picks: Unified Nominate-or-Endorse Model. **Reviewed + cleared by Richard (0 Must Fix, 2 Should Fix — both addressed inline). Ready to commit + merge to main.**
-**Last committed:** Step 13 (`68dbeb1`) shipped + merged. Step 14 about to ship.
+**Active step:** Step 14.1 — Hotfix shipped on top of Step 14 (gym_progress redirect + Gyms-tab anchor persistence). Awaiting next direction.
+**Last committed:** Step 14.1 about to ship on top of Step 14 (`141e706`, shipped + merged).
 **Pending deploy:** Step 14 ships 2 migrations (`add_player_avatars_to_soul_link_runs`, `cleanup_current_nomination_from_inflight_drafts`) — both run in pre-deploy. The cleanup migration is idempotent (guarded by `next unless data.key?("current_nomination")`).
 
 **Should Fix items resolved inline post-review:**
@@ -29,6 +29,24 @@ Full suite still 370/370 after the two edits; rubocop still clean (152 files, 0 
 
 ## Step History
 *Session-scoped.*
+
+### Step 14.1 — Hotfix: Mark Beaten redirect + Gyms-tab persistence — 2026-05-02
+**Status:** Shipped + merged to main.
+
+User reported that clicking MARK BEATEN (or UNMARK) on the Gyms tab landed them on a "different view" — diagnosis: `GymProgressController#update` returned `render json: { gyms_defeated: N }` for ALL callers, and the `button_to ... data: { turbo: false }` form on the Gyms tab posted as plain HTML, so the browser rendered the JSON response body as the page text. Pre-existing since before Step 13; the JSON contract is consumed by `timeline_controller.js:342` on the map page (real XHR caller).
+
+**Files modified (3):**
+- `app/controllers/gym_progress_controller.rb` — content-type branch. Helper `json_request? = request.content_type == "application/json"` distinguishes the timeline XHR (which sets `Content-Type: application/json`) from the dashboard's HTML form posts. JSON consumers keep `render json: { gyms_defeated: N }`; HTML consumers now `redirect_to root_path(anchor: "gyms")` with a `notice` (success) or `alert` (error). Both error early-returns also branched via a new `respond_with_error(message)` private helper.
+- `app/javascript/controllers/pixeldex_controller.js` — new private `#applyHashTab()` called from `connect()`. Reads `window.location.hash`, finds the matching `tabButton`, and clicks it. Replays the existing switchTab flow without touching `switchTab` itself. Combined with the controller's `root_path(anchor: "gyms")`, the user lands back on the Gyms tab after the redirect instead of the default PC BOX.
+- `test/controllers/gym_progress_controller_test.rb` — 4 existing tests updated to assert redirect-with-flash for HTML (was asserting `:success`/`:unprocessable_entity` against the JSON path). 1 new test added: `JSON request returns gyms_defeated count without redirect` (uses `as: :json`, asserts the JSON contract is preserved).
+
+**Tests:** 370 → 371 (+1). 0 failures, 0 errors.
+
+**Lint:** rubocop clean (152 files, 0 offenses). Same as Step 14.
+
+**Diff scope:** 1 controller + 1 JS + 1 test + handoff updates. Single commit, FF-merged.
+
+---
 
 ### Step 14 — Gym Draft Final-2 Picks: Unified Nominate-or-Endorse Model — 2026-05-01
 **Status:** Awaiting review.
