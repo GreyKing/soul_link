@@ -18,7 +18,7 @@ reset until the gap is addressed or the decision is replaced.
 **Brakeman:** Clean (no new warnings; 2 pre-existing weak-confidence File Access warnings unchanged).
 **Migrations:** 2 new (additive, nullable); both ran cleanly on dev + test DBs.
 
-**Last committed:** Step 16 (8965e47) on `origin/main`. Step 17 worktree branch `claude/recursing-cori-8d3bfc` rebased onto it; nothing committed yet (about to commit + FF-merge + push).
+**Last committed:** Step 17 shipped at `eefcbbe`, FF-merged to `origin/main` and pushed. Worktree branch `claude/recursing-cori-8d3bfc` also pushed. **Awaiting next brief from Project Owner.**
 **Pending deploy:** Step 17 ships 2 migrations (`add_step_17_columns_to_soul_link_pokemon` adds `pid bigint`, `met_location_id integer`, `ot_id integer`, `ot_sid integer`, `trade_in boolean default false null false`, `acquired_via string` + compound non-unique index `(soul_link_run_id, discord_user_id, pid)`; `add_parsed_party_data_to_soul_link_emulator_save_slots` adds `parsed_party_data json` nullable). Pre-deploy safe — both additive, no data backfill, no breaking changes. Manual catches stay backward compatible (validations on `species` + per-group uniqueness gated on `soul_link_pokemon_group_id.present?`; Step-17 rows have nil group_id and nil pid for manual rows).
 
 **Richard's verifications (notable):**
