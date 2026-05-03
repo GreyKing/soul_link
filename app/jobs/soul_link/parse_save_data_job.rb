@@ -10,13 +10,11 @@ module SoulLink
   # CRC-failed save — from producing spurious BadgeLost events through
   # the new `SaveDiff` pipeline when the next valid save lands.
   #
-  # **Step 15 dispatch:** after writing the parse result, we capture the
-  # pre-update `parsed_badges` and feed both values into
-  # `SoulLink::SaveDiff.between`, then hand the events off to
-  # `SoulLink::GymBeatenCoordinator`. The diff runs only when the slot
-  # has a prior baseline (`prev_parsed_at.present?`) — the slot's first
-  # ever successful parse is silent so importing a save with N badges
-  # doesn't spam N gym-beaten events.
+  # **Step 16 dispatch:** the diff/dispatch logic (Step 15 introduced for
+  # badges; Step 16 extends to TID/Pokédex/HoF) lives in
+  # `SoulLink::SaveDiffDispatcher`. This job is now a "pure parser +
+  # persist" — capture pre-update state, parse, persist, hand prev/curr
+  # snapshots to the dispatcher. No per-category branching here.
   #
   # **Critical**: writes via `update_columns` so the after_update_commit
   # callback that enqueued *this* job does not refire and create an
@@ -29,45 +27,51 @@ module SoulLink
       return if slot.nil?
       return if slot.save_data.blank?
 
-      # Capture pre-update baseline BEFORE running the parse. Both
-      # values must reflect the DB state from before this job's write
-      # so the diff sees the actual transition.
-      prev_parsed_at = slot.parsed_at
-      prev_badges    = slot.parsed_badges
+      # Capture pre-update baseline BEFORE running the parse. Every
+      # value reflects DB state from before this job's write so the
+      # diff sees the actual transition.
+      prev = capture_state(slot)
 
       result = SoulLink::SaveParser.parse(slot.save_data)
 
       if result
         slot.update_columns(
-          parsed_trainer_name: result.trainer_name,
-          parsed_money:        result.money,
-          parsed_play_seconds: result.play_seconds,
-          parsed_badges:       result.badges_count.to_i,
-          parsed_map_id:       result.map_id,
-          parsed_at:           Time.current
+          parsed_trainer_name:   result.trainer_name,
+          parsed_money:          result.money,
+          parsed_play_seconds:   result.play_seconds,
+          parsed_badges:         result.badges_count.to_i,
+          parsed_map_id:         result.map_id,
+          parsed_trainer_id:     result.trainer_id,
+          parsed_secret_id:      result.secret_id,
+          parsed_pokedex_caught: result.pokedex_caught,
+          parsed_pokedex_seen:   result.pokedex_seen,
+          parsed_hof_count:      result.hof_count,
+          parsed_at:             Time.current
         )
+
+        SoulLink::SaveDiffDispatcher.dispatch(slot, prev: prev, curr: capture_state(slot))
       else
         # KG-13 fix: parse failed — only stamp parsed_at so we don't
         # re-loop. Leave every other parsed_* field at its prior value
         # so a CRC-bad save never appears as "lost all badges" to the
         # diff layer. The slot card still renders the most recently
-        # successful parse.
+        # successful parse. Dispatch is skipped entirely (no Result).
         slot.update_columns(parsed_at: Time.current)
-        return
       end
+    end
 
-      # Diff dispatch. Skip on first-ever parse (baseline rule) so a
-      # mid-run save import doesn't fire N events for a player who has
-      # never had a parsed_at stamp before.
-      return if prev_parsed_at.nil?
+    private
 
-      diff = SoulLink::SaveDiff.between(
-        prev_badges: prev_badges,
-        curr_badges: result.badges_count.to_i
-      )
-      return if diff.empty?
-
-      SoulLink::GymBeatenCoordinator.process(slot, diff.badge_events)
+    def capture_state(slot)
+      {
+        parsed_at:      slot.parsed_at,
+        badges:         slot.parsed_badges,
+        trainer_id:     slot.parsed_trainer_id,
+        secret_id:      slot.parsed_secret_id,
+        pokedex_caught: slot.parsed_pokedex_caught,
+        pokedex_seen:   slot.parsed_pokedex_seen,
+        hof_count:      slot.parsed_hof_count
+      }
     end
   end
 end

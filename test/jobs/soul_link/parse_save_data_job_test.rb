@@ -14,11 +14,16 @@ module SoulLink
       @slot.update!(save_data: "\x00".b * 0x80000)
 
       result = SoulLink::SaveParser::Result.new(
-        trainer_name: "Lyra",
-        money:        12_345,
-        play_seconds: 3_600,
-        badges_count: 4,
-        map_id:       42
+        trainer_name:   "Lyra",
+        money:          12_345,
+        play_seconds:   3_600,
+        badges_count:   4,
+        map_id:         42,
+        trainer_id:     0xABCD,
+        secret_id:      0x1357,
+        pokedex_caught: 50,
+        pokedex_seen:   75,
+        hof_count:      0
       )
 
       SoulLink::SaveParser.stub(:parse, result) do
@@ -31,6 +36,12 @@ module SoulLink
       assert_equal 3_600,   @slot.parsed_play_seconds
       assert_equal 4,       @slot.parsed_badges
       assert_equal 42,      @slot.parsed_map_id
+      # Step 16 columns also populate.
+      assert_equal 0xABCD,  @slot.parsed_trainer_id
+      assert_equal 0x1357,  @slot.parsed_secret_id
+      assert_equal 50,      @slot.parsed_pokedex_caught
+      assert_equal 75,      @slot.parsed_pokedex_seen
+      assert_equal 0,       @slot.parsed_hof_count
       assert_not_nil @slot.parsed_at
     end
 
@@ -73,12 +84,12 @@ module SoulLink
 
       called = false
       SoulLink::SaveParser.stub(:parse, nil) do
-        SoulLink::GymBeatenCoordinator.stub(:process, ->(*_) { called = true }) do
+        SoulLink::SaveDiffDispatcher.stub(:dispatch, ->(*_) { called = true }) do
           SoulLink::ParseSaveDataJob.perform_now(@slot)
         end
       end
 
-      assert_not called, "GymBeatenCoordinator.process must not be called when the parse fails"
+      assert_not called, "SaveDiffDispatcher.dispatch must not be called when the parse fails"
     end
 
     # --- callback non-firing ------------------------------------------------
@@ -168,6 +179,45 @@ module SoulLink
           SoulLink::ParseSaveDataJob.perform_now(@slot)
         end
       end
+    end
+
+    test "Step 16: dispatcher receives prev/curr snapshots after a successful parse" do
+      @slot.update_columns(parsed_badges: 0, parsed_trainer_id: 0, parsed_secret_id: 0,
+                           parsed_pokedex_caught: 0, parsed_pokedex_seen: 0, parsed_hof_count: 0,
+                           parsed_at: 1.minute.ago)
+      @slot.update!(save_data: "\x00".b * 0x80000)
+
+      result = SoulLink::SaveParser::Result.new(
+        trainer_name: "X", money: 0, play_seconds: 0, badges_count: 1, map_id: nil,
+        trainer_id: 1234, secret_id: 5678,
+        pokedex_caught: 50, pokedex_seen: 75, hof_count: 1
+      )
+
+      captured = nil
+      capture_dispatch = ->(slot, prev:, curr:) { captured = { slot: slot, prev: prev, curr: curr } }
+
+      SoulLink::SaveParser.stub(:parse, result) do
+        SoulLink::SaveDiffDispatcher.stub(:dispatch, capture_dispatch) do
+          SoulLink::ParseSaveDataJob.perform_now(@slot)
+        end
+      end
+
+      assert_not_nil captured, "dispatcher should be invoked after a successful parse with prior baseline"
+      assert_equal @slot.id, captured[:slot].id
+
+      # prev: state before the parse-save write — all zeros, parsed_at present
+      assert_not_nil captured[:prev][:parsed_at]
+      assert_equal 0, captured[:prev][:badges]
+      assert_equal 0, captured[:prev][:trainer_id]
+      assert_equal 0, captured[:prev][:hof_count]
+
+      # curr: state after the write — values from the SaveParser Result
+      assert_equal 1,    captured[:curr][:badges]
+      assert_equal 1234, captured[:curr][:trainer_id]
+      assert_equal 5678, captured[:curr][:secret_id]
+      assert_equal 50,   captured[:curr][:pokedex_caught]
+      assert_equal 75,   captured[:curr][:pokedex_seen]
+      assert_equal 1,    captured[:curr][:hof_count]
     end
 
     test "subsequent parse, badges +1, 4/4 satisfy → gym_results row created" do
@@ -305,6 +355,48 @@ module SoulLink
     end
 
     # --- idempotency --------------------------------------------------------
+
+    # --- Step 16: HoF integration ------------------------------------------
+    #
+    # Stubs SaveParser.parse to return progressively HoF-entered results
+    # across 4 sessions. Only the 4th save sets run.completed_at — the
+    # all-4 AND-gate enforces that the run isn't marked complete until
+    # every player has reached the Hall of Fame.
+
+    test "Step 16 integration: HoF auto-completion fires only on the 4th player's save" do
+      @session.destroy!
+      sessions = 4.times.map do |i|
+        create(:soul_link_emulator_session, :ready, soul_link_run: @run, active_save_slot: 1, discord_user_id: 500 + i)
+      end
+      slots = sessions.map do |s|
+        create(:soul_link_emulator_save_slot,
+               soul_link_emulator_session: s, slot_number: 1,
+               parsed_badges: 0, parsed_hof_count: 0, parsed_at: 5.minutes.ago)
+      end
+
+      result_with_hof = SoulLink::SaveParser::Result.new(
+        trainer_name: "X", money: 0, play_seconds: 0, badges_count: 0, map_id: nil,
+        trainer_id: 1, secret_id: 1, pokedex_caught: 0, pokedex_seen: 0, hof_count: 1
+      )
+
+      SoulLink::SaveParser.stub(:parse, result_with_hof) do
+        slots[0].update!(save_data: "\x00".b * 0x80000)
+        SoulLink::ParseSaveDataJob.perform_now(slots[0])
+        assert_nil @run.reload.completed_at, "after 1/4 the run should NOT be complete"
+
+        slots[1].update!(save_data: "\x00".b * 0x80000)
+        SoulLink::ParseSaveDataJob.perform_now(slots[1])
+        assert_nil @run.reload.completed_at, "after 2/4 the run should NOT be complete"
+
+        slots[2].update!(save_data: "\x00".b * 0x80000)
+        SoulLink::ParseSaveDataJob.perform_now(slots[2])
+        assert_nil @run.reload.completed_at, "after 3/4 the run should NOT be complete"
+
+        slots[3].update!(save_data: "\x00".b * 0x80000)
+        SoulLink::ParseSaveDataJob.perform_now(slots[3])
+        assert_not_nil @run.reload.completed_at, "after 4/4 the run SHOULD be complete"
+      end
+    end
 
     test "running the job twice produces the same final state" do
       @slot.update!(save_data: "\x00".b * 0x80000)

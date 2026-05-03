@@ -23,7 +23,14 @@
               <span class="type-text" style="border-color: var(--d1); background: var(--d2); color: var(--l2); margin-left: 4px;">VIEWING</span>
             <% end %>
           </div>
-          <span class="type-text" style="border-color: var(--d1); background: var(--d2); color: var(--l2);">ACTIVE</span>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <%# Step 16: run-completion pill — fires when 4/4 players have
+                reached HoF and HallOfFameCoordinator stamped completed_at. %>
+            <% if active_run&.completed? %>
+              <span class="type-text" style="border-color: var(--amber); background: var(--amber); color: var(--d1);">🏆 COMPLETE</span>
+            <% end %>
+            <span class="type-text" style="border-color: var(--d1); background: var(--d2); color: var(--l2);">ACTIVE</span>
+          </div>
         </div>
 
         <div class="gb-grid-4" style="margin-bottom: 12px;">
@@ -44,6 +51,16 @@
             <div style="font-size: 9px; color: var(--l1); margin-top: 2px;">STARTED</div>
           </div>
         </div>
+
+        <%# Step 16: completion timestamp tile, rendered as a row below
+            the gb-grid-4 stats (rather than expanding the grid to 5
+            columns) so the layout stays readable on narrow viewports. %>
+        <% if active_run&.completed_at %>
+          <div class="gb-card-dark" style="text-align: center; padding: 8px; margin-bottom: 12px;">
+            <div style="font-size: 10px; color: var(--l2);"><%= active_run.completed_at.strftime("%b %-d, %Y") %></div>
+            <div style="font-size: 9px; color: var(--l1); margin-top: 2px;">COMPLETED</div>
+          </div>
+        <% end %>
 
         <div data-run-management-target="errorMessage"
              class="hidden gb-flash gb-flash-alert" style="margin-bottom: 8px;">

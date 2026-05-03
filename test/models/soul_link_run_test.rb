@@ -171,4 +171,97 @@ class SoulLinkRunTest < ActiveSupport::TestCase
     @run.upsert_avatar!(nil, "https://cdn.discord/abc.png")
     assert_nil @run.player_avatars
   end
+
+  # ── Step 16: completion ────────────────────────────────────────────────
+
+  test "#completed? is true when completed_at is set, false otherwise" do
+    assert_not @run.completed?
+    @run.update!(completed_at: Time.current)
+    assert @run.completed?
+  end
+
+  # ── Step 16: TID conflict detection ────────────────────────────────────
+
+  test "#tid_conflict_groups is empty when no sessions exist" do
+    assert_equal [], @run.tid_conflict_groups
+  end
+
+  test "#tid_conflict_groups is empty when all sessions have unique TIDs" do
+    sess = 4.times.map do |i|
+      create(:soul_link_emulator_session, :ready, soul_link_run: @run, active_save_slot: 1, discord_user_id: 700 + i)
+    end
+    sess.each_with_index do |s, i|
+      create(:soul_link_emulator_save_slot, soul_link_emulator_session: s, slot_number: 1,
+             parsed_trainer_id: 1000 + i, parsed_secret_id: 2000 + i)
+    end
+
+    assert_equal [], @run.reload.tid_conflict_groups
+  end
+
+  test "#tid_conflict_groups returns one group of two ids when two sessions share (TID, SID)" do
+    sess = 4.times.map do |i|
+      create(:soul_link_emulator_session, :ready, soul_link_run: @run, active_save_slot: 1, discord_user_id: 800 + i)
+    end
+    # Sessions 0 and 2 share the same (TID, SID).
+    [
+      [ 1234, 5678 ],
+      [ 9999, 1111 ],
+      [ 1234, 5678 ],
+      [ 7777, 8888 ]
+    ].each_with_index do |(tid, sid), i|
+      create(:soul_link_emulator_save_slot, soul_link_emulator_session: sess[i], slot_number: 1,
+             parsed_trainer_id: tid, parsed_secret_id: sid)
+    end
+
+    groups = @run.reload.tid_conflict_groups
+    assert_equal 1, groups.size
+    assert_equal [ sess[0].id, sess[2].id ].sort, groups.first.sort
+  end
+
+  test "#tid_conflict_groups returns one group of four ids when all 4 sessions share (TID, SID)" do
+    sess = 4.times.map do |i|
+      create(:soul_link_emulator_session, :ready, soul_link_run: @run, active_save_slot: 1, discord_user_id: 900 + i)
+    end
+    sess.each do |s|
+      create(:soul_link_emulator_save_slot, soul_link_emulator_session: s, slot_number: 1,
+             parsed_trainer_id: 1234, parsed_secret_id: 5678)
+    end
+
+    groups = @run.reload.tid_conflict_groups
+    assert_equal 1, groups.size
+    assert_equal sess.map(&:id).sort, groups.first.sort
+  end
+
+  test "#tid_conflict_groups ignores sessions with nil/zero TID (unparsed slots)" do
+    sess = 4.times.map do |i|
+      create(:soul_link_emulator_session, :ready, soul_link_run: @run, active_save_slot: 1, discord_user_id: 1000 + i)
+    end
+    # Two slots have TID 0 (unparsed); two share a real (TID, SID).
+    [
+      [ 0, 0 ],
+      [ 1234, 5678 ],
+      [ 0, 0 ],
+      [ 1234, 5678 ]
+    ].each_with_index do |(tid, sid), i|
+      create(:soul_link_emulator_save_slot, soul_link_emulator_session: sess[i], slot_number: 1,
+             parsed_trainer_id: tid, parsed_secret_id: sid)
+    end
+
+    groups = @run.reload.tid_conflict_groups
+    assert_equal 1, groups.size, "the two TID=0 slots must NOT be flagged as a conflict group"
+    assert_equal [ sess[1].id, sess[3].id ].sort, groups.first.sort
+  end
+
+  test "#tid_conflict_groups distinguishes (TID, SID) pairs (same TID, different SID is not a conflict)" do
+    sess = 2.times.map do |i|
+      create(:soul_link_emulator_session, :ready, soul_link_run: @run, active_save_slot: 1, discord_user_id: 1100 + i)
+    end
+    # Same TID, different SID — NOT a conflict (different save).
+    create(:soul_link_emulator_save_slot, soul_link_emulator_session: sess[0], slot_number: 1,
+           parsed_trainer_id: 1234, parsed_secret_id: 5678)
+    create(:soul_link_emulator_save_slot, soul_link_emulator_session: sess[1], slot_number: 1,
+           parsed_trainer_id: 1234, parsed_secret_id: 9999)
+
+    assert_equal [], @run.reload.tid_conflict_groups
+  end
 end

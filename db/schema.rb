@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_02_191439) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_03_135726) do
   create_table "gym_auto_mark_suppressions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "gym_number", null: false
@@ -132,9 +132,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_02_191439) do
     t.datetime "created_at", null: false
     t.datetime "parsed_at"
     t.integer "parsed_badges", default: 0, null: false
+    t.integer "parsed_hof_count"
     t.integer "parsed_map_id", limit: 2
     t.integer "parsed_money"
     t.integer "parsed_play_seconds"
+    t.integer "parsed_pokedex_caught"
+    t.integer "parsed_pokedex_seen"
+    t.integer "parsed_secret_id"
+    t.integer "parsed_trainer_id"
     t.string "parsed_trainer_name", limit: 16
     t.binary "save_data", size: :long
     t.integer "slot_number", null: false
@@ -204,6 +209,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_02_191439) do
     t.bigint "catches_channel_id"
     t.bigint "catches_panel_message_id"
     t.bigint "category_id"
+    t.datetime "completed_at"
     t.datetime "created_at", null: false
     t.bigint "deaths_channel_id"
     t.bigint "deaths_panel_message_id"
@@ -215,6 +221,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_02_191439) do
     t.datetime "updated_at", null: false
     t.index ["active"], name: "index_soul_link_runs_on_active"
     t.index ["active_guild_id"], name: "index_soul_link_runs_on_active_guild_id", unique: true
+    t.index ["completed_at"], name: "index_soul_link_runs_on_completed_at"
     t.index ["guild_id", "active"], name: "index_soul_link_runs_on_guild_id_and_active"
     t.index ["guild_id", "run_number"], name: "index_soul_link_runs_on_guild_id_and_run_number", unique: true
   end

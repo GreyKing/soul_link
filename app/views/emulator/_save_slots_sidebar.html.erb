@@ -98,6 +98,27 @@
           </div>
         <% end %>
 
+        <%# Step 16: TID/SID — same render rules as the run-roster card.
+            Skip the TID conflict pill here — the player's own slots
+            can't conflict with themselves. %>
+        <% if slot.parsed_trainer_id.to_i.positive? %>
+          <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
+            TID <%= slot.parsed_trainer_id %> / SID <%= slot.parsed_secret_id %>
+          </div>
+        <% end %>
+
+        <% if slot.parsed_pokedex_caught || slot.parsed_pokedex_seen %>
+          <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
+            Pokédex <%= slot.parsed_pokedex_caught || 0 %> caught / <%= slot.parsed_pokedex_seen || 0 %> seen
+          </div>
+        <% end %>
+
+        <% if slot.parsed_hof_count.to_i >= 1 %>
+          <div style="margin-top: 4px;">
+            <span class="type-text" style="border-color: var(--amber); background: var(--amber); color: var(--d1); font-size: 9px;">🏆 HALL OF FAME</span>
+          </div>
+        <% end %>
+
         <% if saved_bytes && saved_bytes > 0 %>
           <div style="font-size: 9px; color: var(--d2); opacity: 0.7; line-height: 1.6;">
             <%= number_to_human_size(saved_bytes) %> &middot; saved <%= time_ago_in_words(slot.updated_at) %> ago

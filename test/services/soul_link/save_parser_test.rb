@@ -15,6 +15,7 @@ module SoulLink
 
     SLOT_SIZE = SoulLink::SaveParser::SLOT_SIZE
     GENERAL_BLOCK_SIZE = SoulLink::SaveParser::GENERAL_BLOCK_SIZE
+    EXPECTED_TOTAL = SoulLink::SaveParser::EXPECTED_TOTAL
 
     # Build a single 0x40000 slot with given trainer block fields, computing
     # and inserting a valid CRC16-CCITT into the footer. `save_counter`
@@ -25,7 +26,9 @@ module SoulLink
     # CRC covers everything in the block before the CRC field (0..0xCF2A).
     def build_slot(name_indices: [], money: 0, badges_byte: 0,
                    play_hours: 0, play_minutes: 0, play_seconds: 0,
-                   map_id: 0, save_counter: 1, valid_crc: true)
+                   map_id: 0, save_counter: 1, valid_crc: true,
+                   trainer_id: 0, secret_id: 0,
+                   pokedex_caught_bits: 0, pokedex_seen_bits: 0)
       slot = "\x00".b * SLOT_SIZE
 
       # Trainer name: 8 little-endian uint16 indices, padded with 0x0000.
@@ -39,6 +42,22 @@ module SoulLink
       slot.setbyte(SoulLink::SaveParser::PLAY_MINUTES_OFFSET, play_minutes & 0xFF)
       slot.setbyte(SoulLink::SaveParser::PLAY_SECONDS_OFFSET, play_seconds & 0xFF)
       slot[SoulLink::SaveParser::MAP_ID_OFFSET, 2] = [ map_id ].pack("v")
+
+      slot[SoulLink::SaveParser::TRAINER_ID_OFFSET, 2] = [ trainer_id & 0xFFFF ].pack("v")
+      slot[SoulLink::SaveParser::SECRET_ID_OFFSET, 2]  = [ secret_id  & 0xFFFF ].pack("v")
+
+      # Pokédex caught/seen regions: write `pokedex_caught_bits` set
+      # bits starting at species index 0 (sequential). Real saves set
+      # bits at species-id positions, but for popcount tests the
+      # arrangement doesn't matter — only the count does.
+      if pokedex_caught_bits.positive?
+        slot[SoulLink::SaveParser::POKEDEX_CAUGHT_OFFSET, SoulLink::SaveParser::POKEDEX_CAUGHT_BYTES] =
+          bytes_with_n_bits_set(pokedex_caught_bits, SoulLink::SaveParser::POKEDEX_CAUGHT_BYTES)
+      end
+      if pokedex_seen_bits.positive?
+        slot[SoulLink::SaveParser::POKEDEX_SEEN_OFFSET, SoulLink::SaveParser::POKEDEX_SEEN_BYTES] =
+          bytes_with_n_bits_set(pokedex_seen_bits, SoulLink::SaveParser::POKEDEX_SEEN_BYTES)
+      end
 
       # Save counter at footer start (block-relative 0xCF18, = BLOCK_COUNTER_OFFSET).
       slot[SoulLink::SaveParser::BLOCK_COUNTER_OFFSET, 4] = [ save_counter ].pack("V")
@@ -55,9 +74,60 @@ module SoulLink
       slot
     end
 
-    def build_sram(slot_a:, slot_b: nil)
+    def build_sram(slot_a:, slot_b: nil, hof_a: nil, hof_b: nil)
       slot_b ||= "\x00".b * SLOT_SIZE
-      slot_a + slot_b
+      sram = slot_a + slot_b
+      # Pad to the full 0x80000 file size (slots only take 0..0x80000;
+      # the HoF / extra-block regions live at fixed absolute offsets but
+      # are within the same 512KB file).
+      sram = sram.b
+      sram += "\x00".b * (EXPECTED_TOTAL - sram.bytesize) if sram.bytesize < EXPECTED_TOTAL
+      sram = sram.byteslice(0, EXPECTED_TOTAL)
+
+      # Hall of Fame block: primary at 0x20000, secondary mirror at
+      # 0x60000. Either build_hof_block(...) (valid CRC) or pass raw
+      # bytes for adversarial cases.
+      if hof_a
+        sram[SoulLink::SaveParser::HOF_PRIMARY_OFFSET, SoulLink::SaveParser::HOF_BLOCK_TOTAL_SIZE] = hof_a
+      end
+      if hof_b
+        sram[SoulLink::SaveParser::HOF_PRIMARY_OFFSET + SoulLink::SaveParser::HOF_PARTITION_SIZE,
+             SoulLink::SaveParser::HOF_BLOCK_TOTAL_SIZE] = hof_b
+      end
+      sram
+    end
+
+    # Build a 0x2AC0-byte HoF block with the given ClearCount and a
+    # valid CRC16-CCITT footer. CRC covers everything before the last
+    # 2 bytes (the CRC field itself). Set `valid_crc: false` to inject
+    # a corruption that the parser must reject.
+    def build_hof_block(clear_count:, valid_crc: true)
+      block = "\x00".b * SoulLink::SaveParser::HOF_BLOCK_TOTAL_SIZE
+      block[SoulLink::SaveParser::HOF_CLEAR_COUNT_OFFSET, 4] = [ clear_count ].pack("V")
+
+      crc_value = if valid_crc
+        crc16_ccitt(block.byteslice(0, SoulLink::SaveParser::HOF_CRC_RANGE_END))
+      else
+        0xDEAD
+      end
+      block[SoulLink::SaveParser::HOF_CRC_OFFSET, 2] = [ crc_value ].pack("v")
+      block
+    end
+
+    # Returns `byte_length` bytes containing exactly `n` set bits,
+    # starting from LSB of byte 0. Used to seed Pokédex caught/seen
+    # regions with a known popcount.
+    def bytes_with_n_bits_set(n, byte_length)
+      raise ArgumentError if n > byte_length * 8
+      out = "\x00".b * byte_length
+      remaining = n
+      byte_length.times do |i|
+        break if remaining.zero?
+        bits = [ remaining, 8 ].min
+        out.setbyte(i, (1 << bits) - 1)
+        remaining -= bits
+      end
+      out
     end
 
     # Mirror of the parser's CRC routine — kept inline so tests don't accidentally
@@ -252,6 +322,170 @@ module SoulLink
       assert_respond_to result, :play_seconds
       assert_respond_to result, :badges_count
       assert_respond_to result, :map_id
+      assert_respond_to result, :trainer_id
+      assert_respond_to result, :secret_id
+      assert_respond_to result, :pokedex_caught
+      assert_respond_to result, :pokedex_seen
+      assert_respond_to result, :hof_count
+    end
+
+    # ── Step 16: TID / SID ────────────────────────────────────────────────
+
+    test "parses trainer_id (TID) at offset 0x0078 as little-endian uint16" do
+      slot = build_slot(name_indices: name_indices_for("A"), trainer_id: 0x1234)
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot))
+
+      assert_not_nil result
+      assert_equal 0x1234, result.trainer_id
+    end
+
+    test "parses secret_id (SID) at offset 0x007A as little-endian uint16" do
+      slot = build_slot(name_indices: name_indices_for("A"), secret_id: 0x5678)
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot))
+
+      assert_not_nil result
+      assert_equal 0x5678, result.secret_id
+    end
+
+    test "trainer_id and secret_id default to 0 when slot is all zeros" do
+      slot = build_slot(name_indices: name_indices_for("A"))
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot))
+
+      assert_not_nil result
+      assert_equal 0, result.trainer_id
+      assert_equal 0, result.secret_id
+    end
+
+    # ── Step 16: Pokédex caught/seen popcount ─────────────────────────────
+
+    test "pokedex_caught popcount matches the number of set bits" do
+      slot = build_slot(name_indices: name_indices_for("A"), pokedex_caught_bits: 47)
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot))
+
+      assert_not_nil result
+      assert_equal 47, result.pokedex_caught
+    end
+
+    test "pokedex_seen popcount matches the number of set bits" do
+      slot = build_slot(name_indices: name_indices_for("A"), pokedex_seen_bits: 89)
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot))
+
+      assert_not_nil result
+      assert_equal 89, result.pokedex_seen
+    end
+
+    test "pokedex_caught is 0 when no bits are set (player hasn't caught anything)" do
+      slot = build_slot(name_indices: name_indices_for("A"))
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot))
+
+      assert_not_nil result
+      assert_equal 0, result.pokedex_caught
+      assert_equal 0, result.pokedex_seen
+    end
+
+    test "pokedex defensive cap: bit count > 493 returns nil for that field" do
+      # 494 set bits exceeds POKEDEX_BIT_LIMIT (493 = NATIONAL_DEX_COUNT
+      # for Sinnoh) — the offset must be wrong; surface nil so the view
+      # omits the field rather than rendering nonsense.
+      slot = build_slot(name_indices: name_indices_for("A"), pokedex_caught_bits: 494)
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot))
+
+      assert_not_nil result
+      assert_nil result.pokedex_caught
+    end
+
+    # ── Step 16: Hall of Fame ─────────────────────────────────────────────
+
+    test "hof_count is 0 when valid HoF block contains ClearCount=0 (player hasn't entered HoF)" do
+      slot = build_slot(name_indices: name_indices_for("A"))
+      hof = build_hof_block(clear_count: 0)
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot, hof_a: hof))
+
+      assert_not_nil result
+      assert_equal 0, result.hof_count
+    end
+
+    test "hof_count is 1 when valid HoF block contains ClearCount=1 (player just entered HoF)" do
+      slot = build_slot(name_indices: name_indices_for("A"))
+      hof = build_hof_block(clear_count: 1)
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot, hof_a: hof))
+
+      assert_not_nil result
+      assert_equal 1, result.hof_count
+    end
+
+    test "hof_count is the higher of two valid partition mirrors" do
+      slot = build_slot(name_indices: name_indices_for("A"))
+      hof_primary   = build_hof_block(clear_count: 1)
+      hof_secondary = build_hof_block(clear_count: 3)
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot, hof_a: hof_primary, hof_b: hof_secondary))
+
+      assert_not_nil result
+      assert_equal 3, result.hof_count
+    end
+
+    test "hof_count is nil when both HoF partitions have CRC fail (never false-positive completion)" do
+      slot = build_slot(name_indices: name_indices_for("A"))
+      hof_bad_a = build_hof_block(clear_count: 1, valid_crc: false)
+      hof_bad_b = build_hof_block(clear_count: 1, valid_crc: false)
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot, hof_a: hof_bad_a, hof_b: hof_bad_b))
+
+      assert_not_nil result
+      assert_nil result.hof_count
+    end
+
+    test "hof_count falls back to the valid partition when one mirror is corrupt" do
+      slot = build_slot(name_indices: name_indices_for("A"))
+      hof_bad   = build_hof_block(clear_count: 1, valid_crc: false)
+      hof_good  = build_hof_block(clear_count: 2)
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot, hof_a: hof_bad, hof_b: hof_good))
+
+      assert_not_nil result
+      assert_equal 2, result.hof_count
+    end
+
+    test "hof_count is nil when both HoF partitions are zero-padded (no init / fresh save)" do
+      # A fresh ROM with no HoF data ever written has the block region
+      # zero-padded. The CRC over all zeros is some specific value, NOT
+      # 0x0000 (the stored field). So the CRC check fails on both
+      # partitions and we return nil — distinct from "valid block, count
+      # is 0" which means "player initialized the save but hasn't entered
+      # HoF." Both render the same to the user (no completion pill), but
+      # the parser's nil-vs-0 distinction matters for the diff layer.
+      slot = build_slot(name_indices: name_indices_for("A"))
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot))
+
+      assert_not_nil result
+      assert_nil result.hof_count
+    end
+
+    # ── Step 16: backward compat ──────────────────────────────────────────
+
+    test "existing fields populate alongside the new Step 16 fields" do
+      slot = build_slot(
+        name_indices: name_indices_for("Lyra"),
+        money: 12_345,
+        badges_byte: 0b00001111,
+        play_hours: 5, play_minutes: 30, play_seconds: 12,
+        map_id: 426,
+        trainer_id: 0xABCD, secret_id: 0x1357,
+        pokedex_caught_bits: 50, pokedex_seen_bits: 75
+      )
+      hof = build_hof_block(clear_count: 1)
+      result = SoulLink::SaveParser.parse(build_sram(slot_a: slot, hof_a: hof))
+
+      assert_not_nil result
+      # Step 1-pre fields untouched.
+      assert_equal "Lyra", result.trainer_name
+      assert_equal 12_345, result.money
+      assert_equal 4,      result.badges_count
+      assert_equal 426,    result.map_id
+      # Step 16 fields populated.
+      assert_equal 0xABCD, result.trainer_id
+      assert_equal 0x1357, result.secret_id
+      assert_equal 50,     result.pokedex_caught
+      assert_equal 75,     result.pokedex_seen
+      assert_equal 1,      result.hof_count
     end
   end
 end

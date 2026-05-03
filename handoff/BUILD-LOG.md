@@ -11,9 +11,9 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 14.3 — Gym-draft candidate card hotfix. About to ship on top of Step 15 (`e556671`).
-**Last committed:** Step 15 (`6e80fe5`) shipped + merged. Gym-leader YAML correction (`e556671`) shipped on top.
-**Pending deploy:** Step 15 ships 1 migration (`create_gym_auto_mark_suppressions`). Pre-deploy safe — additive table, no data backfill, no breaking schema changes.
+**Active step:** Step 16 — Non-decryption SRAM expansion: TID/SID + Pokédex caught/seen + Hall of Fame detection. **Reviewed + cleared by Richard (0 Must Fix, 1 Should Fix — cosmetic param rename `_sid` → `_session_id` in `tid_conflict_groups` block, applied inline). KG-14 closed (Pokédex offsets cited from PKHeX SAV4Pt.cs + pret/pokeplatinum include/pokedex.h primary sources). Rebased onto main (which advanced past Step 15 with hotfix 14.3 `c845e8a`); ready to FF-merge + push.**
+**Last committed:** Parallel main advanced through `c845e8a` (Step 14.3 — gym-draft candidate cards hotfix). Step 16 lands on top.
+**Pending deploy:** Step 16 ships 2 migrations (`add_step_16_parsed_columns_to_soul_link_emulator_save_slots` + `add_completed_at_to_soul_link_runs`). Pre-deploy safe — both additive (5 nullable integer columns + 1 nullable datetime column with index), no data backfill, no breaking schema changes.
 
 **Should Fix items resolved inline post-review:**
 1. `test/services/soul_link/gym_beaten_coordinator_test.rb:111-130` — transaction-rollback test was stubbing `update!` to raise `ActiveRecord::Rollback`, which is silently swallowed by `transaction { }`. Test passed but the wrapping `begin/rescue` was dead code AND the test would have passed even without the transaction wrapper. Switched the stub to raise `RuntimeError` (propagates through `transaction`) and replaced the dead rescue with `assert_raises(RuntimeError)`. Now correctly proves the transaction wraps both writes — without the wrap, the test would fail because `create!` would have completed before `update!` raised.
@@ -39,6 +39,81 @@ Full suite at 397/397 (370 → 397, +27); rubocop clean (152 → 159 files, 0 of
 PO bug report: candidate cards in the nominating phase showed only one pokemon's species, reading as "just my pokemon" to viewers. Root cause: `gym_draft_controller.js:304` rendered `group.pokemon[0].species` — but `g.soul_link_pokemon` has no default order, so the visible species was non-deterministic ("whichever player happened to be saved first"). Fix: render each linked pokemon as `<player>: <species>` on its own line, mirroring the existing gym-result snapshot pattern at `_gyms_content.html.erb:81`. ~10 lines of JS, single file.
 
 **Tests:** 397 → 400 (parallel work landed +3 tests with the gym-leader YAML fixes; this hotfix adds none — JS-only rendering change with no JS test infrastructure in the project, same shape as Step 14.1 / 14.2 hotfixes). Rubocop clean.
+
+---
+### Step 16 — Non-decryption SRAM expansion: TID/SID + Pokédex counts + Hall of Fame — 2026-05-03
+**Status:** Built; awaiting Richard's review. **KG-14 closes** (Pokédex offsets pinned to PKHeX `SAV4Pt.cs` + pret/pokeplatinum `include/pokedex.h` primary sources, cited inline in code comments).
+
+Bundles the three highest-ROI SRAM additions that don't pay decryption cost, all on top of the Step 15 SaveDiff infra: (1) TID/SID surfacing for save-mix-up detection, (2) Pokédex caught/seen counters (closes KG-14), (3) Hall of Fame run-completion detection. Refactors `ParseSaveDataJob` to hand off to a new `SoulLink::SaveDiffDispatcher` so the job stays a "pure parser + persist" facade and per-category branching lives in one place — opens the door for future categories without rewriting the job again.
+
+**Architecture decision (durable — see § Architecture Decisions):**
+- **Dispatcher extracted.** `SoulLink::SaveDiffDispatcher.dispatch(slot, prev:, curr:)` owns the baseline rule (skip on first-ever parse) and the empty-diff short-circuit. Job builds two state-snapshot Hashes (pre/post) and hands them to the dispatcher; dispatcher computes the diff and fans out to four coordinators.
+- **Three new coordinators (TID, Pokédex, HoF) — symmetric pattern.** TID and Pokédex are log-only (the user-visible value comes from parser-persisted columns + view reads). HoF is the side-effect coordinator: when 4/4 sessions report `parsed_hof_count >= 1`, sets `run.completed_at = Time.current`. Mirrors `GymBeatenCoordinator`'s all-4 AND-gate.
+- **TID-mix-up detection is read-side.** `SoulLinkRun#tid_conflict_groups` returns groups of session-ids sharing the same `(parsed_trainer_id, parsed_secret_id)` pair. The view renders a "⚠ TID CONFLICT" pill on each affected card. No coordinator action — the player resolves manually.
+- **No auto-deactivation of completed runs.** PO follow-on call. `active` flag stays as-is. Logged in Known Gaps.
+- **HoF block CRC.** Same CRC16-CCITT-FALSE variant as the general block (verified against PKHeX `Dendou4.cs` `Checksums.CRC16_CCITT(GetRegion()[..^2])` and reused the existing `crc16_ccitt` helper). On CRC fail or any error → `parsed_hof_count = nil` (NEVER false-positive a "Run complete").
+
+**KG-14 closure citation (in code comments at `app/services/soul_link/save_parser.rb:75-99`):**
+- PKHeX `PKHeX.Core/Saves/SAV4Pt.cs`: `private const int PokeDex = 0x1328;`
+- PKHeX `PKHeX.Core/Saves/Substructures/PokeDex/Zukan4.cs`: `SIZE_REGION = 0x40`, `var ofs = 4 + (region * SIZE_REGION) + (index >> 3)` — "Region 0: Caught flags / Region 1: Seen flags"
+- pret/pokeplatinum `include/pokedex.h` `struct Pokedex`: `u32 magic; u32 caughtPokemon[DEX_SIZE_U32]; u32 seenPokemon[DEX_SIZE_U32]; ...` with `DEX_SIZE_U32 = 16` — identical layout
+- Defensive cap: popcount > `POKEDEX_BIT_LIMIT` (493 = `NATIONAL_DEX_COUNT` per pret) → returns nil for that field, mirroring `safe_map_id`'s graceful degradation
+
+**HoF block citation (in code comments at `app/services/soul_link/save_parser.rb:101-138`):**
+- PKHeX `PKHeX.Core/Saves/SAV4Pt.cs`: `ExtraBlocks => [ new(0, 0x20000, 0x2AC0), // Hall of Fame, ... ]`
+- PKHeX `PKHeX.Core/Saves/Substructures/Gen4/Dendou4.cs`: layout `Dendou4Record[30]` (each 0x16C bytes), then `u32 IndexNextOverwrite` at 0x2AA8, then `u32 ClearCount` at 0x2AAC; footer at 0x2AB0 (16 bytes); CRC at 0x2ABE
+- pret/pokeplatinum `include/savedata/save_table.h` + `src/savedata/save_table.c`: `EXTRA_SAVE_TABLE_ENTRY_HALL_OF_FAME = 0` registered via `HallOfFame_SaveSize`/`HallOfFame_Init`
+- Both partition mirrors (primary 0x20000, secondary 0x60000) read; higher CRC-valid `ClearCount` wins. Both corrupt → nil.
+
+**Migrations (2):**
+- `db/migrate/20260503135725_add_step_16_parsed_columns_to_soul_link_emulator_save_slots.rb` — adds `parsed_trainer_id`, `parsed_secret_id`, `parsed_pokedex_caught`, `parsed_pokedex_seen`, `parsed_hof_count` (all `:integer`, nullable, no defaults). Avoided `limit: 2` to prevent uint16 upper-half overflow.
+- `db/migrate/20260503135726_add_completed_at_to_soul_link_runs.rb` — adds `completed_at :datetime` + index.
+
+**Files created (7):**
+- `app/services/soul_link/save_diff_dispatcher.rb` — new fan-out service.
+- `app/services/soul_link/tid_observation_coordinator.rb` — log-only.
+- `app/services/soul_link/pokedex_progress_coordinator.rb` — log-only.
+- `app/services/soul_link/hall_of_fame_coordinator.rb` — side-effect (sets `completed_at`).
+- `test/services/soul_link/save_diff_dispatcher_test.rb` — 7 tests (baseline rule, empty diff, per-category dispatch, all-4 fan-out).
+- `test/services/soul_link/tid_observation_coordinator_test.rb` — 4 tests (empty events, log assertion, orphan slot, no AR side effects).
+- `test/services/soul_link/pokedex_progress_coordinator_test.rb` — 4 tests (same shape as TID).
+- `test/services/soul_link/hall_of_fame_coordinator_test.rb` — 7 tests (4/4 sets completed_at, 3/4 no-op, idempotency, inactive run, 0 sessions, missing active slot, empty events).
+
+**Files modified (8):**
+- `app/services/soul_link/save_parser.rb` — extended `Result` struct with 5 new fields; added Pokédex + HoF constants with primary-source citations; added `read_uint16_le`, `count_pokedex_bits`, `safe_hof_count`, `extract_hof_count` helpers; populated TID/SID/Pokédex/HoF in the `parse(...)` Result. Top-level `rescue StandardError → nil` preserved.
+- `app/services/soul_link/save_diff.rb` — added `TidObserved`/`PokedexProgress`/`HallOfFameEntered` structs; extended `Result` with `tid_events:`, `pokedex_events:`, `hof_events:` keyword fields; extended `between(...)` with new keyword args (default `nil`); refactored per-dimension diff helpers. Backward compat: Step-15-style call signature returns Result with all 4 event arrays populated correctly.
+- `app/jobs/soul_link/parse_save_data_job.rb` — refactored to "pure parser + persist". `capture_state(slot)` builds prev/curr snapshots before/after the parsed_* write; dispatcher receives both. Step 15's diff/dispatch logic relocated to `SaveDiffDispatcher`. KG-13 contract preserved (parse failure stamps only `parsed_at`, no dispatch).
+- `app/models/soul_link_run.rb` — added `broadcasts_refreshes_to ->(record) { [ record, :dashboard ] }` (mirrors Step 15 GymResult pattern); added `completed?` and `tid_conflict_groups` methods.
+- `app/views/emulator/_run_sidebar_card.html.erb` — appended TID/SID line, Pokédex line, HoF pill, TID-conflict pill after the existing badges line. Conflict computation runs inline per card render (cheap because `includes(:save_slots)` eager-loaded; no controller-context-needing helper extraction).
+- `app/views/emulator/_save_slots_sidebar.html.erb` — mirrored TID/SID, Pokédex, HoF pill on the player's own slot column. Skipped TID conflict pill (player's own slots can't conflict with themselves).
+- `app/views/dashboard/_runs_content.html.erb` — added "🏆 COMPLETE" pill next to the existing "ACTIVE" pill in the run header; added "COMPLETED" timestamp tile as a row below the gb-grid-4 stats (chose row-below over gb-grid-5 to keep CSS untouched and the layout readable on narrow viewports — brief allowed either).
+- `test/services/soul_link/save_parser_test.rb` — extended `build_slot` with `trainer_id`, `secret_id`, `pokedex_caught_bits`, `pokedex_seen_bits` kwargs; extended `build_sram` with `hof_a`/`hof_b` kwargs and pads to full 0x80000 size; added `build_hof_block(clear_count:, valid_crc:)` and `bytes_with_n_bits_set(n, byte_length)` helpers. Added 14 new tests (TID/SID parse, Pokédex popcount, defensive cap, HoF count, HoF CRC fail, HoF dual-partition picking, backward-compat smoke).
+- `test/services/soul_link/save_diff_test.rb` — added 16 new tests (Step-16 backward compat with Step-15 signature, Result#empty?, TidObserved 5 cases, PokedexProgress 4 cases, HallOfFameEntered 5 cases).
+- `test/jobs/soul_link/parse_save_data_job_test.rb` — extended success-path test to assert all 5 new columns populate; replaced the KG-13 dispatch-suppression test's stub target from `GymBeatenCoordinator.process` to `SaveDiffDispatcher.dispatch` (the call site moved); added a `SaveDiffDispatcher.dispatch` call-args test (asserts prev/curr snapshot shape + values); added a 4-session HoF integration test (only 4th save sets `run.completed_at`).
+- `test/models/soul_link_run_test.rb` — added 7 new tests (completed?, tid_conflict_groups: empty / unique TIDs / 2-of-4 share / 4-of-4 share / nil-zero TID excluded / TID-only-match no-conflict).
+
+**Tests:** 461/461 (was 400). +61 over Step 15 baseline. 0 failures, 0 errors.
+**Lint:** `bundle exec rubocop` clean (169 files, 0 offenses; +10 from Step 15's 159 — 2 migrations + 1 dispatcher + 3 coordinators + 4 new test files; 1 inline `_ = noop` smell autocorrected pre-commit by removing the unused literal).
+**Brakeman:** Clean (no new warnings; the 2 weak-confidence pre-existing File Access warnings are unchanged).
+
+**Backward-compat invariants exercised:**
+- Step-15-style call `SaveDiff.between(prev_badges: 0, curr_badges: 1)` returns `Result.new(badge_events: [BadgeGained.new(gym_number: 1)], tid_events: [], pokedex_events: [], hof_events: [])` and the existing 8 Step-15 SaveDiff tests pass unchanged.
+- `SaveParser::Result.new(trainer_name: "X", money: 0, play_seconds: 0, badges_count: 0, map_id: nil)` (the Step-15 form used in 7 existing job tests) still works because `keyword_init: true` defaults missing fields to nil.
+- `GymBeatenCoordinator` body is untouched. The dispatcher relocates the *call* to `process(slot, diff.badge_events)` — no change to all-4 gate, suppression, idempotency, or transaction-wrap semantics.
+- Step 15's retry-safety regression test (`coordinator raise on first run does not double-fire on the retry`) still passes — the dispatcher refactor moved call sites but not invariants.
+
+**Walks (the same shape Step 15 used):**
+- **HoF coordinator walk:** `process(slot, events)` returns early if `events.empty?`. Resolves `run = slot.session&.run`; returns if run is nil, inactive, or already completed (idempotency guard). Calls `all_players_in_hall_of_fame?(run)` which returns false for empty session sets (mirroring `GymBeatenCoordinator.all_players_have_badge?`'s same guard) and uses `s.active_slot&.parsed_hof_count.to_i >= 1` for nil-safe checks. Only on the all-4 pass: `run.update!(completed_at: Time.current)` + info log line.
+- **TID-conflict-group walk:** `tid_conflict_groups` filter_maps over `soul_link_emulator_sessions.includes(:save_slots)`, dropping nil active slots and slots with TID 0 (unparsed). Groups by `[tid, sid]` pair, keeps only groups of size ≥ 2, returns the session-id arrays. Pair key is `[tid, sid]` so two players with the same TID but different SIDs are NOT flagged (different save anyway).
+- **HoF block walk:** `safe_hof_count(bytes)` reads both partition mirrors (primary at 0x20000, secondary at 0x60000), CRC-validates each (CRC16-CCITT over the data region except the last 2 bytes), takes the higher of the valid `ClearCount` values. Returns nil if both partitions fail CRC (NEVER 0 — the `>= 1` check on a nil-coerced-to-0 then correctly fails the all-4 gate, never false-positives a "Run complete").
+
+**Diff scope:** 2 migrations + 1 modified parser + 1 modified diff + 1 new dispatcher + 3 new coordinators + 1 modified model + 1 modified job + 3 modified views + 4 new test files + 4 extended test files. Inside the brief's stated diff scope.
+
+**KG closure logged:** KG-14 closes — Pokédex offsets cited from primary sources in code comments. **No new KGs added by this step.**
+
+**New Known Gaps logged this step:** see § Known Gaps below — KG-16 (auto-deactivation of completed runs deferred), KG-17 (Discord notification on HoF deferred — could be a 1-liner inside `HallOfFameCoordinator`), KG-18 (TID conflict resolution flow — pill is informational only, no UI to resolve), KG-19 (HoF "uncomplete" path — direct AR edit only, no UI).
+
+**Rebase note:** branch was based on Step 15 + corrigendum (`e556671`); main advanced through Step 14.3 hotfix (`c845e8a`) before Step 16 landed. Rebase resolved one trivial conflict in `BUILD-LOG.md` (Current Status replaced; Step 14.3 entry preserved below the new Step 16 entry).
 
 ---
 
@@ -766,7 +841,7 @@ ALL FACTORY SMOKE CHECKS PASSED
 ## Known Gaps
 *Durable. Items logged here instead of expanding the current step. Persists across sessions until addressed.*
 
-### Closed in Steps 9-15 (2026-04-30 → 2026-05-02)
+### Closed in Steps 9-16 (2026-04-30 → 2026-05-03)
 - ~~**KG-1: No real-time updates on the run roster sidebar**~~ — closed in Step 9 (targeted frame replacement on save-slot parsed_* updates)
 - ~~**KG-2: No real-time broadcast of species change to other players' dashboards**~~ — closed in Step 9 (`broadcasts_refreshes_to` on `SoulLinkPokemon` + `SoulLinkPokemonGroup`)
 - ~~**KG-3: No loading state on EVOLVE button**~~ — closed in Step 9 (button disable + "EVOLVING..." text)
@@ -774,6 +849,7 @@ ALL FACTORY SMOKE CHECKS PASSED
 - ~~**KG-5: 133 pre-existing rubocop offenses**~~ — closed in Step 10 (`rubocop -a` autocorrect; codebase now 0 offenses across 147 files)
 - ~~**KG-6: Map ID → name lookup**~~ — closed in Step 12 (`config/soul_link/maps.yml` + `SoulLink::GameState.map_name` + `EmulatorHelper#format_map_name` + view edits in run-roster + slot-card surfaces)
 - ~~**KG-13: Parse-failure path zeroes parsed_badges**~~ — closed in Step 15 (`ParseSaveDataJob` failure branch now updates ONLY `parsed_at`; every other parsed_* field keeps its prior value, so a CRC-bad save sandwiched between two good ones never produces spurious BadgeLost events through the new `SaveDiff` pipeline)
+- ~~**KG-14: Pokédex caught/seen flag offsets not yet validated against a real Platinum save**~~ — closed in Step 16 (`POKEDEX_OFFSET = 0x1328`, `POKEDEX_CAUGHT_OFFSET = 0x132C`, `POKEDEX_SEEN_OFFSET = 0x136C` cited from PKHeX `SAV4Pt.cs` `private const int PokeDex = 0x1328` + `Zukan4.cs` `SIZE_REGION = 0x40` region layout + pret/pokeplatinum `include/pokedex.h` `struct Pokedex { u32 magic; u32 caughtPokemon[16]; u32 seenPokemon[16]; ... }`. Defensive cap: popcount > `POKEDEX_BIT_LIMIT = 493` (`NATIONAL_DEX_COUNT`) returns nil for that field. Citations in code comments at `app/services/soul_link/save_parser.rb:75-99`.)
 - ~~**YOU-badge restoration follow-up (logged in Step 9)**~~ — closed in Step 10 (new `roster_you_marker_controller.js` decorates the matching `[data-discord-user-id]` card on `connect()` + `turbo:before-stream-render`)
 - ~~**Soft Point #3: SoulLinkRun.current(guild_id) lacks a hard invariant**~~ — closed in Step 11 (DB-level virtual-column unique index on `active_guild_id`)
 - ~~**Convert legacy fixture-based tests to FactoryBot**~~ — closed in Steps 4-8 (FactoryBot conversion shipped)
@@ -786,6 +862,12 @@ ALL FACTORY SMOKE CHECKS PASSED
 - **`window.alert()` for Tier-A error toasts** (Step 9). Smallest user-facing change that closed the silent-failure gap; a styled toast component (matching the `gb-flash gb-flash-alert` palette) would be cleaner. Track if alerts feel intrusive in real use.
 - **Bot-process broadcasts not yet supported.** The async cable adapter is in-process; Discord modal updates (which run in the bot process via `rake soul_link:bot`) don't propagate to web clients in real time. Switching to a redis cable adapter would unlock this.
 - **Pre-existing soft points from `handoff/PROJECT-REVIEW-2026-04-30.md`** — 20 items, ranked by ROI in that document. Top-priority structural cleanups: (1) `discord_bot.rb` god-object decomposition; (2) zero test coverage on services/channels; (3) `SoulLinkRun.current(guild_id)` lacks a hard "one active per guild" invariant; (4) `DashboardController#show` needs presenter extraction; (5) `SoulLinkEmulatorSession::GzipCoder` should move to a concern. None of these are urgent — Tier-1 refactor work, fresh-session candidate.
+
+### New — From Step 16 (2026-05-03)
+- **KG-16: Auto-deactivation of completed runs.** `HallOfFameCoordinator` sets `run.completed_at = Time.current` when 4/4 sessions reach HoF, but does NOT flip the `active` flag. PO follow-on call (locked decision in the brief). The dashboard renders a "🏆 COMPLETE" pill alongside the existing "ACTIVE" pill so the state is visible; un-completing requires direct AR write (`run.update!(completed_at: nil)`). Future: PO may want a "WRAP UP RUN" button on the dashboard that flips `active` to false.
+- **KG-17: Discord notification on Hall of Fame.** Could be a 1-liner inside `HallOfFameCoordinator` (post to the run's `general_channel_id` with a "🏆 Run #N complete!" message). Deferred per brief — PO follow-on ask.
+- **KG-18: TID conflict resolution flow.** The "⚠ TID CONFLICT" pill is informational only. Two players uploading the same `.sav` produces a pill on each affected card with no UI to resolve (the player must figure out which save belongs where and re-upload). Future: a per-slot "this isn't my save" / "this is mine" prompt to clarify.
+- **KG-19: HoF "uncomplete" path.** Direct AR `update!(completed_at: nil)` is the only way to undo run-completion (e.g., if the auto-detection fired prematurely on a save-state shenanigan). No UI for it; if a PO discovers a need, this is a small button in the dashboard runs panel.
 
 ### New — From Step 13 (2026-05-01)
 - **`test/controllers/dashboard_controller_test.rb` does not exist.** The Step 13 brief listed render-condition tests (UNMARK button visibility, RESET DRAFT button gating) as *optional* and explicitly said "creating the whole controller test file from scratch is scope expansion — log as Known Gap." Manual render-smoke verified all four data states ([A] 1 defeated, [B] 2 defeated, [C] lobby draft, [D] complete draft) but the assertions were not committed to a permanent test file. A future step that stands up `dashboard_controller_test.rb` should fold these in.
@@ -829,14 +911,19 @@ ALL FACTORY SMOKE CHECKS PASSED
 - **Subprocess pattern: `Process.spawn` + `waitpid(WNOHANG)` poll loop + TERM→KILL on deadline.** `Open3.capture3 + Timeout.timeout` is banned (raises in calling thread but leaves child Java running — zombie leak).
 - **`emulator_session.rom_path` is server-derived** — only ever set by `RomRandomizer` via `Pathname#relative_path_from(Rails.root)` of a path constructed under `OUTPUT_DIR`. Never user input. If a future writer changes this, `EmulatorController#rom`'s `send_file` becomes a file-read-anywhere primitive and needs an explicit `path.start_with?(OUTPUT_DIR)` guard.
 
-### SRAM auto-tracking (locked 2026-05-02)
-- **Two-layer dispatch pattern.** SRAM-derived state changes flow through (a) `SoulLink::SaveDiff` (pure function on parsed values, returns a structured `Result`) and (b) a category-specific coordinator (`SoulLink::GymBeatenCoordinator` for category 1; future `SoulLink::CatchDetectionCoordinator` etc. for categories 2/3). The diff layer NEVER touches AR, `Rails.logger`, or `Time.current`; the coordinator owns all side effects. This separation mirrors the existing `SoulLink::SaveParser` purity contract and makes the diff layer testable in pure isolation.
+### SRAM auto-tracking (locked 2026-05-02, extended 2026-05-03)
+- **Three-layer dispatch pattern (Step 16 update).** SRAM-derived state changes flow through (a) `SoulLink::SaveDiff` (pure function on parsed values, returns a structured `Result` with per-category event arrays), (b) `SoulLink::SaveDiffDispatcher` (owns the baseline rule + empty-diff short-circuit + fan-out to coordinators), and (c) per-category coordinators (`GymBeatenCoordinator`, `TidObservationCoordinator`, `PokedexProgressCoordinator`, `HallOfFameCoordinator`). The diff layer NEVER touches AR, `Rails.logger`, or `Time.current`; the coordinator owns all side effects. `ParseSaveDataJob` is now a "pure parser + persist" facade — it captures pre/post snapshots and delegates to the dispatcher. Adding new categories does NOT require touching the job or the dispatcher: extend `SaveDiff::Result` with a new `*_events:` keyword field, register a new coordinator in the dispatcher's fan-out, ship the coordinator. Step 17/18 (PKM-decryption-gated catches + gym teams) follows this pattern.
 - **`SaveDiff::Result` is the extension point for categories 2 and 3.** Future categories add new keyword fields to the Result struct (`catch_events:`, `evolution_events:`) WITHOUT rewriting existing call sites. Existing consumers that only read `badge_events` keep working untouched. This is the architectural promise from the SRAM auto-tracking audit (`handoff/2026-05-02-sram-auto-tracking-audit.md` § 4).
 - **All-4 AND-gate is the auto-mark policy for category 1.** `GymBeatenCoordinator.all_players_have_badge?(run, gym_number)` returns true only when `run.soul_link_emulator_sessions.all? { |s| s.active_slot&.parsed_badges.to_i >= gym_number }` AND the session set is non-empty. Manual MARK BEATEN bypasses this entirely (different controller path, never hits the coordinator). PO decision (option (b) from audit § 1) — locked.
 - **`gym_auto_mark_suppressions` is the manual-UNMARK escape hatch.** When a player UNMARK-s a gym from the dashboard, `GymProgressController#update` creates a `(soul_link_run_id, gym_number)` row via `find_or_create_by!`. While that row exists, `GymBeatenCoordinator.attempt_auto_mark` refuses to re-mark, even when the all-4 gate would otherwise pass. Suppression clears on (a) manual MARK BEATEN of the same gym, (b) post-draft `GymDraftsController#mark_beaten` (explicit re-engagement signal). Unique index on `(soul_link_run_id, gym_number)` enforces single-row-per-gym at the DB level.
 - **Down events (`BadgeLost`) log only.** A player loading an older save state produces BadgeLost events through `SaveDiff.between`; the coordinator logs at info level (for traceability — this is normal user behavior, not an error) and never auto-unmarks. PO decision — no auto-unmark policy until/unless explicitly designed.
 - **Baseline rule: first-ever parse skips the diff dispatch entirely.** `ParseSaveDataJob` captures `prev_parsed_at` BEFORE writing the new parse, then gates the dispatch on `prev_parsed_at.present?`. A slot whose first-ever successful parse lands with N>0 badges does NOT fire N gym-beaten events (which would be wrong for a mid-run save import). Only diffs against a known prior baseline count.
 - **KG-13 fix: parse-failure path updates ONLY `parsed_at`.** Every other parsed_* field keeps its prior value. This prevents a CRC-bad save from appearing as "lost all badges" to the diff layer. The slot card still renders the most recently successful parse (no UI regression). The failure path also skips the diff dispatch entirely (returns immediately after `update_columns(parsed_at: ...)`).
+- **Step 16: Pokédex offsets pinned (KG-14 closed).** `POKEDEX_OFFSET = 0x1328` from PKHeX `SAV4Pt.cs` `private const int PokeDex = 0x1328`; layout (u32 magic, then 4 regions of 0x40 bytes each = caught/seen/genderFirst/genderSecond) from PKHeX `Zukan4.cs` and pret/pokeplatinum `include/pokedex.h struct Pokedex`. Caught region at `0x132C` (64 bytes, bit-per-species), seen region at `0x136C` (64 bytes, bit-per-species). Defensive cap: popcount > `POKEDEX_BIT_LIMIT = 493` (`NATIONAL_DEX_COUNT`) → returns nil for that field, mirroring `safe_map_id`'s graceful degradation when an offset is wrong.
+- **Step 16: Hall of Fame block layout pinned.** Absolute file offsets — primary at `0x20000`, secondary mirror at `0x60000` (= primary + 0x40000 partition size). Block total size `0x2AC0` = data (`0x2AB0`) + footer (`0x10`). Within the data: `Dendou4Record[30]` (each `0x16C` bytes) followed by `u32 IndexNextOverwrite` then `u32 ClearCount` (the field we read at `0x2AAC`). Footer at `0x2AB0`; CRC at `0x2ABE` covers everything before it. Same CRC16-CCITT-FALSE variant as the general block — reused the existing `crc16_ccitt` helper. Source: PKHeX `SAV4Pt.cs` `ExtraBlocks` table + `Dendou4.cs` + pret/pokeplatinum `include/savedata/save_table.h` `EXTRA_SAVE_TABLE_ENTRY_HALL_OF_FAME = 0`.
+- **Step 16: HoF count semantics (locked).** `parsed_hof_count == ClearCount` (number of times the player has entered the HoF). `>= 1` means "this player has reached the Hall of Fame at least once" — that's all the run-completion AND-gate cares about. Higher values (1 → 2 → ...) are repeat clears; the diff layer suppresses them as not-interesting (`HallOfFameEntered` only fires on 0/nil → ≥1 transitions). On CRC fail OR any error → `parsed_hof_count = nil` (NEVER 0) so a corrupted HoF block can't false-positive a "Run complete" — `nil.to_i = 0` in the coordinator's `>= 1` check correctly fails the all-4 gate.
+- **Step 16: HoF run-completion is the only side-effect-bearing Step 16 coordinator.** When 4/4 sessions in a run report `parsed_hof_count >= 1`, `HallOfFameCoordinator.process` sets `run.completed_at = Time.current`. Idempotent: skips if `completed_at` is already set (the un-completion path is a direct AR `update!(completed_at: nil)` — no UI). The `active` flag is NOT auto-flipped (PO follow-on call — KG-16). The dashboard renders a "🏆 COMPLETE" pill alongside the existing "ACTIVE" pill.
+- **Step 16: TID-mix-up detection is read-side only.** `SoulLinkRun#tid_conflict_groups` returns groups of session-ids whose active slots share the same `(parsed_trainer_id, parsed_secret_id)` pair (sessions with nil/zero TID excluded as "unparsed, not conflict"). The view renders a "⚠ TID CONFLICT" pill on each affected card. No coordinator action — the player resolves manually (could be a legitimate save-reset, not a mix-up). `TidObservationCoordinator` exists for symmetric pattern adherence and traceability (log-only).
 
 ### Carried over (still load-bearing)
 - Discord user IDs are `bigint` in DB columns, `String` in Stimulus values, coerced at the controller boundary

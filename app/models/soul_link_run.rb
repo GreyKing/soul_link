@@ -12,6 +12,13 @@ class SoulLinkRun < ApplicationRecord
   validates :guild_id, presence: true
   validate :no_other_active_run_for_guild, if: -> { active? }
 
+  # Step 16 — broadcast a Turbo refresh on every run change so that when
+  # `HallOfFameCoordinator` updates `completed_at`, the dashboard
+  # refreshes and the "🏆 COMPLETE" banner appears in real time.
+  # Mirrors the Step 15 `GymResult` pattern — the dashboard show.html.erb
+  # already has `<%= turbo_stream_from @run, :dashboard %>` to receive it.
+  broadcasts_refreshes_to ->(record) { [ record, :dashboard ] }
+
   scope :active, -> { where(active: true) }
   scope :inactive, -> { where(active: false) }
   scope :for_guild, ->(guild_id) { where(guild_id: guild_id) }
@@ -44,6 +51,47 @@ class SoulLinkRun < ApplicationRecord
 
   def deactivate!
     update!(active: false)
+  end
+
+  # Step 16 — Hall of Fame run-completion. Set by
+  # `SoulLink::HallOfFameCoordinator` when all 4 sessions report
+  # `parsed_hof_count >= 1`. The `active` flag is intentionally NOT
+  # auto-flipped (PO follow-on call). Direct AR
+  # `update!(completed_at: nil)` is the un-completion path.
+  def completed?
+    completed_at.present?
+  end
+
+  # Step 16 — TID/SID mix-up detection (read-side).
+  #
+  # Returns `Array<Array<Integer>>` — each inner array is a list of
+  # session ids whose active slots share the same `(parsed_trainer_id,
+  # parsed_secret_id)` pair. Empty when every session has a unique or
+  # unset TID. Used by the dashboard to surface a "⚠ TID conflict"
+  # pill on each affected save-slot card.
+  #
+  # Sessions with nil/zero TID are excluded (unparsed, not a conflict
+  # — a freshly-onboarded run with 0 saves shouldn't pill 4× warnings).
+  # Pair key is `[trainer_id, secret_id]` so two players with the same
+  # TID but different SIDs are NOT flagged (different save anyway).
+  #
+  # No coordinator action — the player resolves manually (could be a
+  # legitimate save-reset, not a mix-up).
+  def tid_conflict_groups
+    pairs = soul_link_emulator_sessions
+      .includes(:save_slots)
+      .filter_map do |s|
+        slot = s.active_slot
+        next if slot.nil?
+        next if slot.parsed_trainer_id.to_i.zero?
+        [ slot.parsed_trainer_id, slot.parsed_secret_id, s.id ]
+      end
+
+    pairs
+      .group_by { |tid, sid, _sid| [ tid, sid ] }
+      .values
+      .select { |group| group.size >= 2 }
+      .map    { |group| group.map { |_, _, session_id| session_id } }
   end
 
   # ── Discord avatar cache (Step 14) ──

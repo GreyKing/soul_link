@@ -92,6 +92,43 @@
     </div>
   <% end %>
 
+  <%# Step 16: TID/SID — surfaces save-mix-up risk. Only render when a
+      real (nonzero) TID has been parsed. %>
+  <% if active_slot&.parsed_trainer_id.to_i.positive? %>
+    <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
+      TID <%= active_slot.parsed_trainer_id %> / SID <%= active_slot.parsed_secret_id %>
+    </div>
+  <% end %>
+
+  <%# Step 16: Pokédex caught/seen counts. Render when either side is
+      present (parser may surface 0 even on a fresh save, which is
+      meaningful). %>
+  <% if active_slot && (active_slot.parsed_pokedex_caught || active_slot.parsed_pokedex_seen) %>
+    <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
+      Pokédex <%= active_slot.parsed_pokedex_caught || 0 %> caught / <%= active_slot.parsed_pokedex_seen || 0 %> seen
+    </div>
+  <% end %>
+
+  <%# Step 16: Hall of Fame pill — fires when this player has reached
+      the Hall of Fame at least once. Run-completion is enforced when
+      ALL 4 players reach this state (HallOfFameCoordinator). %>
+  <% if active_slot&.parsed_hof_count.to_i >= 1 %>
+    <div style="margin-top: 4px;">
+      <span class="type-text" style="border-color: var(--amber); background: var(--amber); color: var(--d1); font-size: 9px;">🏆 HALL OF FAME</span>
+    </div>
+  <% end %>
+
+  <%# Step 16: TID conflict pill. Computed inline per-card render —
+      cheap because session.save_slots is includes()-loaded by the
+      run-roster controller. Don't extract to controller-level memo:
+      this partial is broadcast-rendered with no controller context. %>
+  <% conflict_session_ids = s.soul_link_run.tid_conflict_groups.flatten %>
+  <% if conflict_session_ids.include?(s.id) %>
+    <div style="margin-top: 4px;">
+      <span class="type-text" style="border-color: #6b5a2c; background: #4a3a1c; color: #e8d6a0; font-size: 9px;">⚠ TID CONFLICT</span>
+    </div>
+  <% end %>
+
   <div style="font-size: 9px; color: var(--d2); opacity: 0.7; margin-top: 4px; word-break: break-all;">
     Seed: <%= s.seed %>
   </div>
