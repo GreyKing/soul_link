@@ -6,6 +6,7 @@ module SoulLink
     SETTINGS_PATH = Rails.root.join('config', 'soul_link', 'settings.yml')
     POKEDEX_PATH = Rails.root.join('config', 'soul_link', 'pokedex.yml')
     MAPS_PATH = Rails.root.join('config', 'soul_link', 'maps.yml')
+    MET_LOCATIONS_PATH = Rails.root.join('config', 'soul_link', 'met_locations.yml')
     MAP_COORDINATES_PATH = Rails.root.join('config', 'soul_link', 'map_coordinates.yml')
     PROGRESSION_PATH = Rails.root.join('config', 'soul_link', 'progression.yml')
     TYPES_PATH = Rails.root.join('config', 'soul_link', 'types.yml')
@@ -86,6 +87,38 @@ module SoulLink
         maps.dig(map_id.to_i, "name")
       end
 
+      # Pokemon Platinum **met-location** IDs (per-PKM Block-B
+      # `MetLocation_PtHGSS` u16 at decrypted record offset
+      # `0x46-0x47`) → `{ name: "Route 201" [, event: true] }` hashes.
+      # **Different enum from `maps`** — see config/soul_link/met_locations.yml
+      # header for the source citation (closes KG-12).
+      def met_locations
+        @met_locations ||= File.exist?(MET_LOCATIONS_PATH) ? (YAML.load_file(MET_LOCATIONS_PATH) || {}) : {}
+      end
+
+      # Returns the human-readable name for a met-location ID, or nil if
+      # the ID is unknown or nil. Callers should fall back to a
+      # "Met-Location ##{id}" string the same way EmulatorHelper#
+      # format_map_name handles unknown map IDs.
+      def met_location_name(id)
+        return nil if id.nil?
+        met_locations.dig(id.to_i, "name")
+      end
+
+      # True for met-location IDs flagged `event: true` in
+      # met_locations.yml (daycare, link trade, mystery gift,
+      # ranger, faraway-place sentinels). Used by `CatchCoordinator`
+      # to tag rows with `acquired_via: 'event_gift'` instead of
+      # `'catch'`. Returns false for nil and for unknown IDs (a
+      # missing ID is treated as a real-world location until proven
+      # otherwise — false-positives on event flag are worse than
+      # false-negatives).
+      def event_met_location?(id)
+        return false if id.nil?
+        entry = met_locations[id.to_i]
+        entry.is_a?(Hash) && entry["event"] == true
+      end
+
       # Player management for multi-player species tracking
       def players
         settings['players'] || []
@@ -158,6 +191,7 @@ module SoulLink
         @settings = nil
         @pokedex = nil
         @maps = nil
+        @met_locations = nil
         @map_coordinates = nil
         @progression = nil
         @pokemon_types = nil

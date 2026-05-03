@@ -14,6 +14,49 @@
 </div>
 <div class="panel-body">
 
+  <%# Step 17 — AUTO-DETECTED CATCHES (per-player) %>
+  <%
+    auto_catches = @auto_detected_catches || []
+    # First-encounter computation: per (location), pick the earliest by caught_at.
+    # Done here so the view stays a pure render — controller doesn't need to
+    # ship a precomputed set just for this badge.
+    first_ids_by_location = auto_catches
+      .group_by { |p| p.location.to_s }
+      .each_with_object({}) { |(loc, list), out| out[loc] = list.min_by { |p| p.caught_at || Time.at(0) }.id }
+  %>
+  <% if auto_catches.any? %>
+    <div class="box-section-label" title="Auto-detected from your save file (PartyParser)">
+      AUTO-DETECTED CATCHES (<%= auto_catches.size %>)
+    </div>
+    <div class="box-grid box-grid-wide" data-pixeldex-target="autoCatchesGrid">
+      <% auto_catches.each do |p| %>
+        <% first = first_ids_by_location[p.location.to_s] == p.id %>
+        <div class="box-cell <%= 'on-team' if first %>"
+             data-group-pid="<%= p.pid %>"
+             data-group-species="<%= p.species %>"
+             data-group-location="<%= p.location %>"
+             data-group-status="auto">
+          <div class="box-cell-name" style="margin-bottom: 4px;">
+            <%= p.species.to_s.upcase %>
+            <% if first %>
+              <span class="type-text" style="margin-left:4px; border-color: var(--amber); color: var(--amber);" title="First encounter on this route">1ST</span>
+            <% end %>
+            <% if p.trade_in %>
+              <span class="type-text" style="margin-left:4px; border-color: var(--amber); color: var(--amber);" title="Acquired via trade">TRADE-IN</span>
+            <% end %>
+            <% if p.acquired_via == "event_gift" %>
+              <span class="type-text" style="margin-left:4px; border-color: var(--d2); color: var(--d2);" title="Event / mystery-gift Pokemon — not a Soul Link encounter">EVENT</span>
+            <% end %>
+          </div>
+          <div class="box-cell-loc"><%= p.location %><% if p.level %> &middot; Lv <%= p.level %><% end %></div>
+        </div>
+      <% end %>
+      <% ((3 - auto_catches.size % 3) % 3).times do %>
+        <div class="box-cell empty"></div>
+      <% end %>
+    </div>
+  <% end %>
+
   <%# ON TEAM section %>
   <div class="box-section-label">&#9733; ON TEAM (<%= @on_team_groups.size %>)</div>
   <div class="box-grid box-grid-wide" data-pixeldex-target="onTeamGrid">

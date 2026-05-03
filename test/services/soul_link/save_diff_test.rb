@@ -218,5 +218,118 @@ module SoulLink
       )
       assert_equal [], result.hof_events
     end
+
+    # ── Step 17: party diff (catches + removals) ──────────────────────
+
+    # Tiny helper for building party-entry hashes the way
+    # ParseSaveDataJob persists them (PkmDecoder::Pkm#to_h).
+    def pkm_h(pid:, species: 100, met_loc: 16, level: 5, ot_id: 1, ot_sid: 1, is_egg: false)
+      { pid: pid, species: species, met_location_id: met_loc, level: level,
+        ot_id: ot_id, ot_sid: ot_sid, is_egg: is_egg }
+    end
+
+    test "Step 17 backward compat: Step-15-style call returns empty catch/removal arrays" do
+      result = SoulLink::SaveDiff.between(prev_badges: 0, curr_badges: 1)
+      assert_equal [], result.catch_events
+      assert_equal [], result.removal_events
+    end
+
+    test "empty prev + empty curr produces no catch / removal events" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_party: [], curr_party: []
+      )
+      assert_equal [], result.catch_events
+      assert_equal [], result.removal_events
+    end
+
+    test "empty prev + 1 PKM curr → 1 PokemonCaughtEvent" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_party: [],
+        curr_party: [ pkm_h(pid: 0xAAAA, species: 387, met_loc: 16, level: 5) ]
+      )
+      assert_equal 1, result.catch_events.size
+      event = result.catch_events.first
+      assert_kind_of SoulLink::SaveDiff::PokemonCaughtEvent, event
+      assert_equal 0xAAAA, event.pid
+      assert_equal 387,    event.species_id
+      assert_equal 16,     event.met_location_id
+      assert_equal 5,      event.level
+      assert_equal [], result.removal_events
+    end
+
+    test "1 PKM prev + same 1 PKM curr → no events (PID stable)" do
+      same = pkm_h(pid: 0xAAAA, species: 387, met_loc: 16)
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_party: [ same ], curr_party: [ same ]
+      )
+      assert_equal [], result.catch_events
+      assert_equal [], result.removal_events
+    end
+
+    test "1 PKM prev + different PID curr → 1 catch + 1 removal" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_party: [ pkm_h(pid: 0xAAAA, species: 387) ],
+        curr_party: [ pkm_h(pid: 0xBBBB, species: 100) ]
+      )
+      assert_equal 1, result.catch_events.size
+      assert_equal 0xBBBB, result.catch_events.first.pid
+      assert_equal 1, result.removal_events.size
+      assert_equal 0xAAAA, result.removal_events.first.pid
+    end
+
+    test "6 prev + 5 curr (same 5 PIDs survived) → 1 removal" do
+      shared = (1..5).map { |i| pkm_h(pid: 0x1000 + i, species: 100 + i) }
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_party: shared + [ pkm_h(pid: 0xDEAD, species: 999) ],
+        curr_party: shared
+      )
+      assert_equal [], result.catch_events
+      assert_equal 1, result.removal_events.size
+      assert_equal 0xDEAD, result.removal_events.first.pid
+    end
+
+    test "both nil → no catch / removal events (defensive)" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_party: nil, curr_party: nil
+      )
+      assert_equal [], result.catch_events
+      assert_equal [], result.removal_events
+    end
+
+    test "only one side nil → no events (defensive)" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_party: nil, curr_party: [ pkm_h(pid: 0xAAAA) ]
+      )
+      assert_equal [], result.catch_events
+      assert_equal [], result.removal_events
+    end
+
+    test "string-keyed entries (post-JSON-roundtrip) work the same as symbol-keyed" do
+      str_entry = { "pid" => 0xCAFE, "species" => 50, "met_location_id" => 17,
+                    "level" => 10, "ot_id" => 1, "ot_sid" => 1, "is_egg" => false }
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_party: [], curr_party: [ str_entry ]
+      )
+      assert_equal 1, result.catch_events.size
+      assert_equal 0xCAFE, result.catch_events.first.pid
+      assert_equal 50,     result.catch_events.first.species_id
+      assert_equal 17,     result.catch_events.first.met_location_id
+    end
+
+    test "Result#empty? is false when only catch events are present" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_party: [], curr_party: [ pkm_h(pid: 0xAAAA) ]
+      )
+      assert_not result.empty?
+    end
   end
 end

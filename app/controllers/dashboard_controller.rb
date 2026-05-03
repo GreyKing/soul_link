@@ -57,6 +57,20 @@ class DashboardController < ApplicationController
     @storage_groups = @all_groups.select { |g| g.caught? && !@team_group_ids.include?(g.id) }
     @fallen_groups = @all_groups.select(&:dead?)
 
+    # Step 17 — auto-detected catches (from PartyParser → CatchCoordinator).
+    # Per-player view: only this user's auto-detected, group-unassigned
+    # rows. `pid IS NOT NULL` filters out manually-created Catch-modal
+    # rows (which leave pid nil for back-compat). `soul_link_pokemon_group_id IS NULL`
+    # is redundant today (Step 17 never assigns groups) but locks the
+    # contract: any future code that auto-assigns groups would naturally
+    # remove rows from this list.
+    @auto_detected_catches = run.soul_link_pokemon
+                                .where(discord_user_id: current_user_id)
+                                .where.not(pid: nil)
+                                .where(soul_link_pokemon_group_id: nil)
+                                .order(caught_at: :desc)
+                                .to_a
+
     # Gym & map data
     @gym_info = SoulLink::GameState.gym_info
     @next_gym = SoulLink::GameState.next_gym_info(@gyms_defeated)

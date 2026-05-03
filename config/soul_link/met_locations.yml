@@ -1,0 +1,189 @@
+# config/soul_link/met_locations.yml
+#
+# Pokemon Platinum **met-location** IDs → human-readable names.
+#
+# **Different enum from `maps.yml`.** maps.yml maps **map-header IDs**
+# (where am I right now? — the SRAM trainer block field). This file
+# maps **met-location IDs** (where was this Pokemon encountered? — the
+# per-PKM Block-B `MetLocation_PtHGSS` u16 at decrypted record offset
+# `0x46-0x47`). Different table, different IDs. They overlap in name
+# but not in numeric value.
+#
+# Sources (closes KG-12):
+# - PKHeX `PKHeX.Core/Resources/text/locations/gen4/text_hgss_00000_en.txt`
+#   — 235 entries, 0-indexed. The first 127 entries (IDs 0..126) are
+#   the Sinnoh / Platinum-relevant met-locations. IDs 127..234 are
+#   Johto/Kanto/HGSS — out of scope for a Platinum-only Soul Link run
+#   but documented inline in case a Pokemon traded in from HGSS lands
+#   in a player's party.
+# - PKHeX `PKHeX.Core/Game/Locations/Locations.cs` — special met-IDs:
+#     * 2000 = Daycare4         (egg, hatched at daycare)
+#     * 2001 = LinkTrade4NPC    (in-game trade with an NPC)
+#     * 2002 = LinkTrade4       (link trade with another player)
+#     * 3001 = Ranger4          (event Pokemon from Pokemon Ranger)
+#     * 3002 = Faraway4         (mystery gift / distant land sentinel)
+#   These five all carry `event: true` so `CatchCoordinator` flags
+#   them with `acquired_via: 'event_gift'` rather than dropping the
+#   row. Players can still see the catch landed but it's clearly
+#   marked as not-a-Soul-Link-encounter.
+# - pret/pokeplatinum `res/text/special_met_location_names.json`
+#   confirms the same special-ID set (Daycare, Link trade, Distant
+#   land, Mystery Zone, Ranger, etc.) under different numeric IDs
+#   that PKHeX reads from the in-game text-table file — PKHeX's
+#   numbers are the canonical PKM-record values; pret's are the
+#   internal text-table indices. We use PKHeX's, which are what the
+#   actual `MetLocation_PtHGSS` field in a saved PKM contains.
+#
+# Format: integer ID → { name: "Display Name" [, event: true] }.
+# Hash shape leaves room for future fields (region:, dungeon:) without
+# breaking the API. Missing IDs surface as "Met-Location #N" via the
+# `EmulatorHelper#format_map_name`-shaped fallback in the helper.
+#
+# Coverage v1: every Platinum route 201-230, every gym town, every
+# notable dungeon, plus the five special pseudo-IDs. Total ~127 entries.
+
+# ── 0: Mystery Zone (sentinel — uninitialized PKM, treated as event) ──
+0:    { name: "Mystery Zone", event: true }
+
+# ── Towns & Cities ──
+1:    { name: "Twinleaf Town" }
+2:    { name: "Sandgem Town" }
+3:    { name: "Floaroma Town" }
+4:    { name: "Solaceon Town" }
+5:    { name: "Celestic Town" }
+6:    { name: "Jubilife City" }
+7:    { name: "Canalave City" }
+8:    { name: "Oreburgh City" }
+9:    { name: "Eterna City" }
+10:   { name: "Hearthome City" }
+11:   { name: "Pastoria City" }
+12:   { name: "Veilstone City" }
+13:   { name: "Sunyshore City" }
+14:   { name: "Snowpoint City" }
+15:   { name: "Pokemon League" }
+
+# ── Routes 201-230 ──
+16:   { name: "Route 201" }
+17:   { name: "Route 202" }
+18:   { name: "Route 203" }
+19:   { name: "Route 204" }
+20:   { name: "Route 205" }
+21:   { name: "Route 206" }
+22:   { name: "Route 207" }
+23:   { name: "Route 208" }
+24:   { name: "Route 209" }
+25:   { name: "Route 210" }
+26:   { name: "Route 211" }
+27:   { name: "Route 212" }
+28:   { name: "Route 213" }
+29:   { name: "Route 214" }
+30:   { name: "Route 215" }
+31:   { name: "Route 216" }
+32:   { name: "Route 217" }
+33:   { name: "Route 218" }
+34:   { name: "Route 219" }
+35:   { name: "Route 220" }
+36:   { name: "Route 221" }
+37:   { name: "Route 222" }
+38:   { name: "Route 223" }
+39:   { name: "Route 224" }
+40:   { name: "Route 225" }
+41:   { name: "Route 226" }
+42:   { name: "Route 227" }
+43:   { name: "Route 228" }
+44:   { name: "Route 229" }
+45:   { name: "Route 230" }
+
+# ── Dungeons & overworld special locations (Platinum) ──
+46:   { name: "Oreburgh Mine" }
+47:   { name: "Valley Windworks" }
+48:   { name: "Eterna Forest" }
+49:   { name: "Fuego Ironworks" }
+50:   { name: "Mt. Coronet" }
+51:   { name: "Spear Pillar" }
+52:   { name: "Great Marsh" }
+53:   { name: "Solaceon Ruins" }
+54:   { name: "Victory Road" }
+55:   { name: "Pal Park" }
+56:   { name: "Amity Square" }
+57:   { name: "Ravaged Path" }
+58:   { name: "Floaroma Meadow" }
+59:   { name: "Oreburgh Gate" }
+60:   { name: "Fullmoon Island" }
+61:   { name: "Sendoff Spring" }
+62:   { name: "Turnback Cave" }
+63:   { name: "Flower Paradise" }
+64:   { name: "Snowpoint Temple" }
+65:   { name: "Wayward Cave" }
+66:   { name: "Ruin Maniac Cave" }
+67:   { name: "Maniac Tunnel" }
+68:   { name: "Trophy Garden" }
+69:   { name: "Iron Island" }
+70:   { name: "Old Chateau" }
+71:   { name: "Galactic HQ" }
+72:   { name: "Verity Lakefront" }
+73:   { name: "Valor Lakefront" }
+74:   { name: "Acuity Lakefront" }
+75:   { name: "Spring Path" }
+76:   { name: "Lake Verity" }
+77:   { name: "Lake Valor" }
+78:   { name: "Lake Acuity" }
+79:   { name: "Newmoon Island" }
+80:   { name: "Battle Tower" }
+81:   { name: "Fight Area" }
+82:   { name: "Survival Area" }
+83:   { name: "Resort Area" }
+84:   { name: "Stark Mountain" }
+85:   { name: "Seabreak Path" }
+86:   { name: "Hall of Origin" }
+87:   { name: "Verity Cavern" }
+88:   { name: "Valor Cavern" }
+89:   { name: "Acuity Cavern" }
+
+# ── Indoor / overworld special (Sinnoh interior buildings) ──
+90:   { name: "Jubilife TV" }
+91:   { name: "Pokétch Co." }
+92:   { name: "GTS" }
+93:   { name: "Trainers' School" }
+94:   { name: "Mining Museum" }
+95:   { name: "Flower Shop" }
+96:   { name: "Cycle Shop" }
+97:   { name: "Contest Hall" }
+98:   { name: "Poffin House" }
+99:   { name: "Foreign Building" }
+100:  { name: "Pokemon Day Care" }
+101:  { name: "Veilstone Store" }
+102:  { name: "Game Corner" }
+103:  { name: "Canalave Library" }
+104:  { name: "Vista Lighthouse" }
+105:  { name: "Sunyshore Market" }
+106:  { name: "Pokemon Mansion" }
+107:  { name: "Footstep House" }
+108:  { name: "Café" }
+109:  { name: "Grand Lake" }
+110:  { name: "Restaurant" }
+111:  { name: "Battle Park" }
+112:  { name: "Battle Frontier" }
+113:  { name: "Battle Factory" }
+114:  { name: "Battle Castle" }
+115:  { name: "Battle Arcade" }
+116:  { name: "Battle Hall" }
+117:  { name: "Distortion World" }
+118:  { name: "Global Terminal" }
+119:  { name: "Villa" }
+120:  { name: "Battleground" }
+121:  { name: "ROTOM's Room" }
+122:  { name: "T.G. Eterna Bldg" }
+123:  { name: "Iron Ruins" }
+124:  { name: "Iceberg Ruins" }
+125:  { name: "Rock Peak Ruins" }
+
+# ── Special pseudo-IDs (event / trade / mystery gift) ──
+# Tagged event:true so CatchCoordinator records them with
+# `acquired_via: 'event_gift'` instead of `'catch'`. Player still sees
+# the row but it's clearly marked as not-a-Soul-Link-encounter.
+2000: { name: "Day-Care Couple", event: true }   # Daycare4 — egg hatched at daycare
+2001: { name: "Link Trade (NPC)", event: true }  # LinkTrade4NPC — in-game trade with NPC
+2002: { name: "Link Trade", event: true }        # LinkTrade4 — link trade with another player
+3001: { name: "Pokémon Ranger", event: true }    # Ranger4 — event Pokemon from Pokemon Ranger
+3002: { name: "Faraway Place", event: true }     # Faraway4 — mystery gift / distant land sentinel

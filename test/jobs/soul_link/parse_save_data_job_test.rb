@@ -398,6 +398,174 @@ module SoulLink
       end
     end
 
+    # --- Step 17: parsed_party_data persistence + integration ----------
+
+    test "Step 17: parsed_party_data is written from PartyParser output on success" do
+      @slot.update!(save_data: "\x00".b * 0x80000)
+
+      result = SoulLink::SaveParser::Result.new(
+        trainer_name: "X", money: 0, play_seconds: 0, badges_count: 0, map_id: nil
+      )
+      pkm_a = SoulLink::PkmDecoder::Pkm.new(
+        pid: 0xAAAA, species: 100, level: 5, ot_id: 0, ot_sid: 0,
+        met_location_id: 16, met_level: 5, is_egg: false, slot_index: 0
+      )
+      pkm_b = SoulLink::PkmDecoder::Pkm.new(
+        pid: 0xBBBB, species: 200, level: 7, ot_id: 0, ot_sid: 0,
+        met_location_id: 17, met_level: 7, is_egg: false, slot_index: 1
+      )
+
+      SoulLink::SaveParser.stub(:parse, result) do
+        SoulLink::PartyParser.stub(:parse, [ pkm_a, pkm_b ]) do
+          SoulLink::ParseSaveDataJob.perform_now(@slot)
+        end
+      end
+
+      data = @slot.reload.parsed_party_data
+      assert data.is_a?(Array), "parsed_party_data should be an Array"
+      assert_equal 2, data.size
+      # JSON load returns string-keyed hashes.
+      assert_equal 0xAAAA, data[0]["pid"]
+      assert_equal 100,    data[0]["species"]
+      assert_equal 0xBBBB, data[1]["pid"]
+    end
+
+    test "Step 17: parse failure does not write parsed_party_data" do
+      @slot.update_columns(parsed_party_data: [ { "pid" => 0x1111 } ], parsed_at: 1.minute.ago)
+      @slot.update!(save_data: "\xFF".b * 0x80000)
+
+      SoulLink::SaveParser.stub(:parse, nil) do
+        # PartyParser.parse should also not be called on failure path.
+        SoulLink::PartyParser.stub(:parse, ->(_bytes) { flunk "PartyParser must not be called on parse failure" }) do
+          SoulLink::ParseSaveDataJob.perform_now(@slot)
+        end
+      end
+
+      # Pre-existing parsed_party_data is preserved (KG-13 invariant: only parsed_at moves on failure).
+      assert_equal [ { "pid" => 0x1111 } ], @slot.reload.parsed_party_data
+    end
+
+    test "Step 17 integration: 1→2 party transition creates a SoulLinkPokemon row with PID + route name" do
+      @session.update!(active_save_slot: 1, discord_user_id: 700)
+      @slot.update_columns(
+        parsed_trainer_id: 0xABCD, parsed_secret_id: 0x1234,
+        parsed_party_data: [ { "pid" => 0x1111, "species" => 100,
+                               "met_location_id" => 16, "level" => 5,
+                               "ot_id" => 0xABCD, "ot_sid" => 0x1234,
+                               "is_egg" => false } ],
+        parsed_at: 5.minutes.ago
+      )
+      @slot.update!(save_data: "\x00".b * 0x80000)
+
+      result = SoulLink::SaveParser::Result.new(
+        trainer_name: "X", money: 0, play_seconds: 0, badges_count: 0, map_id: nil,
+        trainer_id: 0xABCD, secret_id: 0x1234
+      )
+      new_pkm = SoulLink::PkmDecoder::Pkm.new(
+        pid: 0x2222, species: 387, level: 10, ot_id: 0xABCD, ot_sid: 0x1234,
+        met_location_id: 17, met_level: 10, is_egg: false, slot_index: 1
+      )
+      keep_pkm = SoulLink::PkmDecoder::Pkm.new(
+        pid: 0x1111, species: 100, level: 5, ot_id: 0xABCD, ot_sid: 0x1234,
+        met_location_id: 16, met_level: 5, is_egg: false, slot_index: 0
+      )
+
+      SoulLink::SaveParser.stub(:parse, result) do
+        SoulLink::PartyParser.stub(:parse, [ keep_pkm, new_pkm ]) do
+          assert_difference "SoulLinkPokemon.count", 1 do
+            SoulLink::ParseSaveDataJob.perform_now(@slot)
+          end
+        end
+      end
+
+      row = SoulLinkPokemon.find_by(pid: 0x2222)
+      assert_not_nil row
+      assert_equal 700,         row.discord_user_id
+      assert_equal "Route 202", row.location
+      # species is resolved via pokemon_base_stats (national_dex_number → species);
+      # in the test DB that table is empty, so we get the "Species ##{id}" fallback.
+      # The exact format isn't load-bearing for this integration test — what matters
+      # is that the row is created with non-nil species.
+      assert_match(/Species|^[A-Z]/, row.species)
+      assert_equal 10,          row.level
+      assert_equal "catch",     row.acquired_via
+      assert_equal false,       row.trade_in
+    end
+
+    test "Step 17 integration: re-running the same job produces NO duplicate (PID dedup via parsed_party_data baseline)" do
+      @session.update!(active_save_slot: 1, discord_user_id: 800)
+      @slot.update_columns(
+        parsed_trainer_id: 0xABCD, parsed_secret_id: 0x1234,
+        parsed_party_data: [],
+        parsed_at: 5.minutes.ago
+      )
+      @slot.update!(save_data: "\x00".b * 0x80000)
+
+      result = SoulLink::SaveParser::Result.new(
+        trainer_name: "X", money: 0, play_seconds: 0, badges_count: 0, map_id: nil,
+        trainer_id: 0xABCD, secret_id: 0x1234
+      )
+      new_pkm = SoulLink::PkmDecoder::Pkm.new(
+        pid: 0x3333, species: 387, level: 10, ot_id: 0xABCD, ot_sid: 0x1234,
+        met_location_id: 17, met_level: 10, is_egg: false, slot_index: 0
+      )
+
+      SoulLink::SaveParser.stub(:parse, result) do
+        SoulLink::PartyParser.stub(:parse, [ new_pkm ]) do
+          assert_difference "SoulLinkPokemon.count", 1 do
+            SoulLink::ParseSaveDataJob.perform_now(@slot)
+          end
+          # Re-run with the same party — prev_party_data == curr_party_data, no new row.
+          assert_no_difference "SoulLinkPokemon.count" do
+            SoulLink::ParseSaveDataJob.perform_now(@slot)
+          end
+        end
+      end
+    end
+
+    test "Step 17: CatchCoordinator retry-safety — coordinator raise does not double-fire" do
+      @session.update!(active_save_slot: 1, discord_user_id: 900)
+      @slot.update_columns(
+        parsed_trainer_id: 0xABCD, parsed_secret_id: 0x1234,
+        parsed_party_data: [],
+        parsed_at: 5.minutes.ago
+      )
+      @slot.update!(save_data: "\x00".b * 0x80000)
+
+      result = SoulLink::SaveParser::Result.new(
+        trainer_name: "X", money: 0, play_seconds: 0, badges_count: 0, map_id: nil
+      )
+      new_pkm = SoulLink::PkmDecoder::Pkm.new(
+        pid: 0x4444, species: 387, level: 10, ot_id: 0xABCD, ot_sid: 0x1234,
+        met_location_id: 17, met_level: 10, is_egg: false, slot_index: 0
+      )
+
+      coordinator_calls = 0
+      raising_then_passing = ->(_slot, _events) {
+        coordinator_calls += 1
+        raise StandardError, "boom" if coordinator_calls == 1
+        flunk "CatchCoordinator must not be invoked on retry — diff should have been empty"
+      }
+
+      SoulLink::SaveParser.stub(:parse, result) do
+        SoulLink::PartyParser.stub(:parse, [ new_pkm ]) do
+          SoulLink::CatchCoordinator.stub(:process, raising_then_passing) do
+            assert_raises(StandardError) do
+              SoulLink::ParseSaveDataJob.perform_now(@slot)
+            end
+            assert_equal 1, @slot.reload.parsed_party_data.size,
+              "party_data must persist BEFORE dispatch so retry sees prev==curr"
+
+            # Retry — diff is empty, coordinator never re-invoked.
+            SoulLink::ParseSaveDataJob.perform_now(@slot)
+          end
+        end
+      end
+
+      assert_equal 1, coordinator_calls,
+        "CatchCoordinator must run exactly once across both job runs"
+    end
+
     test "running the job twice produces the same final state" do
       @slot.update!(save_data: "\x00".b * 0x80000)
 

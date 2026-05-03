@@ -35,6 +35,14 @@ module SoulLink
       result = SoulLink::SaveParser.parse(slot.save_data)
 
       if result
+        # Step 17: parse the party block alongside the trainer block.
+        # Party data is independent of the trainer-block parser
+        # (different layer of the SRAM) so a successful trainer parse
+        # can carry forward an empty party Array even when the party
+        # block is corrupt — `PartyParser.parse` returns [] on any
+        # failure, never nil from a successful trainer parse.
+        party_data = SoulLink::PartyParser.parse(slot.save_data).map(&:to_h)
+
         slot.update_columns(
           parsed_trainer_name:   result.trainer_name,
           parsed_money:          result.money,
@@ -46,6 +54,7 @@ module SoulLink
           parsed_pokedex_caught: result.pokedex_caught,
           parsed_pokedex_seen:   result.pokedex_seen,
           parsed_hof_count:      result.hof_count,
+          parsed_party_data:     party_data,
           parsed_at:             Time.current
         )
 
@@ -70,7 +79,10 @@ module SoulLink
         secret_id:      slot.parsed_secret_id,
         pokedex_caught: slot.parsed_pokedex_caught,
         pokedex_seen:   slot.parsed_pokedex_seen,
-        hof_count:      slot.parsed_hof_count
+        hof_count:      slot.parsed_hof_count,
+        # Step 17 — Array<Hash> or nil. nil on first-ever parse / on
+        # rows pre-dating the Step-17 column add (additive migration).
+        party_data:     slot.parsed_party_data
       }
     end
   end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_03_135726) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_03_160002) do
   create_table "gym_auto_mark_suppressions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "gym_number", null: false
@@ -135,6 +135,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_03_135726) do
     t.integer "parsed_hof_count"
     t.integer "parsed_map_id", limit: 2
     t.integer "parsed_money"
+    t.json "parsed_party_data"
     t.integer "parsed_play_seconds"
     t.integer "parsed_pokedex_caught"
     t.integer "parsed_pokedex_seen"
@@ -166,6 +167,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_03_135726) do
 
   create_table "soul_link_pokemon", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.string "ability"
+    t.string "acquired_via"
     t.datetime "caught_at"
     t.datetime "created_at", null: false
     t.datetime "died_at"
@@ -173,15 +175,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_03_135726) do
     t.integer "evolution_level"
     t.integer "level"
     t.string "location", null: false
+    t.integer "met_location_id"
     t.string "name", null: false
     t.string "nature"
+    t.integer "ot_id"
+    t.integer "ot_sid"
+    t.bigint "pid"
     t.bigint "soul_link_pokemon_group_id"
     t.bigint "soul_link_run_id", null: false
     t.string "species", null: false
     t.string "status", default: "caught", null: false
+    t.boolean "trade_in", default: false, null: false
     t.datetime "updated_at", null: false
     t.index ["soul_link_pokemon_group_id", "discord_user_id"], name: "index_pokemon_on_group_and_user", unique: true
     t.index ["soul_link_pokemon_group_id"], name: "index_soul_link_pokemon_on_soul_link_pokemon_group_id"
+    t.index ["soul_link_run_id", "discord_user_id", "pid"], name: "index_soul_link_pokemon_on_run_user_pid"
     t.index ["soul_link_run_id", "status"], name: "index_soul_link_pokemon_on_soul_link_run_id_and_status"
     t.index ["soul_link_run_id"], name: "index_soul_link_pokemon_on_soul_link_run_id"
     t.index ["status"], name: "index_soul_link_pokemon_on_status"

@@ -16,6 +16,8 @@ module SoulLink
     # @param prev [Hash] pre-parse snapshot of the slot's parsed_*
     #   columns. Required keys: :parsed_at, :badges, :trainer_id,
     #   :secret_id, :pokedex_caught, :pokedex_seen, :hof_count.
+    #   Step 17 also reads :party_data (Array<Hash> or nil — the
+    #   JSON-decoded `parsed_party_data` column).
     # @param curr [Hash] post-parse snapshot — same shape.
     def self.dispatch(slot, prev:, curr:)
       # Baseline rule (Step 15): a slot's first-ever successful parse
@@ -30,7 +32,8 @@ module SoulLink
         prev_sid:            prev[:secret_id],      curr_sid:            curr[:secret_id],
         prev_pokedex_caught: prev[:pokedex_caught], curr_pokedex_caught: curr[:pokedex_caught],
         prev_pokedex_seen:   prev[:pokedex_seen],   curr_pokedex_seen:   curr[:pokedex_seen],
-        prev_hof_count:      prev[:hof_count],      curr_hof_count:      curr[:hof_count]
+        prev_hof_count:      prev[:hof_count],      curr_hof_count:      curr[:hof_count],
+        prev_party:          prev[:party_data],     curr_party:          curr[:party_data]
       )
       return if diff.empty?
 
@@ -38,6 +41,9 @@ module SoulLink
       SoulLink::TidObservationCoordinator.process(slot, diff.tid_events)      if diff.tid_events.any?
       SoulLink::PokedexProgressCoordinator.process(slot, diff.pokedex_events) if diff.pokedex_events.any?
       SoulLink::HallOfFameCoordinator.process(slot, diff.hof_events)          if diff.hof_events.any?
+      if diff.catch_events.any? || diff.removal_events.any?
+        SoulLink::CatchCoordinator.process(slot, diff.catch_events + diff.removal_events)
+      end
     end
   end
 end
