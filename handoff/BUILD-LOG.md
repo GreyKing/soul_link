@@ -11,8 +11,8 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 15 — SaveDiff Infrastructure + Category 1 (Gyms-Beaten Auto-Detection) + KG-13 fix. **Reviewed + cleared by Richard (0 Must Fix, 3 Should Fix — 2 addressed inline post-review, 1 accepted as-is per Richard's own recommendation). Rebased onto main (which advanced past Step 14 with hotfixes 14.1 / 14.2 / `b8a769e` audit / `23253e1` YAML+SRAM-expansion); ready to commit + push.**
-**Last committed:** Parallel main advanced through `23253e1` (YAML data fixes + SRAM expansion brainstorm). Step 15 lands on top.
+**Active step:** Step 14.3 — Gym-draft candidate card hotfix. About to ship on top of Step 15 (`e556671`).
+**Last committed:** Step 15 (`6e80fe5`) shipped + merged. Gym-leader YAML correction (`e556671`) shipped on top.
 **Pending deploy:** Step 15 ships 1 migration (`create_gym_auto_mark_suppressions`). Pre-deploy safe — additive table, no data backfill, no breaking schema changes.
 
 **Should Fix items resolved inline post-review:**
@@ -32,6 +32,15 @@ Full suite at 397/397 (370 → 397, +27); rubocop clean (152 → 159 files, 0 of
 
 ## Step History
 *Session-scoped.*
+
+### Step 14.3 — Hotfix: gym-draft candidate cards show all 4 linked pokemon — 2026-05-03
+**Status:** Shipped + merged to main.
+
+PO bug report: candidate cards in the nominating phase showed only one pokemon's species, reading as "just my pokemon" to viewers. Root cause: `gym_draft_controller.js:304` rendered `group.pokemon[0].species` — but `g.soul_link_pokemon` has no default order, so the visible species was non-deterministic ("whichever player happened to be saved first"). Fix: render each linked pokemon as `<player>: <species>` on its own line, mirroring the existing gym-result snapshot pattern at `_gyms_content.html.erb:81`. ~10 lines of JS, single file.
+
+**Tests:** 397 → 400 (parallel work landed +3 tests with the gym-leader YAML fixes; this hotfix adds none — JS-only rendering change with no JS test infrastructure in the project, same shape as Step 14.1 / 14.2 hotfixes). Rubocop clean.
+
+---
 
 ### YAML correction — Platinum gym order + level caps — 2026-05-03
 **Status:** Shipped to main. Supersedes the gym data shipped 2026-05-02 in commit `23253e1` (audit doc `handoff/2026-05-02-yml-and-sram-expansion.md`).

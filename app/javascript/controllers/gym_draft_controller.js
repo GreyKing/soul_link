@@ -300,13 +300,24 @@ export default class extends Controller {
       name.textContent = group?.nickname || `#${cand.group_id}`
       card.appendChild(name)
 
-      // First pokemon's species as a representative label
-      const speciesText = group?.pokemon?.[0]?.species || ""
-      if (speciesText) {
-        const species = document.createElement("div")
-        species.className = "gb-candidate-card__species"
-        species.textContent = speciesText
-        card.appendChild(species)
+      // Each linked pokemon (one per player) on its own line — mirrors the
+      // gym-result snapshot rendering at _gyms_content.html.erb:81.
+      // Showing only `pokemon[0].species` was misleading: AR ordering of
+      // the soul_link_pokemon association is undefined, so the single
+      // species rendered was effectively "whichever player happened to be
+      // saved first," which read as "just my pokemon" to viewers.
+      const pokemon = group?.pokemon || []
+      if (pokemon.length > 0) {
+        const speciesContainer = document.createElement("div")
+        speciesContainer.className = "gb-candidate-card__species"
+        pokemon.forEach(p => {
+          const player = this.findPlayer(p.discord_user_id)
+          const label = player?.display_name || "?"
+          const line = document.createElement("div")
+          line.textContent = `${label}: ${p.species || "?"}`
+          speciesContainer.appendChild(line)
+        })
+        card.appendChild(speciesContainer)
       }
 
       const row = document.createElement("div")
