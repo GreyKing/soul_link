@@ -88,7 +88,7 @@ class SoulLinkRun < ApplicationRecord
       end
 
     pairs
-      .group_by { |tid, sid, _sid| [ tid, sid ] }
+      .group_by { |tid, sid, _session_id| [ tid, sid ] }
       .values
       .select { |group| group.size >= 2 }
       .map    { |group| group.map { |_, _, session_id| session_id } }
