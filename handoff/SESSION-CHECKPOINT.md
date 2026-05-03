@@ -6,43 +6,46 @@
 
 ## Where We Stopped
 
-Step 15 (SaveDiff infrastructure + Category 1 gyms-beaten auto-detection + KG-13 fix) shipped + pushed to `main`. Awaiting next brief from Project Owner.
+Step 16 (Non-decryption SRAM expansion: TID/SID + Pokédex caught/seen + Hall of Fame detection) shipped + FF-merged to `main` (`eff673b`). Awaiting next brief from Project Owner.
 
 ---
 
 ## What Was Built
 
-**Step 15 — SaveDiff Infrastructure + Category 1 (Gyms-Beaten Auto-Detection) + KG-13 fix.**
+**Step 16 — Non-decryption SRAM expansion on top of Step 15 SaveDiff infra. KG-14 closed.**
 
-Per the SRAM auto-tracking audit (`handoff/2026-05-02-sram-auto-tracking-audit.md`, on main as `b8a769e`), and the Project Owner's option-(b) decision (gym auto-marks beaten only when all 4 players' active save slots show that badge, with manual MARK BEATEN bypass and manual UNMARK creating per-gym suppression).
+Bundles three highest-ROI SRAM additions that don't pay PKM-decryption cost, all riding the Step-15 `SoulLink::SaveDiff` pure-diff layer:
+1. **TID/SID surfacing** — save-mix-up detection via cross-player `(parsed_trainer_id, parsed_secret_id)` comparison.
+2. **Pokédex caught/seen counter** — closes KG-14 via primary-source citations from PKHeX `SAV4Pt.cs`/`Zukan4.cs` and pret/pokeplatinum `include/pokedex.h`.
+3. **Hall of Fame detection** — auto run-completion when all 4 sessions report `parsed_hof_count >= 1`. Block layout cited from PKHeX `SAV4Pt.cs` ExtraBlocks + `Dendou4.cs` and pret/pokeplatinum `save_table.h`.
 
 **Surfaces introduced:**
-- `SoulLink::SaveDiff` — pure function diff layer (`app/services/soul_link/save_diff.rb`). Takes two `parsed_badges` snapshots, returns a `Result` of `BadgeGained` / `BadgeLost` events. No AR, no logger, no `Time.current`. Extension point for categories 2/3 (add `catch_events:` / `evolution_events:` keyword fields without rewriting consumers).
-- `SoulLink::GymBeatenCoordinator` — static-method service (`app/services/soul_link/gym_beaten_coordinator.rb`) wrapping the all-4 AND-gate. Three guards in priority order: gym already marked → suppression exists → all-4 satisfy. Auto-mark wraps `gym_results.create!` + `gyms_defeated` update in a `run.transaction { }`.
-- `GymAutoMarkSuppression` model + table — per-`(run, gym_number)` unique row. Created on UNMARK in `GymProgressController#update`; cleared by both `GymProgressController#update` mark branch AND `GymDraftsController#mark_beaten`.
-- `ParseSaveDataJob` rewired: captures `prev_parsed_at` + `prev_badges` BEFORE update_columns, dispatches `SaveDiff` + `GymBeatenCoordinator` only if `prev_parsed_at.present?` (baseline rule).
-- `GymResult.broadcasts_refreshes_to ->(record) { [record.soul_link_run, :dashboard] }` — auto-mark surfaces in real-time on open dashboards via the same Step-9 KG-2 pattern.
-- KG-13 fix: parse-failure path went from 7 lines (zeroing every parsed_*) to 1 line (`update_columns(parsed_at: Time.current)` + `return`). Eliminates spurious BadgeLost events from CRC-failed saves.
+- `SoulLink::SaveDiffDispatcher` — new fan-out service. `dispatch(slot, prev:, curr:)` owns the baseline rule (skip on first-ever parse) + empty-diff short-circuit + 4-way coordinator fan-out. `ParseSaveDataJob` becomes a "pure parser + persist" job calling the dispatcher with two state-snapshot Hashes.
+- `SoulLink::TidObservationCoordinator` and `SoulLink::PokedexProgressCoordinator` — log-only (mirrors `GymBeatenCoordinator`'s `BadgeLost` no-op shape; user-visible value comes from parser-persisted columns + view reads).
+- `SoulLink::HallOfFameCoordinator` — side-effect coordinator. All-4 AND-gate (mirrors `GymBeatenCoordinator.all_players_have_badge?`); on pass, sets `run.completed_at = Time.current`. Triple guard: events.empty? / run nil-or-inactive-or-completed / all-4 fail.
+- `SaveDiff::Result` extended with `tid_events:`, `pokedex_events:`, `hof_events:` keyword fields (default `[]`); 3 new event structs (`TidObserved`, `PokedexProgress`, `HallOfFameEntered`); 10 new keyword args on `SaveDiff.between(...)` (all default `nil`). Step-15-style call signatures continue working unchanged.
+- `SaveParser::Result` extended with 5 new fields (`trainer_id`, `secret_id`, `pokedex_caught`, `pokedex_seen`, `hof_count`) + new private helpers (`read_uint16_le`, `count_pokedex_bits`, `safe_hof_count`). Defensive cap: Pokédex count > 493 (`POKEDEX_BIT_LIMIT`) → nil; HoF CRC fail → nil (NEVER 0).
+- `SoulLinkRun#completed?` + `#tid_conflict_groups` (returns groups of session-ids sharing `[trainer_id, secret_id]` pair, excludes nil/zero TID).
+- `broadcasts_refreshes_to ->(record) { [ record, :dashboard ] }` on `SoulLinkRun` — mirrors Step 15 `GymResult` pattern. The "🏆 COMPLETE" pill on the dashboard runs panel surfaces in real time when `HallOfFameCoordinator` updates `completed_at`.
+- View additions: TID/SID + Pokédex + HoF pill on `_run_sidebar_card`; same minus conflict pill on `_save_slots_sidebar`; "🏆 COMPLETE" pill + "COMPLETED" timestamp tile on `_runs_content`.
 
-**Counts:** 370 → 397 tests (+27). Rubocop clean (152 → 159 files, 0 offenses). 1 migration.
+**Counts:** 400 → 461 tests (+61). Rubocop clean (159 → 169 files, 0 offenses). 2 migrations.
 
-**Review:** 0 Must Fix, 3 Should Fix. Two resolved inline post-review (transaction-rollback test stubbed wrong exception; missing retry-idempotency regression). Third (BadgeLost log-level not asserted in tests) accepted as-is per Richard's recommendation — code inspection covers focus area #10.
+**Review:** 0 Must Fix, 1 Should Fix (cosmetic block-param rename `_sid` → `_session_id` in `tid_conflict_groups` — applied inline post-review).
 
 ---
 
 ## What Was Decided This Session
 
-- **Option (b) AND-gate.** Gym auto-marks only when all 4 players' active slots show `parsed_badges >= gym_number`. While 1-3 players have it, gym stays in current state — no UI flicker.
-- **Manual MARK BEATEN bypasses the AND-gate** (different controller action, never hits the coordinator).
-- **Manual UNMARK creates a suppression record** persisting until next manual MARK BEATEN clears it.
-- **Down events (`BadgeLost`) are no-ops** — coordinator logs at `info` level, no auto-unmark. PO will design un-detection later if needed.
-- **Multi-bit jumps process sequentially.** `0→2 badges` produces two `BadgeGained` events; each runs the all-4 check independently.
-- **`SaveDiff` is genuinely pure** (no AR / logger / clock). Coordinator does the side effects. Pattern mirrors `SoulLink::SaveParser`.
-- **`parsed_badges` count semantics, not raw bits.** No `parsed_badge_bits` column. `parsed_badges >= N` is equivalent to "has badge N" in legitimate Platinum play (in-game bitfield is monotonically progressive).
-- **Baseline rule:** diff dispatch is gated on `slot.parsed_at` being non-nil BEFORE the current parse runs. First-ever successful parse is silent (importing a save with N badges doesn't spam N events).
-- **KG-13 fix shape:** failure branch only updates `parsed_at`. Doesn't touch any other `parsed_*`. Branches on `result.nil?` (parser's contract), not on hash-value inspection.
-- **Suppression as a separate table** (not a JSON column, not a flag on `gym_results`). Clean relational model, unique index, `find_or_create_by!` against the index for double-click idempotency.
-- **Categories 2 (gym battle teams) and 3 (catches+routes) explicitly deferred** to a future step. They both need Gen-IV PKM decryption (PID-shuffle + LCG XOR), which is its own design phase. Audit logged KG-11 (party block offset verification) and KG-12 (met-location → route name table) as the prerequisites for that future step.
+- **Dispatcher extraction.** `ParseSaveDataJob` becomes "pure parser + persist". Diff + dispatch lives in `SoulLink::SaveDiffDispatcher`. Per-category branching consolidates into one place — opens the door for Step 17/18 categories (PKM-decryption-gated catches + battle teams) without rewriting the job again.
+- **Three-coordinator symmetry.** TID and Pokédex coordinators are log-only (the value lives in parser-persisted columns + view reads). Coordinators exist for symmetric pattern adherence + traceability. HoF is the side-effect coordinator.
+- **TID-mix-up is read-side.** `SoulLinkRun#tid_conflict_groups` runs at view time on the broadcast partial. Pair key is `[tid, sid]` — same TID with different SIDs is NOT flagged.
+- **No auto-deactivation of completed runs.** PO follow-on. `active` flag stays as-is on completion. Logged as KG-16.
+- **HoF block CRC.** Same CRC16-CCITT-FALSE variant as the general block (verified against PKHeX `Dendou4.cs`); reused the existing `crc16_ccitt` helper. Both partition mirrors read; higher CRC-valid `ClearCount` wins. Both corrupt → nil.
+- **HoF count semantics: `>= 1` boolean gate.** PKHeX's `ClearCount` field is the # of HoF entries recorded. Our run-completion logic only cares whether the player has entered at least once — the `>= 1` check makes this clear.
+- **Pokédex defensive cap at 493 (Sinnoh national dex max).** Belt-and-suspenders for offset misalignment — popcount > 493 returns nil, mirroring `safe_map_id`'s graceful degradation pattern.
+- **`SoulLinkRun.broadcasts_refreshes_to` pattern.** Verified absent before Step 16; mirrors Step 15 GymResult pattern. Dashboard `show.html.erb` already had `<%= turbo_stream_from @run, :dashboard %>` to receive it.
+- **Migration column types: plain `:integer`** (4-byte signed) — NOT `limit: 2` (smallint risks overflow on uint16 upper half). uint16 max 65535 fits cleanly in default `:integer`.
 
 ---
 
@@ -50,11 +53,15 @@ Per the SRAM auto-tracking audit (`handoff/2026-05-02-sram-auto-tracking-audit.m
 
 *See `handoff/BUILD-LOG.md` Known Gaps — running list maintained there.*
 
-Step 15 closed KG-13 (parse-failure zeros parsed_badges). Logged two new gaps from the audit: KG-11 (Gen-IV party block offset within the SRAM slot not yet pinned to a credible source — projectpokemon's Platinum doc has 0xA0 but is "under construction"; need pret/pokeplatinum `SaveData` cross-reference) and KG-12 (Platinum met-location ID → route-name table not yet sourced; different enum from `maps.yml`'s map-header IDs). Both are design-phase prerequisites for the future categories-2/3 step.
+Step 16 closed KG-14 (Pokédex caught/seen offsets validated against PKHeX + pret primary sources). Logged four new gaps:
+- **KG-16:** Auto-deactivation of completed runs deferred — PO call. `active` flag stays as-is when `completed_at` is set; user owns deactivation via existing END RUN button.
+- **KG-17:** Discord notification on HoF deferred — could be a 1-liner inside `HallOfFameCoordinator`. PO call.
+- **KG-18:** TID conflict resolution flow — pill is informational only. No UI to resolve.
+- **KG-19:** HoF "uncomplete" path — direct AR edit (`run.update!(completed_at: nil)`) only. No UI.
 
-KG-7 (real-save offset verification for `MAP_ID_OFFSET`) still open from Step 12.
+KG-7 (real-save offset verification for `MAP_ID_OFFSET`) still open from Step 12. KG-15 (item bag / HM offsets) still open from Step 15 audit.
 
-In-browser smoke deferred this step (parse-job + service code, no new UI). The `broadcasts_refreshes_to` wiring on `GymResult` mirrors the Step 9 KG-2 pattern; no dedicated test (matches KG-2's missing test, accepted by Richard as pattern-parity).
+In-browser smoke deferred this step (parse-job + service + view code, all server-side broadcast-driven). The `broadcasts_refreshes_to` wiring on `SoulLinkRun` mirrors the Step 15 GymResult pattern; no dedicated test (matches the same pattern-parity acceptance from Step 15).
 
 ---
 
