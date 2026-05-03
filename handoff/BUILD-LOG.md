@@ -33,6 +33,41 @@ Full suite at 397/397 (370 → 397, +27); rubocop clean (152 → 159 files, 0 of
 ## Step History
 *Session-scoped.*
 
+### YAML correction — Platinum gym order + level caps — 2026-05-03
+**Status:** Shipped to main. Supersedes the gym data shipped 2026-05-02 in commit `23253e1` (audit doc `handoff/2026-05-02-yml-and-sram-expansion.md`).
+
+PO flagged that the prior YAML fix had gym 3/4/5 in **Diamond/Pearl** order (Maylene/Wake/Fantina) instead of **Platinum** order (Fantina/Maylene/Wake — the "Fantina shuffle"). Several level-cap values were also wrong: gym-3 cap, gym-6 cap (39 was the BDSP value, not Platinum's 41), gym-7 cap (Abomasnow 42 vs actual highest Froslass 44), gym-8 cap (Luxray 49 was the DP value, Platinum has Electivire 50). All values re-verified against `https://pokemondb.net/platinum/gymleaders-elitefour` and shipped.
+
+**Corrected table (Platinum, pokemondb-verified):**
+| Gym | Leader | City | Cap | Cap-defining mon |
+|---|---|---|---|---|
+| 1 | Roark | Oreburgh | 14 | Cranidos |
+| 2 | Gardenia | Eterna | 22 | Roserade |
+| 3 | **Fantina** | **Hearthome** | **26** | Mismagius |
+| 4 | **Maylene** | **Veilstone** | 32 | Lucario |
+| 5 | **Crasher Wake** | **Pastoria** | 37 | Floatzel |
+| 6 | Byron | Canalave | **41** | Bastiodon |
+| 7 | Candice | Snowpoint | **44** | **Froslass** *(highest; Abomasnow at 42 is the canonical "ace" but not the cap-defining mon)* |
+| 8 | Volkner | Sunyshore | **50** | **Electivire** *(highest; Luxray at 48 is the canonical "ace")* |
+
+The Platinum cap progression is monotonic: 14 → 22 → 26 → 32 → 37 → 41 → 44 → 50. (My 2026-05-02 commit produced an erroneous 14 → 22 → 32 → 37 → 40 → 39 → 42 → 49 sequence and I incorrectly framed the resulting non-monotonicity as a Platinum oddity. It wasn't — it was bad data.)
+
+**Files modified (4):**
+- `config/soul_link/gym_info.yml` — full rewrite of slots 3-5 (Fantina-shuffle), level fixes for slots 6-8, ace-species fixes for slots 7-8 (Froslass, Electivire). Updated header comment to pin `ace` field semantics ("cap-defining mon, may differ from canonical signature") and to cite pokemondb. Per-entry comments on slots 7 and 8 explaining the Froslass/Abomasnow and Electivire/Luxray distinction so future re-edits don't "fix" them back to the signatures.
+- `config/soul_link/progression.yml` — three segment-to-gym key references re-pointed: Hearthome segment `gym: fifth_gym` → `gym: third_gym`; Veilstone `third_gym` → `fourth_gym`; Pastoria `fourth_gym` → `fifth_gym`. The `*_gym` keys are positional in `GYM_KEYS` (game_state.rb:42), so these reference updates are required to keep the timeline view's gym associations correct.
+- `config/soul_link/locations.yml` — `gym_number:` flags on three cities updated: hearthome_city 5→3, veilstone_city 3→4, pastoria_city 4→5. (This field is documentation-as-data — not consumed by any code today — but kept in sync for future readers.)
+- `handoff/2026-05-02-yml-and-sram-expansion.md` — corrigendum note appended at the top of the doc pointing forward to this BUILD-LOG entry. Body of the doc is left as the historical snapshot of architect-phase reasoning at that point in time; the SRAM expansion section (§ 3) was not affected and stands as written.
+
+**Why the corrigendum, not a delete-and-rewrite:** the audit doc captures a frozen snapshot of architect reasoning, including the SRAM expansion brainstorm that's still load-bearing for the Step 16 recommendation. Deleting it would lose that. A top-of-file warning + pointer to the corrected data in this BUILD-LOG entry preserves both.
+
+**No code paths touched.** Step 15's `SaveDiff` and `GymBeatenCoordinator` use `parsed_badges` as a population count of set bits, **not** as a bitfield — count → gym number is a sequential mapping, so the in-game gym order shuffle has no effect on auto-mark logic. Verified by reading `app/services/soul_link/save_diff.rb:42-51` and `gym_beaten_coordinator.rb:68-71`.
+
+**No tests touched.** No test asserts on a specific `max_level` integer or on monotonic-progression invariants (verified via `grep "max_level\|monoton" test/`). Step 15's tests assert on `gyms_defeated` (run-state counter), which is unrelated to the YAML config.
+
+**Diff scope:** 3 YAML edits + 1 audit-doc corrigendum + this BUILD-LOG entry. Single commit, FF-merged.
+
+---
+
 ### Step 15 — SaveDiff Infrastructure + Category 1 (Gyms-Beaten Auto-Detection) + KG-13 fix — 2026-05-02
 **Status:** Shipped + pushed to main.
 

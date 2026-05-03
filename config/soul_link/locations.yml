@@ -34,7 +34,7 @@ eterna_city:
 hearthome_city:
   name: "Hearthome City"
   type: city
-  gym_number: 5
+  gym_number: 3
 
 solaceon_town:
   name: "Solaceon Town"
@@ -43,12 +43,12 @@ solaceon_town:
 veilstone_city:
   name: "Veilstone City"
   type: city
-  gym_number: 3
+  gym_number: 4
 
 pastoria_city:
   name: "Pastoria City"
   type: city
-  gym_number: 4
+  gym_number: 5
 
 celestic_town:
   name: "Celestic Town"

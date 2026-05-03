@@ -1,14 +1,21 @@
 # config/soul_link/gym_info.yml
 #
 # Pokémon Platinum gym data. `max_level` is the Soul Link Nuzlocke level
-# cap for facing that gym — by convention, it equals that gym leader's
-# ace Pokémon level. Confirmed against pret/pokeplatinum trainer data on
-# 2026-05-02; values are Platinum-specific (BDSP and DP differ at gyms
-# 6 / 7 — see handoff/2026-05-02-yml-and-sram-expansion.md).
+# cap for facing that gym — by convention, it equals the level of the
+# leader's HIGHEST-level Pokémon (the cap-defining mon, which is not
+# always the leader's signature/canonical "ace" — see Candice/Volkner
+# below). Verified against pokemondb.net/platinum/gymleaders-elitefour
+# on 2026-05-03; values are Platinum-specific (DP and BDSP differ at
+# multiple positions — see handoff/2026-05-03-gym-info-correction.md).
 #
-# Names match the in-game gym signs (e.g. "Eterna Gym", not "Eterna City
-# Gym"). Consumed via SoulLink::GameState.gym_info and rendered as
-# "Level Cap: <max_level>" in dashboard / map / gym_ready views.
+# Gym ORDER reflects Platinum's "Fantina shuffle" — Fantina moved from
+# gym 5 (DP) to gym 3 (Platinum); Maylene and Crasher Wake each shift
+# down one slot. The keys (first_gym .. eighth_gym) are positional and
+# must match `GYM_KEYS` in app/services/soul_link/game_state.rb:42.
+#
+# Names match the in-game gym signs (e.g. "Eterna Gym", not "Eterna
+# City Gym"). Consumed via SoulLink::GameState.gym_info and rendered
+# as "Level Cap: <max_level>" in dashboard / map / gym_ready views.
 first_gym:
   name: "Oreburgh Gym"
   max_level: 14
@@ -28,55 +35,61 @@ second_gym:
   ace: "Roserade"
 
 third_gym:
-  name: "Veilstone Gym"
-  max_level: 32
-  location: veilstone_city
-  number: 3
-  leader: "Maylene"
-  type: "Fighting"
-  ace: "Lucario"
-
-fourth_gym:
-  name: "Pastoria Gym"
-  max_level: 37
-  location: pastoria_city
-  number: 4
-  leader: "Crasher Wake"
-  type: "Water"
-  ace: "Floatzel"
-
-fifth_gym:
   name: "Hearthome Gym"
-  max_level: 40
+  max_level: 26
   location: hearthome_city
-  number: 5
+  number: 3
   leader: "Fantina"
   type: "Ghost"
   ace: "Mismagius"
 
+fourth_gym:
+  name: "Veilstone Gym"
+  max_level: 32
+  location: veilstone_city
+  number: 4
+  leader: "Maylene"
+  type: "Fighting"
+  ace: "Lucario"
+
+fifth_gym:
+  name: "Pastoria Gym"
+  max_level: 37
+  location: pastoria_city
+  number: 5
+  leader: "Crasher Wake"
+  type: "Water"
+  ace: "Floatzel"
+
 sixth_gym:
   name: "Canalave Gym"
-  max_level: 39
+  max_level: 41
   location: canalave_city
   number: 6
   leader: "Byron"
   type: "Steel"
   ace: "Bastiodon"
 
+# Note: Candice's signature/canonical ace is Abomasnow (Lv 42), but
+# Froslass (Lv 44) is the highest-level mon on her team and therefore
+# the cap-defining Pokémon. `ace` here means "cap-defining mon", not
+# "narrative ace" — see header comment.
 seventh_gym:
   name: "Snowpoint Gym"
-  max_level: 42
+  max_level: 44
   location: snowpoint_city
   number: 7
   leader: "Candice"
   type: "Ice"
-  ace: "Abomasnow"
+  ace: "Froslass"
 
+# Same note as above for Volkner: Luxray (Lv 48) is his canonical ace;
+# Electivire (Lv 50) is the highest-level mon and the cap source.
 eighth_gym:
   name: "Sunyshore Gym"
-  max_level: 49
+  max_level: 50
   location: sunyshore_city
   number: 8
   leader: "Volkner"
   type: "Electric"
-  ace: "Luxray"
+  ace: "Electivire"

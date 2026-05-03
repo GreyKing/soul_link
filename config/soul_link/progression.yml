@@ -33,7 +33,7 @@ segments:
       - mt_coronet
       - route_208
       - hearthome_city
-    gym: fifth_gym
+    gym: third_gym
 
   - locations:
       - route_209
@@ -41,7 +41,7 @@ segments:
       - route_210
       - route_215
       - veilstone_city
-    gym: third_gym
+    gym: fourth_gym
 
   - locations:
       - route_214
@@ -49,7 +49,7 @@ segments:
       - lake_valor
       - route_213
       - pastoria_city
-    gym: fourth_gym
+    gym: fifth_gym
 
   - locations:
       - safari_zone

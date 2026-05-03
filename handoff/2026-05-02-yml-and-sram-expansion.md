@@ -1,6 +1,8 @@
 # YML Accuracy Audit + SRAM Scope Expansion
 *Architect (Ava) — 2026-05-02 — investigation + small data fixes shipped inline.*
 
+> **⚠️ Corrigendum (2026-05-03):** the gym-data table in § 1.2 of this report is partially incorrect. The Platinum gym ORDER is wrong — Fantina is gym 3, Maylene gym 4, Crasher Wake gym 5 (the "Fantina shuffle"; the table here has Maylene at 3 and Fantina at 5, which is DP order). Several level-cap values are also off because the species-to-level pairings were drawn from DP-bleed memory. **The corrected, pokemondb-verified data is in `gym_info.yml` as of commit on 2026-05-03; see `BUILD-LOG.md` "YAML correction" entry for the diff and a corrected table.** The § 3 SRAM expansion brainstorm is unaffected — those offsets and effort estimates stand.
+
 The Project Owner asked two related questions in one breath: (a) are there mismatches in our reference-data YAML files we should fix, and especially can we attach proper level caps to the gym data, and (b) what *else* in a Pokémon Platinum `.sav` file is worth pulling beyond the three categories the prior audit (`handoff/2026-05-02-sram-auto-tracking-audit.md`) already covered?
 
 This document answers both. **The YAML fixes have been shipped on this commit** — they are unambiguous data corrections backed by canonical sources. The SRAM scope expansion is a prioritized brainstorm; nothing in §3 is shipped. **No code paths were touched** — Step 15's SaveDiff/auto-mark work on the parallel worktree is uninterrupted.
