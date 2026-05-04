@@ -1,163 +1,176 @@
-# Review Request
-*Written by Builder. Read by Reviewer.*
-*Session-scoped — archived and reset at session end.*
+# Review Request — Step 18
 
----
-
-**Step:** Step 17 — PkmDecoder + PartyParser + catches+routes auto-detection
 **Builder:** Bob
-**Branch:** `claude/recursing-cori-8d3bfc`
-**Ready for Review:** YES
+**Branch:** `claude/lucid-lamport-624d16` (worktree at `b0be7e4` baseline; uncommitted)
+**Ready for Review: YES**
+**Scope:** Step 18 — Per-Pokémon stats (Nature / IVs / EVs / moveset) + PC box parsing (closes KG-21).
 
 ---
 
 ## Summary
 
-Ships category 3 of the SRAM auto-tracking audit (catches + routes). New Gen-IV PKM decryption infrastructure (Layer A: `PkmDecoder` + `PartyParser`, both pure functions never raising) plus a new side-effect coordinator (Layer B: `CatchCoordinator`) that creates `SoulLinkPokemon` rows from auto-detected party transitions. `SaveDiff` extends with `catch_events:` / `removal_events:` and `prev_party:` / `curr_party:` kwargs (backward compatible). The dashboard PC BOX tab gets a new "AUTO-DETECTED CATCHES" section per player.
+Eleven files touched, six new files added. Test count: **547 → 596 (+49)**. Assertions: **1737 → 1906 (+169)**. Rubocop clean. Brakeman clean (the two pre-existing weak-confidence warnings in `emulator_controller.rb` and `gym_schedule_discord_update_job.rb` are unchanged and outside Step-18 scope).
 
-**Closes KG-11** (party block offset = 0xA0, cited from PKHeX `SAV4Pt.cs`).
-**Closes KG-12** (Platinum met-location enum, cited from PKHeX `text_hgss_00000_en.txt` + `Locations.cs`).
+### Per-file changes
 
----
+#### Migrations (NEW)
 
-## Files (with line ranges)
+- **`db/migrate/20260503184057_add_step_18_columns_to_soul_link_pokemon.rb`** — adds `ivs` (json), `evs` (json), `moves` (json), `caught_off_feed` (boolean default false NOT NULL). `nature` already exists on the table from the legacy `20260406000002` migration; reused, not re-added.
+- **`db/migrate/20260503184058_add_parsed_box_data_to_soul_link_emulator_save_slots.rb`** — adds `parsed_box_data` (json, nullable). Mirrors `parsed_party_data`'s shape.
 
-### Migrations
+#### Services
 
-- `db/migrate/20260503160001_add_step_17_columns_to_soul_link_pokemon.rb` (1-43) — adds `pid` (bigint), `met_location_id` (integer), `ot_id` (integer), `ot_sid` (integer), `trade_in` (boolean default false null false), `acquired_via` (string). Compound non-unique index `(soul_link_run_id, discord_user_id, pid)` for the dedup-lookup hot path. All additive; manual catches (Step 1+ Catch modal) keep validating with `pid: nil`.
-- `db/migrate/20260503160002_add_parsed_party_data_to_soul_link_emulator_save_slots.rb` (1-15) — adds `parsed_party_data :json`, nullable, no default. Same shape as Step 16's parsed_* additions.
+- **`app/services/soul_link/natures.rb`** (NEW, 33 lines) — frozen 25-entry array of canonical PKHeX/pret nature names + `Natures.name(id)` lookup with defensive `"Nature ##{id}"` fallback.
+- **`app/services/soul_link/box_parser.rb`** (NEW, 172 lines) — pure Layer-B parser sibling to `PartyParser`. Picks the active storage block across both partitions (independent of the general block's active partition, per PKHeX swap semantics), walks 18 boxes × 30 slots × 136-byte records, decodes each via `PkmDecoder.decrypt`, filters eggs + species==0. Returns `Array<Pkm>` (size 0..540) or `[]` on any failure. Top-level `rescue StandardError → []`.
+- **`app/services/soul_link/pkm_decoder.rb`** (extended) — `Pkm` Struct gains 4 new keyword fields (`:nature, :ivs, :evs, :moves`) appended at the end of the declaration so Step-17 positional access stays stable. New constants `UNSHUFFLED_EV_OFFSET / UNSHUFFLED_MOVES_OFFSET / UNSHUFFLED_PP_OFFSET / UNSHUFFLED_PP_UP_OFFSET / IV_FIELD_MASK / IV_*_SHIFT` cite the PKHeX `PK4.cs` accessor at the citation comment for each. New private extractors `extract_ivs / extract_evs / extract_moves` (each defensive — return all-zero Hash / 4 zeroed entries on slice boundary failure rather than nil). Decoder still never raises.
+- **`app/services/soul_link/save_diff.rb`** (extended) — `BoxedPokemonObservedEvent` Struct, `Result#box_events` (default `[]`), `Result#empty?` extended, `between(...)` gains `prev_box: nil, curr_box: nil` keyword args, `diff_box(...)` method (mirrors `diff_party` shape). `PokemonCaughtEvent` and `BoxedPokemonObservedEvent` carry `:nature, :ivs, :evs, :moves` keyword fields; `diff_party` and `diff_box` populate them via `hash_get`.
+- **`app/services/soul_link/save_diff_dispatcher.rb`** (extended) — reads `prev[:box_data]` / `curr[:box_data]`, threads them into `SaveDiff.between`, and combines `catch_events + removal_events + box_events` into a single `CatchCoordinator.process` call. Doc comment lists the new `:box_data` key.
+- **`app/services/soul_link/catch_coordinator.rb`** (extended) — new `case` branch for `BoxedPokemonObservedEvent → handle_box_observed`. Both `handle_caught` and `handle_box_observed` delegate to a shared `create_pokemon_row(... caught_off_feed:)` helper. The PID-dedup `.exists?` check covers both intra-event-type dedup AND the cross-event (party + box, same PID, same snapshot) collision; dispatcher orders catch first → party-side wins on the dedup. Persists `nature` (resolved via `Natures.name`), `ivs`, `evs`, `moves`, `caught_off_feed`.
 
-### Decoder (`app/services/soul_link/pkm_decoder.rb` — NEW)
+#### Job
 
-- (1-65) Header citation block — pret/pokeplatinum sources for crypto algorithm + struct layout, PKHeX `PokeCrypto.cs` cross-check, projectpokemon Gen-4 PKM-structure r65 doc reference.
-- (66-115) Constants — `BOX_SIZE = 136`, `PARTY_SIZE = 236`, field offsets within unshuffled (canonical ABCD) payload (species @ 0x00 of Block A → record offset 0x08, met-location @ 0x1E of Block B → record offset 0x46, met-level @ 0x1C of Block D → record offset 0x84, etc.), LCG constants (`0x41C64E6D` / `0x6073`), 32-entry `SHUFFLE_TABLE` transcribed verbatim from pret/pokeplatinum `src/pokemon.c:4861-4924` (cases 24..31 mirror cases 0..7 per pret).
-- (117-130) `Pkm` Struct value object (pid, species, level, ot_id, ot_sid, met_location_id, met_level, is_egg, slot_index).
-- (132-180) `decrypt(bytes, slot_index:)` static method. Pipeline: validate length → read PID + checksum → XOR-decrypt blocks region with checksum-keyed LCG → verify checksum → unshuffle blocks per `((PID >> 13) & 0x1F)` → for party records, XOR-decrypt party stats region with PID-keyed LCG → extract canonical fields → return Struct. Top-level `rescue StandardError → nil`.
-- (182-225) Private helpers: `lcg_xor(bytes, seed)` (XOR halfwords with LCG keystream), `checksum_valid?` (sum-of-uint16-words mod 0x10000), `unshuffle(blocks, pid)` (re-orders 4 × 32-byte blocks), `read_u32_le` / `read_u16_le` (boundary-safe), `extract_egg_bit` (Block-B IV-dword bit 30 OR species==0 sentinel).
+- **`app/jobs/soul_link/parse_save_data_job.rb`** (extended) — calls `SoulLink::BoxParser.parse(slot.save_data).map(&:to_h)` after `PartyParser.parse(...)`. Persists via `update_columns(parsed_box_data: ...)`. `capture_state(slot)` extended with `:box_data`. **KG-13 invariant preserved** — failure path still only stamps `parsed_at`; pre-existing `parsed_box_data` is left alone. Verified by `Step 18: parse failure does not write parsed_box_data (KG-13 invariant)`.
 
-### Walker (`app/services/soul_link/party_parser.rb` — NEW)
+#### View
 
-- (1-46) Header citation — PKHeX `SAV4Pt.cs` `Party = 0xA0` (closes KG-11), pret/pokeplatinum `include/party.h` Party struct shape.
-- (48-58) Constants — `PARTY_OFFSET_IN_GENERAL_BLOCK = 0xA0`, party header (8 bytes: capacity u32 + currentCount u32) + 6 × 236-byte records.
-- (60-92) `parse(save_data)` — validates input length, picks the active slot via the same CRC-validated picker as SaveParser (replicated, not delegated, to keep parsers loosely coupled), reads count u32 (clamps out-of-bounds to 6), iterates slots calling PkmDecoder, filters nils + eggs + zero-species. Top-level `rescue StandardError → []`.
-- (94-140) Private helpers: `pick_active_slot` (CRC-validated higher-counter picker), `slot_valid?`, `read_save_counter`, `crc16_ccitt`, `read_u32_le`. Replicates SaveParser's slot-picking logic by reading SaveParser's public class constants (CRC_RANGE_END, BLOCK_CRC_OFFSET, etc.).
+- **`app/views/dashboard/_pc_box_content.html.erb`** (extended) — adds `OFF-FEED` pill (using `var(--d3)` palette token, "informational not alarming") in the existing pill row. Adds a `<details>`-driven `STATS` panel below `box-cell-loc` that renders Nature / IVs / EVs / Moves when present. Backward compat: every guard checks `.present?` / `.is_a?(Hash|Array)` so Step-17 rows (all four fields nil) render exactly as today — no `<details>` block, no console errors.
 
-### Coordinator (`app/services/soul_link/catch_coordinator.rb` — NEW)
+#### Tests
 
-- (1-50) Header — filters & dedup logic explained: eggs / PID dedup / trade-in / event-met / route-resolution.
-- (52-77) `process(slot, events)` — early-return on empty/nil/missing-session/missing-run; opens `slot.transaction { }`; iterates events; routes PokemonCaughtEvent to `handle_caught`, PokemonRemovedEvent to `Rails.logger.info` (no AR side effect — mirrors `BadgeLost` no-op).
-- (79-113) `handle_caught(_slot, session, run, event)` — egg/zero-PID/unclaimed guards; PID dedup against `(soul_link_run_id, discord_user_id, pid)`; resolves route + species; classifies acquired_via (event_gift > trade_in > catch precedence); `SoulLinkPokemon.create!` with `soul_link_pokemon_group_id: nil`.
-- (115-122) `resolve_route_name(met_id)` — calls `GameState.met_location_name`, falls back to "Met-Location #N" / "Met-Location #?" gracefully.
-- (124-145) `resolve_species_string(species_id)` + `species_name_by_id` memoized lookup from `pokemon_base_stats.national_dex_number`. Returns "Species #N" fallback (KG-20) when the table is empty.
-- (147-156) `reset_species_cache!` — test helper.
-- (158-180) `trade_in?(session, event)` + `acquired_via(met_id, trade_in)` — slot's parsed TID/SID lookup with nil-safety; defaults trade_in false when no baseline exists.
-
-### Met-locations YAML (`config/soul_link/met_locations.yml` — NEW)
-
-- (1-39) Header — full source citation block (PKHeX `text_hgss_00000_en.txt` + `Locations.cs` for special IDs, pret/pokeplatinum `res/text/special_met_location_names.json` cross-check). Closes KG-12.
-- (41-127) 127 entries — Sentinel Mystery Zone (event:true), 15 cities, 30 routes (201-230), 44 dungeons / overworld special, 36 indoor / overworld interior locations.
-- (129-134) 5 special pseudo-IDs flagged event:true — Daycare4=2000, LinkTrade4NPC=2001, LinkTrade4=2002, Ranger4=3001, Faraway4=3002.
-
-### GameState extension (`app/services/soul_link/game_state.rb`)
-
-- (10) Added `MET_LOCATIONS_PATH` constant.
-- (90-119) Added `met_locations` (memoized YAML loader, `{}` fallback), `met_location_name(id)` (nil for unknown / nil), `event_met_location?(id)` (false for nil/unknown — false-positives on event flag are worse than false-negatives).
-- (179) Extended `reload!` to clear `@met_locations` ivar.
-
-### SaveDiff extension (`app/services/soul_link/save_diff.rb`)
-
-- (28-49) Added `Pkm` Struct (re-declared for diff layer's contract — JSON-roundtripped Hashes from `parsed_party_data` aren't PkmDecoder::Pkm Structs anymore), `PokemonCaughtEvent`, `PokemonRemovedEvent`. Extended `Result` with `catch_events:`, `removal_events:`. `Result#empty?` checks all six event arrays.
-- (76-93) Extended `between(...)` with `prev_party:` / `curr_party:` keyword args (default `nil` for backward compat). New `diff_party` helper produces `[catches, removals]`.
-- (152-204) `diff_party(prev_party, curr_party)` — returns `[[], []]` when either side is nil (defensive), indexes both sides by PID via `index_party_by_pid`, walks curr-not-in-prev → catches and prev-not-in-curr → removals. `index_party_by_pid` skips nil/zero PIDs (defensive). `hash_get(entry, key)` accepts both symbol-keyed and string-keyed entries (pre/post JSON roundtrip).
-
-### Dispatcher extension (`app/services/soul_link/save_diff_dispatcher.rb`)
-
-- (20-22) Updated docstring to mention `:party_data`.
-- (29-37) Wired `prev_party: prev[:party_data]` / `curr_party: curr[:party_data]` into the `SaveDiff.between` call.
-- (44-46) Added `CatchCoordinator.process(slot, diff.catch_events + diff.removal_events)` fan-out when either array is non-empty.
-
-### Job extension (`app/jobs/soul_link/parse_save_data_job.rb`)
-
-- (39-50) Calls `SoulLink::PartyParser.parse(slot.save_data).map(&:to_h)` on success; persists JSON-serialized party data via `update_columns(parsed_party_data: ...)` (same write that already covered the parsed_* columns). Failure path UNCHANGED — KG-13 invariant preserved (only stamps `parsed_at`).
-- (74-78) Extended `capture_state(slot)` to include `:party_data => slot.parsed_party_data`.
-
-### Controller extension (`app/controllers/dashboard_controller.rb`)
-
-- (60-72) Loads `@auto_detected_catches` — current_user_id-scoped, `pid IS NOT NULL` (auto-detected only — manual catches keep pid nil for back-compat), `soul_link_pokemon_group_id IS NULL` (Step-17 rows are unpaired), ordered `caught_at: :desc`.
-
-### View extension (`app/views/dashboard/_pc_box_content.html.erb`)
-
-- (17-49) New "AUTO-DETECTED CATCHES" section above the existing ON TEAM section. Conditionally rendered (`if auto_catches.any?`). First-encounter badge (`1ST`) computed live by grouping per location and picking earliest-by-caught_at. Trade-in pill (`TRADE-IN`), event pill (`EVENT`). Mirrors the visual style of existing box-cell layout.
-
-### Tests
-
-- `test/services/soul_link/pkm_decoder_test.rb` (NEW, 9 tests / 220 assertions) — synthetic round-trip via known-PID encrypted blocks; all 24 PID-shuffle orderings; checksum mismatch returns nil; boundary errors return nil; nil/non-String input returns nil; egg bit detected; species==0 collapses to is_egg; box-only record (136 bytes) decrypts with level=nil; slot_index propagated.
-- `test/services/soul_link/party_parser_test.rb` (NEW, 10 tests / 19 assertions) — empty (count=0), single-Pokemon, three-Pokemon (with slot indices), six-Pokemon, eggs filtered, corrupt PKM dropped (others returned), wrong total bytesize returns [], nil/non-String returns [], no-CRC-valid-slot returns [], out-of-bounds count fallback walks all 6 slots.
-- `test/services/soul_link/catch_coordinator_test.rb` (NEW, 17 tests / 52 assertions) — empty/nil events no-op, missing slot/session/uid no-op, egg/zero-PID/removed-event drops, new catch creates row with all fields, PID dedup within run, cross-run PID allowed (different guild_id to dodge active-run uniqueness invariant), trade-in detection, event-met flag, unknown met-id fallback, event_gift precedence, transaction wrap (raise rolls back partials), no-baseline trade-in defaults false.
-- `test/services/soul_link/game_state_met_locations_test.rb` (NEW, 11 tests / 29 assertions) — mirrors maps test shape: file absent, known ID lookup, unknown ID returns nil, nil input returns nil, string coercion, event_met_location? predicate (true/false/nil/unknown), reload! clears cache, production-file canary on gym towns + Routes 201/230 + Distortion World / Mt. Coronet / Eterna Forest / Stark Mountain + event-flagged IDs.
-- `test/services/soul_link/save_diff_test.rb` (extended, +9 tests) — Step-17 backward compat (Step-15-style call returns empty catch/removal), empty/empty no events, new PID → catch, stable PID no events, removed PID → 1 catch + 1 removal, 6-prev-5-curr removal, both-nil defensive, only-one-side-nil defensive, string-keyed entries (post-JSON-roundtrip), Result#empty? false with catches.
-- `test/services/soul_link/save_diff_dispatcher_test.rb` (extended, +4 tests) — `with_stubbed_coordinators` extended to cover `CatchCoordinator`; updated existing 7 tests' assertion hashes to include the new `:catch` key (always 0 for pre-Step-17 cases); added PokemonCaughtEvent fan-out, PokemonRemovedEvent fan-out, stable PIDs no-op, baseline rule for catches.
-- `test/jobs/soul_link/parse_save_data_job_test.rb` (extended, +5 tests) — parsed_party_data persists on success, parse-failure preserves prior parsed_party_data + skips PartyParser, integration 1→2 party transition creates SoulLinkPokemon row with correct route name, re-running same job produces no duplicate via PID dedup, CatchCoordinator retry-safety (raise on first run does not double-fire on retry; mirrors Step 15's regression test shape).
+- **`test/services/soul_link/natures_test.rb`** (NEW, 6 tests / 23 assertions)
+- **`test/services/soul_link/box_parser_test.rb`** (NEW, 14 tests / 32 assertions) — empty box, single record, full single box, multi-box walk order, egg filtering, corrupt-record isolation, both-CRC-bad → `[]`, one-CRC-bad → uses good partition, higher-counter wins, wrong bytesize, nil/non-String, all-zero SRAM, source-discipline (no AR/Rails.logger/Time.current).
+- **`test/services/soul_link/pkm_decoder_test.rb`** (extended, 9 → 22 tests / 220 → 270 assertions, +13 new) — nature derivation, IVs round-trip (perfect + per-stat distinct + empty fallback), EVs round-trip (per-stat + max-byte), moves round-trip (distinct + empty fallback), backward-compat composite, Struct member-order lock.
+- **`test/services/soul_link/save_diff_test.rb`** (extended, 34 → 48, +14 new) — `box_events` default, single-PID box catch, stable PID, withdraw side, nil prev/curr, zero-PID skip, nature/ivs/evs/moves carried through, Step-17 backward-compat (nil fields), string-keyed JSON entries, same-PID-in-party-AND-box dual-fire, `Result#empty?`.
+- **`test/services/soul_link/save_diff_dispatcher_test.rb`** (extended, 11 → 15, +4 new) — `BoxedPokemonObservedEvent` fan-out, stable box PIDs, baseline rule for box, combined catch+box single-call ordering.
+- **`test/services/soul_link/catch_coordinator_test.rb`** (extended, 17 → 29, +12 new) — nature/ivs/evs/moves persist; back-compat (nil columns); `BoxedPokemonObservedEvent` creates with `caught_off_feed: true`; existing-PID dedup; **same-snapshot party+box dual-fire creates exactly one row**; box event_gift, box trade-in, box egg drop, box zero-PID drop, nil-nature stays nil, `caught_off_feed: false` default for catches, Struct kw-init contract.
+- **`test/jobs/soul_link/parse_save_data_job_test.rb`** (extended, 20 → 26, +6 new) — `parsed_box_data` written on success; KG-13 failure path keeps it untouched; `capture_state` carries box_data; box-only PID creates row with `caught_off_feed: true`; same-PID party+box dual-fire creates one row; pre-Step-18 `parsed_party_data` (no nature/ivs/evs/moves keys) runs through cleanly with no exceptions / no spurious events.
 
 ---
 
-## Tests + lint + brakeman
+## Test counts
 
-- **Tests:** 461 → **527** (+66). 0 failures, 0 errors.
-- **Rubocop:** 169 → **178** files, **0 offenses**.
-- **Brakeman:** Clean (no new warnings; the 2 weak-confidence pre-existing File Access warnings — `EmulatorController#rom` `send_file` and `GymScheduleDiscordUpdateJob` Discord URL — are unchanged).
+```
+Before:   547 runs, 1737 assertions, 0 failures, 0 errors
+After:    596 runs, 1906 assertions, 0 failures, 0 errors
+Delta:    +49 runs, +169 assertions
+```
 
----
-
-## Reviewer focus areas
-
-1. **PkmDecoder crypto correctness.**
-   - PID-shuffle table (`pkm_decoder.rb:103-130`) — 32-entry constant transcribed verbatim from pret/pokeplatinum `src/pokemon.c:4861-4924`. Cases 24..31 mirror cases 0..7 (so the lookup is a single-index op rather than `index % 24`). Verify the table against pret + cross-check against PKHeX `PokeCrypto.BlockPosition` if you can pull it.
-   - LCG (`pkm_decoder.rb:184-194`) — `seed = (seed * mult + inc) & U32_MASK; ks = (seed >> 16) & U16_MASK`; XOR uses HIGH 16 bits per pret `LCRNG_NextFrom`. Multiplier `0x41C64E6D` and increment `0x6073` cited from `include/math_util.h`.
-   - Two-region dual-key encryption (`pkm_decoder.rb:155-168`): blocks A-D keyed with checksum, party stats keyed with PID. Cited from pret `src/pokemon.c:328-329` `Pokemon_DecryptData(&mon->party, ..., personality)` + `Pokemon_DecryptData(&mon->box.dataBlocks, ..., checksum)`. Test exercises both via the round-trip helper.
-   - Checksum verify (`pkm_decoder.rb:200-206`) — sum of all 64 u16 words in the decrypted blocks region mod 0x10000 must equal stored checksum at 0x06. Verified before unshuffling (sum is order-independent). Mismatch → returns nil.
-   - All 24 PID-shuffle orderings tested via `pkm_decoder_test.rb:115-135` (parametric over case_idx ∈ [0..23]).
-
-2. **PartyParser party block offset (KG-11 closure).**
-   - `PARTY_OFFSET_IN_GENERAL_BLOCK = 0xA0` cited from PKHeX `PKHeX.Core/Saves/SAV4Pt.cs` `GetSAVOffsets()` method. Header docstring at `party_parser.rb:30-44` documents the source explicitly.
-   - Cross-checked against pret/pokeplatinum `include/party.h` Party struct shape (`int capacity; int currentCount; Pokemon[6]`). Audit `2026-05-02-sram-auto-tracking-audit.md` flagged this as the biggest unknown — the brief locked the PKHeX-sourced answer; verify the citation.
-
-3. **met_locations.yml coverage + citation (KG-12 closure).**
-   - `config/soul_link/met_locations.yml:1-39` header cites PKHeX `text_hgss_00000_en.txt` + `Locations.cs`. 127 entries shipped (Sinnoh routes 201-230, all gym towns, 44 notable dungeons + interiors, 5 special event pseudo-IDs). Production-file canary in `game_state_met_locations_test.rb:113-138` asserts gym towns + routes + dungeons + event flags ship.
-
-4. **SaveDiff backward compat.**
-   - `save_diff_test.rb:233` — `SaveDiff.between(prev_badges: 0, curr_badges: 1)` with NO new kwargs returns Result with empty `catch_events` + `removal_events` arrays. All 16 Step-15/16 SaveDiff tests pass unchanged after the Step-17 additions.
-   - `save_diff_dispatcher_test.rb:42-117` — existing 7 dispatcher tests' assertion hashes were extended with `:catch` key (always 0 for pre-Step-17 cases); the underlying dispatcher behavior for badges/TID/Pokédex/HoF is unchanged.
-   - `parse_save_data_job_test.rb` "Step 17: parse failure does not write parsed_party_data" — KG-13 invariant preserved; parse failure ONLY stamps `parsed_at`, every other parsed_* field (including the new `parsed_party_data`) keeps its prior value.
-
-5. **CatchCoordinator transaction wrap, PID dedup, trade-in detection, egg filter, retry idempotency.**
-   - Transaction wrap: `catch_coordinator.rb:62-77` opens `slot.transaction { }` around the events loop. Tested in `catch_coordinator_test.rb:153-168` — stub `SoulLinkPokemon.create!` to raise on the second call; assert no row persists (`assert_no_difference "SoulLinkPokemon.count"`).
-   - PID dedup: `catch_coordinator.rb:90-93` `where(soul_link_run_id:, discord_user_id:, pid:).exists?`. Tested in `catch_coordinator_test.rb:95-100` (same PID twice = no second row) and `catch_coordinator_test.rb:103-117` (cross-run PID allowed, with different guild_id to dodge active-run uniqueness invariant).
-   - Trade-in: `catch_coordinator.rb:159-167` compares event TID/SID against slot's `parsed_trainer_id` / `parsed_secret_id`. Returns false if either side is unset (defense against false-positives). Tested in `catch_coordinator_test.rb:119-127` (different IDs → trade_in true) + `catch_coordinator_test.rb:170-181` (no baseline → defaults false).
-   - Egg filter: `catch_coordinator.rb:80-83` defense in depth (PartyParser already filters). Tested in `catch_coordinator_test.rb:62-67`.
-   - Retry idempotency: `parse_save_data_job_test.rb` "Step 17: CatchCoordinator retry-safety" mirrors Step 15's regression test — coordinator raise on first run does not double-fire on retry because `parsed_party_data` is persisted via `update_columns` BEFORE the dispatch line, so the retry sees `prev_party_data == curr_party_data`, diff is empty, coordinator never re-invoked.
-
-6. **Migration shape.**
-   - Both migrations are additive only (nullable columns + one `default: false, null: false` boolean for `trade_in` which is safe for back-compat).
-   - No data-backfill blocks. No `change_column`. No removal/rename.
-   - Compound index `(soul_link_run_id, discord_user_id, pid)` is non-unique per brief decision 9 (application-level dedup is acceptable for v1; the index serves the lookup hot path, the uniqueness check happens in `CatchCoordinator.handle_caught` before the create).
-
-7. **Dashboard PC BOX section's data isolation.**
-   - Controller scope (`dashboard_controller.rb:60-72`): `run.soul_link_pokemon.where(discord_user_id: current_user_id).where.not(pid: nil).where(soul_link_pokemon_group_id: nil).order(caught_at: :desc)`. Per-player + per-run + auto-detected-only + group-unassigned.
-   - View (`_pc_box_content.html.erb:17-49`) reads exclusively from `@auto_detected_catches` and computes first-encounter inline by location-group min-by-caught_at. No leakage across players (the controller filter is the only join).
-
-8. **Rubocop + Brakeman clean.**
-   - Rubocop: 178 files, 0 offenses. New files (PkmDecoder, PartyParser, CatchCoordinator, met_locations.yml, 4 test files, 2 migrations) all conformant.
-   - Brakeman: 2 pre-existing weak-confidence File Access warnings unchanged (EmulatorController + GymScheduleDiscordUpdateJob); no new warnings from Step 17 surface.
+Within the brief's expected `~+30..50` envelope.
 
 ---
 
-## Open questions / escalations
+## Citations of primary sources for every new offset
 
-None. The brief was fully specified, primary sources verified pre-implementation, and every edge case from the test plan is covered.
+Every new constant in `pkm_decoder.rb` and `box_parser.rb` carries an inline citation comment. Reviewer should spot-check these against:
 
-One thing the reviewer might surface: **the species lookup falls back to "Species #N" when `pokemon_base_stats` is empty** (KG-20 in BUILD-LOG). The integration test in `parse_save_data_job_test.rb:480-495` tolerates this with a regex match (`assert_match(/Species|^[A-Z]/, row.species)`) since the test DB doesn't seed pokemon data. In production this is a non-issue — the seed task is part of normal deploy. If the reviewer wants stronger guarantees, options are: (a) seed pokemon_base_stats in test_helper, (b) fall back to reading `pokedex.yml` (though that file isn't id-keyed today), or (c) leave as-is and document.
+### PK4 record offsets (from PKHeX `PKHeX.Core/PKM/PK4.cs`)
+
+WebFetch verified — `PK4.cs` accessors quote PK4-ABSOLUTE offsets (the full record including the 8-byte header at PID/flags/checksum). Our `unshuffled` ontology is the 128-byte blocks-buffer (no header), so `unshuffled offset = PK4 absolute - 0x08`. The mapping:
+
+| Field | PK4 absolute | unshuffled | Citation |
+|---|---|---|---|
+| EV_HP..SPD | `Data[0x18..0x1D]` | `0x10..0x15` | `PK4.cs` `EV_HP` getter |
+| Move1/2/3/4 | `Data[0x28]/[0x2A]/[0x2C]/[0x2E]` | `0x20..0x27` | `PK4.cs` `Move1` getter (u16 LE) |
+| Move PP | `Data[0x30..0x33]` | `0x28..0x2B` | `PK4.cs` `Move1_PP` getter |
+| Move PP-Ups | `Data[0x34..0x37]` | `0x2C..0x2F` | `PK4.cs` `Move1_PPUps` getter |
+| IV32 | `Data[0x38]` | `0x30` (already in code from Step 17) | `PK4.cs` `IV32` getter |
+
+### IV bit packing (from pret/pokeplatinum `include/struct_defs/pokemon.h`)
+
+WebFetch confirmed:
+```
+u32 hpIV : 5; atkIV : 5; defIV : 5; speedIV : 5; spAtkIV : 5; spDefIV : 5; isEgg : 1; hasNickname : 1;
+```
+
+### Storage block layout (from PKHeX `PKHeX.Core/Saves/SAV4Pt.cs`)
+
+WebFetch confirmed:
+- `public const  int GeneralSize = 0xCF2C;`
+- `private const int StorageSize = 0x121E4;`
+- Comment `"Start 0xCF2C, +4 starts box data"` — the first 4 bytes of the storage block are `currentBoxIndex`; box-PKM records start at storage offset `0x04`.
+
+### Storage footer parity (from PKHeX `PKHeX.Core/Saves/SAV4.cs` + pret/pokeplatinum `include/savedata.h`)
+
+PKHeX uses identical `Checksums.CRC16_CCITT(...)` + `^2..` CRC location for both general and storage blocks (single `CalcBlockChecksum`/`GetBlockChecksumValid` method pair handles both). pret/pokeplatinum defines a single `SaveBlockFooter` struct shared between blocks. **Storage footer is structurally identical to the general footer** — counter at footer +0x00 (block size - 20), CRC at footer +0x12 (block size - 2). Documented inline in `box_parser.rb`'s class doc.
+
+### Nature names (from PKHeX `Nature.cs` + pret/pokeplatinum `include/constants/pokemon.h`)
+
+Cited inline in `natures.rb`. 25-entry canonical order Hardy=0..Quirky=24.
+
+### Box dimensions (from PKHeX SAV4 BoxCount=18 / BoxSlotCount=30)
+
+Standard Gen-IV constants — 18 boxes × 30 slots × 136 bytes/record = `0x11EE0` bytes total of box-PKM records. Cited inline in `box_parser.rb`.
 
 ---
 
-**Ready for Review: YES**
+## Open questions / known gaps for Richard
+
+1. **The brief's "unshuffled offset" labels for the new fields were off by 0x08.** The brief said e.g. "moves at unshuffled offset `0x28..0x2F` (Block B +0x08..+0x0F)" — but the existing decoder's `UNSHUFFLED_*` ontology is the 128-byte blocks-buffer (no PK4 header). Move1 at PK4-absolute 0x28 lands at unshuffled `0x20` (Block B +0x00), not `0x28` (Block B +0x08). I followed the existing decoder's ontology (the only consistent way to extend it) and made the citation comments quote PK4-absolute offsets explicitly so Richard can cross-check. The math chains cleanly: PK4 `EV_HP=0x18` → unshuffled `0x10` (Block A +0x10), PK4 `Move1=0x28` → unshuffled `0x20` (Block B +0x00), PK4 `IV32=0x38` → unshuffled `0x30` (Block B +0x10) — same delta of 0x08 across the board. Reviewer: please verify this matches your PKHeX read.
+
+2. **Brief's nature math example was wrong.** Brief said "PID `0xFFFFFFFF` → `% 25 = 9` (Lax)". Actual: `0xFFFFFFFF % 25 = 20` (Calm). I tested for the correct value (`Step 18: nature for PID 0xFFFFFFFF is 20 (Calm)`). Not a code issue — flagging in case Ava wanted to update the brief.
+
+3. **`extract_ivs / extract_evs / extract_moves` return all-zero Hash/Array on boundary failure rather than `nil`.** Brief was silent on this; I picked the "always-Hash/always-Array" contract because (a) it makes the view's `.is_a?(Hash)` / `.is_a?(Array)` guard cleaner, (b) it matches `read_u16_le`'s "return 0 on slice fail" pattern, and (c) the surrounding `rescue StandardError` in `decrypt` would otherwise swallow `nil`-receiver errors and lose the rest of the record. Tradeoff: a record with a corrupted IV chunk surfaces `{ hp: 0, ... }` rather than nil; the view distinguishes nil (Step-17 row) vs. zeros (Step-18 row with bad slice) only by presence of other fields. I think this is right but flagging for Reviewer.
+
+4. **`SoulLinkPokemon.create!` for box-events does NOT touch `caught_at`.** The model's `before_create :set_caught_at, if: -> { status == 'caught' }` callback handles that, same as Step 17. So a box-only catch gets a `caught_at = Time.current` exactly when its row is created — meaning the dashboard's "first encounter on this route" computation works the same way for box-only catches as for party-side catches. Confirming with Reviewer that this is the desired UX.
+
+5. **No `BoxParser` slot-level mutation tests against pre-existing rows in DB.** All Step-18 BoxParser/CatchCoordinator integration tests stub `BoxParser.parse` and `PartyParser.parse` — there's no end-to-end "build a real 0x80000 SRAM with party + box, run through the full job" test. I judged the integration test in `parse_save_data_job_test.rb` (with stubs) sufficient because the real-SRAM path is exercised in `box_parser_test.rb` against the synthetic builder. Reviewer: if you want a real-SRAM end-to-end, flag it and I'll add one.
+
+6. **Move-name rendering is purely numeric (`MOVE 1: #N · PP n/m`).** Logged as KG-24 (per brief). No `config/soul_link/moves.yml` work in Step 18.
+
+7. **No new column on `soul_link_pokemon` for `box_index` / `slot_index`.** A box catch's slot location (which box, which slot) is not surfaced anywhere — the catch row just records `pid + species + met_location + caught_off_feed: true`. Brief did not call for this; if you want it, it'd be a Step 19 column add.
+
+---
+
+## Deviations from the brief
+
+**None on byte values; one cosmetic on labels.** The brief's "Block B +0x08" offset annotations for moves were wrong (off by 0x08 because the brief was using PK4-absolute offsets but labelling them as unshuffled-buffer offsets); I implemented to match PKHeX's actual offsets and the existing decoder's "unshuffled = blocks-buffer" ontology. **The byte values read from the record are exactly what the brief intended**; only the labels in the brief were inconsistent. Documented in §"Open questions" #1 above.
+
+The brief's nature-math example for `0xFFFFFFFF` was also wrong (`= 9` should be `= 20`); my test asserts the correct value. No code impact.
+
+---
+
+## Reviewer focus areas (suggested)
+
+1. **PK4 offset citations** — every new constant in `pkm_decoder.rb` carries an inline `# PK4 0xNN` comment. Spot-check three (`UNSHUFFLED_MOVES_OFFSET`, `UNSHUFFLED_EV_OFFSET`, `UNSHUFFLED_PP_OFFSET`) against PKHeX `PK4.cs` directly.
+2. **Storage footer offsets** — `box_parser.rb` `STORAGE_COUNTER_OFFSET` / `STORAGE_CRC_OFFSET`. Verify against PKHeX `SAV4.cs`'s footer-parity claim. The doc comment cites the parity assertion explicitly; if you have a real Gen-IV save handy, the integration check is "does `BoxParser.parse(real_save)` return non-empty when the player has at least 1 boxed Pokémon."
+3. **Cross-event PID dedup** — `test/services/soul_link/catch_coordinator_test.rb` `Step 18: same-snapshot PokemonCaughtEvent + BoxedPokemonObservedEvent for same PID creates exactly one row` and `test/jobs/soul_link/parse_save_data_job_test.rb` `Step 18 integration: same PID in party AND box (same snapshot) creates exactly one row`. Both pin the invariant.
+4. **KG-13 invariant** — `test/jobs/soul_link/parse_save_data_job_test.rb` `Step 18: parse failure does not write parsed_box_data (KG-13 invariant)`. Verify `update_columns(parsed_at: Time.current)` in the failure branch is unchanged.
+5. **Backward-compat for Step-17 rows** — `test/jobs/soul_link/parse_save_data_job_test.rb` `Step 18: pre-Step-18 parsed_party_data without nature/ivs/evs/moves keys runs through cleanly`. Plus the view: a row with all four new columns nil renders the existing row layout exactly, no console errors, no `<details>` block.
+6. **Decoder/parser purity** — grep `pkm_decoder.rb`, `box_parser.rb`, `natures.rb`, `save_diff.rb` for `Rails.logger`, `Time.current`, `ActiveRecord`, `.find_by`, `.create!`, `.update!`. Only hit is a doc-comment in `pkm_decoder.rb`. Confirms decoder layer stays pure.
+
+---
+
+## Manual smoke checks
+
+`bin/dev` not started (no real SRAM blob in this worktree to feed the auto-tracker). The view's render path is covered by the existing dashboard tests that exercise `_pc_box_content.html.erb`; a Step-17 row continues to render with no `<details>` block, and a synthesized Step-18 row would render the OFF-FEED pill plus the STATS expandable. Reviewer's render-smoke pass is the right gate for the live UI.
+
+---
+
+Build complete. **Ready for Builder: NO** — over to Richard.
+
+---
+
+## Post-Review Fixes (2026-05-03)
+
+Richard's review landed; addressed Must Fix #1 and Nice-to-Have #4 inline (working
+tree only — uncommitted, awaiting Ava's re-verification call):
+
+- **Must Fix #1** — `app/services/soul_link/box_parser.rb:73`:
+  `STORAGE_CRC_RANGE_END` now points at `STORAGE_FOOTER_OFFSET` (0x121D0)
+  instead of `STORAGE_CRC_OFFSET` (0x121E2), so the storage-block CRC body
+  excludes the entire 20-byte footer per PKHeX
+  `SAV4.cs:113` (`Checksums.CRC16_CCITT(data[..^FooterSize])`) +
+  `SAV4Sinnoh.cs:12` (`FooterSize => 0x14`). Citation comment added inline
+  next to the constant. Synthetic builder in
+  `test/services/soul_link/box_parser_test.rb` recomputes against the new
+  range automatically — all 14 BoxParser tests stay green.
+- **Nice-to-Have #4** — `app/views/dashboard/_pc_box_content.html.erb:71`:
+  `PP <pp>/<pp_up>` → `PP <pp> · ↑<pp_up>` so PP-Ups consumed (0..3) reads as
+  a separate counter, not a denominator.
+
+Re-verification:
+- `PARALLEL_WORKERS=10 mise exec -- ruby -S bundle exec rails test --seed 300`:
+  596 runs, 1906 assertions, 0 failures, 0 errors, 0 skips.
+- `mise exec -- ruby -S bundle exec rubocop`: 184 files inspected, no offenses.
+
+DONE — fixes applied, ready for re-review.
