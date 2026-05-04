@@ -232,5 +232,74 @@ class SoulLinkEmulatorSaveSlotTest < ActiveSupport::TestCase
     # The YOU-marker Stimulus controller (Step 10) selects on this
     # attribute. Guard against the partial accidentally dropping it.
     assert_includes rendered, "data-discord-user-id="
+
+    # Step 21 R3 — locked structural assertions. Wrapper class moved
+    # from gb-card to roster-card; 3-tile stat strip; <details>STATS
+    # collapse; click-to-copy seed via roster-seed controller.
+    assert_includes rendered, 'class="roster-card"'
+    assert_includes rendered, 'class="stats"'
+    assert_equal 3, rendered.scan(/class="stat"/).size,
+      "expected exactly 3 stat tiles (BADGES / DEX / PLAY)"
+    assert_includes rendered, "<details>"
+    assert_includes rendered, "<summary>STATS</summary>"
+    assert_includes rendered, 'data-controller="roster-seed"'
+  end
+
+  test "run_sidebar_card renders HOF inline pill inside the name span when parsed_hof_count >= 1" do
+    create(:soul_link_emulator_save_slot, :filled,
+           soul_link_emulator_session: @session,
+           slot_number: 1,
+           parsed_hof_count: 1)
+    @session.update_column(:active_save_slot, 1)
+    rendered = ApplicationController.render(partial: "emulator/run_sidebar_card", locals: { s: @session.reload })
+
+    assert_includes rendered, 'class="hof-pill"'
+    # The HOF pill must live INSIDE the .name span (not a peer block).
+    # Match the substring that places the hof-pill between the name
+    # text and the closing </span>.
+    assert_match(%r{<span class="name roster-card-name">[^<]*<span class="hof-pill">[^<]*HOF[^<]*</span>\s*</span>}m, rendered)
+  end
+
+  test "run_sidebar_card renders no HOF pill when parsed_hof_count is zero or nil" do
+    create(:soul_link_emulator_save_slot, :filled,
+           soul_link_emulator_session: @session,
+           slot_number: 1,
+           parsed_hof_count: 0)
+    @session.update_column(:active_save_slot, 1)
+    rendered = ApplicationController.render(partial: "emulator/run_sidebar_card", locals: { s: @session.reload })
+    assert_no_match(/class="hof-pill"/, rendered)
+  end
+
+  test "run_sidebar_card renders the conflict-warning band when the session is in a TID conflict group" do
+    other = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: 999_888_777)
+    # Two slots with matching TID/SID across two sessions — exactly
+    # what tid_conflict_groups detects.
+    create(:soul_link_emulator_save_slot, :filled,
+           soul_link_emulator_session: @session,
+           slot_number: 1,
+           parsed_trainer_id: 12345,
+           parsed_secret_id: 4321)
+    create(:soul_link_emulator_save_slot, :filled,
+           soul_link_emulator_session: other,
+           slot_number: 1,
+           parsed_trainer_id: 12345,
+           parsed_secret_id: 4321)
+    @session.update_column(:active_save_slot, 1)
+    other.update_column(:active_save_slot, 1)
+
+    rendered = ApplicationController.render(partial: "emulator/run_sidebar_card", locals: { s: @session.reload })
+    assert_includes rendered, 'class="conflict-warning"'
+    assert_includes rendered, "re-roll the seed"
+  end
+
+  test "run_sidebar_card omits the conflict-warning band when there is no TID conflict" do
+    create(:soul_link_emulator_save_slot, :filled,
+           soul_link_emulator_session: @session,
+           slot_number: 1,
+           parsed_trainer_id: 12345,
+           parsed_secret_id: 4321)
+    @session.update_column(:active_save_slot, 1)
+    rendered = ApplicationController.render(partial: "emulator/run_sidebar_card", locals: { s: @session.reload })
+    assert_no_match(/class="conflict-warning"/, rendered)
   end
 end

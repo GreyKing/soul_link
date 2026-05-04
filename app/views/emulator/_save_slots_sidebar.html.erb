@@ -1,9 +1,15 @@
-<%# Save slots sidebar — left column on /emulator. Renders the player's
-    own 5 save slots (1..5). Filled slots show parsed in-game metadata plus
-    per-slot actions (Download, Make Active, Delete). Empty slots show
-    "Empty". When all 5 are full and the user clicks "Save File" in the
-    emulator UI, the page enters overwrite-pending mode and each card
-    becomes a click-target that overwrites that slot.
+<%# Save slots sidebar — left column on /emulator. Step 21 R3 redesign.
+    Renders the player's own 5 save slots (1..5). Every slot shows a
+    state pill (EMPTY/SAVED/ACTIVE/TARGET/CONFIRM). Filled slots show
+    parsed in-game metadata + per-slot actions (DOWNLOAD, MAKE ACTIVE,
+    DELETE). DELETE and CLEAR ALL SLOTS use inline confirmation
+    (no modal); the inline `.confirm-inline` block is rendered hidden
+    server-side and revealed by save_slots_controller.js.
+
+    Overwrite-pending mode: when all 5 slots are full and the user
+    clicks "Save File" in the emulator UI, the column enters TARGET
+    mode — sticky banner appears at top, every filled slot becomes a
+    click-target with the amber TARGET pill. Cancel via the banner.
 
     `@save_slots` is preloaded by EmulatorController#show in slot_number
     order. `@session.active_save_slot` (or nil) is the active pointer;
@@ -16,178 +22,150 @@
      data-save-slots-csrf-value="<%= form_authenticity_token %>"
      data-save-slots-active-value="<%= @session.active_save_slot.to_s %>">
 
-  <div class="gb-card" style="padding: 8px 10px; margin-bottom: 8px;">
-    <div style="font-size: 11px; color: var(--d1); letter-spacing: 0.1em;">SAVE SLOTS</div>
-  </div>
+  <h2 style="font-family: 'Press Start 2P', monospace; font-size: 11px; color: var(--white); margin: 0 0 10px; letter-spacing: 1px;">SAVE SLOTS</h2>
 
-  <%# Banner — shown only when overwrite-pending mode is active (set by the
-      Stimulus controller after a 409 response). data-save-slots-target=
-      "banner" + the `hidden` class flip is the only behavior here. %>
-  <div data-save-slots-target="banner"
-       hidden
-       class="gb-card"
-       style="padding: 8px 10px; margin-bottom: 8px; background: #4a3a1c; color: #e8d6a0; border: 2px solid #6b5a2c;">
-    <div style="font-size: 10px; line-height: 1.4;">
-      All slots full. Click a slot below to overwrite it with the save you just made.
-    </div>
+  <%# Pending banner — revealed by save_slots_controller.js when the
+      column enters overwrite-pending mode (after a 409 response). The
+      CANCEL button exits the mode without writing anything. %>
+  <div data-save-slots-target="banner" hidden class="pending-banner">
+    <span class="icon">⚠</span>
+    SAVE FULL — PICK A SLOT TO OVERWRITE
+    <button type="button" data-action="click->save-slots#cancelOverwrite">CANCEL</button>
   </div>
 
   <% (SoulLinkEmulatorSaveSlot::MIN_SLOT..SoulLinkEmulatorSaveSlot::MAX_SLOT).each do |n| %>
     <% slot = slots_by_number[n] %>
     <% is_active = @session.active_save_slot == n %>
-    <% saved_bytes = slot&.read_attribute_before_type_cast("save_data")&.bytesize %>
+    <% pill_class = if slot.nil?
+                     "empty"
+                   elsif is_active
+                     "active"
+                   else
+                     "saved"
+                   end %>
+    <% pill_text = pill_class.upcase %>
 
-    <div class="gb-card"
+    <div class="slot<%= ' active' if is_active %><%= ' empty' if slot.nil? %>"
          data-save-slots-target="slot"
          data-slot-number="<%= n %>"
-         data-filled="<%= !slot.nil? %>"
-         style="padding: 10px; margin-bottom: 8px; position: relative;<%= ' border-width: 4px;' if is_active %>">
+         data-filled="<%= !slot.nil? %>">
 
-      <%# Click overlay — only visible in overwrite-pending mode. The
-          Stimulus controller toggles `hidden` on this element. Clicking
-          triggers the overwrite PATCH for this slot. %>
-      <button type="button"
-              data-save-slots-target="overwriteOverlay"
-              data-action="click->save-slots#overwriteSlot"
-              data-slot-number="<%= n %>"
-              hidden
-              class="type-text"
-              style="position: absolute; inset: 0; width: 100%; height: 100%; background: rgba(74, 58, 28, 0.85); color: #e8d6a0; border: 2px solid #6b5a2c; font-size: 11px; letter-spacing: 0.05em; cursor: pointer; z-index: 5;">
-        CLICK TO OVERWRITE SLOT <%= n %>
-      </button>
-
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 6px;">
-        <div style="font-size: 12px; color: var(--d1);">
-          SLOT <%= n %>
-        </div>
-        <% if is_active %>
-          <span class="type-text" style="border-color: var(--d1); background: var(--d1); color: var(--l2); font-size: 9px;">ACTIVE</span>
-        <% end %>
+      <div class="slot-head">
+        <span class="slot-num">SLOT <%= n %></span>
+        <span class="state-pill <%= pill_class %>" data-save-slots-target="slotPill"><%= pill_text %></span>
       </div>
 
       <% if slot.nil? %>
-        <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">Empty</div>
+        <div class="slot-meta">— drop a save here from the emulator —</div>
       <% else %>
-        <% if slot.parsed_trainer_name.present? %>
-          <div style="font-size: 11px; color: var(--d1); margin-bottom: 2px;">
-            <%= slot.parsed_trainer_name %>
-          </div>
-        <% end %>
+        <div class="slot-meta">
+          <% if slot.parsed_trainer_name.present? %>
+            <strong><%= slot.parsed_trainer_name %></strong>
+          <% end %>
 
-        <% if slot.parsed_play_seconds %>
-          <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-            Time: <%= format_play_time(slot.parsed_play_seconds) %>
-          </div>
-        <% end %>
+          <% play_present = slot.parsed_play_seconds.present? %>
+          <% badges_present = slot.parsed_trainer_name.present? %>
+          <% if play_present || badges_present %>
+            <div class="row">
+              <% if play_present %>
+                <span class="lbl">PLAY</span> <span class="val"><%= format_play_time(slot.parsed_play_seconds) %></span>
+              <% end %>
+              <% if badges_present %>
+                <span class="lbl">BADGES</span> <span class="val"><%= slot.parsed_badges.to_i %> / 8</span>
+              <% end %>
+            </div>
+          <% end %>
 
-        <% if slot.parsed_money %>
-          <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-            Money: &#8369;<%= number_with_delimiter(slot.parsed_money) %>
-          </div>
-        <% end %>
+          <% if slot.parsed_map_id %>
+            <div class="row">
+              <span class="lbl">MAP</span> <span class="val"><%= format_map_name(slot.parsed_map_id) %></span>
+            </div>
+          <% end %>
 
-        <% if slot.parsed_map_id %>
-          <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-            Map: <%= format_map_name(slot.parsed_map_id) %>
-          </div>
-        <% end %>
+          <% if slot.parsed_pokedex_caught || slot.parsed_pokedex_seen %>
+            <div class="row">
+              <span class="lbl">DEX</span>
+              <span class="val"><%= slot.parsed_pokedex_caught || 0 %> caught · <%= slot.parsed_pokedex_seen || 0 %> seen</span>
+            </div>
+          <% end %>
 
-        <% if slot.parsed_trainer_name.present? %>
-          <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-            Badges: <%= slot.parsed_badges %> / 8
-          </div>
-        <% end %>
+          <%# Step 16: TID/SID — same render rule as the run-roster card.
+              No conflict pill on the player's own slots. %>
+          <% if slot.parsed_trainer_id.to_i.positive? %>
+            <div class="row">
+              <span class="lbl">TID/SID</span>
+              <span class="val"><%= slot.parsed_trainer_id %> / <%= slot.parsed_secret_id %></span>
+            </div>
+          <% end %>
+        </div>
 
-        <%# Step 16: TID/SID — same render rules as the run-roster card.
-            Skip the TID conflict pill here — the player's own slots
-            can't conflict with themselves. %>
-        <% if slot.parsed_trainer_id.to_i.positive? %>
-          <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-            TID <%= slot.parsed_trainer_id %> / SID <%= slot.parsed_secret_id %>
-          </div>
-        <% end %>
-
-        <% if slot.parsed_pokedex_caught || slot.parsed_pokedex_seen %>
-          <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-            Pokédex <%= slot.parsed_pokedex_caught || 0 %> caught / <%= slot.parsed_pokedex_seen || 0 %> seen
-          </div>
-        <% end %>
-
+        <%# HOF pill — kept on the slot card per Ava's answer #4. Renders
+            after the body rows, before .slot-actions. %>
         <% if slot.parsed_hof_count.to_i >= 1 %>
-          <div style="margin-top: 4px;">
-            <span class="type-text" style="border-color: var(--amber); background: var(--amber); color: var(--d1); font-size: 9px;">🏆 HALL OF FAME</span>
+          <div style="margin-top: 6px;">
+            <span class="hof-pill">🏆 HOF</span>
           </div>
         <% end %>
 
-        <% if saved_bytes && saved_bytes > 0 %>
-          <div style="font-size: 9px; color: var(--d2); opacity: 0.7; line-height: 1.6;">
-            <%= number_to_human_size(saved_bytes) %> &middot; saved <%= time_ago_in_words(slot.updated_at) %> ago
-          </div>
-        <% end %>
-
-        <%# Per-slot actions. Download is a plain <a> (let the browser
-            handle attachment headers); Make Active and Delete are buttons
-            that the Stimulus controller intercepts. %>
-        <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;">
-          <a href="<%= download_emulator_save_slot_path(slot_number: n) %>"
-             class="type-text"
-             style="background: var(--l2); color: var(--d1); border: 2px solid var(--d1); font-size: 9px; letter-spacing: 0.05em; padding: 3px 6px; text-decoration: none; flex: 1; text-align: center;">
-            DOWNLOAD
-          </a>
+        <%# Per-slot action row. Hidden by save_slots_controller.js
+            during TARGET mode and during inline DELETE confirm. %>
+        <div class="slot-actions" data-save-slots-target="actionRow">
+          <a href="<%= download_emulator_save_slot_path(slot_number: n) %>">DOWNLOAD</a>
           <% unless is_active %>
             <button type="button"
+                    class="primary"
                     data-action="click->save-slots#makeActive"
-                    data-slot-number="<%= n %>"
-                    class="type-text"
-                    style="background: var(--l2); color: var(--d1); border: 2px solid var(--d1); font-size: 9px; letter-spacing: 0.05em; cursor: pointer; padding: 3px 6px; flex: 1;">
+                    data-slot-number="<%= n %>">
               MAKE ACTIVE
             </button>
           <% end %>
-          <%# Step 20 — confirm-modal gate. Trigger opens the modal; the
-              modal's confirm button carries the original save-slots#deleteSlot
-              action with the per-slot data-slot-number. %>
           <button type="button"
-                  data-action="click->confirm-modal#open"
-                  data-confirm-modal-id-param="delete-slot-<%= n %>-confirm"
-                  class="type-text"
-                  style="background: #4a1c1c; color: #e8a0a0; border: 2px solid #6b2c2c; font-size: 9px; letter-spacing: 0.05em; cursor: pointer; padding: 3px 6px; flex: 1;">
+                  class="danger"
+                  data-action="click->save-slots#confirmDelete"
+                  data-slot-number="<%= n %>">
             DELETE
           </button>
-          <%= confirm_modal(
-            id: "delete-slot-#{n}-confirm",
-            title: "DELETE THIS SLOT?",
-            body: "This permanently removes the save data for slot <strong>#{n}</strong>. <strong>The save file is gone after this — there is no undo.</strong>",
-            confirm_label: "DELETE FOREVER",
-            confirm_data: { action: "click->save-slots#deleteSlot", slot_number: n }
-          ) %>
+        </div>
+
+        <%# Inline DELETE confirm — rendered hidden, revealed by
+            save_slots_controller.js#confirmDelete. The DELETE FOREVER
+            button fires the existing save-slots#deleteSlot. %>
+        <div class="confirm-inline" hidden data-save-slots-target="confirmRow" data-slot-number="<%= n %>">
+          <div class="q">DELETE THIS SLOT?</div>
+          <div class="body"><%= format_progress_phrase(slot.parsed_play_seconds) %>. There's no undo — the save file is gone after this.</div>
+          <div class="actions">
+            <button type="button"
+                    data-action="click->save-slots#cancelDelete"
+                    data-slot-number="<%= n %>">CANCEL</button>
+            <button type="button"
+                    class="confirm"
+                    data-action="click->save-slots#deleteSlot"
+                    data-slot-number="<%= n %>">DELETE FOREVER</button>
+          </div>
         </div>
       <% end %>
     </div>
   <% end %>
 
-  <%# Clear-all button — wipes every slot. Lives at the bottom of the
-      column. Reuses the existing clear-save Stimulus controller, which
-      DELETEs /emulator/save_data (server now wipes all slots). %>
+  <%# CLEAR ALL SLOTS footer — wipes every slot via the existing
+      clear-save controller. Inline confirm: clicking the trigger
+      reveals a sibling confirm block; the confirm button fires
+      clear-save#clear. %>
   <% if @save_slots.any? %>
     <div data-controller="clear-save"
          data-clear-save-url-value="<%= save_data_emulator_path %>"
-         data-clear-save-csrf-value="<%= form_authenticity_token %>"
-         style="margin-top: 16px;">
-      <%# Step 20 — confirm-modal gate for CLEAR ALL SLOTS. %>
-      <button type="button"
-              data-action="click->confirm-modal#open"
-              data-confirm-modal-id-param="clear-all-slots-confirm"
-              class="type-text"
-              style="background: #4a1c1c; color: #e8a0a0; border: 2px solid #6b2c2c; font-size: 9px; letter-spacing: 0.05em; cursor: pointer; width: 100%; padding: 6px 8px;">
-        CLEAR ALL SLOTS
-      </button>
-      <%= confirm_modal(
-        id: "clear-all-slots-confirm",
-        title: "CLEAR EVERY SAVE?",
-        body: "This wipes <strong>all #{@save_slots.size} save slots</strong> at once. There is no undo for any of them.",
-        confirm_label: "CLEAR ALL SLOTS",
-        confirm_data: { action: "click->clear-save#clear" }
-      ) %>
+         data-clear-save-csrf-value="<%= form_authenticity_token %>">
+      <div class="footer-actions" data-save-slots-target="clearAllAction">
+        <button type="button" data-action="click->save-slots#confirmClearAll">CLEAR ALL SLOTS</button>
+      </div>
+      <div class="confirm-inline" hidden data-save-slots-target="clearAllConfirm">
+        <div class="q">CLEAR EVERY SAVE?</div>
+        <div class="body">This wipes all <%= @save_slots.size %> save slots at once. There is no undo for any of them.</div>
+        <div class="actions">
+          <button type="button" data-action="click->save-slots#cancelClearAll">CANCEL</button>
+          <button type="button" class="confirm" data-action="click->clear-save#clear">CLEAR ALL SLOTS</button>
+        </div>
+      </div>
     </div>
   <% end %>
 </div>

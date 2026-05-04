@@ -166,12 +166,94 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
   test "show renders ACTIVE badge on the slot matching active_save_slot" do
     sess = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
     create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: sess, slot_number: 2)
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: sess, slot_number: 3)
     sess.update!(active_save_slot: 2)
 
     login_as(GREY)
     get emulator_path
     assert_response :success
+    # Step 21 R3 — every slot has a state pill. The active slot pill is
+    # ACTIVE; other filled slots are SAVED; unfilled slots are EMPTY.
     assert_match(/>ACTIVE</, response.body)
+    assert_match(/>SAVED</, response.body)
+    assert_match(/>EMPTY</, response.body)
+  end
+
+  # --- show: Step 21 R3 save-slot redesign assertions --------------------
+
+  test "show renders the empty-slot CTA copy on unfilled slots" do
+    create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+    # Em-dash CTA copy on every empty slot — verbatim from the mockup.
+    assert_match(/drop a save here from the emulator/, response.body)
+  end
+
+  test "show renders inline DELETE confirm markup hidden per filled slot" do
+    sess = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: sess, slot_number: 1)
+
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+    # The DELETE trigger fires save-slots#confirmDelete (NOT confirm-modal#open).
+    # Hand-written ERB attribute values aren't auto-escaped, so the literal
+    # `>` survives. (Tag-helper-rendered modals like Step 20's escape it.)
+    assert_match(/data-action="click->save-slots#confirmDelete"/, response.body)
+    # The confirm-inline block exists in the response body, rendered hidden.
+    assert_match(/class="confirm-inline" hidden/, response.body)
+    # And carries the DELETE FOREVER label.
+    assert_match(/DELETE FOREVER/, response.body)
+  end
+
+  test "show renders inline CLEAR ALL SLOTS confirm markup hidden in the footer" do
+    sess = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: sess, slot_number: 1)
+
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+    # Trigger fires save-slots#confirmClearAll (NOT confirm-modal#open).
+    assert_match(/data-action="click->save-slots#confirmClearAll"/, response.body)
+    # And the inline confirm block is rendered with the clearAllConfirm target.
+    assert_match(/data-save-slots-target="clearAllConfirm"/, response.body)
+  end
+
+  test "show does NOT render the Step-20 confirm-modal partial for any save-slot DELETE or CLEAR ALL SLOTS" do
+    sess = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: sess, slot_number: 1)
+    create(:soul_link_emulator_save_slot, :filled, soul_link_emulator_session: sess, slot_number: 2)
+
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+    # Step 21 R3 — the per-slot DELETE modal ids (1..5) and the
+    # CLEAR ALL SLOTS modal id should NOT appear; the inline-confirm
+    # pattern replaced them.
+    (1..5).each do |n|
+      assert_no_match(/id="delete-slot-#{n}-confirm"/, response.body)
+    end
+    assert_no_match(/id="clear-all-slots-confirm"/, response.body)
+  end
+
+  test "show body never contains the peso glyph (Step 21 R3 dropped the money symbol)" do
+    sess = create(:soul_link_emulator_session, :ready, soul_link_run: @run, discord_user_id: GREY)
+    create(:soul_link_emulator_save_slot,
+           soul_link_emulator_session: sess,
+           slot_number: 1,
+           save_data: "EXISTING".b,
+           parsed_trainer_name: "Lyra",
+           parsed_money: 12_345,
+           parsed_at: Time.current)
+    sess.update!(active_save_slot: 1)
+
+    login_as(GREY)
+    get emulator_path
+    assert_response :success
+    # Mockup explicitly drops the Pokédollar glyph on both surfaces.
+    assert_no_match(/&#8369;/, response.body)
+    assert_no_match(/₱/, response.body)
   end
 
   # --- show: run roster sidebar ------------------------------------------
@@ -277,7 +359,8 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Lyra/, response.body)
     assert_match(/12,345/, response.body)
     assert_match(/5h 30m/, response.body)
-    assert_match(/Badges:\s*4\s*\/\s*8/, response.body)
+    # Step 21 R3 — badges live in a stat tile, no "/ 8" suffix.
+    assert_match(%r{<div class="lbl">BADGES</div>\s*<div class="val">4</div>}, response.body)
   end
 
   test "show roster omits parsed_* lines when no slot has parsed data" do
@@ -291,11 +374,12 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
 
     assert_match(/RUN ROSTER/, response.body)
-    assert_no_match(/In-game:/, response.body)
-    assert_no_match(/Time played:/, response.body)
-    assert_no_match(/Money:/, response.body)
-    # The slot column header "Money:" line lives only inside FILLED slot
-    # cards (gated on parsed_money). With all slots empty, nothing shows.
+    # Step 21 R3 — Trainer / Map / Money rows live inside <details>STATS
+    # and only render when the parsed_* field is present. With no parsed
+    # data, the inner rows collapse — assert their LABELS don't appear.
+    assert_no_match(/<span class="lbl">TRAINER<\/span>/, response.body)
+    assert_no_match(/<span class="lbl">MAP<\/span>/, response.body)
+    assert_no_match(/<span class="lbl">MONEY<\/span>/, response.body)
   end
 
   test "show roster shows '0 / 8' badges for a parsed other-player session with zero badges" do
@@ -320,7 +404,8 @@ class EmulatorControllerTest < ActionDispatch::IntegrationTest
 
     assert_match(/Bob/, response.body)
     assert_match(/0h 0m/, response.body)
-    assert_match(/Badges:\s*0\s*\/\s*8/, response.body)
+    # Step 21 R3 — badges live in a stat tile, no "/ 8" suffix.
+    assert_match(%r{<div class="lbl">BADGES</div>\s*<div class="val">0</div>}, response.body)
   end
 
   # --- show: cheats payload ----------------------------------------------

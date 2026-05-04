@@ -11,17 +11,31 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 20 — Phase 1 cross-cutting safety nets (post-audit). Five buckets bundled: gb-grid 520px media query · shared confirm_modal partial wired into 6 destructive sites · ARIA + focus trap on the 7 existing modals · gym-schedule cancel proposer-only (view + channel authz) · `<NEXT` literal cleanup. **Reviewed by Richard: 0 Must Fix, 0 Should Fix, 2 Nice-to-Have (unused `window.__confirmModals` registry + unreachable cancel-target fallback in `confirm_modal_controller.js`, both intentional defense-in-depth, no change).** Two new KGs (KG-31 mark-dead/reset-draft modals retain bespoke implementations; KG-32 confirm-modal global registry).
+**Active step:** Step 21 — R3 Save Slots redesign (Phase 2 R3 of the 2026-05-04 audit). Locked mockup `handoff/2026-05-04-ui-audit-mockup-save-slots.html`, 5 screens. Five buckets per Bob's plan + Ava's approved answers:
+- B-1 — three new tokens (`--d0`, `--green-glow`, `--crimson`) + `/* ── R3 Save Slots ── */` scoped CSS section in `pixeldex.css` (~245 lines added; mockup CSS verbatim except `.slot.overwriteTarget` → `.slot.overwrite-target` kebab-rename).
+- B-2 — `_save_slots_sidebar.html.erb` rewrite: state pills always render, empty-slot CTA copy, inline DELETE confirm, `.pending-banner` overwrite mode, `.footer-actions` CLEAR ALL with inline confirm. Two `confirm_modal(...)` calls dropped; HOF pill kept on slot card per Ava #4.
+- B-3 — `save_slots_controller.js` overhaul: new targets (`slotPill`/`actionRow`/`confirmRow`/`clearAllAction`/`clearAllConfirm`), new actions (`confirmDelete`/`cancelDelete`/`confirmClearAll`/`cancelClearAll`/`cancelOverwrite`), wrapper-level click target replaces overlay button, `window.confirm` removed from `overwriteSlot`, `_actionButtons()` selector retargeted at `confirmDelete` triggers.
+- B-4 — `_run_sidebar_card.html.erb` rewrite: `.head` row + 3-tile stat strip (BADGES/DEX/PLAY) + TID conflict warning band (with partner names from `tid_conflict_groups` lookup) + `<details>STATS` collapse + click-to-copy seed. Trainer / map / money / TID-SID / DEX-seen move inside `<details>`. Money symbol dropped. "Active … ago" + "Save: bytes" rows dropped (KG-34).
+- B-4b/c — `roster_you_marker_controller.js` updated to emit `.you` class + inject `.you-badge` into `.roster-card-name`. New `roster_seed_controller.js` (~25 lines) — click-to-copy with 1s revert. Both Stimulus controllers eager-loaded via existing `controllers/index.js`.
+- B-5 — new `format_progress_phrase(seconds)` helper in `EmulatorHelper` (locked rule: integer-hour truncation, no zero-pad, singular special-cases for 1 minute / 1 hour). 12 new tests across 4 test files, all green.
 
-**Test count:** 654 → **676** (+22). 0 failures, 0 errors. 2011 → 2095 assertions (+84).
-**Lint:** rubocop clean (191 → **197** files, 0 offenses).
-**Brakeman:** Clean (no new warnings; 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess unchanged from Steps 18/19).
+**Reviewed by Richard:** **0 Must Fix, 1 Should Fix (fixed inline), Step 21 clear.** Richard's `REVIEW-FEEDBACK.md` cleared the step. Should Fix: `_enterOverwriteMode` did not reconcile a slot whose inline DELETE confirm was already open — slot would show both "confirm delete?" row AND amber TARGET pill, and on exit the pill would restore to SAVED (not in-flight CONFIRM). Fixed inline at `save_slots_controller.js:178-181` by hiding the slot's `confirmRow` before the pill swap, with a 4-line WHY comment. Single-method change, no test changes needed (edge case not covered by markup tests). Two new KGs logged (KG-33 slot-card "saved Xm ago" + bytes dropped; KG-34 roster-card "Active … ago" + "Save: bytes" dropped) per Ava's answer #3.
+
+**Test count:** 676 → **697** (+21). 0 failures, 0 errors.
+**Lint:** rubocop clean (197 files, 0 offenses; +1 file: new `roster_seed_controller.js`).
+**Brakeman:** Clean (no new warnings; same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess unchanged from Steps 18/19/20).
 **Migrations:** None.
 
-**Shipped:** Step 20 committed at `fbd51af` on branch `claude/condescending-jones-2bf3c7`, FF-merged to `origin/main` and pushed.
-**Pending deploy:** Step 20 has zero migrations and zero new gem dependencies. Pure ERB/CSS/JS + new Stimulus controllers. Pre-deploy safe.
+**Shipped:** Step 20 (previous step) committed at `fbd51af` on branch `claude/condescending-jones-2bf3c7`, FF-merged to `origin/main` and pushed. Step 21 reviewed clear and ready to ship on `claude/agitated-matsumoto-d48881`; deploy gate approved by Project Owner 2026-05-04.
+**Pending deploy:** Step 21 has zero migrations and zero new gem dependencies. Pure ERB/CSS/JS + 1 new Stimulus controller. Pre-deploy safe.
 
-**Audit FF-merge prelude:** before Step 20, the 2026-05-04 UI/UX audit + 4 redesign mockups (`handoff/2026-05-04-ui-audit*.{md,html}`) plus the OFF-FEED `var(--d3)` inline fix landed on `origin/main` at `028643b` after a rebase off Step 19. Step 20 builds on that.
+**Audit FF-merge prelude:** before Step 20, the 2026-05-04 UI/UX audit + 4 redesign mockups (`handoff/2026-05-04-ui-audit*.{md,html}`) plus the OFF-FEED `var(--d3)` inline fix landed on `origin/main` at `028643b` after a rebase off Step 19. Step 20 built on that. Step 21 is the first Phase 2 redesign (R3 Save Slots) per § 5 of the audit (locked R3 → R2 → R4 → R1 ship order).
+
+**Step 21 highlights:**
+- Pill-class repurposing approved by Ava: `saved`/`target`/`confirm` carry the colour vocabulary on BOTH slots and roster cards. `ready` → saved, `pending`/`generating` → target, `failed` → confirm.
+- TID conflict band on the roster card lists partner names via inline lookup against `tid_conflict_groups` (max 3 `find_by` calls per render, fires only on the conflict path — Ava OK'd the N+1 trade).
+- `format_progress_phrase` rule locked in helper docstring + tested at all 5 boundaries (`60 → 1 minute`, `120 → 2 minutes`, `3600 → 1 hour`, `7200 → 2 hours`, `3h59m → 3 hours of progress`).
+- `.emulator-grid` shape test asserts `1fr` outside any media block AND `280px minmax(0, 1fr) 280px` at the existing 900px breakpoint — guards against accidental regression of Step 20's collapse behaviour.
 
 **Richard's verifications (notable, Step 20):**
 - All 7 existing modals + the new shared confirm-modal partial inspected end-to-end for ARIA shape (`role="dialog"`, `aria-modal="true"`, `aria-labelledby` pointing at a real `<span id="...">` matching the title). Coin-flip is intentionally ARIA-only (no close button, auto-dismisses, focus trap on a 1-2s animation would be friction).
@@ -43,6 +57,67 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 21 — R3 Save Slots redesign (Phase 2 R3 of the 2026-05-04 audit) — 2026-05-04
+**Status:** Built; awaiting Richard's review (`REVIEW-REQUEST.md` posted). **No KGs close** (Phase 2 redesigns are surface-level UX work, not backlog items). Two new KGs logged (KG-33, KG-34) per Ava's answer #3.
+
+First Phase 2 redesign per § 5 of `handoff/2026-05-04-ui-audit.md`. Five locked screens in `handoff/2026-05-04-ui-audit-mockup-save-slots.html`. Net-additive on tokens (+3) + scoped CSS (+~245 lines), full body rewrite of two view partials, JS-controller overhaul, helper extension, +21 tests. Architect-locked decisions are tracked under `## Architecture Decisions` below.
+
+**Architecture decisions (durable — see § Architecture Decisions):**
+- **Single colour vocabulary across slots and roster (Ava answer #1).** `state-pill.saved`/`target`/`confirm` apply on BOTH slot cards (semantic: SAVED file / TARGET overwrite / CONFIRM delete) AND roster cards (semantic: READY / PENDING-or-GENERATING / FAILED). Future divergence is a separate redesign step. No parallel `.ready/.pending/.failed` class set.
+- **`format_progress_phrase` rule (Ava answer #2 — locked in helper docstring).** Integer-hour truncation, no zero-pad, singular special-case for 1 minute / 1 hour. `60 → "1 minute of progress"`, `120 → "2 minutes of progress"`, `3540 → "59 minutes of progress"`, `3600 → "1 hour of progress"`, `7200 → "2 hours of progress"`, `3h59m → "3 hours of progress"`.
+- **HOF pill on slot card placement (Ava answer #4).** After the body rows, before `.slot-actions`. Mockup doesn't depict slot-card HOF, but the audit says "keep functionality, restyle only" — bottom-of-body is the next-best read since the slot card has no head HOF slot.
+- **Inline confirm replaces Step 20 modal for save-slot DELETE + CLEAR ALL SLOTS only.** Other Step 20 consumers (END RUN, group DEL, schedule cancel) keep using the shared `_confirm_modal.html.erb` partial untouched. The inline pattern is mockup-locked for the slot column; the shared partial is correct elsewhere.
+- **Whole-slot click target replaces the per-slot overlay button in overwrite-pending mode.** The slot wrapper picks up `data-action="click->save-slots#overwriteSlot"` only while in TARGET mode (controller-applied). The amber `.overwrite-target` border + amber `TARGET` pill carry the affordance. The sticky `.pending-banner` is the announcement; the click is the consent.
+- **`window.confirm` removed from `overwriteSlot`.** Last native confirm in the file. Banner + amber border + visible TARGET pill is the announcement; clicking a slot is the explicit consent. Step 20 already removed the native confirm from DELETE.
+- **Roster-card YOU markers: `.you` class on the wrapper + `.you-badge` span inside `.roster-card-name`.** The `roster_you_marker_controller.js` lifecycle is unchanged; only the selector and class names move. CSS owns the amber 4px border via `.roster-card.you`.
+- **TID conflict partner-name lookup is inline N+1 by design (Ava OK'd).** `s.soul_link_run.tid_conflict_groups` returns session ids; the partial maps each partner id → `SoulLinkEmulatorSession.find_by(id:)` → `discord_user_id` → `SoulLink::GameState.player_name(...)`. Max 3 lookups per render, only fires on the conflict path. Broadcast partial has no preload context; the trade-off is acceptable. If `tid_conflict_groups` matches but no usable partner labels surface, falls back to `⚠ TID CONFLICT · re-roll the seed`.
+- **Click-to-copy seed via a thin new Stimulus controller (`roster_seed_controller.js`).** ~25 lines. Reads `event.target.textContent`, strips the `Seed: ` prefix, writes to `navigator.clipboard.writeText`, swaps the element to `Copied!` for 1s. CSS owns the hover hint via `.roster-card .seed:hover::after`. Falls back to `window.alert("Could not copy seed — copy it manually.")` on browsers without secure-context clipboard access.
+- **Three new design tokens; no others.** `--d0: #0a1a0a` (slot bezel + action button bg + seed monospace bg), `--green-glow: #5fd45f` (ACTIVE pill bg + 4px active-slot border), `--crimson: #c75a5a` (CONFIRM pill + DELETE FOREVER bg + inline-confirm border). Mockup verbatim. The audit explicitly forbade more.
+
+**Test count:** 676 → 697 (+21). 0 failures, 0 errors.
+
+**Files (new):** 1 — `app/javascript/controllers/roster_seed_controller.js`.
+
+**Files (modified):** 7 —
+- `app/assets/stylesheets/pixeldex.css` (+~245 lines: 3 tokens in `:root` + new `/* ── R3 Save Slots ── */` section above the `RESPONSIVE` block).
+- `app/views/emulator/_save_slots_sidebar.html.erb` (full body rewrite per mockup; outer `data-controller="save-slots"` wrapper preserved).
+- `app/views/emulator/_run_sidebar_card.html.erb` (full body rewrite; `s`-only locals contract preserved per Step-9 lock).
+- `app/javascript/controllers/save_slots_controller.js` (new targets / new actions / removed `overwriteOverlay` target / removed `window.confirm` / `_actionButtons()` selector retargeted).
+- `app/javascript/controllers/roster_you_marker_controller.js` (`gb-card--current-user` → `you`; badge moves into `.roster-card-name` span; inline `style.cssText` dropped).
+- `app/helpers/emulator_helper.rb` (new `format_progress_phrase(seconds)` with locked-rule docstring).
+- `test/helpers/emulator_helper_test.rb`, `test/integration/responsive_grids_test.rb`, `test/controllers/emulator_controller_test.rb`, `test/models/soul_link_emulator_save_slot_test.rb` (extended; +21 tests).
+
+**Tests added (the 12 buckets in the brief, plus singular minute/hour pinning):**
+1. State pills always render (extended `show renders ACTIVE badge…`): asserts `>SAVED<`, `>EMPTY<`, `>ACTIVE<` all in the same render with one filled active + one filled saved + 3 empty.
+2. Empty-slot CTA copy: `drop a save here from the emulator` regex on `response.body`.
+3. Inline DELETE confirm markup: `data-action="click->save-slots#confirmDelete"` on the trigger (literal `>` because hand-written ERB attributes aren't auto-escaped); `class="confirm-inline" hidden` block in body; `DELETE FOREVER` substring.
+4. CLEAR ALL SLOTS inline confirm: `data-action="click->save-slots#confirmClearAll"` on the trigger + `data-save-slots-target="clearAllConfirm"` on the inline block.
+5. No `confirm_modal` for save-slot DELETE or CLEAR ALL SLOTS: `assert_no_match` for `id="delete-slot-N-confirm"` (1..5) and `id="clear-all-slots-confirm"`.
+6. No peso sign anywhere in the response body: `assert_no_match(/&#8369;/)` and `assert_no_match(/₱/)`.
+7. Roster-card structure: `class="roster-card"` + 3 `class="stat"` children + `<details>` + `<summary>STATS</summary>` + `data-controller="roster-seed"`. Existing seed-presence + `data-discord-user-id` assertions preserved.
+8. HOF inline pill: `class="hof-pill"` adjacent to player name (regex anchors the pill INSIDE the `.name` span).
+9. TID conflict warning band: when 2 sessions share TID/SID, the partial contains `class="conflict-warning"` + `re-roll the seed`. Conflict-absent path asserts the band is missing.
+10. `format_progress_phrase` matrix: `nil` / 0 / 30 / 59 / 60 / 120 / 1800 / 3540 / 3600 / 7199 / 7200 / 4h23m / 12h43m / 3h59m → all locked outputs.
+11. R3 styles do NOT collapse `.slot` or `.roster-card` content inside the existing 520px or 900px breakpoints; the three new tokens are declared exactly once in `:root`.
+12. `.emulator-grid` shape test: `grid-template-columns: 1fr;` outside any media block AND `280px minmax(0, 1fr) 280px;` at the 900px breakpoint.
+
+**Pre-existing roster regression assertions updated:** the two `show roster renders parsed_trainer_name…` and `show roster shows '0 / 8' badges…` tests were checking `Badges:\s*N\s*/\s*8` (Step-16 layout). Step 21 R3 places badges inside a stat tile (`<div class="lbl">BADGES</div><div class="val">N</div>`) with no `/8` suffix — both assertions retargeted at the new shape. The `omits parsed_* lines` test similarly retargeted at the new label markers (`<span class="lbl">TRAINER</span>` etc.) instead of the old "In-game:" / "Time played:" / "Money:" prefixes that no longer render.
+
+**Backward-compat invariants exercised:**
+- `_run_sidebar_card.html.erb` still renders standalone with only `s` local — broadcast contract preserved (existing Step-9 test still passes; new structural assertions added on top).
+- The page-level `data-controller="save-slots"` wrapper, `data-save-slots-slots-url-value`, `data-save-slots-csrf-value`, `data-save-slots-active-value` — unchanged.
+- DOWNLOAD URL, MAKE ACTIVE PATCH path, DELETE DELETE path — all unchanged. Only the markup + the gate that fires before DELETE/CLEAR-ALL changed.
+- Step 20 `_confirm_modal.html.erb` partial / helper / Stimulus controller — untouched. Other consumers (END RUN, group DEL, schedule cancel) still wire through it.
+- HOF pill functionality preserved on the slot card (restyled to `.hof-pill` per mockup); roster card now also surfaces it inline next to the name.
+
+**Diff scope:** 1 new JS file + 7 modified files (CSS + 2 views + 2 JS controllers + 1 helper + 4 test files extended). Inside the brief's stated scope.
+
+**KG closures logged:** none.
+
+**New Known Gaps logged this step:** see § Known Gaps below — KG-33 (slot card no longer shows "saved Xm ago" footer or byte count; mockup-driven, not a parser regression), KG-34 (roster card no longer shows "Active … ago" or "Save: bytes"; same shape).
+
+---
 
 ### Step 20 — Phase 1 cross-cutting safety nets (post-audit) — 2026-05-04
 **Status:** Shipped at `fbd51af`. **No KGs close** (the audit's Phase 1 was net-additive infrastructure, not a backlog item). Reviewed by Richard: 0 Must Fix, 0 Should Fix, 2 Nice-to-Have (unused `window.__confirmModals` registry + unreachable cancel-target fallback in `confirm_modal_controller.js`, both intentional defense-in-depth, accepted as-is).
@@ -1086,6 +1161,10 @@ ALL FACTORY SMOKE CHECKS PASSED
 - **`window.alert()` for Tier-A error toasts** (Step 9). Smallest user-facing change that closed the silent-failure gap; a styled toast component (matching the `gb-flash gb-flash-alert` palette) would be cleaner. Track if alerts feel intrusive in real use.
 - **Bot-process broadcasts not yet supported.** The async cable adapter is in-process; Discord modal updates (which run in the bot process via `rake soul_link:bot`) don't propagate to web clients in real time. Switching to a redis cable adapter would unlock this.
 - **Pre-existing soft points from `handoff/PROJECT-REVIEW-2026-04-30.md`** — 20 items, ranked by ROI in that document. Top-priority structural cleanups: (1) `discord_bot.rb` god-object decomposition; (2) zero test coverage on services/channels; (3) `SoulLinkRun.current(guild_id)` lacks a hard "one active per guild" invariant; (4) `DashboardController#show` needs presenter extraction; (5) `SoulLinkEmulatorSession::GzipCoder` should move to a concern. None of these are urgent — Tier-1 refactor work, fresh-session candidate.
+
+### New — From Step 21 (2026-05-04)
+- **KG-33: Slot card no longer shows "saved Xm ago" or byte count.** Step 21 R3's mockup omits the `time_ago_in_words` "saved … ago" footer + the `number_to_human_size` byte count from the per-slot card. Mockup-driven decision (Ava answer #3), not a parser regression — `slot.updated_at` and `save_data.bytesize` are still queried by the controller and persisted; they're just not rendered on the slot column. If anyone misses the time-since-last-save signal, surface again in a follow-up. Adjacent to KG-34.
+- **KG-34: Roster card no longer shows "Active … ago" or "Save: bytes".** Same shape as KG-33 — Step 21 R3 redesign drops both rows from the run-roster card. The `<details>STATS</details>` block now houses TRAINER / MAP / MONEY / TID-SID / DEX-SEEN; the time-since + bytes signals don't fit the new hierarchy. Mockup-driven, not a parser regression. Surface again if the Project Owner misses them.
 
 ### New — From Step 20 (2026-05-04)
 - **KG-31: Existing `_mark_dead_modal.html.erb` and `_reset_draft_modal.html.erb` retain their bespoke implementations.** Step 20 introduced a shared `_confirm_modal.html.erb` partial used by all 6 newly-gated destructive sites, but the two pre-existing destructive modals (Mark Dead and Reset Draft) keep their own templates because converting them would touch Step-19-shipped read-only guards and the gym-draft reset flow. Future cleanup can fold them onto the shared partial; cost-zero today.

@@ -38,4 +38,49 @@ class ResponsiveGridsTest < ActiveSupport::TestCase
     assert_no_match(/\.gb-grid-2\s*\{/, breakpoint_900, "gb-grid-2 should not be overridden in the 900px breakpoint")
     assert_no_match(/\.gb-grid-2\s*\{/, breakpoint_520, "gb-grid-2 should not be overridden in the 520px breakpoint")
   end
+
+  # ── Step 21 R3 — design-token + scoped-rule assertions ──────────────────
+
+  test "Step 21 R3 declares the three new tokens (--d0, --green-glow, --crimson) exactly once each in :root" do
+    assert_equal 1, @css.scan(/--d0:\s*#0a1a0a/).size, "expected --d0 declared exactly once"
+    assert_equal 1, @css.scan(/--green-glow:\s*#5fd45f/).size, "expected --green-glow declared exactly once"
+    assert_equal 1, @css.scan(/--crimson:\s*#c75a5a/).size, "expected --crimson declared exactly once"
+  end
+
+  test "Step 21 R3 styles do NOT collapse .slot or .roster-card content inside the 520px breakpoint" do
+    block = @css[/@media\s*\(max-width:\s*520px\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/m]
+    refute_nil block, "expected an `@media (max-width: 520px)` block"
+    # Mobile breakpoint must not redefine the slot or roster-card layout
+    # in a way that hides the body. Any `display: none` or
+    # grid-template-columns override on these selectors would break the
+    # mockup's mobile reflow contract (Screen 5 of the mockup).
+    assert_no_match(/\.slot\s*\{[^}]*display:\s*none/m, block)
+    assert_no_match(/\.roster-card\s*\{[^}]*display:\s*none/m, block)
+  end
+
+  test "Step 21 R3 styles do NOT collapse .slot or .roster-card content inside the 900px breakpoint" do
+    block = @css[/@media\s*\(max-width:\s*900px\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/m]
+    refute_nil block, "expected an `@media (max-width: 900px)` block"
+    assert_no_match(/\.slot\s*\{[^}]*display:\s*none/m, block)
+    assert_no_match(/\.roster-card\s*\{[^}]*display:\s*none/m, block)
+  end
+
+  test "emulator-grid stays single-column outside any media block AND three-column at 900px" do
+    # Single-column default (outside any @media). Strip every @media
+    # block before searching so we only match the top-level rule.
+    css_no_media = @css.gsub(/@media[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/m, "")
+    assert_match(
+      /\.emulator-grid\s*\{[^}]*grid-template-columns:\s*1fr;/m,
+      css_no_media,
+      "expected .emulator-grid declared single-column outside any media block"
+    )
+
+    block_900 = @css[/@media\s*\(min-width:\s*900px\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/m]
+    refute_nil block_900, "expected an `@media (min-width: 900px)` block"
+    assert_match(
+      /\.emulator-grid\s*\{\s*grid-template-columns:\s*280px\s+minmax\(0,\s*1fr\)\s+280px;/m,
+      block_900,
+      "expected .emulator-grid three-column rule at the 900px breakpoint"
+    )
+  end
 end

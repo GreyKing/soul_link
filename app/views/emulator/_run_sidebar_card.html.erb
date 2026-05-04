@@ -1,135 +1,117 @@
-<%# Single-session card for the run roster sidebar. Extracted from
-    `_run_sidebar.html.erb` so the SoulLinkEmulatorSaveSlot model can
-    re-render it via Turbo Stream broadcasts when parsed_* fields update.
+<%# Single-session card for the run roster sidebar. Step 21 R3 redesign.
+    Extracted from `_run_sidebar.html.erb` so the SoulLinkEmulatorSaveSlot
+    model can re-render it via Turbo Stream broadcasts when parsed_*
+    fields update.
 
     The partial takes a single local `s` (a SoulLinkEmulatorSession). It
     intentionally does NOT reference `current_user_id`, `@run_sessions`,
     or any other ivar — the broadcast renderer has no controller context.
-    The YOU badge / 4px-border are rendered in the parent loop instead,
-    so they survive across stream replacements (acceptable Known Gap:
-    on a fresh broadcast, the YOU badge and 4px border momentarily
-    disappear until the parent loop re-runs on next page load. See
-    BUILD-LOG Known Gaps). %>
+    The YOU badge / 4px-border are applied client-side by
+    roster_you_marker_controller.js (which adds `.you` to the wrapper
+    and injects a `.you-badge` span inside `.roster-card-name`). Same
+    Known Gap as before: on a fresh broadcast, the YOU markers
+    momentarily disappear until the controller re-runs.
+
+    Step 21 R3 changes vs Step 16/17/18 layout:
+    - Single `.head` row (name + state pill).
+    - Three-tile stat strip: BADGES / DEX / PLAY.
+    - TID conflict surfaces as a `.conflict-warning` band, not a pill.
+    - Trainer / map / money / TID-SID / DEX-seen move inside <details>STATS.
+    - Money symbol removed (no universal Pokédollar glyph).
+    - Seed becomes click-to-copy via roster_seed_controller.js.
+    - Active-ago + bytes rows dropped (logged as KG-34). %>
 
 <% active_slot = s.active_save_slot ? s.save_slots.find { |sl| sl.slot_number == s.active_save_slot } : nil %>
-<% saved_bytes = active_slot&.read_attribute_before_type_cast("save_data")&.bytesize %>
 <% player_label = if s.discord_user_id
                    SoulLink::GameState.player_name(s.discord_user_id).presence || s.discord_user_id.to_s
                  else
                    "Unclaimed"
                  end %>
-<% status_style = case s.status
-                  when "ready"
-                    "background: var(--d1); color: var(--l2); border: 2px solid var(--d1);"
-                  when "pending", "generating"
-                    "background: var(--amber); color: var(--d1); border: 2px solid var(--d1);"
-                  when "failed"
-                    "background: #4a1c1c; color: #e8a0a0; border: 2px solid #6b2c2c;"
-                  else
-                    "background: var(--l2); color: var(--d1); border: 2px solid var(--d2);"
-                  end %>
+<% status_pill_class = case s.status
+                      when "ready"                  then "saved"
+                      when "pending", "generating"  then "target"
+                      when "failed"                 then "confirm"
+                      else                                "saved"
+                      end %>
 
-<%# data-discord-user-id is read by roster_you_marker_controller.js to
-    decorate the card matching the viewer's current_user_id with the YOU
-    badge + 4px border. nil sessions render the attribute as empty
-    string — matches no user, harmless. %>
-<div class="gb-card" style="padding: 10px; margin-bottom: 8px;"
-     data-discord-user-id="<%= s.discord_user_id %>">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 6px;">
-    <div style="font-size: 12px; color: var(--d1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-      <%= player_label %>
-    </div>
-  </div>
+<%# TID conflict — surface partner names when the lookup yields any
+    real labels; otherwise fall back to a bare warning. %>
+<% conflict_groups = s.soul_link_run.tid_conflict_groups %>
+<% my_group = conflict_groups.find { |group| group.include?(s.id) } %>
+<% partner_labels = if my_group.present?
+                     other_ids = my_group - [ s.id ]
+                     other_ids.filter_map do |id|
+                       other = SoulLinkEmulatorSession.find_by(id: id)
+                       next if other.nil? || other.discord_user_id.nil?
+                       SoulLink::GameState.player_name(other.discord_user_id).presence
+                     end
+                   else
+                     []
+                   end %>
+<% has_conflict = my_group.present? %>
 
-  <div style="margin-bottom: 6px;">
-    <span class="type-text" style="<%= status_style %> font-size: 9px; letter-spacing: 0.05em;">
-      <%= s.status.upcase %>
+<div class="roster-card" data-discord-user-id="<%= s.discord_user_id %>">
+  <div class="head">
+    <span class="name roster-card-name">
+      <%= player_label %><% if active_slot&.parsed_hof_count.to_i >= 1 %><span class="hof-pill">🏆 HOF</span><% end %>
     </span>
+    <span class="state-pill <%= status_pill_class %>"><%= s.status.upcase %></span>
   </div>
 
-  <% if saved_bytes && saved_bytes > 0 %>
-    <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-      Active <%= time_ago_in_words(active_slot.updated_at) %> ago
+  <div class="stats">
+    <div class="stat">
+      <div class="lbl">BADGES</div>
+      <div class="val"><%= active_slot&.parsed_badges.nil? ? "—" : active_slot.parsed_badges %></div>
     </div>
-    <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-      Save: <%= number_to_human_size(saved_bytes) %>
+    <div class="stat">
+      <div class="lbl">DEX</div>
+      <div class="val"><%= active_slot&.parsed_pokedex_caught.nil? ? "—" : active_slot.parsed_pokedex_caught %></div>
     </div>
-  <% else %>
-    <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">Not started</div>
-    <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">Save: &mdash;</div>
-  <% end %>
-
-  <%# Parsed in-game info — render unconditionally on the broadcast partial.
-      The parent loop in _run_sidebar.html.erb is responsible for hiding
-      these fields on the YOU card (see is_you gating outside the frame). %>
-  <% if active_slot&.parsed_trainer_name.present? %>
-    <div style="font-size: 11px; color: var(--d1); margin-top: 6px; margin-bottom: 2px;">
-      In-game: <%= active_slot.parsed_trainer_name %>
+    <div class="stat">
+      <div class="lbl">PLAY</div>
+      <div class="val"><%= format_play_time(active_slot&.parsed_play_seconds) %></div>
     </div>
-  <% end %>
-
-  <% if active_slot&.parsed_play_seconds %>
-    <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-      Time played: <%= format_play_time(active_slot.parsed_play_seconds) %>
-    </div>
-  <% end %>
-
-  <% if active_slot&.parsed_money %>
-    <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-      Money: &#8369;<%= number_with_delimiter(active_slot.parsed_money) %>
-    </div>
-  <% end %>
-
-  <% if active_slot&.parsed_map_id %>
-    <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-      Map: <%= format_map_name(active_slot.parsed_map_id) %>
-    </div>
-  <% end %>
-
-  <% if active_slot&.parsed_trainer_name.present? %>
-    <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-      Badges: <%= active_slot.parsed_badges %> / 8
-    </div>
-  <% end %>
-
-  <%# Step 16: TID/SID — surfaces save-mix-up risk. Only render when a
-      real (nonzero) TID has been parsed. %>
-  <% if active_slot&.parsed_trainer_id.to_i.positive? %>
-    <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-      TID <%= active_slot.parsed_trainer_id %> / SID <%= active_slot.parsed_secret_id %>
-    </div>
-  <% end %>
-
-  <%# Step 16: Pokédex caught/seen counts. Render when either side is
-      present (parser may surface 0 even on a fresh save, which is
-      meaningful). %>
-  <% if active_slot && (active_slot.parsed_pokedex_caught || active_slot.parsed_pokedex_seen) %>
-    <div style="font-size: 10px; color: var(--d2); line-height: 1.6;">
-      Pokédex <%= active_slot.parsed_pokedex_caught || 0 %> caught / <%= active_slot.parsed_pokedex_seen || 0 %> seen
-    </div>
-  <% end %>
-
-  <%# Step 16: Hall of Fame pill — fires when this player has reached
-      the Hall of Fame at least once. Run-completion is enforced when
-      ALL 4 players reach this state (HallOfFameCoordinator). %>
-  <% if active_slot&.parsed_hof_count.to_i >= 1 %>
-    <div style="margin-top: 4px;">
-      <span class="type-text" style="border-color: var(--amber); background: var(--amber); color: var(--d1); font-size: 9px;">🏆 HALL OF FAME</span>
-    </div>
-  <% end %>
-
-  <%# Step 16: TID conflict pill. Computed inline per-card render —
-      cheap because session.save_slots is includes()-loaded by the
-      run-roster controller. Don't extract to controller-level memo:
-      this partial is broadcast-rendered with no controller context. %>
-  <% conflict_session_ids = s.soul_link_run.tid_conflict_groups.flatten %>
-  <% if conflict_session_ids.include?(s.id) %>
-    <div style="margin-top: 4px;">
-      <span class="type-text" style="border-color: #6b5a2c; background: #4a3a1c; color: #e8d6a0; font-size: 9px;">⚠ TID CONFLICT</span>
-    </div>
-  <% end %>
-
-  <div style="font-size: 9px; color: var(--d2); opacity: 0.7; margin-top: 4px; word-break: break-all;">
-    Seed: <%= s.seed %>
   </div>
+
+  <% if has_conflict %>
+    <div class="conflict-warning">
+      <% if partner_labels.any? %>
+        ⚠ TID CONFLICT WITH <%= partner_labels.join(", ") %> · re-roll the seed
+      <% else %>
+        ⚠ TID CONFLICT · re-roll the seed
+      <% end %>
+    </div>
+  <% end %>
+
+  <details>
+    <summary>STATS</summary>
+    <div class="extra">
+      <% if active_slot&.parsed_trainer_name.present? %>
+        <div class="row"><span class="lbl">TRAINER</span><span><%= active_slot.parsed_trainer_name %></span></div>
+      <% end %>
+
+      <% if active_slot&.parsed_map_id %>
+        <div class="row"><span class="lbl">MAP</span><span><%= format_map_name(active_slot.parsed_map_id) %></span></div>
+      <% end %>
+
+      <% if active_slot&.parsed_money %>
+        <div class="row"><span class="lbl">MONEY</span><span><%= number_with_delimiter(active_slot.parsed_money) %></span></div>
+      <% end %>
+
+      <% if active_slot&.parsed_trainer_id.to_i.positive? %>
+        <div class="row"><span class="lbl">TID/SID</span><span><%= active_slot.parsed_trainer_id %>/<%= active_slot.parsed_secret_id %></span></div>
+      <% end %>
+
+      <% if active_slot&.parsed_pokedex_seen %>
+        <div class="row"><span class="lbl">DEX SEEN</span><span><%= active_slot.parsed_pokedex_seen %></span></div>
+      <% end %>
+
+      <%# Click-to-copy seed. roster_seed_controller.js handles the
+          clipboard write + the brief "Copied!" feedback. CSS owns the
+          hover hint. %>
+      <div class="seed"
+           data-controller="roster-seed"
+           data-action="click->roster-seed#copy">Seed: <%= s.seed %></div>
+    </div>
+  </details>
 </div>

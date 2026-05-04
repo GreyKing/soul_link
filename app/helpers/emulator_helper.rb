@@ -40,4 +40,32 @@ module EmulatorHelper
     return nil if n.zero?
     SoulLink::GameState.move_name(n).presence || "Move ##{n}"
   end
+
+  # Formats a "stake" phrase for the inline DELETE confirm body on
+  # the save-slot card (Step 21 R3). Communicates how much in-game
+  # progress the player is about to lose.
+  #
+  # Locked rule (architect-approved 2026-05-04):
+  #   - nil or seconds < 60        → "less than a minute of progress"
+  #   - 60 ≤ seconds < 120         → "1 minute of progress"      (singular)
+  #   - 120 ≤ seconds < 3600       → "N minutes of progress"     (N = seconds/60, integer div)
+  #   - 3600 ≤ seconds < 7200      → "1 hour of progress"        (singular)
+  #   - seconds ≥ 7200             → "N hours of progress"       (N = seconds/3600, integer div)
+  #
+  # Integer-division (truncating) on the hour figure keeps the phrase
+  # honest about "at least N hours" — 3h59m says "3 hours of progress",
+  # not "4 hours of progress". No zero-padding.
+  def format_progress_phrase(seconds)
+    s = seconds.to_i
+    return "less than a minute of progress" if seconds.nil? || s < 60
+    if s < 3600
+      minutes = s / 60
+      return "1 minute of progress" if minutes == 1
+      "#{minutes} minutes of progress"
+    else
+      hours = s / 3600
+      return "1 hour of progress" if hours == 1
+      "#{hours} hours of progress"
+    end
+  end
 end

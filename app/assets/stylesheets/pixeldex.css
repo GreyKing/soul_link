@@ -9,6 +9,12 @@
   --l2: #9aae7a;
   --white: #c0d0a0;
   --amber: #d4b14a;
+  /* Step 21 R3 — slot inner bezel / action-button bg / seed monospace bg. */
+  --d0: #0a1a0a;
+  /* Step 21 R3 — ACTIVE state pill bg + active-slot 4px border. */
+  --green-glow: #5fd45f;
+  /* Step 21 R3 — CONFIRM state pill + DELETE FOREVER bg + inline-confirm border. */
+  --crimson: #c75a5a;
   --border: 3px solid var(--d1);
   --border-thin: 2px solid var(--d1);
   --border-double: 4px double var(--d1);
@@ -1034,6 +1040,244 @@ body::after {
   0% { background: var(--d1); }
   15% { background: var(--l2); }
   100% { background: var(--l2); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ── R3 Save Slots ──
+   Step 21 — emulator left sidebar redesign + roster-card restyle.
+   Mockup: handoff/2026-05-04-ui-audit-mockup-save-slots.html.
+   Mockup CSS copied verbatim except `.slot.overwriteTarget` is renamed
+   `.slot.overwrite-target` (kebab-case, project convention).
+   ═══════════════════════════════════════════════════════════ */
+
+/* Banner that announces overwrite-pending mode. */
+.pending-banner {
+  background: var(--amber); color: var(--d0);
+  border: 2px solid var(--d0);
+  padding: 8px 10px; margin-bottom: 10px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px; line-height: 1.5;
+  display: flex; align-items: center; gap: 8px;
+}
+.pending-banner .icon {
+  font-size: 14px; line-height: 1;
+}
+.pending-banner button {
+  margin-left: auto;
+  background: var(--d0); color: var(--amber);
+  border: 1px solid var(--d0);
+  padding: 3px 6px; cursor: pointer;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px; letter-spacing: 1px;
+}
+
+/* A single slot card. */
+.slot {
+  background: var(--d1);
+  border: var(--border-thin);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  position: relative;
+}
+.slot.active { border: 4px solid var(--green-glow); padding: 8px 10px; }
+.slot.overwrite-target { border-color: var(--amber); cursor: pointer; }
+.slot.empty .slot-meta { color: var(--d2); }
+
+.slot-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.slot-num {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px; color: var(--l2);
+  letter-spacing: 1px;
+}
+
+/* State pills — used on slot cards AND on roster cards. */
+.state-pill {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  padding: 2px 5px;
+  letter-spacing: 1px;
+  border: 1px solid;
+}
+.state-pill.empty { color: var(--d2); border-color: var(--d2); }
+.state-pill.saved { color: var(--l2); border-color: var(--l2); background: var(--d2); }
+.state-pill.active { color: var(--d0); border-color: var(--green-glow); background: var(--green-glow); }
+.state-pill.target { color: var(--d0); border-color: var(--amber); background: var(--amber); }
+.state-pill.confirm { color: var(--white); border-color: var(--crimson); background: var(--crimson); }
+
+.slot-meta { color: var(--l1); font-size: 14px; line-height: 1.5; }
+.slot-meta .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.slot-meta .row .lbl { color: var(--d2); font-size: 11px; font-family: 'Press Start 2P', monospace; letter-spacing: 0.5px; }
+.slot-meta .row .val { color: var(--white); }
+.slot-meta strong { color: var(--white); font-size: 16px; }
+
+.slot-actions {
+  display: flex; gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--d2);
+}
+.slot-actions button,
+.slot-actions a {
+  flex: 1;
+  background: var(--d2); color: var(--l2);
+  border: 1px solid var(--d0);
+  padding: 6px 8px; cursor: pointer;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px; letter-spacing: 1px;
+  text-decoration: none; text-align: center;
+  display: inline-block;
+}
+.slot-actions button:hover,
+.slot-actions a:hover { background: var(--d0); color: var(--white); }
+.slot-actions button.primary { background: var(--green-glow); color: var(--d0); }
+.slot-actions button.danger { color: var(--crimson); }
+.slot-actions button.danger:hover { background: var(--crimson); color: var(--white); }
+.slot-actions button.confirm { background: var(--crimson); color: var(--white); }
+
+/* Inline confirmation row (DELETE / CLEAR ALL SLOTS). Rendered hidden
+   by default; revealed by save_slots_controller.js. */
+.confirm-inline {
+  background: var(--d0); color: var(--white);
+  border: 2px solid var(--crimson);
+  padding: 10px;
+  margin-top: 10px;
+}
+.confirm-inline .q {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px; color: var(--crimson);
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+.confirm-inline .body {
+  font-size: 14px; color: var(--l1);
+  margin-bottom: 8px;
+}
+.confirm-inline .actions { display: flex; gap: 6px; }
+.confirm-inline .actions button {
+  flex: 1;
+  background: var(--d2); color: var(--l2);
+  border: 1px solid var(--d0);
+  padding: 6px 8px; cursor: pointer;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px; letter-spacing: 1px;
+}
+.confirm-inline .actions button.confirm {
+  background: var(--crimson); color: var(--white);
+}
+
+.footer-actions {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--d2);
+}
+.footer-actions button {
+  width: 100%;
+  background: transparent; color: var(--crimson);
+  border: 1px dashed var(--crimson);
+  padding: 8px 10px; cursor: pointer;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px; letter-spacing: 1px;
+}
+.footer-actions button:hover { background: var(--crimson); color: var(--white); border-style: solid; }
+
+/* Roster card redesign. */
+.roster-card {
+  background: var(--d1);
+  border: var(--border-thin);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.roster-card.you { border: 4px solid var(--amber); padding: 10px 12px; }
+.roster-card .head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.roster-card .name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px; color: var(--white);
+  letter-spacing: 1px;
+}
+.roster-card .name .you-badge {
+  background: var(--amber); color: var(--d0);
+  font-size: 7px; padding: 2px 4px; margin-left: 6px;
+  letter-spacing: 1px;
+}
+.roster-card .stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.roster-card .stat {
+  background: var(--d0);
+  border: 1px solid var(--d2);
+  padding: 6px;
+  text-align: center;
+}
+.roster-card .stat .lbl {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px; color: var(--l1);
+  letter-spacing: 1px; margin-bottom: 2px;
+}
+.roster-card .stat .val {
+  color: var(--white); font-size: 16px;
+}
+.roster-card details {
+  margin-top: 6px;
+  border-top: 1px dashed var(--d2); padding-top: 6px;
+}
+.roster-card summary {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px; color: var(--l2);
+  letter-spacing: 1px; cursor: pointer;
+  list-style: none; user-select: none;
+}
+.roster-card summary::after { content: "  ▾"; color: var(--d2); }
+.roster-card details[open] summary::after { content: "  ▴"; }
+.roster-card .extra { color: var(--l1); font-size: 14px; margin-top: 6px; }
+.roster-card .extra .row { display: flex; justify-content: space-between; }
+.roster-card .extra .row .lbl { font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--d2); letter-spacing: 0.5px; }
+.roster-card .seed {
+  font-family: monospace;
+  font-size: 11px; color: var(--d2);
+  background: var(--d0);
+  border: 1px solid var(--d2);
+  padding: 4px 6px;
+  margin-top: 6px;
+  word-break: break-all;
+  cursor: copy;
+  position: relative;
+}
+.roster-card .seed:hover { color: var(--l1); }
+.roster-card .seed::after {
+  content: "click to copy"; position: absolute;
+  right: 6px; top: 50%; transform: translateY(-50%);
+  background: var(--d0); color: var(--amber);
+  font-family: 'Press Start 2P', monospace; font-size: 7px;
+  padding: 2px 4px;
+  opacity: 0; transition: opacity 0.15s;
+}
+.roster-card .seed:hover::after { opacity: 1; }
+
+.conflict-warning {
+  background: #4a3a1c; color: var(--amber);
+  border: 1px solid var(--amber);
+  padding: 6px 8px;
+  margin-top: 6px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px; line-height: 1.5;
+  letter-spacing: 0.5px;
+}
+
+.hof-pill {
+  display: inline-block;
+  background: var(--amber); color: var(--d0);
+  font-family: 'Press Start 2P', monospace; font-size: 7px;
+  padding: 2px 5px; letter-spacing: 1px;
+  margin-left: 4px;
 }
 
 /* ═══════════════════════════════════════════════════════════
