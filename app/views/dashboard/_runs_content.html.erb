@@ -80,10 +80,19 @@
           <% if active_run && active_run.id != @run.id %>
             <a href="/?run_id=<%= active_run.id %>" class="gb-btn gb-btn-sm" style="text-decoration: none;">VIEW</a>
           <% end %>
-          <button data-action="click->run-management#endRun"
+          <%# Step 20 — confirm-modal gate for destructive END RUN. %>
+          <button data-action="click->confirm-modal#open"
+                  data-confirm-modal-id-param="end-run-dashboard-confirm"
                   class="gb-btn-danger gb-btn-sm">
             END RUN
           </button>
+          <%= confirm_modal(
+            id: "end-run-dashboard-confirm",
+            title: "END THIS RUN?",
+            body: "This archives the current run and stops Soul Link tracking. <strong>Runs cannot be un-ended through the UI.</strong>",
+            confirm_label: "END RUN",
+            confirm_data: { action: "click->run-management#endRun" }
+          ) %>
           <button data-action="click->run-management#setupDiscord"
                   data-run-management-target="setupDiscordButton"
                   class="gb-btn-primary gb-btn-sm <%= 'hidden' if active_run&.discord_channels_configured? %>">

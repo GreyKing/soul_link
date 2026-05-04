@@ -143,13 +143,23 @@
               MAKE ACTIVE
             </button>
           <% end %>
+          <%# Step 20 — confirm-modal gate. Trigger opens the modal; the
+              modal's confirm button carries the original save-slots#deleteSlot
+              action with the per-slot data-slot-number. %>
           <button type="button"
-                  data-action="click->save-slots#deleteSlot"
-                  data-slot-number="<%= n %>"
+                  data-action="click->confirm-modal#open"
+                  data-confirm-modal-id-param="delete-slot-<%= n %>-confirm"
                   class="type-text"
                   style="background: #4a1c1c; color: #e8a0a0; border: 2px solid #6b2c2c; font-size: 9px; letter-spacing: 0.05em; cursor: pointer; padding: 3px 6px; flex: 1;">
             DELETE
           </button>
+          <%= confirm_modal(
+            id: "delete-slot-#{n}-confirm",
+            title: "DELETE THIS SLOT?",
+            body: "This permanently removes the save data for slot <strong>#{n}</strong>. <strong>The save file is gone after this — there is no undo.</strong>",
+            confirm_label: "DELETE FOREVER",
+            confirm_data: { action: "click->save-slots#deleteSlot", slot_number: n }
+          ) %>
         </div>
       <% end %>
     </div>
@@ -163,12 +173,21 @@
          data-clear-save-url-value="<%= save_data_emulator_path %>"
          data-clear-save-csrf-value="<%= form_authenticity_token %>"
          style="margin-top: 16px;">
+      <%# Step 20 — confirm-modal gate for CLEAR ALL SLOTS. %>
       <button type="button"
-              data-action="click->clear-save#clear"
+              data-action="click->confirm-modal#open"
+              data-confirm-modal-id-param="clear-all-slots-confirm"
               class="type-text"
               style="background: #4a1c1c; color: #e8a0a0; border: 2px solid #6b2c2c; font-size: 9px; letter-spacing: 0.05em; cursor: pointer; width: 100%; padding: 6px 8px;">
         CLEAR ALL SLOTS
       </button>
+      <%= confirm_modal(
+        id: "clear-all-slots-confirm",
+        title: "CLEAR EVERY SAVE?",
+        body: "This wipes <strong>all #{@save_slots.size} save slots</strong> at once. There is no undo for any of them.",
+        confirm_label: "CLEAR ALL SLOTS",
+        confirm_data: { action: "click->clear-save#clear" }
+      ) %>
     </div>
   <% end %>
 </div>

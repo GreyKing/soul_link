@@ -59,12 +59,24 @@
     </div>
   </div>
 
-  <%# ── Cancel Button ── %>
-  <div data-gym-schedule-target="cancelAction" style="text-align: center;">
-    <button type="button"
-            data-action="click->gym-schedule#cancel"
-            class="gb-btn-danger gb-btn-sm">
-      Cancel this schedule
-    </button>
-  </div>
+  <%# ── Cancel Button — proposer-only (Step 20). The channel handler also
+      enforces this server-side (gym_schedule_channel.rb#cancel). %>
+  <% if @schedule.proposed_by == current_user_id %>
+    <div data-gym-schedule-target="cancelAction" style="text-align: center;">
+      <button type="button"
+              data-action="click->confirm-modal#open"
+              data-confirm-modal-id-param="cancel-schedule-confirm"
+              class="gb-btn-danger gb-btn-sm">
+        Cancel this schedule
+      </button>
+    </div>
+
+    <%= confirm_modal(
+      id: "cancel-schedule-confirm",
+      title: "CANCEL THIS SCHEDULE?",
+      body: "This cancels the proposed gym battle for <strong>#{@schedule.scheduled_at.strftime("%A, %B %-d at %-I:%M %p")}</strong>. RSVPs are discarded.",
+      confirm_label: "CANCEL SCHEDULE",
+      confirm_data: { action: "click->gym-schedule#cancel" }
+    ) %>
+  <% end %>
 </div>

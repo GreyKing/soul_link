@@ -174,8 +174,13 @@
        style="position: fixed; inset: 0; z-index: 70;">
     <div style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.92);"></div>
     <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
-      <div class="gb-modal" style="max-width: 480px; text-align: center; border-color: #c0392b;">
-        <div class="gb-modal-title" style="color: #c0392b;">★ WILD COIN APPEARED! ★</div>
+      <%# Step 20 — ARIA only. The coin-flip modal has no close button and
+          auto-dismisses post-animation; no focus trap is meaningful. %>
+      <div class="gb-modal" style="max-width: 480px; text-align: center; border-color: #c0392b;"
+           role="dialog"
+           aria-modal="true"
+           aria-labelledby="coin-flip-modal-title">
+        <div class="gb-modal-title" style="color: #c0392b;" id="coin-flip-modal-title">★ WILD COIN APPEARED! ★</div>
         <div style="padding: 16px;">
           <div data-gym-draft-target="coinFlipMessage" style="font-size: 11px; color: var(--d1); margin-bottom: 16px;">
             A tied vote — the coin decides...

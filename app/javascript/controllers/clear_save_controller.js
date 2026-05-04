@@ -9,7 +9,9 @@
 // race with the next page's IDBFS mount.
 import { Controller } from "@hotwired/stimulus"
 
-const CONFIRM_MESSAGE = "Permanently delete your save data? This cannot be undone."
+// Step 20 — CLEAR ALL SLOTS is now gated by the shared confirm-modal partial
+// in the view. The native window.confirm() previously fired here is removed;
+// the modal asks the question before this method is called.
 const IDBFS_DB_NAME = "/data/saves"
 
 export default class extends Controller {
@@ -17,7 +19,6 @@ export default class extends Controller {
 
   async clear(event) {
     event.preventDefault()
-    if (!window.confirm(CONFIRM_MESSAGE)) return
 
     try {
       const res = await fetch(this.urlValue, {

@@ -130,9 +130,13 @@
          style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.75);"></div>
 
     <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
-      <div class="gb-modal">
+      <div class="gb-modal"
+           role="dialog"
+           aria-modal="true"
+           aria-labelledby="group-modal-title"
+           data-controller="modal-a11y">
         <div class="gb-modal-title">
-          <span data-species-assignment-target="modalTitle">NEW GROUP</span>
+          <span id="group-modal-title" data-species-assignment-target="modalTitle">NEW GROUP</span>
           <button data-action="click->species-assignment#closeModal"
                   class="gb-modal-close"
                   aria-label="Close modal">&times;</button>

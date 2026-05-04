@@ -78,7 +78,8 @@ export default class extends Controller {
   }
 
   endRun() {
-    if (!confirm("End the current run? All data will be preserved.")) return
+    // Step 20 — confirm-modal partial in the view handles the question; this
+    // is now the post-confirmation handler.
     this.subscription.perform("end_run")
   }
 

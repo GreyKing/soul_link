@@ -1,11 +1,10 @@
-# Review Feedback — Step 19
+# Review Feedback — Step 20
 Date: 2026-05-04
 Ready for Builder: YES
 
 ## Must Fix
 
-None. Each of the architect's ten focus areas was traced and the implementation
-holds up.
+None. All five buckets land cleanly. The architect-locked decisions (six wire sites, two-layer schedule cancel, confirm_modal partial signature, coin-flip ARIA-only) are honored. The non-locked decisions Bob made under "Decisions made for ambiguities" are sound.
 
 ## Should Fix
 
@@ -13,124 +12,85 @@ None.
 
 ## Nice to Have
 
-- `app/services/soul_link/discord_notifier.rb:125-127` — the rescue list
-  enumerates `RestClient::ExceptionWithResponse, RestClient::Exception,
-  SocketError, Errno::ECONNREFUSED, Errno::ETIMEDOUT, Errno::EHOSTUNREACH,
-  JSON::ParserError, StandardError`. Since `StandardError` is the superclass
-  of every other entry, the explicit list is documentation, not behaviour.
-  Bob comments this as "belt-and-suspenders." Fine as-is. If a future cleanup
-  pass wants the comment without the redundancy, drop the specific classes
-  and keep only `StandardError` plus a doc comment listing the expected
-  failure modes.
+- `app/javascript/controllers/confirm_modal_controller.js:24-29` — the `window.__confirmModals` registry is populated in `connect()` and torn down in `disconnect()`, but no callsite **reads** from it. The `open()` action discriminates by `event.params?.id !== this.idValue` instead. The registry is dead code today and only earns its keep if a future external script wants to call `window.__confirmModals['some-id'].click()` programmatically (e.g. a Turbo-Stream payload that opens a modal server-side). Worth keeping for now per the brief's KG-32; if a future cleanup wants to drop it, the dependency on the registry is zero. Tracked in KG-32 already.
 
-- `app/views/dashboard/_runs_content.html.erb:40` uses `active_run` for the
-  read-only check while `_pc_box_content`, `_pokemon_modal`, and
-  `_gyms_content` use `@run`. When the user is viewing a *past* wiped run
-  via `?run_id=N`, `@run` is the past run and the buttons hide on the
-  dashboard — but those buttons would have operated on the active run
-  server-side anyway (controllers all resolve
-  `current_run = SoulLinkRun.current(guild_id)`). Cosmetic inconsistency
-  only; v1 contract is "UI hide only" so server still enforces correctness.
+- `app/javascript/controllers/confirm_modal_controller.js:48-51` — `open()` falls back to `firstFocusable()` if `hasCancelTarget` is false. The partial always renders the cancel button with the right target attribute, so the `hasCancelTarget` branch is the only one that ever fires in production. Defense-in-depth comment is fine; the fallback is a no-cost belt-and-suspenders for any future caller that omits the cancel button (won't happen).
 
 ## Notes (observations, not blocking)
 
-- **Move-name YAML cross-check passed.** I pulled
-  `kwsch/PKHeX/master/PKHeX.Core/Resources/text/other/en/text_Moves_en.txt`
-  directly and compared rows 2, 34, 166, 258, 468 (move IDs 1, 33, 165, 257,
-  467) against `config/soul_link/move_names.yml`. All five boundary samples
-  match: 1=Pound, 33=Tackle, 165=Struggle, 257=Heat Wave, 467=Shadow Force.
-  Three Gen-IV-only spot-checks (354=Psycho Boost, 400=Night Slash,
-  428=Zen Headbutt) also match. The file has 467 entries, no gaps, no
-  duplicates, IDs 1..467 contiguous. Bob's off-by-one resolution (extracting
-  source lines 2..468 because line 1 is the "no move" sentinel) is correct.
+- **Bucket A — CSS media query placed correctly.** `pixeldex.css:1061-1064` sits immediately after the existing `@media (max-width: 900px)` block (1043-1059). Cascade is right: at 521-900px, gb-grid-3/4 → 2 cols (existing); at ≤520px, → 1 col (new); above 900px, original column counts (declared at the top-level rules at 975-985). gb-grid-2 is never overridden — confirmed by `ResponsiveGridsTest#test_gb-grid-2_stays_2-column`.
 
-- **WipeCoordinator idempotency is sound.** The
-  `return if run.wiped_at.present?` inside the `with_lock` block returns
-  from the enclosing `process` method (Ruby `do/end` block return semantics
-  — confirmed). The notifier call is unreachable when the inner double-check
-  fires. The transaction commits an empty changeset before the method
-  unwinds, which is harmless. Race between two concurrent Mark Dead
-  requests is correctly handled.
+- **Bucket B — partial markup audit.** Walked `app/views/shared/_confirm_modal.html.erb` end-to-end:
+  - Outer `<div id="<%= id %>">` carries `class="hidden"` + `data-controller="confirm-modal"` + `data-confirm-modal-id-value="<%= id %>"`.
+  - Inner `<div class="gb-modal">` carries `role="dialog" aria-modal="true" aria-labelledby="<%= title_id %>"`.
+  - Title `<span id="<%= title_id %>">` matches the labelledby pointer (id is `"#{id}-title"`).
+  - Cancel button has `data-confirm-modal-target="cancel"` and `data-action="click->confirm-modal#close"`.
+  - Confirm button class defaults to `"gb-btn-danger gb-btn-sm"`; `confirm_data` hash is spread via `.map { |k, v| %(data-#{k.to_s.dasherize}="#{ERB::Util.html_escape(v)}") }.join(" ").html_safe` — verified the `>` in `"click->run-management#endRun"` ends up as `&gt;` on the rendered confirm button (matches the test expectation).
+  - Backdrop click closes (`data-action="click->confirm-modal#close"`).
+  - The `.gb-modal-close` button (the `&times;` X) is present, so `escape_close_controller` finds and clicks it on ESC.
 
-- **Wipe path notification fan-out verified.** In
-  `pokemon_groups_controller.rb:79-85`: `notify_death` fires once per linked
-  Pokemon (via `group.soul_link_pokemon.reload.each`), then
-  `WipeCoordinator.process(run)` is called exactly once after the loop. The
-  coordinator itself fires `notify_wipe` exactly once per nil→Time
-  transition. So a 4-player linked group going dead produces 4
-  deaths-channel messages + 1 general-channel wipe message. Correct per
-  the brief.
+- **Bucket B — six wire sites verified.** For each of the six sites, the trigger's `data-action` is `click->confirm-modal#open` and `data-confirm-modal-id-param` matches the partial's `:id` local. The confirm button's `confirm_data` carries the **original** Stimulus action that used to live on the trigger. Site-by-site:
+  | Site | Trigger id-param | Confirm action |
+  |---|---|---|
+  | dashboard runs tab END RUN | `end-run-dashboard-confirm` | `click->run-management#endRun` |
+  | /runs page END RUN | `end-run-page-confirm` | `click->run-management#endRun` |
+  | save-slot DELETE | `delete-slot-#{n}-confirm` | `click->save-slots#deleteSlot` + `slot_number: n` |
+  | CLEAR ALL SLOTS | `clear-all-slots-confirm` | `click->clear-save#clear` |
+  | group DEL | `delete-group-#{group.id}-confirm` | `click->species-assignment#deleteGroup` + `group_id: group.id` |
+  | schedule Cancel | `cancel-schedule-confirm` | `click->gym-schedule#cancel` |
 
-- **Schema diff is clean.** `git diff origin/main -- db/schema.rb` shows
-  only the version bump (2026_05_03_184058 → 2026_05_04_000001) and the
-  new `t.datetime "wiped_at"` column on `soul_link_runs`. The pre-existing
-  `add_foreign_key "gym_auto_mark_suppressions", "soul_link_runs"` line
-  that Bob flagged in REVIEW-REQUEST §6 is preserved.
+  Two distinct ids for END RUN (dashboard vs /runs) is intentional and defensive — if a future redesign hosts both surfaces in one DOM tree, they don't collide.
 
-- **broadcast_state new key is harmless for now.**
-  `run_management_controller.js` only reads
-  `run_number / gyms_defeated / caught_count / dead_count / started_at /
-  has_discord_channels / emulator_status`. The new `wiped_at` ride-along
-  is unused client-side; the wipe banner is server-rendered via the
-  `broadcasts_refreshes_to` Turbo refresh. Forward-looking key, minor
-  payload bloat on every run mutation. Bob already flagged this in
-  REVIEW-REQUEST §1.
+- **Bucket B — JS controller deferred-confirm cleanup.** All four JS controllers had their native `window.confirm()` removed correctly:
+  - `save_slots_controller.js#deleteSlot` — `CONFIRM_DELETE` constant deleted (was unused after the removal — checked the file for any other reference).
+  - `clear_save_controller.js#clear` — `CONFIRM_MESSAGE` constant deleted.
+  - `run_management_controller.js#endRun` — only the `endRun` confirm removed; `startRun` and `regenerateEmulatorRoms` confirms left in place per Bob's note (out of brief scope).
+  - `gym_schedule_controller.js#cancel` — confirm removed.
 
-- **Brakeman warnings are pre-existing.** `git diff origin/main` shows zero
-  changes to `app/controllers/emulator_controller.rb` and
-  `app/jobs/gym_schedule_discord_update_job.rb`. The two weak-confidence
-  warnings (`emulator_controller.rb:79` SendFile,
-  `gym_schedule_discord_update_job.rb:14` FileAccess) are not Step-19
-  introductions.
+  The `species_assignment_controller.js#deleteGroup` change is more substantive: it now reads `groupId` from `event.currentTarget.dataset.groupId` (the confirm button's spread attribute) with a `.closest("[data-group-id]")` fallback. This dual-read keeps the `_group_card` partial's confirm-button wiring working AND keeps any future callsite that doesn't migrate to the modal pattern functional. Sensible.
 
-- **Map-view "NEW CATCH" form is not gated.**
-  `app/views/map/show.html.erb:228` has its own NEW CATCH form
-  (timeline_controller#submitCatch) that isn't wrapped in
-  `dashboard_read_only?`. The brief's affordance list named the dashboard
-  surfaces explicitly; the map-view path is arguably a separate surface.
-  Out of spec scope as written. Worth flagging to Ava for a
-  product-decision call: do we want read-only mode to apply to the
-  map-view catch form too? If yes, that's a follow-on KG, not a Step-19
-  blocker.
+- **Bucket B — `_actionButtons()` selector update is correct.** Verified `save_slots_controller.js:117-124` matches `[data-action*='save-slots#makeActive'], [data-confirm-modal-id-param^='delete-slot-']`. The make-active trigger still has its data-action (unchanged); the DELETE trigger now matches by id-param prefix. Overwrite-pending mode (`_enterOverwriteMode`) still disables both trigger types.
 
-- **All new tests use FactoryBot.** Verified across
-  `wipe_coordinator_test.rb`, `discord_notifier_test.rb`,
-  `game_state_move_names_test.rb`, `wipe_flow_test.rb`,
-  `gym_beaten_coordinator_test.rb` (Step 19 additions),
-  `catch_coordinator_test.rb` (Step 19 additions),
-  `hall_of_fame_coordinator_test.rb` (Step 19 additions),
-  `gym_progress_controller_test.rb` (Step 19 additions),
-  `soul_link_run_test.rb` (Step 19 additions). No fixture references.
+- **Bucket C — ARIA shape on every modal.** All seven existing modals have `role="dialog"` + `aria-modal="true"` + `aria-labelledby` pointing at a `<span id="...">` matching the labelledby value. Six attach `data-controller="modal-a11y"`; the coin-flip is ARIA-only as documented (no close button, auto-dismisses, focus trap on a 1-2s animation would be friction). Agree with Bob's call on the coin-flip — `aria-modal="true"` alone gives screen-reader users the announcement, and the lack of focus trap is correct for a dialog with no interactive controls.
 
-- **All five wipe scenarios (a)..(e) have dedicated tests.** Each named
-  comment block in `wipe_coordinator_test.rb` ties to a brief scenario:
-  (a) brand-new run no-wipe, (b) one-zero-alive triggers, (c) all-alive
-  no-wipe, (d) idempotent re-run, (e) cleared-then-re-fired. Plus nil-run
-  defense + most-recent-death route resolution.
+- **Bucket C — `modal_a11y_controller` wrapper detection.** The `#findWrapper()` heuristic walks `parentElement` looking for either `.hidden` or `position: fixed` inline style. Spot-checked each modal:
+  - `_catch_modal.html.erb:3-4` — outer wrapper has `class="hidden"` + `style="position: fixed; inset: 0; z-index: 50;"`. The walk hits it on the second hop (gb-modal → outer flex-center wrapper → `position: fixed` outer). ✓
+  - `_pokemon_modal.html.erb` — same shape. ✓
+  - `_mark_dead_modal.html.erb`, `_reset_draft_modal.html.erb` — same. ✓
+  - `_quick_calc_modal.html.erb` — same. ✓
+  - `species_assignments/show.html.erb` group modal at line 128 — outer div has `class="hidden"` + `position: fixed`. ✓
+  - The shared `_confirm_modal.html.erb` outer is itself `position: fixed` and `class="hidden"` — but the partial uses `confirm-modal` controller, not `modal-a11y`. ✓
 
-- **`was_marked` precondition for gym team-beaten** is covered by the
-  "fires only when the all-4 gate flips the gym" test (when not previously
-  marked → fires) and "does NOT fire on idempotent re-run" test (when
-  already marked → no fire). The latter is the precise precondition the
-  architect called out.
+- **Bucket C — ESC propagation in pixeldex layout.** Confirmed `app/views/layouts/pixeldex.html.erb:28` has `<body data-controller="escape-close">`. Before this step, the dashboard layout had no global ESC handler — the catch / pokemon / mark-dead / reset-draft modals could only be closed by clicking the X or the backdrop. Now ESC works for them too. The bundle-in is documented in REVIEW-REQUEST §6 and is the right call.
 
-- **Test environment caveat.** I could not run the test suite locally —
-  the worktree's mise/bundler config resolves to Ruby 3.0.6 while the
-  Gemfile.lock targets 3.4.5, producing a `Bundler::GemNotFound`.
-  Reviewed the code structurally and trust Bob's reported
-  `654 runs, 2011 assertions, 0 failures`. CI will be the canonical
-  verification.
+- **Bucket D — view authz.** Confirmed `gym_schedules/show.html.erb:64` wraps the cancel button + accompanying confirm-modal partial in `<% if @schedule.proposed_by == current_user_id %>`. Both `proposed_by` (bigint Integer) and `current_user_id` (Integer from `auth.uid.to_i` at OAuth callback) are Ruby Integer — direct equality works.
 
-## Cleared
+- **Bucket D — channel authz.** Confirmed `gym_schedule_channel.rb:23-25` matches the brief exactly. The early return uses `transmit({ error: "Only the proposer can cancel this schedule." })` — same shape as the existing `rsvp` rescue path. The `unless ... return` reads cleanly. `current_user_id` on the channel comes from `Connection#identified_by`, which traces back to `session[:discord_user_id]` (set on OAuth callback as `auth.uid.to_i`). Same Integer comparison as the view.
 
-Reviewed: move_names.yml (boundary + spot-check + structural), DiscordNotifier
-class + tests, WipeCoordinator class + tests, HallOfFameCoordinator
-notify_run_complete wiring, GymBeatenCoordinator per-player + team-beaten
-notification placement, GymProgressController manual MARK BEATEN/UNMARK
-notification placement, CatchCoordinator notify_catch placement (party + box
-paths), PokemonGroupsController death + wipe firing, SoulLinkRun model
-additions (`wiped?`, `read_only?`, `broadcast_state[:wiped_at]`),
-ApplicationHelper `dashboard_read_only?`, EmulatorHelper `format_move_name`,
-the four dashboard view edits, `db/schema.rb` diff, the migration.
+- **Bucket D — channel authz tested.** `test/channels/gym_schedule_channel_test.rb` covers: subscribe + initial broadcast (1 test), proposer cancel succeeds (1), non-proposer cancel rejected with the error message + schedule stays proposed (1), non-proposer cancel does NOT trigger a second broadcast (1). The "no extra broadcast" test is a nice belt-and-suspenders verification — even though `transmit({ error: })` is a per-connection send, not a broadcast, asserting `broadcasts(@schedule).size` doesn't increase is the cleanest way to prove the channel didn't accidentally fan out the rejection.
 
-Step 19 is clear.
+- **Bucket E — `<NEXT` literal cleanup.** `_gyms_content.html.erb:52` now reads:
+  ```erb
+  <span class="type-text" style="border-color: var(--amber); color: var(--amber); margin-left: 4px;">NEXT</span>
+  ```
+  Reuses the existing `type-text` badge class with amber border + color. Visually consistent with the type-abbreviation badge that immediately precedes it on line 51. Cleaner than the original literal.
+
+- **Tests.** 22 new tests, all using FactoryBot (no fixtures — verified `test/channels/gym_schedule_channel_test.rb` and `test/factories/gym_schedules.rb` are factory-only; the GymSchedule factory is new this step but follows the existing factory conventions). 0 failures, 0 errors. Suite count `654 → 676` matches the assertion increase from `2011 → 2095` (+84 assertions).
+
+- **Test environment caveat.** Same as Step 19: the worktree's PATH resolves to Ruby 3.0.6's bundle by default, which can't load Rails 8.1.1 gems. Workaround invocation: `PATH="/Users/gferm/.local/share/mise/installs/ruby/3.4.5/bin:$PATH" /Users/gferm/.local/share/mise/installs/ruby/3.4.5/bin/bundle exec rails test`. Bob ran with this; I re-ran the new tests in isolation (`test/helpers/...`, `test/integration/confirm_modal_flow_test.rb`, `test/integration/responsive_grids_test.rb`, `test/channels/gym_schedule_channel_test.rb`) — all 22 pass in 0.36s.
+
+- **Rubocop / Brakeman.** Rubocop clean (191 → 197 files, 0 offenses; +6 files = the 6 new Ruby/JS/ERB files). Brakeman clean — same two pre-existing weak warnings as Step 19 (`emulator_controller.rb:79` SendFile, `gym_schedule_discord_update_job.rb:14` FileAccess), no new warnings.
+
+- **Hand-rolled vs helper-rendered attribute escaping.** Verified the asymmetry that initially failed Bob's test: the trigger button's `data-action="click->confirm-modal#open"` is hand-written ERB and preserves `>` literally; the confirm button's data-attributes go through `ERB::Util.html_escape` and become `click-&gt;run-management#endRun`. Both are functional (HTML attribute parsing decodes `&gt;` back to `>`), but a follow-up cleanup could normalize by using `tag_helper`-rendered buttons with `data:` hashes for consistency. Minor; not worth a follow-up KG.
+
+- **Map-view NEW CATCH gating preserved.** Step 19 added `dashboard_read_only?(@run)` guard to `app/views/map/show.html.erb:228`. Step 20 didn't touch that file. Confirmed the guard is still there.
+
+- **No regressions in the existing Step 18/19 tests.** All 654 pre-existing tests still pass (676 - 22 new = 654 from Step 19 baseline).
+
+- **Frontend smoke not performed.** Same pattern as Steps 15-19: the changes are server-rendered ERB + Stimulus controller scaffolding. Existing `broadcasts_refreshes_to` infrastructure handles real-time updates. The user's standing instruction is integration test (not system test) — and integration tests verify markup, not interactive Stimulus behavior. The Selenium-driven "click END RUN, modal opens, ESC closes, run is still active" verification is a manual smoke step the Project Owner can run — or a future system-test cycle.
+
+- **Coin-flip ARIA-only — concur with Bob.** Re-reviewed the architect brief: it locked "all 8 modals" but the coin-flip's no-close-button structure makes a focus trap actively harmful (1-2s animation lockup with no escape). Bob made the right architectural call to skip `modal-a11y` there while still adding ARIA. If Project Owner disagrees, the cost to add `modal-a11y` later is one line of markup.
+
+## Summary
+
+Five buckets, all clean. 22 new tests, full suite green. Rubocop clean. Brakeman clean. The architect-locked decisions hold up under code-walk. Two tiny "nice to have" notes about the controller's unused registry and unreachable fallback path; both are intentional defense-in-depth and acceptable as-is. **Ship it.**

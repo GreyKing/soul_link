@@ -41,10 +41,19 @@
       </div>
 
       <div style="display: flex; align-items: center; gap: 8px;">
-        <button data-action="click->run-management#endRun"
+        <%# Step 20 — confirm-modal gate for destructive END RUN. %>
+        <button data-action="click->confirm-modal#open"
+                data-confirm-modal-id-param="end-run-page-confirm"
                 class="gb-btn-danger gb-btn-sm">
           End Current Run
         </button>
+        <%= confirm_modal(
+          id: "end-run-page-confirm",
+          title: "END THIS RUN?",
+          body: "This archives the current run and stops Soul Link tracking. <strong>Runs cannot be un-ended through the UI.</strong>",
+          confirm_label: "END RUN",
+          confirm_data: { action: "click->run-management#endRun" }
+        ) %>
         <button data-action="click->run-management#setupDiscord"
                 data-run-management-target="setupDiscordButton"
                 class="gb-btn-primary gb-btn-sm <%= 'hidden' if @current_run&.discord_channels_configured? %>">

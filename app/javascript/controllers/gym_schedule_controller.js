@@ -54,9 +54,9 @@ export default class extends Controller {
   }
 
   cancel() {
-    if (confirm("Cancel this schedule?")) {
-      this.subscription.perform("cancel")
-    }
+    // Step 20 — confirm-modal partial in the view handles the question; this
+    // is now the post-confirmation handler.
+    this.subscription.perform("cancel")
   }
 
   // ── Rendering ──

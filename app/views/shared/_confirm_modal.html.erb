@@ -1,0 +1,50 @@
+<%# Shared confirm modal — Step 20. See ConfirmModalHelper#confirm_modal
+    for usage. Triggering buttons get data-action of confirm-modal#open
+    plus data-confirm-modal-id-param matching the partial's :id local. %>
+<%
+  confirm_class ||= "gb-btn-danger gb-btn-sm"
+  confirm_data  ||= {}
+  cancel_label  ||= "CANCEL"
+  title_id = "#{id}-title"
+%>
+<div id="<%= id %>"
+     class="hidden"
+     data-controller="confirm-modal"
+     data-confirm-modal-id-value="<%= id %>"
+     style="position: fixed; inset: 0; z-index: 50;">
+  <div data-action="click->confirm-modal#close"
+       style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.85);"></div>
+
+  <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
+    <div class="gb-modal" style="max-width: 440px;"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="<%= title_id %>">
+      <div class="gb-modal-title">
+        <span id="<%= title_id %>"><%= title %></span>
+        <button type="button"
+                data-action="click->confirm-modal#close"
+                class="gb-modal-close"
+                aria-label="Close modal">&times;</button>
+      </div>
+
+      <div style="font-size: 11px; line-height: 1.7; color: var(--d1); margin-bottom: 16px;">
+        <%= raw body %>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+        <button type="button"
+                data-action="click->confirm-modal#close"
+                data-confirm-modal-target="cancel"
+                class="gb-btn gb-btn-sm">
+          <%= cancel_label %>
+        </button>
+        <button type="button"
+                class="<%= confirm_class %>"
+                <%= confirm_data.map { |k, v| %(data-#{k.to_s.dasherize}="#{ERB::Util.html_escape(v)}") }.join(" ").html_safe %>>
+          <%= confirm_label %>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

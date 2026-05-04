@@ -20,6 +20,9 @@ class GymScheduleChannel < ApplicationCable::Channel
 
   def cancel(_data)
     @schedule.reload
+    unless @schedule.proposed_by == current_user_id
+      return transmit({ error: "Only the proposer can cancel this schedule." })
+    end
     @schedule.cancel!
     broadcast_state
   rescue => e

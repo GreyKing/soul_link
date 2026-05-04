@@ -13,7 +13,9 @@
 // SRAM at the original Save File click (a few seconds of in-game drift).
 import { Controller } from "@hotwired/stimulus"
 
-const CONFIRM_DELETE = "Permanently delete this slot? This cannot be undone."
+// Step 20 — DELETE is now gated by the shared confirm-modal partial in the
+// view. The native window.confirm() previously fired here is removed; the
+// modal asks the question before this method is called.
 const CONFIRM_OVERWRITE = "Overwrite this slot with the save you just made? The current contents will be lost."
 
 export default class extends Controller {
@@ -66,7 +68,6 @@ export default class extends Controller {
     event.preventDefault()
     const slotNumber = event.currentTarget.dataset.slotNumber
     if (!slotNumber) return
-    if (!window.confirm(CONFIRM_DELETE)) return
     try {
       const res = await fetch(`${this.slotsUrlValue}/${slotNumber}`, {
         method: "DELETE",
@@ -114,8 +115,11 @@ export default class extends Controller {
   }
 
   _actionButtons() {
+    // Step 20 — the DELETE trigger now opens the shared confirm-modal instead
+    // of firing save-slots#deleteSlot directly. Match its data-confirm-modal-
+    // id-param prefix so overwrite-pending mode still disables it.
     return this.element.querySelectorAll(
-      "[data-action*='save-slots#makeActive'], [data-action*='save-slots#deleteSlot']"
+      "[data-action*='save-slots#makeActive'], [data-confirm-modal-id-param^='delete-slot-']"
     )
   }
 

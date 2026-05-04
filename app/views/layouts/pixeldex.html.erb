@@ -25,7 +25,7 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
+  <body data-controller="escape-close">
     <% if flash[:alert] %>
       <div class="gb-flash gb-flash-alert" style="position: relative; z-index: 10;"><%= flash[:alert] %></div>
     <% end %>

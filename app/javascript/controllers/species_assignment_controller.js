@@ -206,15 +206,12 @@ export default class extends Controller {
   }
 
   async deleteGroup(event) {
-    const card = event.currentTarget.closest("[data-group-id]")
-    if (!card) return
-
-    const groupId = card.dataset.groupId
-    const nickname = card.dataset.groupNickname || "this group"
-
-    if (!confirm(`Delete "${nickname}" and all its pokemon? This cannot be undone.`)) {
-      return
-    }
+    // Step 20 — confirm-modal gate handles the question; the confirm button
+    // carries data-group-id directly. Fall back to walking up to a group
+    // card for any legacy callsite that hasn't migrated yet.
+    const groupId = event.currentTarget.dataset.groupId ||
+                    event.currentTarget.closest("[data-group-id]")?.dataset.groupId
+    if (!groupId) return
 
     try {
       const response = await fetch(`${this.groupsUrlValue}/${groupId}`, {
