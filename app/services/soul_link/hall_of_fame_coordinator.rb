@@ -25,6 +25,10 @@ module SoulLink
       Rails.logger.info(
         "HallOfFameCoordinator: run=#{run.id} marked complete (4/4 HoF)"
       )
+      # Step 19 — closes KG-17. Fires once per nil→Time transition;
+      # the `completed_at.present?` guard above keeps idempotent re-runs
+      # from re-firing.
+      SoulLink::DiscordNotifier.notify_run_complete(run)
     end
 
     # All-4 check. Returns false on an empty session set so a

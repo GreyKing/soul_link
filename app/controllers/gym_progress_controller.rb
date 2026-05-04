@@ -32,6 +32,9 @@ class GymProgressController < ApplicationController
       # Manual MARK BEATEN clears any suppression for this gym so
       # auto-detection can resume after a re-engagement.
       run.gym_auto_mark_suppressions.where(gym_number: gym_number).destroy_all
+      # Step 19 — manual MARK BEATEN is a team event by definition;
+      # no per-player notification path on this branch.
+      SoulLink::DiscordNotifier.notify_gym_team_beaten(run, gym_number)
       notice = "Gym #{gym_number} marked beaten."
     end
 

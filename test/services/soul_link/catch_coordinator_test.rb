@@ -313,6 +313,30 @@ module SoulLink
       assert_equal false, SoulLinkPokemon.last.caught_off_feed
     end
 
+    # ── Step 19: DiscordNotifier wiring ──────────────────────────────
+
+    test "Step 19: happy-path catch fires notify_catch with off_feed: false" do
+      calls = []
+      recorder = ->(*args, **kwargs) { calls << [ args, kwargs ] }
+      SoulLink::DiscordNotifier.stub(:notify_catch, recorder) do
+        SoulLink::CatchCoordinator.process(@slot, [ caught_event ])
+      end
+      assert_equal 1, calls.size
+      kwargs = calls.first[1]
+      assert_equal false, kwargs[:off_feed]
+    end
+
+    test "Step 19: box-observed catch fires notify_catch with off_feed: true" do
+      calls = []
+      recorder = ->(*args, **kwargs) { calls << [ args, kwargs ] }
+      SoulLink::DiscordNotifier.stub(:notify_catch, recorder) do
+        SoulLink::CatchCoordinator.process(@slot, [ boxed_event ])
+      end
+      assert_equal 1, calls.size
+      kwargs = calls.first[1]
+      assert_equal true, kwargs[:off_feed]
+    end
+
     test "Step 18: PokemonCaughtEvent struct accepts the new keyword fields" do
       # Lock the Struct contract — new fields are keyword-init, not raise.
       ev = SoulLink::SaveDiff::PokemonCaughtEvent.new(

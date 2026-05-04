@@ -72,6 +72,17 @@ class PokemonGroupsController < ApplicationController
         nickname: params[:nickname]&.strip || group.nickname,
         location: params[:location]&.strip || group.location
       )
+
+      # Step 19 — Discord death notifications, one per linked Pokemon.
+      # `reload` so we see the cascaded dead status; `notify_death` is
+      # fire-and-forget (rescues every failure internally).
+      group.soul_link_pokemon.reload.each do |p|
+        SoulLink::DiscordNotifier.notify_death(run, p.discord_user_id, p.species, p.location)
+      end
+
+      # Step 19 — wipe-detection runs on every Mark Dead transition.
+      # Idempotency lives inside the coordinator (skips if wiped_at set).
+      SoulLink::WipeCoordinator.process(run)
     elsif new_status == "caught" && group.dead?
       # Revive: set group + all pokemon back to caught
       ActiveRecord::Base.transaction do

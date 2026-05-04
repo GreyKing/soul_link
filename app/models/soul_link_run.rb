@@ -62,6 +62,24 @@ class SoulLinkRun < ApplicationRecord
     completed_at.present?
   end
 
+  # Step 19 — wipe detection. SoulLink::WipeCoordinator stamps
+  # `wiped_at = Time.current` when a Mark Dead transition leaves a
+  # player with zero alive Pokemon. Direct AR
+  # `update!(wiped_at: nil)` is the un-wipe path (no UI in v1).
+  def wiped?
+    wiped_at.present?
+  end
+
+  # Step 19 — read-only mode for the dashboard. True when the run is
+  # wiped AND not yet completed (HoF wins — a run that wipes after HoF
+  # is "complete" first, "wiped" second). Gates dashboard affordances
+  # via `dashboard_read_only?(active_run)` view helper. Server-side
+  # authz remains unchanged in v1 (UI hide-only); KG covers server
+  # enforcement of read-only mode.
+  def read_only?
+    wiped_at.present? && !completed?
+  end
+
   # Step 16 — TID/SID mix-up detection (read-side).
   #
   # Returns `Array<Array<Integer>>` — each inner array is a list of
@@ -155,7 +173,8 @@ class SoulLinkRun < ApplicationRecord
       started_at: created_at&.iso8601,
       ended_at: active? ? nil : updated_at&.iso8601,
       has_discord_channels: discord_channels_configured?,
-      emulator_status: emulator_status
+      emulator_status: emulator_status,
+      wiped_at: wiped_at&.iso8601
     }
   end
 

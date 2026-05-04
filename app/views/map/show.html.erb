@@ -223,7 +223,8 @@
     <%# Panel body (populated by JS) %>
     <div data-timeline-target="panelBody" style="padding: 12px 16px;"></div>
 
-    <%# Catch form %>
+    <%# Catch form — hidden in read-only (wiped) mode for consistency with the dashboard surfaces. %>
+    <% unless dashboard_read_only?(@run) %>
     <div data-timeline-target="panelForm" class="hidden" style="padding: 12px 16px; border-top: var(--border-thin);">
       <div style="font-size: 12px; margin-bottom: 8px;">NEW CATCH</div>
       <form data-action="submit->timeline#submitCatch">
@@ -264,6 +265,7 @@
         </div>
       </form>
     </div>
+    <% end %>
   </div>
 
   <%# Backdrop overlay %>

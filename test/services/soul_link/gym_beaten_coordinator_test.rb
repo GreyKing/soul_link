@@ -89,6 +89,12 @@ module SoulLink
       # Stub the slot's session/run chain so process can resolve a run with zero sessions.
       lone_session_double = Object.new
       lone_session_double.define_singleton_method(:soul_link_run) { lone_run }
+      # Step 19 — notifier reads `session.discord_user_id` for the
+      # per-player progress message; stub returns nil so notifier falls
+      # back to "Player <nil>" but never raises (notify_gym_player_progress
+      # only short-circuits on nil-run / blank channel — discord_user_id
+      # being nil is acceptable for this defensive test).
+      lone_session_double.define_singleton_method(:discord_user_id) { nil }
       lone_slot.define_singleton_method(:soul_link_emulator_session) { lone_session_double }
 
       assert_not SoulLink::GymBeatenCoordinator.all_players_have_badge?(lone_run, 4)
@@ -128,6 +134,75 @@ module SoulLink
           SoulLink::GymBeatenCoordinator.attempt_auto_mark(run_proxy, 4)
         end
       end
+    end
+
+    # --- Step 19: DiscordNotifier wiring ------------------------------------
+
+    test "Step 19: BadgeGained always fires notify_gym_player_progress" do
+      progress_calls = []
+      team_calls = []
+      progress_recorder = ->(run, gym, uid) { progress_calls << [ run.id, gym, uid ] }
+      team_recorder = ->(run, gym) { team_calls << [ run.id, gym ] }
+
+      # 3/4 — only 3 players have the badge, gate doesn't flip.
+      @slots[0..2].each { |slot| slot.update_columns(parsed_badges: 4) }
+
+      SoulLink::DiscordNotifier.stub(:notify_gym_player_progress, progress_recorder) do
+        SoulLink::DiscordNotifier.stub(:notify_gym_team_beaten, team_recorder) do
+          SoulLink::GymBeatenCoordinator.process(@slots.first, [ event(SoulLink::SaveDiff::BadgeGained, 4) ])
+        end
+      end
+
+      assert_equal 1, progress_calls.size, "per-player progress fires regardless of gate"
+      assert_equal [], team_calls, "team-beaten does NOT fire when gate fails (3/4)"
+    end
+
+    test "Step 19: notify_gym_team_beaten fires only when the all-4 gate flips the gym" do
+      team_calls = []
+      team_recorder = ->(run, gym) { team_calls << [ run.id, gym ] }
+
+      # 4/4 — gate flips.
+      @slots.each { |slot| slot.update_columns(parsed_badges: 4) }
+
+      SoulLink::DiscordNotifier.stub(:notify_gym_player_progress, ->(*) { }) do
+        SoulLink::DiscordNotifier.stub(:notify_gym_team_beaten, team_recorder) do
+          SoulLink::GymBeatenCoordinator.process(@slots.first, [ event(SoulLink::SaveDiff::BadgeGained, 4) ])
+        end
+      end
+
+      assert_equal [ [ @run.id, 4 ] ], team_calls
+    end
+
+    test "Step 19: notify_gym_team_beaten does NOT fire on idempotent re-run (gym already marked)" do
+      team_calls = []
+      team_recorder = ->(run, gym) { team_calls << [ run.id, gym ] }
+
+      @slots.each { |slot| slot.update_columns(parsed_badges: 4) }
+      @run.gym_results.create!(gym_number: 4, beaten_at: Time.current)
+
+      SoulLink::DiscordNotifier.stub(:notify_gym_player_progress, ->(*) { }) do
+        SoulLink::DiscordNotifier.stub(:notify_gym_team_beaten, team_recorder) do
+          SoulLink::GymBeatenCoordinator.process(@slots.first, [ event(SoulLink::SaveDiff::BadgeGained, 4) ])
+        end
+      end
+
+      assert_equal [], team_calls
+    end
+
+    test "Step 19: BadgeLost does NOT fire either notifier" do
+      progress_calls = []
+      team_calls = []
+      progress_recorder = ->(*) { progress_calls << :hit }
+      team_recorder = ->(*) { team_calls << :hit }
+
+      SoulLink::DiscordNotifier.stub(:notify_gym_player_progress, progress_recorder) do
+        SoulLink::DiscordNotifier.stub(:notify_gym_team_beaten, team_recorder) do
+          SoulLink::GymBeatenCoordinator.process(@slots.first, [ event(SoulLink::SaveDiff::BadgeLost, 4) ])
+        end
+      end
+
+      assert_equal [], progress_calls
+      assert_equal [], team_calls
     end
 
     # --- multi-event sequence -----------------------------------------------

@@ -139,6 +139,14 @@ module SoulLink
         moves:               event.moves,
         caught_off_feed:     caught_off_feed
       )
+
+      # Step 19 — Discord notification, fire-and-forget. Last line of the
+      # method so an exception out of the swallowing rescue (none today,
+      # but defense in depth) can't roll back the create. The notifier
+      # itself rescues every failure mode and logs at warn level.
+      SoulLink::DiscordNotifier.notify_catch(
+        run, uid, species_s, route, event.level, off_feed: caught_off_feed
+      )
     end
 
     # Returns "Route 201" for known IDs; "Met-Location #N" fallback for

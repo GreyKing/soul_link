@@ -2,7 +2,12 @@
   <span>GYMS</span>
   <span style="display: flex; align-items: center; gap: 8px;">
     <span class="panel-header-sub"><%= @gyms_defeated %>/8 BADGES</span>
-    <%= button_to "START GYM DRAFT", gym_drafts_path, method: :post, class: "gb-btn-primary gb-btn-sm", style: "font-size: 9px; padding: 3px 8px;" %>
+    <%# Step 19 — START GYM DRAFT (NEW DRAFT trigger) hidden in read-only
+        mode. Existing drafts remain visible (read-only display); only
+        the create path is gated. %>
+    <% unless dashboard_read_only?(@run) %>
+      <%= button_to "START GYM DRAFT", gym_drafts_path, method: :post, class: "gb-btn-primary gb-btn-sm", style: "font-size: 9px; padding: 3px 8px;" %>
+    <% end %>
     <% if @active_draft %>
       <button type="button"
               class="gb-btn-danger gb-btn-sm"
@@ -46,10 +51,13 @@
             <span class="type-text" style="border-color: var(--l1);"><%= PixeldexHelper::TYPE_ABBREVIATIONS[gym["type"]] || gym["type"] %></span>
             &lt;NEXT
           </span>
-          <%= button_to "MARK BEATEN", gym_progress_path(gym_number: num),
-              method: :patch, class: "gb-btn-primary gb-btn-sm",
-              style: "font-size: 9px; padding: 3px 8px; margin-left: auto;",
-              data: { turbo: false } %>
+          <%# Step 19 — hide MARK BEATEN in read-only mode. %>
+          <% unless dashboard_read_only?(@run) %>
+            <%= button_to "MARK BEATEN", gym_progress_path(gym_number: num),
+                method: :patch, class: "gb-btn-primary gb-btn-sm",
+                style: "font-size: 9px; padding: 3px 8px; margin-left: auto;",
+                data: { turbo: false } %>
+          <% end %>
           <% loc_data = @locations[gym["location"]] %>
           <div style="font-size: 9px; color: var(--l1); margin-top: 4px; width: 100%;">
             <%= loc_data&.[]("name") || gym["location"] %> &mdash; Level Cap: <%= gym["max_level"] %>
@@ -61,11 +69,14 @@
           <%= gym["leader"]&.upcase %>
           <span class="type-text"><%= PixeldexHelper::TYPE_ABBREVIATIONS[gym["type"]] || gym["type"] %></span>
           <% if num == @gyms_defeated %>
-            <%= button_to "UNMARK", gym_progress_path(gym_number: num),
-                method: :patch, class: "gb-btn gb-btn-sm",
-                style: "font-size: 8px; padding: 2px 6px; margin-left: auto;",
-                data: { turbo: false },
-                title: "Removes the star and decrements the badge count" %>
+            <%# Step 19 — hide UNMARK in read-only mode. %>
+            <% unless dashboard_read_only?(@run) %>
+              <%= button_to "UNMARK", gym_progress_path(gym_number: num),
+                  method: :patch, class: "gb-btn gb-btn-sm",
+                  style: "font-size: 8px; padding: 2px 6px; margin-left: auto;",
+                  data: { turbo: false },
+                  title: "Removes the star and decrements the badge count" %>
+            <% end %>
             <span style="margin-left: 6px; font-size: 9px; color: var(--d2);">Lv. <%= gym["max_level"] %></span>
           <% else %>
             <span style="margin-left: auto; font-size: 9px; color: var(--d2);">Lv. <%= gym["max_level"] %></span>

@@ -104,12 +104,17 @@
       <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 10px; border-top: var(--border-thin);">
         <span data-pixeldex-target="modalStatus" style="font-size: 10px; color: var(--d2);"></span>
         <div style="display: flex; gap: 6px;">
-          <button type="button"
-                  data-pixeldex-target="modalDeadBtn"
-                  data-action="click->dashboard#openMarkDeadModal"
-                  class="gb-btn-danger gb-btn-sm">
-            MARK DEAD
-          </button>
+          <%# Step 19 — hide the Mark Dead trigger when the run is in
+              read-only mode (already wiped). UI-hide only; server-side
+              authz unchanged in v1. %>
+          <% unless dashboard_read_only?(@run) %>
+            <button type="button"
+                    data-pixeldex-target="modalDeadBtn"
+                    data-action="click->dashboard#openMarkDeadModal"
+                    class="gb-btn-danger gb-btn-sm">
+              MARK DEAD
+            </button>
+          <% end %>
           <button type="button"
                   data-action="click->pixeldex#savePokemon"
                   class="gb-btn-primary gb-btn-sm">

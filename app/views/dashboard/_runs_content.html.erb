@@ -33,6 +33,16 @@
           </div>
         </div>
 
+        <%# Step 19 — wipe banner. Renders ABOVE the gb-grid-4 stats
+            when the active run is wiped + not yet completed (HoF wins).
+            Suppressed if completed_at is set (the COMPLETE pill carries
+            the relevant signal in that case). %>
+        <% if dashboard_read_only?(active_run) %>
+          <div class="gb-flash gb-flash-alert" style="margin-bottom: 12px; text-align: center; font-weight: bold;">
+            💀 RUN ENDED — WIPED <%= active_run.wiped_at.strftime("%b %-d, %Y") %>
+          </div>
+        <% end %>
+
         <div class="gb-grid-4" style="margin-bottom: 12px;">
           <div class="gb-card-dark" style="text-align: center; padding: 8px;">
             <div style="font-size: 16px; color: var(--l2);" data-run-management-target="gymsDefeated"><%= active_run&.gyms_defeated || 0 %>/8</div>

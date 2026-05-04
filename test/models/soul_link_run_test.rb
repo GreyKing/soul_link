@@ -180,6 +180,43 @@ class SoulLinkRunTest < ActiveSupport::TestCase
     assert @run.completed?
   end
 
+  # ── Step 19: wiped + read_only ─────────────────────────────────────────
+
+  test "#wiped? is true when wiped_at is set, false otherwise" do
+    assert_not @run.wiped?
+    @run.update!(wiped_at: Time.current)
+    assert @run.wiped?
+  end
+
+  test "#read_only? is true when wiped and NOT completed" do
+    @run.update!(wiped_at: Time.current)
+    assert @run.read_only?
+  end
+
+  test "#read_only? is false when only completed (HoF wins)" do
+    @run.update!(completed_at: Time.current)
+    assert_not @run.read_only?
+  end
+
+  test "#read_only? is false when both wiped and completed (HoF wins)" do
+    @run.update!(wiped_at: Time.current, completed_at: Time.current)
+    assert_not @run.read_only?
+  end
+
+  test "#read_only? is false when neither wiped nor completed" do
+    assert_not @run.read_only?
+  end
+
+  test "#broadcast_state includes wiped_at as ISO8601 (or nil)" do
+    payload = @run.broadcast_state
+    assert_includes payload.keys, :wiped_at
+    assert_nil payload[:wiped_at]
+
+    t = Time.current
+    @run.update!(wiped_at: t)
+    assert_equal t.iso8601, @run.broadcast_state[:wiped_at]
+  end
+
   # ── Step 16: TID conflict detection ────────────────────────────────────
 
   test "#tid_conflict_groups is empty when no sessions exist" do

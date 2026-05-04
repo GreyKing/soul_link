@@ -25,13 +25,30 @@ module SoulLink
     # @param events [Array<SoulLink::SaveDiff::BadgeGained, SoulLink::SaveDiff::BadgeLost>]
     #   the diff payload from `SoulLink::SaveDiff.between`.
     def self.process(slot, events)
-      run = slot.soul_link_emulator_session&.soul_link_run
+      session = slot.soul_link_emulator_session
+      run = session&.soul_link_run
       return if run.nil? || !run.active?
 
       events.each do |event|
         case event
         when SoulLink::SaveDiff::BadgeGained
+          # Step 19 — per-player progress notification fires BEFORE the
+          # gate so each session's badge-earned event lands in #general
+          # whether or not the team-beaten gate flips this turn.
+          SoulLink::DiscordNotifier.notify_gym_player_progress(
+            run, event.gym_number, session.discord_user_id
+          )
+
+          # Step 19 — capture pre-state so we can detect the nil→present
+          # transition and fire the team-beaten notification exactly
+          # once per gym. If the gym was already marked (idempotent
+          # re-run), `attempt_auto_mark` is itself a no-op and the
+          # transition predicate stays false.
+          was_marked = run.gym_results.exists?(gym_number: event.gym_number)
           attempt_auto_mark(run, event.gym_number)
+          if !was_marked && run.gym_results.exists?(gym_number: event.gym_number)
+            SoulLink::DiscordNotifier.notify_gym_team_beaten(run, event.gym_number)
+          end
         when SoulLink::SaveDiff::BadgeLost
           Rails.logger.info(
             "GymBeatenCoordinator: BadgeLost gym_number=#{event.gym_number} " \

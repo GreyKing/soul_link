@@ -7,6 +7,7 @@ module SoulLink
     POKEDEX_PATH = Rails.root.join('config', 'soul_link', 'pokedex.yml')
     MAPS_PATH = Rails.root.join('config', 'soul_link', 'maps.yml')
     MET_LOCATIONS_PATH = Rails.root.join('config', 'soul_link', 'met_locations.yml')
+    MOVE_NAMES_PATH = Rails.root.join('config', 'soul_link', 'move_names.yml')
     MAP_COORDINATES_PATH = Rails.root.join('config', 'soul_link', 'map_coordinates.yml')
     PROGRESSION_PATH = Rails.root.join('config', 'soul_link', 'progression.yml')
     TYPES_PATH = Rails.root.join('config', 'soul_link', 'types.yml')
@@ -105,6 +106,24 @@ module SoulLink
         met_locations.dig(id.to_i, "name")
       end
 
+      # Pokemon Platinum move IDs (1..467) → English move names. Loaded
+      # from config/soul_link/move_names.yml; see that file's header for
+      # the source citation (closes KG-24). Returns {} when the file is
+      # absent. Move ID 0 ("no move" sentinel) is intentionally omitted —
+      # the PC-box view filters via `m["id"].to_i.positive?`.
+      def move_names
+        @move_names ||= File.exist?(MOVE_NAMES_PATH) ? (YAML.load_file(MOVE_NAMES_PATH) || {}) : {}
+      end
+
+      # Returns the canonical English name for a move ID, or nil if the
+      # ID is unknown or nil. Callers (EmulatorHelper#format_move_name)
+      # fall back to "Move #N" for unknown IDs the same way
+      # `format_map_name` handles unknown map IDs.
+      def move_name(id)
+        return nil if id.nil?
+        move_names[id.to_i]
+      end
+
       # True for met-location IDs flagged `event: true` in
       # met_locations.yml (daycare, link trade, mystery gift,
       # ranger, faraway-place sentinels). Used by `CatchCoordinator`
@@ -192,6 +211,7 @@ module SoulLink
         @pokedex = nil
         @maps = nil
         @met_locations = nil
+        @move_names = nil
         @map_coordinates = nil
         @progression = nil
         @pokemon_types = nil

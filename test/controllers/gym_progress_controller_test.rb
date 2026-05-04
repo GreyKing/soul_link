@@ -89,4 +89,35 @@ class GymProgressControllerTest < ActionDispatch::IntegrationTest
     assert_not @run.gym_auto_mark_suppressions.exists?(gym_number: 3)
     assert @run.gym_results.exists?(gym_number: 3)
   end
+
+  # --- Step 19: DiscordNotifier wiring ------------------------------------
+
+  test "Step 19: MARK BEATEN success fires notify_gym_team_beaten" do
+    login_as(GREY)
+    calls = []
+    recorder = ->(run, gym) { calls << [ run.id, gym ] }
+
+    SoulLink::DiscordNotifier.stub(:notify_gym_team_beaten, recorder) do
+      patch gym_progress_path(gym_number: 1)
+    end
+
+    assert_equal 1, calls.size
+    assert_equal @run.id, calls.first[0]
+    assert_equal 1, calls.first[1]
+  end
+
+  test "Step 19: UNMARK does NOT fire any notifier" do
+    login_as(GREY)
+    @run.gym_results.create!(gym_number: 1, beaten_at: Time.current)
+    @run.update!(gyms_defeated: 1)
+
+    calls = []
+    recorder = ->(*) { calls << :hit }
+
+    SoulLink::DiscordNotifier.stub(:notify_gym_team_beaten, recorder) do
+      patch gym_progress_path(gym_number: 1)
+    end
+
+    assert_equal [], calls
+  end
 end

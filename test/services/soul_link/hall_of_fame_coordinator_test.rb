@@ -79,6 +79,33 @@ module SoulLink
       assert_not SoulLink::HallOfFameCoordinator.all_players_in_hall_of_fame?(@run.reload)
     end
 
+    # ── Step 19: DiscordNotifier wiring ──────────────────────────────────
+
+    test "Step 19: notify_run_complete fires once when completed_at flips nil → Time" do
+      calls = []
+      recorder = ->(run) { calls << run.id }
+      @slots.each { |slot| slot.update_columns(parsed_hof_count: 1) }
+
+      SoulLink::DiscordNotifier.stub(:notify_run_complete, recorder) do
+        SoulLink::HallOfFameCoordinator.process(@slots.first, [ event ])
+      end
+
+      assert_equal [ @run.id ], calls
+    end
+
+    test "Step 19: notify_run_complete does NOT re-fire on idempotent call (completed_at already set)" do
+      calls = []
+      recorder = ->(run) { calls << run.id }
+      @slots.each { |slot| slot.update_columns(parsed_hof_count: 1) }
+      @run.update_columns(completed_at: 2.days.ago)
+
+      SoulLink::DiscordNotifier.stub(:notify_run_complete, recorder) do
+        SoulLink::HallOfFameCoordinator.process(@slots.first, [ event ])
+      end
+
+      assert_equal [], calls
+    end
+
     # ── empty event array ─────────────────────────────────────────────────
 
     test "process with empty events is a no-op (does not even read the run)" do

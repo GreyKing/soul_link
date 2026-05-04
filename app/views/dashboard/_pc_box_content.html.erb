@@ -5,11 +5,14 @@
   <span>PC BOX - ALL POKEMON</span>
   <span style="display: flex; align-items: center; gap: 8px;">
     <span class="panel-header-sub"><%= total_count %> TOTAL</span>
-    <button type="button"
-            data-action="click->dashboard#openCatchModal"
-            class="gb-btn-primary gb-btn-sm" style="font-size: 9px; padding: 3px 8px;">
-      + NEW CATCH
-    </button>
+    <%# Step 19 — hide the catch modal trigger in read-only mode. %>
+    <% unless dashboard_read_only?(@run) %>
+      <button type="button"
+              data-action="click->dashboard#openCatchModal"
+              class="gb-btn-primary gb-btn-sm" style="font-size: 9px; padding: 3px 8px;">
+        + NEW CATCH
+      </button>
+    <% end %>
   </span>
 </div>
 <div class="panel-body">
@@ -68,7 +71,7 @@
               <% if p.moves.is_a?(Array) %>
                 <% p.moves.each_with_index do |m, i| %>
                   <% next unless m.is_a?(Hash) && m["id"].to_i.positive? %>
-                  <div>MOVE <%= i + 1 %>: #<%= m["id"] %> &middot; PP <%= m["pp"] %> &middot; &uarr;<%= m["pp_up"] %></div>
+                  <div>MOVE <%= i + 1 %>: <%= format_move_name(m["id"]) %> &middot; PP <%= m["pp"] %> &middot; &uarr;<%= m["pp_up"] %></div>
                 <% end %>
               <% end %>
             </details>

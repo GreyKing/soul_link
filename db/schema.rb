@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_03_184058) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_04_000001) do
   create_table "gym_auto_mark_suppressions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "gym_number", null: false
@@ -232,6 +232,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_03_184058) do
     t.json "player_avatars"
     t.integer "run_number", null: false
     t.datetime "updated_at", null: false
+    t.datetime "wiped_at"
     t.index ["active"], name: "index_soul_link_runs_on_active"
     t.index ["active_guild_id"], name: "index_soul_link_runs_on_active_guild_id", unique: true
     t.index ["completed_at"], name: "index_soul_link_runs_on_completed_at"

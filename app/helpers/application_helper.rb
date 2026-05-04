@@ -1,4 +1,13 @@
 module ApplicationHelper
+  # Step 19 — single source of truth for "is the dashboard in read-only
+  # mode?" (i.e., the run wiped, but not yet completed). Views guard
+  # individual affordances with `<% unless dashboard_read_only?(active_run) %>`.
+  # Server-side authz is intentionally NOT updated in v1; KG covers the
+  # follow-on enforcement step.
+  def dashboard_read_only?(run)
+    run&.read_only? || false
+  end
+
   # Renders a Pokemon sprite <img> tag for the given species name.
   # Returns empty string if species has no sprite mapping (graceful fallback).
   def pokemon_sprite_tag(species_name, size: 32)
