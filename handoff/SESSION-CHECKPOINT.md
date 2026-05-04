@@ -6,7 +6,7 @@
 
 ## Where We Stopped
 
-Step 20 (Phase 1 cross-cutting safety nets — post-audit) shipped at `<sha-pending>`, FF-merged to `origin/main` and pushed. Awaiting next brief from Project Owner.
+Step 20 (Phase 1 cross-cutting safety nets — post-audit) shipped at `fbd51af`, FF-merged to `origin/main` and pushed. Awaiting next brief from Project Owner.
 
 The user's instructions were explicit: after Step 20 ships, **stop**. Phase 2 redesigns (R3 Save Slots → R2 PC Box → R4 Map → R1 Dashboard, in that order per § 5 of the audit) each get their own future session.
 

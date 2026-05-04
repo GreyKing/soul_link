@@ -18,7 +18,7 @@ reset until the gap is addressed or the decision is replaced.
 **Brakeman:** Clean (no new warnings; 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess unchanged from Steps 18/19).
 **Migrations:** None.
 
-**Shipped:** Step 20 committed at `<sha-pending>` on branch `claude/condescending-jones-2bf3c7`, FF-merged to `origin/main` and pushed.
+**Shipped:** Step 20 committed at `fbd51af` on branch `claude/condescending-jones-2bf3c7`, FF-merged to `origin/main` and pushed.
 **Pending deploy:** Step 20 has zero migrations and zero new gem dependencies. Pure ERB/CSS/JS + new Stimulus controllers. Pre-deploy safe.
 
 **Audit FF-merge prelude:** before Step 20, the 2026-05-04 UI/UX audit + 4 redesign mockups (`handoff/2026-05-04-ui-audit*.{md,html}`) plus the OFF-FEED `var(--d3)` inline fix landed on `origin/main` at `028643b` after a rebase off Step 19. Step 20 builds on that.
@@ -45,7 +45,7 @@ reset until the gap is addressed or the decision is replaced.
 *Session-scoped.*
 
 ### Step 20 — Phase 1 cross-cutting safety nets (post-audit) — 2026-05-04
-**Status:** Shipped at `<sha-pending>`. **No KGs close** (the audit's Phase 1 was net-additive infrastructure, not a backlog item). Reviewed by Richard: 0 Must Fix, 0 Should Fix, 2 Nice-to-Have (unused `window.__confirmModals` registry + unreachable cancel-target fallback in `confirm_modal_controller.js`, both intentional defense-in-depth, accepted as-is).
+**Status:** Shipped at `fbd51af`. **No KGs close** (the audit's Phase 1 was net-additive infrastructure, not a backlog item). Reviewed by Richard: 0 Must Fix, 0 Should Fix, 2 Nice-to-Have (unused `window.__confirmModals` registry + unreachable cancel-target fallback in `confirm_modal_controller.js`, both intentional defense-in-depth, accepted as-is).
 
 Five buckets per § 5 of `handoff/2026-05-04-ui-audit.md`, all bundled to pay one review tax and unblock the Phase 2 redesigns. The five (A → E → D → B → C build order to keep diffs reviewable):
 
