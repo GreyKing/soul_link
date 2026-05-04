@@ -26,7 +26,7 @@ reset until the gap is addressed or the decision is replaced.
 **Brakeman:** Clean (no new warnings; same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess unchanged from Steps 18/19/20).
 **Migrations:** None.
 
-**Shipped:** Step 20 (previous step) committed at `fbd51af` on branch `claude/condescending-jones-2bf3c7`, FF-merged to `origin/main` and pushed. Step 21 reviewed clear and ready to ship on `claude/agitated-matsumoto-d48881`; deploy gate approved by Project Owner 2026-05-04.
+**Shipped:** Step 21 committed at `3c001ed` on branch `claude/agitated-matsumoto-d48881`, FF-merged to `origin/main` and pushed. Step 20 (previous step) committed at `fbd51af`.
 **Pending deploy:** Step 21 has zero migrations and zero new gem dependencies. Pure ERB/CSS/JS + 1 new Stimulus controller. Pre-deploy safe.
 
 **Audit FF-merge prelude:** before Step 20, the 2026-05-04 UI/UX audit + 4 redesign mockups (`handoff/2026-05-04-ui-audit*.{md,html}`) plus the OFF-FEED `var(--d3)` inline fix landed on `origin/main` at `028643b` after a rebase off Step 19. Step 20 built on that. Step 21 is the first Phase 2 redesign (R3 Save Slots) per § 5 of the audit (locked R3 → R2 → R4 → R1 ship order).

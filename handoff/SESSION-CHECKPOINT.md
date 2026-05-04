@@ -6,51 +6,44 @@
 
 ## Where We Stopped
 
-Step 20 (Phase 1 cross-cutting safety nets — post-audit) shipped at `fbd51af`, FF-merged to `origin/main` and pushed. Awaiting next brief from Project Owner.
+Step 21 (R3 Save Slots redesign — Phase 2 R3 of the 2026-05-04 UI/UX audit) shipped at `3c001ed`, FF-merged to `origin/main` and pushed. Worktree branch `claude/agitated-matsumoto-d48881` also pushed. Awaiting next brief from Project Owner.
 
-The user's instructions were explicit: after Step 20 ships, **stop**. Phase 2 redesigns (R3 Save Slots → R2 PC Box → R4 Map → R1 Dashboard, in that order per § 5 of the audit) each get their own future session.
+The user's instructions were explicit: after Step 21 ships, **stop**. R2 (PC Box) gets its own future session. Locked Phase 2 ship order: R3 → R2 → R4 → R1.
 
 ---
 
 ## What Was Built
 
-**Step 20 — Phase 1 cross-cutting safety nets (post-audit).**
+**Step 21 — R3 Save Slots redesign.**
 
-Five buckets bundled per § 5 of `handoff/2026-05-04-ui-audit.md`. They're independent and small individually; bundling pays one review tax and unblocks the four queued redesigns.
+Implements the locked mockup `handoff/2026-05-04-ui-audit-mockup-save-slots.html` across all 5 screens. Layered on the existing save-slot models + parser pipeline (Steps 9-12 + 17-18); only the view + Stimulus controllers change. Two Arch decisions resolved up-front: (1) inline DELETE confirmation is genuinely inline per the mockup, not the Step 20 modal — the Project Owner's prompt-text pointed at the modal but the mockup is locked design, so the mockup wins; (2) roster cards show trainer stats, not party Pokémon — `OFF-FEED` stays on the PC BOX tab where Step 18 put it.
 
 **Surfaces introduced:**
-- **Bucket A** — `pixeldex.css:1061-1064`: new `@media (max-width: 520px) { .gb-grid-3 { grid-template-columns: 1fr; } .gb-grid-4 { grid-template-columns: 1fr; } }` block. Cascades to runs/index, dashboard runs tab, teams/index, gym_ready, map (special encounters), gym_schedules show. `.gb-grid-2` intentionally untouched.
-- **Bucket B** — Shared confirm-modal partial:
-  - `app/views/shared/_confirm_modal.html.erb` (NEW directory)
-  - `app/helpers/confirm_modal_helper.rb` — single method `confirm_modal(id:, title:, body:, confirm_label:, confirm_class:, confirm_data:, cancel_label:)`
-  - `app/javascript/controllers/confirm_modal_controller.js` — per-instance Stimulus controller; `open(event)` discriminates by `event.params?.id !== this.idValue`; saves prior focus + focuses Cancel target + traps Tab; `close()` restores focus.
-  - Wired into 6 destructive sites: dashboard END RUN, /runs END RUN, save-slot DELETE, CLEAR ALL SLOTS, group DEL, schedule Cancel — distinct ids per site.
-  - 4 JS controllers had their now-redundant native `window.confirm()` calls removed (save_slots, clear_save, run_management endRun only, gym_schedule).
-  - `save_slots_controller.js#_actionButtons()` selector updated to match new `[data-confirm-modal-id-param^='delete-slot-']` triggers (overwrite-pending mode still disables them).
-  - `species_assignment_controller.js#deleteGroup` now reads `groupId` from confirm-button dataset directly (with closest-fallback for legacy callers).
-- **Bucket C** — `app/javascript/controllers/modal_a11y_controller.js` (NEW). Sibling Stimulus controller; `#findWrapper()` walks parents; MutationObserver on the wrapper's `class` attribute drives open/close; on open saves prior focus + focuses first focusable + attaches Tab-trap. Applied `role="dialog" aria-modal="true" aria-labelledby="<id>-title" data-controller="modal-a11y"` to: `_catch_modal`, `_pokemon_modal`, `_mark_dead_modal`, `_reset_draft_modal`, `_quick_calc_modal`, and the inline group modal in `species_assignments/show.html.erb`. Coin-flip modal in `gym_drafts/show.html.erb` got ARIA only (no close button, auto-dismisses post-animation, focus trap on a 1-2s coin animation would be active friction). Bundle-in: `pixeldex.html.erb:28` got `data-controller="escape-close"` to match `application.html.erb` — pre-Step-20 the dashboard modals had no global ESC handler.
-- **Bucket D** — Two-layer fix. View: `gym_schedules/show.html.erb:64` wraps the cancel button + accompanying confirm-modal partial in `<% if @schedule.proposed_by == current_user_id %>`. Channel: `gym_schedule_channel.rb#cancel(_data)` early-returns with `transmit({ error: "Only the proposer can cancel this schedule." })` when `current_user_id != @schedule.proposed_by`.
-- **Bucket E** — `_gyms_content.html.erb:52` replaced `&lt;NEXT` literal with a styled `type-text` badge: `<span class="type-text" style="border-color: var(--amber); color: var(--amber); margin-left: 4px;">NEXT</span>`.
+- **Save-slot column** (`app/views/emulator/_save_slots_sidebar.html.erb`, full body rewrite) — every slot carries an always-visible state pill (`EMPTY` / `SAVED` / `ACTIVE` / `TARGET` / `CONFIRM`). Empty-slot copy is the CTA `— drop a save here from the emulator —`. Active slot gets the 4px green-glow border. Per-slot DELETE swaps the actions row in-place into a `.confirm-inline` block (with stake copy from the new `format_progress_phrase` helper) — replaces the Step 20 modal wiring. CLEAR ALL SLOTS in `.footer-actions` with dashed-border treatment + same inline-confirm pattern. Step 20's `_confirm_modal.html.erb` partial stays in use for END RUN, group DEL, schedule cancel — only the two save-slot wire sites moved to inline.
+- **Overwrite-pending mode** — sticky `⚠ SAVE FULL — PICK A SLOT TO OVERWRITE` banner replaces the spring-loaded per-slot overlay. Filled slots themselves become click targets via amber TARGET pill + border + wrapper-level data-action. `window.confirm` removed from `overwriteSlot` — banner is the announcement, click is the consent.
+- **Roster card** (`app/views/emulator/_run_sidebar_card.html.erb`, full body rewrite) — name + status pill in `.head` row, then a 3-tile stat strip (BADGES / DEX / PLAY) replaces the wall of label rows, then a TID conflict warning band with partner names (looked up against `tid_conflict_groups`) and "re-roll the seed" copy, then `<details>STATS</details>` collapse for trainer / map / money / TID-SID / DEX-seen + the seed (now click-to-copy via the new controller). HOF lives as an inline pill in the trainer name span. Money symbol dropped (audit Cross-cutting 4). Partial keeps its `s`-only locals contract — broadcast renderer has no controller context, so no `current_user_id` / `@run_sessions` references.
+- **`save_slots_controller.js`** — added targets `slotPill` / `actionRow` / `confirmRow` / `clearAllAction` / `clearAllConfirm`. New actions: `confirmDelete` / `cancelDelete` / `confirmClearAll` / `cancelClearAll` / `cancelOverwrite`. `_enterOverwriteMode` now caches each slot's original pill class+text on dataset for restore, hides any open `confirmRow` before swapping (Should Fix from review), wires `data-action="click->save-slots#overwriteSlot"` on the slot wrapper, and hides per-slot action rows. `_exitOverwriteMode` restores from dataset. `_actionButtons()` selector retargeted at `[data-action*='save-slots#confirmDelete']` so overwrite-pending mode still disables the now-internal triggers.
+- **`roster_you_marker_controller.js`** — emits `.you` class (replaces `.gb-card--current-user`) and injects the `.you-badge` span inside `.roster-card-name` instead of appending to the first child div. Inline `style.cssText` dropped — new `.you-badge` CSS owns it.
+- **`roster_seed_controller.js`** (new, ~25 lines) — Stimulus controller for click-to-copy. `await navigator.clipboard.writeText(seed)`, swaps element text to `Copied!` for 1s, restores. `window.alert` fallback for older browsers / non-secure contexts.
+- **`pixeldex.css`** — three new design tokens added to `:root`: `--d0: #0a1a0a;` (darker bezels / action-button bg / seed monospace bg), `--green-glow: #5fd45f;` (ACTIVE pill bg + active-slot 4px border), `--crimson: #c75a5a;` (CONFIRM pill + DELETE FOREVER button + inline-confirm border). New `/* ── R3 Save Slots ── */` section (~245 lines) above the RESPONSIVE block, mockup CSS verbatim except `.slot.overwriteTarget` → `.slot.overwrite-target` (kebab-case, project convention). No existing rule edited.
+- **`format_progress_phrase`** (new helper in `EmulatorHelper`) — locked rule: integer-hour truncation, no zero-pad, singular special-cases for 1 minute / 1 hour. Used only by the inline DELETE stake copy.
 
-**Counts:** 654 → 676 tests (+22). 2011 → 2095 assertions, 0 failures, 0 errors. Rubocop clean (191 → 197 files, 0 offenses). Brakeman clean (0 errors, 2 pre-existing weak-confidence warnings unchanged from Steps 18/19). 0 migrations. 0 new gem dependencies.
+**Counts:** 676 → 697 tests (+21). 0 failures, 0 errors. Rubocop clean (197 files, 0 offenses; +1 file for `roster_seed_controller.js`). Brakeman clean (0 errors; same 2 pre-existing weak-confidence warnings unchanged from Steps 18/19/20). 0 migrations. 0 new gem dependencies.
 
-**Review:** 0 Must Fix, 0 Should Fix, 2 Nice-to-Have (`window.__confirmModals` registry unused / `cancel`-target fallback unreachable in `confirm_modal_controller.js`, both intentional defense-in-depth, accepted as-is). 0 Notes escalated.
-
-**Audit FF-merge prelude:** before Step 20, the 2026-05-04 UI/UX audit + 4 redesign mockups (`handoff/2026-05-04-ui-audit*.{md,html}`) plus the OFF-FEED `var(--d3)` inline fix landed on `origin/main` at `028643b` after a rebase off Step 19. Step 20 builds on that.
+**Review:** 0 Must Fix, 1 Should Fix (fixed inline), 0 Notes escalated. The Should Fix: `_enterOverwriteMode` did not reconcile a slot whose inline DELETE confirm was already open — slot would render both "confirm delete?" row AND amber TARGET pill simultaneously, and on exit the cached pill would restore to SAVED instead of in-flight CONFIRM. Fixed by hiding the slot's `confirmRow` before the pill swap, with a 4-line WHY comment. Single-method change, no test churn.
 
 ---
 
 ## What Was Decided This Session
 
-- **Shared confirm-modal lookup is via per-instance `idValue` matching, not via global registry.** Every connected `confirm-modal` controller receives the click event when a trigger fires `click->confirm-modal#open`; each instance's `open()` checks `if (event.params?.id !== this.idValue) return` to filter. The `window.__confirmModals[id] = element` registry is populated for future programmatic access but currently dead code (KG-32).
-- **Per-modal partial render, not a single shared modal element.** Every wire site renders its own `_confirm_modal.html.erb` partial inline (e.g. inside the slot card, inside the group card, etc.) with a unique `id`. DOM-bloat cost; no cross-controller state plumbing.
-- **`modal_a11y_controller.js` discovers the wrapper via parent-walk.** Walks `parentElement` looking for either `.hidden` or `position: fixed` inline style. Heuristic but covers every modal in the codebase.
-- **Coin-flip modal is ARIA-only.** No close button + 1-2s animation + auto-dismiss = focus trap is friction, not help. `aria-modal="true"` + `role="dialog"` is enough for screen-reader announcement.
-- **The shared partial body accepts safe HTML via `raw(body)`.** Trusted call sites only — none of the six wire sites pass user input into the body string.
-- **Distinct ids for END RUN dashboard vs /runs page (`end-run-dashboard-confirm` vs `end-run-page-confirm`).** Defensive — survives a future view merge.
-- **`pixeldex.html.erb` got `escape-close` controller** (one-line bundle-in not in the original brief). Pre-Step-20 the dashboard modals had no global ESC handler. Bringing the layout to parity with `application.html.erb` was implicit in Bucket C.
-- **Native `window.confirm()` removal scope.** Only the 4 callsites covered by the brief's 6 wire sites had their native confirm dialogs removed (the two endRun callsites share one JS handler). Out-of-scope confirms in `run_management_controller.js` (`startRun` and `regenerateEmulatorRoms`) explicitly left alone.
-- **`gym_schedule_channel.rb#cancel` server-side authz (per-action, not via KG-28).** Read-only mode (KG-28) is "UI hide only"; cancel-schedule is a different scope with unambiguous ownership (proposer = owner). Per-action call: server-enforce because it's free.
+- **Inline DELETE is genuinely inline, not the Step 20 modal.** The Project Owner's prompt text said "use the shared confirm-modal partial" but the mockup explicitly shows in-place row swap. Mockup is locked design — Arch decision in the brief, accepted by Bob and Richard. The Step 20 partial / helper / controller stay untouched and continue to serve the four other consumers (END RUN dashboard, /runs END RUN, group DEL, schedule cancel).
+- **Roster cards show trainer stats, not party Pokémon.** The Project Owner's prompt mentioned `OFF-FEED` and "alive/dead" pills "inline with the species" — the mockup roster cards have no party at all. OFF-FEED lives on the PC BOX tab from Step 18.
+- **Pill-class repurposing is a single colour vocabulary.** `state-pill.saved` (neutral) / `target` (amber, in-progress / overwrite target) / `confirm` (red, destructive / failed) carry the colour grammar across BOTH save-slot and roster-card surfaces. Roster status mapping: `ready` → saved, `pending`/`generating` → target, `failed` → confirm. The trade is that a future tweak to one colour cascades to the other; explicitly accepted as a feature, not a bug.
+- **TID conflict band lookup is N+1 by primary key, on a cold path.** `tid_conflict_groups` returns session ids; the partial does up to 3 `find_by` calls per render, only when conflict applies. No preload contortions for a path that fires rarely. Broadcast partial has no preload context anyway.
+- **`format_progress_phrase` rule locked in helper docstring.** Integer-hour truncation, no zero-pad, singular for 1 minute / 1 hour. Tested at all 5 boundaries (`60 → 1 minute`, `120 → 2 minutes`, `3600 → 1 hour`, `7200 → 2 hours`, `3h59m → 3 hours of progress`).
+- **`window.confirm` removed from `overwriteSlot`.** Banner-as-announcement + click-as-consent contract; the redesign is the safer surface.
+- **Three new design tokens (`--d0`, `--green-glow`, `--crimson`); no others added.** The audit explicitly forbade additions beyond what the mockup uses.
+- **`.emulator-grid` shape locked by test** — `1fr` outside any media block AND `280px minmax(0, 1fr) 280px` at the existing 900px breakpoint. Step 20's collapse stays correct after R3.
 
 ---
 
@@ -58,19 +51,16 @@ Five buckets bundled per § 5 of `handoff/2026-05-04-ui-audit.md`. They're indep
 
 *See `handoff/BUILD-LOG.md` Known Gaps — running list maintained there.*
 
-Step 20 closed nothing — Phase 1 was net-additive infrastructure rather than a backlog item. Logged two new gaps:
-- **KG-31** — `_mark_dead_modal.html.erb` and `_reset_draft_modal.html.erb` retain their bespoke implementations rather than folding onto the shared partial. Future cleanup can consolidate.
-- **KG-32** — `confirm-modal` Stimulus controller's `window.__confirmModals` registry is unused dead code. Earns its keep if a future external script wants programmatic modal access by id.
+Step 21 closed nothing — R3 was net-additive UX rather than a backlog item. Logged two new gaps:
+- **KG-33** — slot card no longer shows "saved Xm ago" footer or `number_to_human_size(saved_bytes)` row. Mockup-driven omission, not a parser regression. `slot.updated_at` and `save_data.bytesize` still persist server-side; surface again if the Project Owner misses them.
+- **KG-34** — roster card no longer shows "Active … ago" or "Save: bytes" rows. Same shape as KG-33; same data still available server-side.
 
-KG-7, KG-19, KG-20, KG-23, KG-25, KG-26, KG-27, KG-28, KG-29, KG-30 still open from earlier steps.
+KG-7, KG-19, KG-20, KG-23, KG-25, KG-26, KG-27, KG-28, KG-29, KG-30, KG-31, KG-32 still open from earlier steps.
 
 **Phase 2 redesigns (queued, separate sessions per the user's instruction):**
-- R3 Save Slots — `handoff/2026-05-04-ui-audit-mockup-save-slots.html` (highest blast radius — bug-fix-shaped)
-- R2 PC Box — `handoff/2026-05-04-ui-audit-mockup-pc-box.html` (densest UX issues, busiest tab)
-- R4 Map / Route timeline — `handoff/2026-05-04-ui-audit-mockup-map.html` (highest creativity opportunity)
-- R1 Dashboard shell + tab navigation — `handoff/2026-05-04-ui-audit-mockup-dashboard.html` (last because it reshapes chrome around tabs that R2/R4 already changed)
-
-Per § 5 of the audit, ship order is R3 → R2 → R4 → R1.
+- R2 PC Box — `handoff/2026-05-04-ui-audit-mockup-pc-box.html` (Step 22, next)
+- R4 Map / Route timeline — `handoff/2026-05-04-ui-audit-mockup-map.html` (Step 23)
+- R1 Dashboard shell + tab navigation — `handoff/2026-05-04-ui-audit-mockup-dashboard.html` (Step 24, last — reshapes chrome around tabs that R2/R4 already changed)
 
 ---
 
