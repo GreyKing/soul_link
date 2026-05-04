@@ -331,5 +331,176 @@ module SoulLink
       )
       assert_not result.empty?
     end
+
+    # ── Step 18: box diff (BoxedPokemonObservedEvent) ─────────────────
+
+    def box_h(pid:, species: 100, met_loc: 16, level: nil, ot_id: 1, ot_sid: 1, is_egg: false,
+              nature: nil, ivs: nil, evs: nil, moves: nil)
+      h = { pid: pid, species: species, met_location_id: met_loc, level: level,
+            ot_id: ot_id, ot_sid: ot_sid, is_egg: is_egg }
+      h[:nature] = nature if nature
+      h[:ivs]    = ivs    if ivs
+      h[:evs]    = evs    if evs
+      h[:moves]  = moves  if moves
+      h
+    end
+
+    test "Step 18 backward compat: Step-17 call signature returns empty box_events" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_party: [], curr_party: []
+      )
+      assert_equal [], result.box_events
+      assert result.empty?
+    end
+
+    test "Step 18: box_events default to [] when prev_box / curr_box not passed" do
+      result = SoulLink::SaveDiff.between(prev_badges: 0, curr_badges: 1)
+      assert_equal [], result.box_events
+    end
+
+    test "Step 18: empty prev_box + 1 PKM curr_box → 1 BoxedPokemonObservedEvent" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_box: [],
+        curr_box: [ box_h(pid: 0xAAAA, species: 387, met_loc: 16) ]
+      )
+      assert_equal 1, result.box_events.size
+      event = result.box_events.first
+      assert_kind_of SoulLink::SaveDiff::BoxedPokemonObservedEvent, event
+      assert_equal 0xAAAA, event.pid
+      assert_equal 387,    event.species_id
+      assert_equal 16,     event.met_location_id
+    end
+
+    test "Step 18: PID present in both prev_box and curr_box → no event" do
+      same = box_h(pid: 0xAAAA, species: 387, met_loc: 16)
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_box: [ same ], curr_box: [ same ]
+      )
+      assert_equal [], result.box_events
+    end
+
+    test "Step 18: PID in prev_box only (withdrawn / released) → no event (no removal counterpart)" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_box: [ box_h(pid: 0xAAAA) ],
+        curr_box: [ box_h(pid: 0xBBBB) ]
+      )
+      # Per brief decision 5 — no BoxedPokemonRemovedEvent.
+      box_events = result.box_events
+      assert_equal 1, box_events.size
+      assert_equal 0xBBBB, box_events.first.pid
+    end
+
+    test "Step 18: nil prev_box → []" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_box: nil, curr_box: [ box_h(pid: 0xAAAA) ]
+      )
+      assert_equal [], result.box_events
+    end
+
+    test "Step 18: nil curr_box → []" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_box: [ box_h(pid: 0xAAAA) ], curr_box: nil
+      )
+      assert_equal [], result.box_events
+    end
+
+    test "Step 18: zero / nil PID entries in box are skipped (defense in depth)" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_box: [],
+        curr_box: [ box_h(pid: 0), box_h(pid: nil), box_h(pid: 0xCAFE) ]
+      )
+      assert_equal 1, result.box_events.size
+      assert_equal 0xCAFE, result.box_events.first.pid
+    end
+
+    test "Step 18: BoxedPokemonObservedEvent carries nature/ivs/evs/moves when present" do
+      ivs = { hp: 31, atk: 31, def: 31, spe: 31, spa: 31, spd: 31 }
+      evs = { hp: 252, atk: 0, def: 4, spe: 252, spa: 0, spd: 0 }
+      moves = [ { id: 1, pp: 35, pp_up: 0 } ]
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_box: [],
+        curr_box: [ box_h(pid: 0xAAAA, nature: 0, ivs: ivs, evs: evs, moves: moves) ]
+      )
+      event = result.box_events.first
+      assert_equal 0,     event.nature
+      assert_equal ivs,   event.ivs
+      assert_equal evs,   event.evs
+      assert_equal moves, event.moves
+    end
+
+    test "Step 18: PokemonCaughtEvent also carries nature/ivs/evs/moves when populated upstream" do
+      ivs = { hp: 31, atk: 31, def: 31, spe: 31, spa: 31, spd: 31 }
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_party: [],
+        curr_party: [ pkm_h(pid: 0xAAAA).merge(nature: 5, ivs: ivs) ]
+      )
+      event = result.catch_events.first
+      assert_equal 5,   event.nature
+      assert_equal ivs, event.ivs
+    end
+
+    test "Step 18 backward compat: Step-17 PokemonCaughtEvent without new fields gets nil" do
+      # An old parsed_party_data Hash doesn't have nature/ivs/evs/moves keys.
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_party: [],
+        curr_party: [ pkm_h(pid: 0xAAAA) ]
+      )
+      event = result.catch_events.first
+      assert_nil event.nature
+      assert_nil event.ivs
+      assert_nil event.evs
+      assert_nil event.moves
+    end
+
+    test "Step 18: string-keyed box entries (post-JSON roundtrip) work" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_box: [],
+        curr_box: [ {
+          "pid" => 0xCAFE, "species" => 50, "met_location_id" => 17,
+          "level" => nil, "ot_id" => 1, "ot_sid" => 1, "is_egg" => false,
+          "nature" => 5, "ivs" => { "hp" => 31, "atk" => 31, "def" => 31, "spe" => 31, "spa" => 31, "spd" => 31 }
+        } ]
+      )
+      assert_equal 1, result.box_events.size
+      event = result.box_events.first
+      assert_equal 0xCAFE, event.pid
+      assert_equal 50,     event.species_id
+      assert_equal 5,      event.nature
+    end
+
+    test "Step 18: same PID in both party AND box (curr) yields events on BOTH sides" do
+      # The party diff sees a new PID → PokemonCaughtEvent. The box diff
+      # also sees the same PID as new → BoxedPokemonObservedEvent.
+      # CatchCoordinator dedups so only one row is created.
+      shared_pid = 0xDEADBEEF
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_party: [], curr_party: [ pkm_h(pid: shared_pid) ],
+        prev_box:   [], curr_box:   [ box_h(pid: shared_pid) ]
+      )
+      assert_equal 1, result.catch_events.size
+      assert_equal 1, result.box_events.size
+      assert_equal shared_pid, result.catch_events.first.pid
+      assert_equal shared_pid, result.box_events.first.pid
+    end
+
+    test "Step 18: Result#empty? false when only box_events populated" do
+      result = SoulLink::SaveDiff.between(
+        prev_badges: 0, curr_badges: 0,
+        prev_box: [], curr_box: [ box_h(pid: 0xAAAA) ]
+      )
+      assert_not result.empty?
+    end
   end
 end

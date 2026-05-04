@@ -42,6 +42,12 @@ module SoulLink
         # block is corrupt — `PartyParser.parse` returns [] on any
         # failure, never nil from a successful trainer parse.
         party_data = SoulLink::PartyParser.parse(slot.save_data).map(&:to_h)
+        # Step 18: parse the PC-box (storage) block too. Same shape —
+        # pure function, returns [] on any failure, never raises.
+        # Storage and party blocks live in independent partitions
+        # (PKHeX swaps them separately), so a corrupt party block
+        # doesn't preclude a valid box parse and vice versa.
+        box_data = SoulLink::BoxParser.parse(slot.save_data).map(&:to_h)
 
         slot.update_columns(
           parsed_trainer_name:   result.trainer_name,
@@ -55,6 +61,7 @@ module SoulLink
           parsed_pokedex_seen:   result.pokedex_seen,
           parsed_hof_count:      result.hof_count,
           parsed_party_data:     party_data,
+          parsed_box_data:       box_data,
           parsed_at:             Time.current
         )
 
@@ -65,6 +72,7 @@ module SoulLink
         # so a CRC-bad save never appears as "lost all badges" to the
         # diff layer. The slot card still renders the most recently
         # successful parse. Dispatch is skipped entirely (no Result).
+        # parsed_box_data also stays at its prior value (Step 18).
         slot.update_columns(parsed_at: Time.current)
       end
     end
@@ -82,7 +90,9 @@ module SoulLink
         hof_count:      slot.parsed_hof_count,
         # Step 17 — Array<Hash> or nil. nil on first-ever parse / on
         # rows pre-dating the Step-17 column add (additive migration).
-        party_data:     slot.parsed_party_data
+        party_data:     slot.parsed_party_data,
+        # Step 18 — Array<Hash> or nil. Same semantics as party_data.
+        box_data:       slot.parsed_box_data
       }
     end
   end

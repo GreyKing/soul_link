@@ -62,6 +62,8 @@ module SoulLink
           case event
           when SoulLink::SaveDiff::PokemonCaughtEvent
             handle_caught(slot, session, run, event)
+          when SoulLink::SaveDiff::BoxedPokemonObservedEvent
+            handle_box_observed(slot, session, run, event)
           when SoulLink::SaveDiff::PokemonRemovedEvent
             Rails.logger.info(
               "CatchCoordinator: PokemonRemovedEvent pid=#{event.pid} " \
@@ -73,13 +75,35 @@ module SoulLink
     end
 
     def self.handle_caught(_slot, session, run, event)
+      create_pokemon_row(session, run, event, caught_off_feed: false)
+    end
+
+    # Step 18 — `BoxedPokemonObservedEvent` arrives via the PC-box diff
+    # path. Same shape as `handle_caught`; the only difference is the
+    # `caught_off_feed: true` flag. The PID-dedup `.exists?` check
+    # ensures a same-snapshot party+box double-fire creates only one
+    # row, with the party-side `caught_off_feed: false` winning because
+    # `SaveDiffDispatcher` orders catch_events ahead of box_events.
+    def self.handle_box_observed(_slot, session, run, event)
+      create_pokemon_row(session, run, event, caught_off_feed: true)
+    end
+
+    # Shared row-create path. Returns nil silently when the event is
+    # filtered (egg / zero PID / unclaimed session / dedup hit) —
+    # matching the prior `handle_caught` no-op semantics.
+    def self.create_pokemon_row(session, run, event, caught_off_feed:)
       return if event.is_egg                  # defense-in-depth (filtered upstream)
       return if event.pid.to_i.zero?          # corrupt or empty slot
 
       uid = session.discord_user_id
       return if uid.nil?                      # session not yet claimed by a player
 
-      # PID dedup against the (run, player, pid) triple.
+      # PID dedup against the (run, player, pid) triple. This single
+      # check covers both intra-event-type dedup AND the cross-event
+      # (party + box, same PID, same snapshot) collision — the
+      # dispatcher orders catch_events first, so by the time a
+      # BoxedPokemonObservedEvent for the same PID arrives the row is
+      # already in DB and this exists? short-circuits.
       return if SoulLinkPokemon
                   .where(soul_link_run_id: run.id, discord_user_id: uid, pid: event.pid)
                   .exists?
@@ -89,6 +113,7 @@ module SoulLink
       species_s = resolve_species_string(event.species_id)
       trade_in  = trade_in?(session, event)
       via       = acquired_via(met_id, trade_in)
+      nature_s  = SoulLink::Natures.name(event.nature) if event.nature
 
       SoulLinkPokemon.create!(
         soul_link_run_id:    run.id,
@@ -104,7 +129,15 @@ module SoulLink
         ot_id:               event.ot_id,
         ot_sid:              event.ot_sid,
         trade_in:            trade_in,
-        acquired_via:        via
+        acquired_via:        via,
+        # Step 18 — per-Pokémon stats. Nil for legacy parse data
+        # (Step-17 parsed_party_data without the new keys); JSON
+        # columns store nil cleanly.
+        nature:              nature_s,
+        ivs:                 event.ivs,
+        evs:                 event.evs,
+        moves:               event.moves,
+        caught_off_feed:     caught_off_feed
       )
     end
 

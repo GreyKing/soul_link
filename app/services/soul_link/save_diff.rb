@@ -39,21 +39,43 @@ module SoulLink
     # PokemonRemovedEvent. Same PID present in both → no event (covers
     # deposit-and-re-catch round-trip across the box block which we
     # don't parse in Step 17).
+    # Step 18 extends `PokemonCaughtEvent` with the per-Pokémon stats
+    # (`nature` / `ivs` / `evs` / `moves`) so `CatchCoordinator` can
+    # populate the corresponding `SoulLinkPokemon` columns. Step-17
+    # callers that don't populate these fields get nil — backwards
+    # compatible because keyword Structs default missing keys to nil.
     PokemonCaughtEvent  = Struct.new(
       :pid, :species_id, :met_location_id, :level, :ot_id, :ot_sid, :is_egg,
+      :nature, :ivs, :evs, :moves,
       keyword_init: true
     )
     PokemonRemovedEvent = Struct.new(:pid, keyword_init: true)
 
+    # Step 18: PC-box parse events — distinct from PokemonCaughtEvent
+    # because provenance matters for the UX ("OFF-FEED" pill) and
+    # because the box-side diff is over a different parsed_* column.
+    # Same shape as PokemonCaughtEvent so CatchCoordinator can mostly
+    # reuse handle_caught's body. PIDs that appear in BOTH the party
+    # diff and the box diff for the same snapshot fire both events,
+    # but the (run, user, pid) `.exists?` check in CatchCoordinator
+    # ensures only one row is created per PID.
+    BoxedPokemonObservedEvent = Struct.new(
+      :pid, :species_id, :met_location_id, :level, :ot_id, :ot_sid, :is_egg,
+      :nature, :ivs, :evs, :moves,
+      keyword_init: true
+    )
+
     Result = Struct.new(
       :badge_events, :tid_events, :pokedex_events, :hof_events,
       :catch_events, :removal_events,
+      :box_events,
       keyword_init: true
     ) do
       def empty?
         badge_events.empty? && tid_events.empty? &&
           pokedex_events.empty? && hof_events.empty? &&
-          catch_events.empty? && removal_events.empty?
+          catch_events.empty? && removal_events.empty? &&
+          box_events.empty?
       end
     end
 
@@ -89,7 +111,8 @@ module SoulLink
                      prev_pokedex_caught: nil, curr_pokedex_caught: nil,
                      prev_pokedex_seen: nil,   curr_pokedex_seen: nil,
                      prev_hof_count: nil,      curr_hof_count: nil,
-                     prev_party: nil,          curr_party: nil)
+                     prev_party: nil,          curr_party: nil,
+                     prev_box: nil,            curr_box: nil)
       catches, removals = diff_party(prev_party, curr_party)
       Result.new(
         badge_events:   diff_badges(prev_badges, curr_badges),
@@ -98,7 +121,8 @@ module SoulLink
                                      prev_pokedex_seen,   curr_pokedex_seen),
         hof_events:     diff_hof(prev_hof_count, curr_hof_count),
         catch_events:   catches,
-        removal_events: removals
+        removal_events: removals,
+        box_events:     diff_box(prev_box, curr_box)
       )
     end
 
@@ -183,7 +207,14 @@ module SoulLink
           level:           hash_get(entry, :level),
           ot_id:           hash_get(entry, :ot_id),
           ot_sid:          hash_get(entry, :ot_sid),
-          is_egg:          hash_get(entry, :is_egg) ? true : false
+          is_egg:          hash_get(entry, :is_egg) ? true : false,
+          # Step 18 — per-Pokémon stats. Defaults to nil for entries
+          # missing the keys (Step-17 parsed_party_data rows pre-dating
+          # the PkmDecoder extension).
+          nature:          hash_get(entry, :nature),
+          ivs:             hash_get(entry, :ivs),
+          evs:             hash_get(entry, :evs),
+          moves:           hash_get(entry, :moves)
         )
       end
 
@@ -194,6 +225,38 @@ module SoulLink
       end
 
       [ catches, removals ]
+    end
+
+    # Step 18 — PC-box diff. Returns BoxedPokemonObservedEvent for each
+    # PID present in `curr_box` but absent from `prev_box`. Mirrors
+    # `diff_party`'s defensive-nil shape: either side nil → []. Skips
+    # entries with nil/zero PID (defense in depth — PartyParser /
+    # BoxParser already filter eggs and species==0, but a corrupted
+    # parsed_box_data JSON could still smuggle a zero-PID entry through).
+    def self.diff_box(prev_box, curr_box)
+      return [] if prev_box.nil? || curr_box.nil?
+
+      prev_by_pid = index_party_by_pid(prev_box)
+      curr_by_pid = index_party_by_pid(curr_box)
+
+      events = []
+      curr_by_pid.each do |pid, entry|
+        next if prev_by_pid.key?(pid)
+        events << BoxedPokemonObservedEvent.new(
+          pid:             pid,
+          species_id:      hash_get(entry, :species_id) || hash_get(entry, :species),
+          met_location_id: hash_get(entry, :met_location_id),
+          level:           hash_get(entry, :level),
+          ot_id:           hash_get(entry, :ot_id),
+          ot_sid:          hash_get(entry, :ot_sid),
+          is_egg:          hash_get(entry, :is_egg) ? true : false,
+          nature:          hash_get(entry, :nature),
+          ivs:             hash_get(entry, :ivs),
+          evs:             hash_get(entry, :evs),
+          moves:           hash_get(entry, :moves)
+        )
+      end
+      events
     end
 
     # Build a {pid => entry} index. Skips entries with nil/zero PID

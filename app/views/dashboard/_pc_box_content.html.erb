@@ -47,8 +47,32 @@
             <% if p.acquired_via == "event_gift" %>
               <span class="type-text" style="margin-left:4px; border-color: var(--d2); color: var(--d2);" title="Event / mystery-gift Pokemon — not a Soul Link encounter">EVENT</span>
             <% end %>
+            <% if p.caught_off_feed %>
+              <span class="type-text" style="margin-left:4px; border-color: var(--d3); color: var(--d3);" title="Detected from PC box rather than the active party">OFF-FEED</span>
+            <% end %>
           </div>
           <div class="box-cell-loc"><%= p.location %><% if p.level %> &middot; Lv <%= p.level %><% end %></div>
+          <%# Step 18 — collapsible per-Pokémon stats. <details> keeps the
+              UX zero-Stimulus and read-only. Step-17 rows render unchanged
+              (every guard collapses to false → no <details> block). %>
+          <% if p.nature.present? || p.ivs.present? || p.evs.present? || p.moves.present? %>
+            <details class="box-cell-detail" style="margin-top: 4px; font-size: 9px; color: var(--d2);">
+              <summary style="cursor: pointer;">STATS</summary>
+              <% if p.nature.present? %><div>NATURE: <%= p.nature.to_s.upcase %></div><% end %>
+              <% if p.ivs.is_a?(Hash) %>
+                <div>IVS: <%= [ p.ivs["hp"], p.ivs["atk"], p.ivs["def"], p.ivs["spe"], p.ivs["spa"], p.ivs["spd"] ].compact.join("/") %></div>
+              <% end %>
+              <% if p.evs.is_a?(Hash) %>
+                <div>EVS: <%= [ p.evs["hp"], p.evs["atk"], p.evs["def"], p.evs["spe"], p.evs["spa"], p.evs["spd"] ].compact.join("/") %></div>
+              <% end %>
+              <% if p.moves.is_a?(Array) %>
+                <% p.moves.each_with_index do |m, i| %>
+                  <% next unless m.is_a?(Hash) && m["id"].to_i.positive? %>
+                  <div>MOVE <%= i + 1 %>: #<%= m["id"] %> &middot; PP <%= m["pp"] %> &middot; &uarr;<%= m["pp_up"] %></div>
+                <% end %>
+              <% end %>
+            </details>
+          <% end %>
         </div>
       <% end %>
       <% ((3 - auto_catches.size % 3) % 3).times do %>

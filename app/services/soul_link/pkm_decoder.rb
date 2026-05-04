@@ -54,13 +54,22 @@ module SoulLink
   # Block A (record 0x08-0x27, 32 bytes):
   #   +0x00  u16 species         → record offset 0x08
   #   +0x04  u32 otID            → record offsets 0x0C-0x0F (TID low + SID high)
+  #   +0x10  u8[6] EVs           → record offsets 0x18-0x1D (HP/Atk/Def/Spe/SpA/SpD)
   # Block B (record 0x28-0x47, 32 bytes):
+  #   +0x00  u16[4] moves        → record offsets 0x28-0x2F (Move1..Move4)
+  #   +0x08  u8[4]  PP           → record offsets 0x30-0x33
+  #   +0x0C  u8[4]  PP-up        → record offsets 0x34-0x37
   #   +0x10  u32 IV/Egg dword    → record offset 0x38; isEgg = bit 30
   #   +0x1E  u16 MetLocation_PtHGSS → record offset 0x46-0x47
   # Block D (record 0x68-0x87, 32 bytes):
   #   +0x1C  u8  metLevel : 7    → record offset 0x84 (mask 0x7F)
   # Party stats (record 0x88-0xEB, 100 bytes, encrypted with PID-LCG):
   #   +0x04  u8  level           → record offset 0x8C
+  #
+  # **Nature** is derived directly from the PID — `nature = pid % 25`,
+  # mapping to the canonical PKHeX `Nature.cs` enum (Hardy=0..Quirky=24).
+  # See `SoulLink::Natures` for the name lookup. Cited from PKHeX
+  # `Nature.cs` and pret/pokeplatinum `include/constants/pokemon.h`.
   class PkmDecoder
     BOX_SIZE          = 136     # 0x88 — block-A..D end + flags + checksum + PID
     PARTY_SIZE        = 236     # 0xEC — BOX_SIZE + 100-byte party stats block
@@ -78,12 +87,58 @@ module SoulLink
     # Field offsets within the 128-byte unshuffled (canonical ABCD) payload.
     # I.e. these are offsets into the buffer after un-shuffling, so
     # block A starts at 0x00, block B at 0x20, block C at 0x40, block D at 0x60.
-    UNSHUFFLED_SPECIES_OFFSET     = 0x00              # block A +0x00
-    UNSHUFFLED_OT_ID_OFFSET       = 0x04              # block A +0x04 (uint16 TID)
-    UNSHUFFLED_OT_SID_OFFSET      = 0x06              # block A +0x06 (uint16 SID)
-    UNSHUFFLED_IV_DWORD_OFFSET    = BLOCK_SIZE + 0x10 # block B +0x10 (0x30)
-    UNSHUFFLED_MET_LOC_OFFSET     = BLOCK_SIZE + 0x1E # block B +0x1E (0x3E)
-    UNSHUFFLED_MET_LEVEL_OFFSET   = (3 * BLOCK_SIZE) + 0x1C # block D +0x1C (0x7C)
+    #
+    # Mapping note: the PKHeX `PK4.cs` accessors quote ABSOLUTE offsets
+    # within the full PK4 record (which prepends an 8-byte header — PID
+    # at 0x00..0x03, flags at 0x04..0x05, checksum at 0x06..0x07). The
+    # `UNSHUFFLED_*_OFFSET` constants below use the 128-byte
+    # blocks-buffer ontology — i.e. PK4 absolute offset minus 0x08. The
+    # comments cite the PK4 absolute offset for cross-checking.
+    UNSHUFFLED_SPECIES_OFFSET     = 0x00              # PK4 0x08; block A +0x00
+    UNSHUFFLED_OT_ID_OFFSET       = 0x04              # PK4 0x0C; block A +0x04 (uint16 TID)
+    UNSHUFFLED_OT_SID_OFFSET      = 0x06              # PK4 0x0E; block A +0x06 (uint16 SID)
+    UNSHUFFLED_IV_DWORD_OFFSET    = BLOCK_SIZE + 0x10 # PK4 0x38 IV32; block B +0x10 (0x30)
+    UNSHUFFLED_MET_LOC_OFFSET     = BLOCK_SIZE + 0x1E # PK4 0x46 Met_Location PtHGSS; block B +0x1E (0x3E)
+    UNSHUFFLED_MET_LEVEL_OFFSET   = (3 * BLOCK_SIZE) + 0x1C # PK4 0x84 Met_Level (mask 0x7F); block D +0x1C (0x7C)
+
+    # ── Step 18: per-Pokémon stats offsets (Nature/IVs/EVs/moveset) ────
+    #
+    # All citations against PKHeX `PKHeX.Core/PKM/PK4.cs` accessors plus
+    # pret/pokeplatinum `include/struct_defs/pokemon.h` struct field
+    # offsets within `PokemonDataBlock`. Reviewer cross-checks: PKHeX
+    # offsets are PK4-absolute; pret offsets are block-relative; both
+    # agree once the 8-byte PK4 header (PID/flags/checksum) is removed
+    # to land in our blocks-buffer ontology.
+    #
+    #   PKHeX PK4.cs:
+    #     EV_HP/ATK/DEF/SPE/SPA/SPD = Data[0x18..0x1D]   (Block A run)
+    #     Move1/2/3/4 (u16 LE)      = Data[0x28]/[0x2A]/[0x2C]/[0x2E]   (Block B start)
+    #     Move1..4_PP (u8)          = Data[0x30..0x33]
+    #     Move1..4_PPUps (u8)       = Data[0x34..0x37]
+    #
+    #   pret/pokeplatinum struct_defs/pokemon.h:
+    #     Block A: hpEV @ +0x10 .. spDefEV @ +0x15  (6 u8, HP/Atk/Def/Spe/SpA/SpD)
+    #     Block B: u16 moves[4]      @ +0x00
+    #              u8 moveCurrentPPs @ +0x08
+    #              u8 movePPUps      @ +0x0C
+    UNSHUFFLED_EV_OFFSET          = 0x10              # PK4 0x18 EV_HP; block A +0x10 (6 bytes)
+    UNSHUFFLED_MOVES_OFFSET       = BLOCK_SIZE + 0x00 # PK4 0x28 Move1; block B +0x00 (4 × u16 LE)
+    UNSHUFFLED_PP_OFFSET          = BLOCK_SIZE + 0x08 # PK4 0x30 Move1_PP; block B +0x08 (4 × u8)
+    UNSHUFFLED_PP_UP_OFFSET       = BLOCK_SIZE + 0x0C # PK4 0x34 Move1_PPUps; block B +0x0C (4 × u8)
+
+    # IV bit-packing within the IV/Egg/Nicknamed dword (low 30 bits).
+    # Source: pret/pokeplatinum `include/struct_defs/pokemon.h` —
+    #   u32 hpIV : 5;  atkIV : 5;  defIV : 5;
+    #   speedIV : 5;   spAtkIV : 5; spDefIV : 5;
+    #   isEgg : 1;     hasNickname : 1;
+    # Order locked: HP / Atk / Def / Spe / SpA / SpD (each 5 bits, low → high).
+    IV_FIELD_MASK    = 0x1F
+    IV_HP_SHIFT      = 0
+    IV_ATK_SHIFT     = 5
+    IV_DEF_SHIFT     = 10
+    IV_SPE_SHIFT     = 15
+    IV_SPA_SHIFT     = 20
+    IV_SPD_SHIFT     = 25
 
     # Within the 100-byte decrypted party stats block:
     #   +0x00  u32 status, +0x04 u8 level
@@ -146,8 +201,16 @@ module SoulLink
 
     # Value object returned by `decrypt`. All Integer fields are
     # decoded straight from the (decrypted) PKM record. `slot_index`
-    # is informational (0..5, set by `PartyParser`) — useful in tests
-    # and logs, never load-bearing for AR.
+    # is informational (0..5, set by `PartyParser`; nil for box) —
+    # useful in tests and logs, never load-bearing for AR.
+    #
+    # Step 18 fields (`nature` / `ivs` / `evs` / `moves`) are appended
+    # at the end so existing positional Struct access from Step-17
+    # callers stays stable. `nature` is an Integer (0..24, the
+    # `pid % 25` index — `Natures.name(...)` resolves the canonical
+    # name); `ivs` / `evs` are symbol-keyed Hashes (string keys after
+    # JSON round-trip); `moves` is an Array of `{id:, pp:, pp_up:}`
+    # Hashes (4 entries; entries with `id == 0` are unused move slots).
     Pkm = Struct.new(
       :pid,
       :species,
@@ -158,6 +221,10 @@ module SoulLink
       :met_level,
       :is_egg,
       :slot_index,
+      :nature,
+      :ivs,
+      :evs,
+      :moves,
       keyword_init: true
     )
 
@@ -210,7 +277,15 @@ module SoulLink
           met_location_id: read_u16_le(unshuffled, UNSHUFFLED_MET_LOC_OFFSET),
           met_level:       (unshuffled.getbyte(UNSHUFFLED_MET_LEVEL_OFFSET).to_i & 0x7F),
           is_egg:          extract_egg_bit(unshuffled),
-          slot_index:      slot_index
+          slot_index:      slot_index,
+          # Step 18: per-Pokémon stats. All extractors are nil-safe and
+          # return defensive defaults (zeros / empty arrays) on slice
+          # boundary errors so the surrounding `rescue StandardError`
+          # never trips for a record that decoded everything else cleanly.
+          nature:          (pid % 25),
+          ivs:             extract_ivs(unshuffled),
+          evs:             extract_evs(unshuffled),
+          moves:           extract_moves(unshuffled)
         )
       rescue StandardError
         nil
@@ -284,6 +359,75 @@ module SoulLink
         dword = chunk.unpack1("V")
         species = read_u16_le(unshuffled, UNSHUFFLED_SPECIES_OFFSET)
         ((dword >> IV_EGG_BIT) & 1) == 1 || species.to_i.zero?
+      end
+
+      # Step 18 — IVs from the 32-bit IV/Egg/Nicknamed dword (Block B
+      # +0x10, PK4 0x38). Order: HP / Atk / Def / Spe / SpA / SpD,
+      # 5 bits each (low → high). Returns a symbol-keyed Hash of
+      # Integer 0..31. Boundary failure → all-zeros Hash (caller sees
+      # `{ hp: 0, atk: 0, ... }` rather than nil — back-compat with
+      # existing rendering & view nil-guards which assume a Hash).
+      def extract_ivs(unshuffled)
+        chunk = unshuffled.byteslice(UNSHUFFLED_IV_DWORD_OFFSET, 4)
+        return ivs_zero if chunk.nil? || chunk.bytesize < 4
+        dword = chunk.unpack1("V")
+        {
+          hp:  (dword >> IV_HP_SHIFT)  & IV_FIELD_MASK,
+          atk: (dword >> IV_ATK_SHIFT) & IV_FIELD_MASK,
+          def: (dword >> IV_DEF_SHIFT) & IV_FIELD_MASK,
+          spe: (dword >> IV_SPE_SHIFT) & IV_FIELD_MASK,
+          spa: (dword >> IV_SPA_SHIFT) & IV_FIELD_MASK,
+          spd: (dword >> IV_SPD_SHIFT) & IV_FIELD_MASK
+        }
+      end
+
+      def ivs_zero
+        { hp: 0, atk: 0, def: 0, spe: 0, spa: 0, spd: 0 }
+      end
+
+      # Step 18 — EVs from Block A +0x10..+0x15 (PK4 0x18..0x1D). Six
+      # bytes, same order as IVs. Boundary failure → all-zeros Hash.
+      def extract_evs(unshuffled)
+        chunk = unshuffled.byteslice(UNSHUFFLED_EV_OFFSET, 6)
+        return evs_zero if chunk.nil? || chunk.bytesize < 6
+        bytes = chunk.bytes
+        {
+          hp:  bytes[0],
+          atk: bytes[1],
+          def: bytes[2],
+          spe: bytes[3],
+          spa: bytes[4],
+          spd: bytes[5]
+        }
+      end
+
+      def evs_zero
+        { hp: 0, atk: 0, def: 0, spe: 0, spa: 0, spd: 0 }
+      end
+
+      # Step 18 — moveset from Block B (PK4 0x28..0x37). Returns an
+      # Array of 4 Hashes shaped `{ id:, pp:, pp_up: }`. Move IDs are
+      # u16 LE; PP and PP-up are u8 each. Boundary failure → 4 zeroed
+      # entries so callers can iterate without nil-guarding individual
+      # slots. `id == 0` represents an unused move slot.
+      def extract_moves(unshuffled)
+        ids_chunk    = unshuffled.byteslice(UNSHUFFLED_MOVES_OFFSET, 8)  # 4 × u16
+        pp_chunk     = unshuffled.byteslice(UNSHUFFLED_PP_OFFSET, 4)     # 4 × u8
+        pp_up_chunk  = unshuffled.byteslice(UNSHUFFLED_PP_UP_OFFSET, 4)  # 4 × u8
+        return moves_zero if ids_chunk.nil? || ids_chunk.bytesize < 8
+        return moves_zero if pp_chunk.nil? || pp_chunk.bytesize < 4
+        return moves_zero if pp_up_chunk.nil? || pp_up_chunk.bytesize < 4
+
+        ids   = ids_chunk.unpack("v4")
+        pps   = pp_chunk.bytes
+        ppups = pp_up_chunk.bytes
+        Array.new(4) do |i|
+          { id: ids[i].to_i, pp: pps[i].to_i, pp_up: ppups[i].to_i }
+        end
+      end
+
+      def moves_zero
+        Array.new(4) { { id: 0, pp: 0, pp_up: 0 } }
       end
     end
   end

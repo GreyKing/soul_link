@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_03_160002) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_03_184058) do
   create_table "gym_auto_mark_suppressions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "gym_number", null: false
@@ -132,6 +132,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_03_160002) do
     t.datetime "created_at", null: false
     t.datetime "parsed_at"
     t.integer "parsed_badges", default: 0, null: false
+    t.json "parsed_box_data"
     t.integer "parsed_hof_count"
     t.integer "parsed_map_id", limit: 2
     t.integer "parsed_money"
@@ -169,13 +170,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_03_160002) do
     t.string "ability"
     t.string "acquired_via"
     t.datetime "caught_at"
+    t.boolean "caught_off_feed", default: false, null: false
     t.datetime "created_at", null: false
     t.datetime "died_at"
     t.bigint "discord_user_id", null: false
     t.integer "evolution_level"
+    t.json "evs"
+    t.json "ivs"
     t.integer "level"
     t.string "location", null: false
     t.integer "met_location_id"
+    t.json "moves"
     t.string "name", null: false
     t.string "nature"
     t.integer "ot_id"

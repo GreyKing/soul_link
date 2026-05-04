@@ -14,7 +14,8 @@ module SoulLink
     def caught_event(overrides = {})
       defaults = {
         pid: 0xDEADBEEF, species_id: 387, met_location_id: 16,
-        level: 5, ot_id: 0xABCD, ot_sid: 0x1234, is_egg: false
+        level: 5, ot_id: 0xABCD, ot_sid: 0x1234, is_egg: false,
+        nature: nil, ivs: nil, evs: nil, moves: nil
       }
       SoulLink::SaveDiff::PokemonCaughtEvent.new(**defaults.merge(overrides))
     end
@@ -178,6 +179,150 @@ module SoulLink
         SoulLink::CatchCoordinator.process(@slot, [ caught_event(ot_id: 0xFFFF, ot_sid: 0xEEEE) ])
       end
       assert_equal false, SoulLinkPokemon.last.trade_in
+    end
+
+    # ── Step 18: per-Pokémon stats persistence ────────────────────────
+
+    test "Step 18: PokemonCaughtEvent persists nature / ivs / evs / moves columns" do
+      ivs = { hp: 31, atk: 31, def: 31, spe: 31, spa: 31, spd: 31 }
+      evs = { hp: 252, atk: 0, def: 4, spe: 252, spa: 0, spd: 0 }
+      moves = [ { id: 1, pp: 35, pp_up: 0 }, { id: 84, pp: 30, pp_up: 1 },
+                { id: 0,  pp: 0,  pp_up: 0 }, { id: 0,  pp: 0,  pp_up: 0 } ]
+      assert_difference "SoulLinkPokemon.count", 1 do
+        SoulLink::CatchCoordinator.process(@slot, [ caught_event(
+          pid: 0x1A1A1A1A,  # 0x1A1A1A1A % 25 = 22 → Sassy
+          nature: 22, ivs: ivs, evs: evs, moves: moves
+        ) ])
+      end
+      row = SoulLinkPokemon.last
+      assert_equal "Sassy", row.nature
+      # JSON read-back gives string-keyed hashes regardless of how we wrote them.
+      assert_equal({ "hp" => 31, "atk" => 31, "def" => 31, "spe" => 31, "spa" => 31, "spd" => 31 }, row.ivs)
+      assert_equal({ "hp" => 252, "atk" => 0, "def" => 4, "spe" => 252, "spa" => 0, "spd" => 0 }, row.evs)
+      assert_equal 4, row.moves.size
+      assert_equal 1, row.moves[0]["id"]
+      assert_equal false, row.caught_off_feed
+    end
+
+    test "Step 18: PokemonCaughtEvent without nature/ivs/evs/moves keeps columns nil (back-compat)" do
+      assert_difference "SoulLinkPokemon.count", 1 do
+        SoulLink::CatchCoordinator.process(@slot, [ caught_event ])  # no nature/ivs/evs/moves
+      end
+      row = SoulLinkPokemon.last
+      assert_nil row.nature
+      assert_nil row.ivs
+      assert_nil row.evs
+      assert_nil row.moves
+      assert_equal false, row.caught_off_feed
+    end
+
+    def boxed_event(overrides = {})
+      defaults = {
+        pid: 0xBADBEEF1, species_id: 387, met_location_id: 16,
+        level: nil, ot_id: 0xABCD, ot_sid: 0x1234, is_egg: false,
+        nature: 0, ivs: nil, evs: nil, moves: nil
+      }
+      SoulLink::SaveDiff::BoxedPokemonObservedEvent.new(**defaults.merge(overrides))
+    end
+
+    test "Step 18: BoxedPokemonObservedEvent for a new PID creates row with caught_off_feed: true" do
+      assert_difference "SoulLinkPokemon.count", 1 do
+        SoulLink::CatchCoordinator.process(@slot, [ boxed_event ])
+      end
+      row = SoulLinkPokemon.last
+      assert_equal 0xBADBEEF1, row.pid
+      assert_equal "catch", row.acquired_via
+      assert_equal true, row.caught_off_feed
+    end
+
+    test "Step 18: BoxedPokemonObservedEvent for a PID already in DB is no-op (existing dedup)" do
+      # Seed a party-side row first.
+      SoulLink::CatchCoordinator.process(@slot, [ caught_event(pid: 0xBABEFACE) ])
+      assert_equal 1, SoulLinkPokemon.count
+
+      # Now a box event arrives for the same PID. Should no-op.
+      assert_no_difference "SoulLinkPokemon.count" do
+        SoulLink::CatchCoordinator.process(@slot, [ boxed_event(pid: 0xBABEFACE) ])
+      end
+      # caught_off_feed remains false (party-side won).
+      assert_equal false, SoulLinkPokemon.find_by(pid: 0xBABEFACE).caught_off_feed
+    end
+
+    test "Step 18: same-snapshot PokemonCaughtEvent + BoxedPokemonObservedEvent for same PID creates exactly one row" do
+      # Critical test — covers the cross-event collision case the brief calls out.
+      # Order matches dispatcher: catch_events first, then box_events.
+      pid = 0xC0FFEE01
+      events = [
+        caught_event(pid: pid),
+        boxed_event(pid: pid)
+      ]
+      assert_difference "SoulLinkPokemon.count", 1 do
+        SoulLink::CatchCoordinator.process(@slot, events)
+      end
+      row = SoulLinkPokemon.find_by(pid: pid)
+      # Party-side wins because it processes first; caught_off_feed: false.
+      assert_equal false, row.caught_off_feed
+      assert_equal "catch", row.acquired_via
+    end
+
+    test "Step 18: BoxedPokemonObservedEvent — egg met_location → acquired_via 'event_gift'" do
+      # 2002 = LinkTrade4 (event:true).
+      assert_difference "SoulLinkPokemon.count", 1 do
+        SoulLink::CatchCoordinator.process(@slot, [ boxed_event(met_location_id: 2002) ])
+      end
+      row = SoulLinkPokemon.last
+      assert_equal "event_gift", row.acquired_via
+      assert_equal true, row.caught_off_feed
+    end
+
+    test "Step 18: BoxedPokemonObservedEvent — trade-in (different OT) → trade_in true + acquired_via 'trade_in'" do
+      assert_difference "SoulLinkPokemon.count", 1 do
+        SoulLink::CatchCoordinator.process(@slot, [ boxed_event(ot_id: 0xFFFF, ot_sid: 0xEEEE) ])
+      end
+      row = SoulLinkPokemon.last
+      assert_equal true, row.trade_in
+      assert_equal "trade_in", row.acquired_via
+      assert_equal true, row.caught_off_feed
+    end
+
+    test "Step 18: BoxedPokemonObservedEvent — egg event silently dropped" do
+      assert_no_difference "SoulLinkPokemon.count" do
+        SoulLink::CatchCoordinator.process(@slot, [ boxed_event(is_egg: true) ])
+      end
+    end
+
+    test "Step 18: BoxedPokemonObservedEvent — zero PID silently dropped" do
+      assert_no_difference "SoulLinkPokemon.count" do
+        SoulLink::CatchCoordinator.process(@slot, [ boxed_event(pid: 0) ])
+      end
+    end
+
+    test "Step 18: nil nature is not coerced to a string (column stays nil)" do
+      assert_difference "SoulLinkPokemon.count", 1 do
+        SoulLink::CatchCoordinator.process(@slot, [ boxed_event(nature: nil) ])
+      end
+      assert_nil SoulLinkPokemon.last.nature
+    end
+
+    test "Step 18: caught_event helper without overrides creates row with caught_off_feed: false" do
+      # Locks the contract that handle_caught explicitly passes false
+      # (column is NOT NULL in DB).
+      assert_difference "SoulLinkPokemon.count", 1 do
+        SoulLink::CatchCoordinator.process(@slot, [ caught_event ])
+      end
+      assert_equal false, SoulLinkPokemon.last.caught_off_feed
+    end
+
+    test "Step 18: PokemonCaughtEvent struct accepts the new keyword fields" do
+      # Lock the Struct contract — new fields are keyword-init, not raise.
+      ev = SoulLink::SaveDiff::PokemonCaughtEvent.new(
+        pid: 1, species_id: 1, met_location_id: 1, level: 1, ot_id: 1, ot_sid: 1, is_egg: false,
+        nature: 5, ivs: { hp: 1 }, evs: { hp: 2 }, moves: [ { id: 1 } ]
+      )
+      assert_equal 5,           ev.nature
+      assert_equal({ hp: 1 },   ev.ivs)
+      assert_equal({ hp: 2 },   ev.evs)
+      assert_equal([ { id: 1 } ], ev.moves)
     end
   end
 end
