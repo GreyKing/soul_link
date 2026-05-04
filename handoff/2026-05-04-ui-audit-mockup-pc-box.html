@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>R2 — PC Box / Catches Redesign</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --d0: #0a1a0a;
+    --d1: #1a2e1a;
+    --d2: #3a5a3a;
+    --l1: #8a9e6a;
+    --l2: #9aae7a;
+    --white: #c0d0a0;
+    --amber: #d4b14a;
+    --crimson: #c75a5a;
+    --green-glow: #5fd45f;
+    --border: 3px solid var(--d1);
+    --border-thin: 2px solid var(--d1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--d0);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(154, 174, 122, 0.025) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse at top, #142214 0%, #0a1a0a 70%);
+    color: var(--white);
+    font-family: 'VT323', monospace;
+    font-size: 18px; line-height: 1.4;
+    min-height: 100vh;
+  }
+
+  .page { max-width: 1140px; margin: 0 auto; padding: 32px 16px 96px; }
+
+  .page-banner {
+    border: var(--border); background: var(--d1);
+    padding: 20px 24px; margin-bottom: 18px; position: relative;
+  }
+  .page-banner::before { content: ""; position: absolute; inset: 4px; border: 1px solid var(--d2); pointer-events: none; }
+  .page-banner h1 { font-family: 'Press Start 2P', monospace; font-size: 16px; color: var(--white); margin: 0 0 8px; letter-spacing: 1px; }
+  .page-banner .sub { color: var(--l1); font-size: 16px; }
+
+  .legend {
+    background: var(--d1); border: var(--border-thin);
+    padding: 14px 18px; margin-bottom: 28px;
+    color: var(--l2); font-size: 16px;
+  }
+  .legend strong { color: var(--amber); }
+  .legend ul { margin: 6px 0 0; padding-left: 20px; }
+  .legend li { margin: 2px 0; }
+
+  .section-anchor {
+    margin: 56px 0 18px;
+    border-top: 1px dashed var(--d2);
+    padding-top: 24px;
+  }
+  .section-anchor:first-of-type { margin-top: 0; border-top: none; padding-top: 0; }
+  .section-tag {
+    display: inline-block; font-family: 'Press Start 2P', monospace;
+    font-size: 9px; color: var(--d0); background: var(--amber);
+    padding: 4px 8px; margin-bottom: 8px; letter-spacing: 1px;
+  }
+  .section-title { font-family: 'Press Start 2P', monospace; font-size: 13px; color: var(--white); margin: 0 0 4px; }
+  .section-note { color: var(--l1); font-size: 16px; margin-bottom: 18px; max-width: 720px; }
+
+  /* Tab panel chrome */
+  .panel {
+    background: var(--d1);
+    border: var(--border);
+    padding: 0;
+    margin-bottom: 28px;
+  }
+  .panel-head {
+    background: var(--d2);
+    padding: 12px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: var(--border-thin);
+    flex-wrap: wrap; gap: 12px;
+  }
+  .panel-head h2 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px; color: var(--white);
+    margin: 0; letter-spacing: 1px;
+  }
+  .panel-head .count { color: var(--l1); font-size: 14px; margin-left: 6px; }
+  .new-catch-btn {
+    background: var(--amber); color: var(--d0);
+    border: 2px solid var(--d0);
+    padding: 6px 12px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; letter-spacing: 1px;
+    cursor: pointer;
+  }
+  .new-catch-btn:hover { background: var(--white); }
+
+  .panel-body { padding: 18px; }
+
+  /* Review tray for auto-detected catches */
+  .review-tray {
+    background: var(--d0);
+    border: 2px solid var(--amber);
+    padding: 14px 16px;
+    margin-bottom: 22px;
+  }
+  .review-tray-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+    flex-wrap: wrap; gap: 8px;
+  }
+  .review-tray-head h3 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px; color: var(--amber);
+    margin: 0; letter-spacing: 1px;
+  }
+  .review-tray-head .count {
+    background: var(--amber); color: var(--d0);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; padding: 3px 6px; letter-spacing: 1px;
+  }
+
+  .badge-legend {
+    background: var(--d1);
+    border: 1px dashed var(--d2);
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: var(--l1);
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px 16px;
+  }
+  .badge-legend .row { display: flex; align-items: center; gap: 8px; }
+  .badge-legend .badge {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 2px 5px;
+    letter-spacing: 1px;
+    border: 1px solid;
+    flex-shrink: 0;
+    min-width: 56px; text-align: center;
+  }
+  .badge.first { color: var(--green-glow); border-color: var(--green-glow); }
+  .badge.trade { color: var(--amber); border-color: var(--amber); }
+  .badge.event { color: var(--d2); border-color: var(--d2); background: var(--l1); }
+  .badge.offfeed { color: var(--l1); border-color: var(--l1); }
+
+  /* A single review row */
+  .review-row {
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    gap: 14px; align-items: center;
+    background: var(--d1);
+    border: var(--border-thin);
+    padding: 10px 14px;
+    margin-bottom: 8px;
+  }
+  .review-row.first { border-color: var(--green-glow); border-width: 3px; padding: 8px 12px; }
+  .review-row.dismissed { opacity: 0.4; }
+
+  .review-row .sprite {
+    width: 56px; height: 56px;
+    background: var(--d0);
+    border: 1px solid var(--d2);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--l2);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+  }
+  .review-row .meta .name {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px;
+    color: var(--white);
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  }
+  .review-row .meta .loc {
+    color: var(--l1); font-size: 14px;
+  }
+  .review-row .meta .stats {
+    color: var(--d2); font-size: 13px; margin-top: 2px;
+  }
+  .review-row .meta .stats span { color: var(--l1); }
+
+  .review-row .actions {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .review-row .actions button {
+    background: var(--d2); color: var(--l2);
+    border: 1px solid var(--d0);
+    padding: 6px 14px;
+    cursor: pointer;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; letter-spacing: 1px;
+    min-width: 92px;
+  }
+  .review-row .actions button.primary { background: var(--green-glow); color: var(--d0); }
+  .review-row .actions button:hover { filter: brightness(1.15); }
+
+  /* Filter chip bar */
+  .filter-bar {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .filter-chip {
+    background: var(--d1); color: var(--l1);
+    border: 1px solid var(--d2);
+    padding: 6px 12px;
+    cursor: pointer;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; letter-spacing: 1px;
+  }
+  .filter-chip.active {
+    background: var(--amber); color: var(--d0);
+    border-color: var(--amber);
+  }
+  .filter-chip:hover:not(.active) { color: var(--white); }
+  .filter-search {
+    margin-left: auto;
+    flex: 1; min-width: 200px;
+  }
+  .filter-search input {
+    width: 100%;
+    background: var(--d0); color: var(--white);
+    border: 2px solid var(--d2);
+    padding: 6px 10px;
+    font-family: 'VT323', monospace;
+    font-size: 16px;
+  }
+  .filter-search input::placeholder { color: var(--d2); }
+
+  /* Pokemon grid */
+  .box-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 22px;
+    align-items: flex-start;
+  }
+  .box-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .box-cell {
+    background: var(--d2);
+    border: 2px solid var(--d0);
+    padding: 8px;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.1s, transform 0.1s;
+  }
+  .box-cell:hover { border-color: var(--amber); transform: translateY(-2px); }
+  .box-cell.team { background: var(--d1); border-color: var(--green-glow); }
+  .box-cell.dead { background: #2a1a1a; border-color: #4a1c1c; opacity: 0.7; }
+  .box-cell .nick {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: var(--white);
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    word-break: break-word;
+  }
+  .box-cell .sprite {
+    width: 40px; height: 40px;
+    margin: 0 auto;
+    background: var(--d0);
+    border: 1px solid var(--d2);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--l2);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+  }
+  .box-cell .loc {
+    color: var(--l1); font-size: 12px; margin-top: 6px;
+    word-break: break-word; line-height: 1.3;
+  }
+  .box-cell .group-marker {
+    position: absolute; top: 4px; left: 4px;
+    font-size: 9px; color: var(--amber);
+    font-family: 'Press Start 2P', monospace;
+  }
+  .box-cell.dead .group-marker { color: var(--crimson); }
+  .box-cell.team .group-marker { color: var(--green-glow); }
+
+  /* Type-coverage rail */
+  .type-coverage {
+    background: var(--d2);
+    border: var(--border-thin);
+    padding: 14px;
+  }
+  .type-coverage h3 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px; color: var(--white);
+    margin: 0 0 10px; letter-spacing: 1px;
+  }
+  .type-coverage .sub {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px; color: var(--l1);
+    letter-spacing: 1px; margin: 10px 0 6px;
+  }
+  .type-pill {
+    display: inline-block;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 3px 6px;
+    margin: 2px;
+    letter-spacing: 1px;
+    border: 1px solid;
+  }
+  .type-pill.covered { background: var(--green-glow); color: var(--d0); border-color: var(--green-glow); }
+  .type-pill.gap { color: var(--crimson); border-color: var(--crimson); border-style: dashed; }
+  .type-pill.weak {
+    background: var(--crimson); color: var(--white);
+    border-color: var(--crimson);
+  }
+
+  .annotation {
+    color: var(--amber);
+    font-size: 14px; line-height: 1.5;
+    background: rgba(212, 177, 74, 0.08);
+    border-left: 3px solid var(--amber);
+    padding: 8px 12px;
+    margin: 10px 0;
+  }
+  .annotation .who {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; letter-spacing: 1px;
+    color: var(--amber); display: block; margin-bottom: 2px;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    padding: 2px 5px;
+    letter-spacing: 1px;
+    border: 1px solid;
+  }
+
+  .empty-state {
+    background: var(--d0);
+    border: 1px dashed var(--d2);
+    padding: 24px;
+    text-align: center;
+    color: var(--d2);
+    font-size: 14px;
+  }
+  .empty-state strong { color: var(--l1); display: block; margin-bottom: 4px; font-family: 'Press Start 2P', monospace; font-size: 10px; letter-spacing: 1px; }
+
+  /* Mobile single-column */
+  .phone {
+    width: 360px;
+    border: 6px solid var(--d2);
+    border-radius: 24px;
+    background: var(--d0);
+    padding: 14px 12px 22px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    margin: 18px auto 0;
+  }
+  .phone-bezel { width: 80px; height: 4px; background: var(--d1); border-radius: 2px; margin: 0 auto 12px; }
+  .phone .box-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .phone .box-cell { padding: 6px; }
+  .phone .box-cell .nick { font-size: 8px; }
+  .phone .box-cell .loc { font-size: 10px; }
+  .phone .filter-bar { gap: 4px; }
+  .phone .filter-chip { font-size: 8px; padding: 4px 8px; }
+
+  .sticky-filter-hint {
+    background: rgba(212, 177, 74, 0.18);
+    border: 1px dashed var(--amber);
+    color: var(--amber);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    padding: 4px 8px;
+    margin: 4px 0 8px;
+    letter-spacing: 1px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="page-banner">
+    <h1>R2 — PC Box / Catches</h1>
+    <div class="sub">Dashboard PC BOX tab · 2026-05-04 audit · architect-only redesign pass</div>
+  </div>
+
+  <div class="legend">
+    <strong>What changes here</strong>
+    <ul>
+      <li>Auto-detected catches become a <strong>REVIEW TRAY</strong> at the top with a one-line <strong>badge legend</strong> and a per-row primary action (LOG / SKIP / EDIT). The flow ends at a click, not at staring.</li>
+      <li>On-team / storage / fallen unify into <strong>one filterable grid</strong> with chips. Filtering is client-side; URL hash preserves chip state across reloads.</li>
+      <li>Cells get real <strong>hover states</strong> (border-color shift + 2px lift), `cursor: pointer`, and a <strong>group marker</strong> in the corner indicating ON TEAM / STORAGE / FALLEN at a glance.</li>
+      <li>Type-coverage moves to a side <strong>rail</strong> instead of being a footer. Covered types are filled green; gaps are dashed crimson; shared weaknesses are filled crimson.</li>
+      <li>Mobile reflows to <strong>3-column grid</strong> with sticky filter chips at the top of the panel.</li>
+      <li>Search field replaces today's "+ NEW CATCH" with both: NEW CATCH stays as the primary action, search is global.</li>
+    </ul>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 1</span>
+    <h2 class="section-title">Default state — review tray + unified grid</h2>
+    <p class="section-note">User opens the PC BOX tab. Their save just parsed three new auto-detected catches; they sit at the top in a review tray with a legend + per-row action. Everything else is in the unified grid below, filtered by ALL.</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>PC BOX</h2>
+        <span class="count">19 TOTAL · 3 NEW PARSED</span>
+      </div>
+      <button class="new-catch-btn">+ NEW CATCH</button>
+    </div>
+    <div class="panel-body">
+
+      <!-- Review tray -->
+      <div class="review-tray">
+        <div class="review-tray-head">
+          <h3>REVIEW PARSED CATCHES</h3>
+          <span class="count">3 NEW</span>
+        </div>
+
+        <div class="badge-legend">
+          <div class="row"><span class="badge first">1ST</span> first encounter on a route — log it</div>
+          <div class="row"><span class="badge trade">TRADE-IN</span> obtained via trade — usually skip</div>
+          <div class="row"><span class="badge event">EVENT</span> mystery gift / event — not a real encounter</div>
+          <div class="row"><span class="badge offfeed">OFF-FEED</span> from PC box, not active party</div>
+        </div>
+
+        <div class="review-row first">
+          <div class="sprite">SPR</div>
+          <div class="meta">
+            <div class="name">STARLY <span class="badge first">1ST</span></div>
+            <div class="loc">Route 201 · Lv 4</div>
+            <div class="stats"><span>HARDY</span> · IVS 22/8/12/30/14/9 · <span>QUICK ATTACK · TACKLE</span></div>
+          </div>
+          <div class="actions">
+            <button class="primary">LOG CATCH</button>
+            <button>EDIT</button>
+            <button>SKIP</button>
+          </div>
+        </div>
+
+        <div class="review-row">
+          <div class="sprite">SPR</div>
+          <div class="meta">
+            <div class="name">MACHOP <span class="badge trade">TRADE-IN</span></div>
+            <div class="loc">Eterna City · Lv 12</div>
+            <div class="stats">received via in-game trade</div>
+          </div>
+          <div class="actions">
+            <button>LOG CATCH</button>
+            <button class="primary">SKIP</button>
+            <button>EDIT</button>
+          </div>
+        </div>
+
+        <div class="review-row">
+          <div class="sprite">SPR</div>
+          <div class="meta">
+            <div class="name">PIPLUP <span class="badge event">EVENT</span></div>
+            <div class="loc">Sandgem Town · Lv 5</div>
+            <div class="stats">starter selection — already logged</div>
+          </div>
+          <div class="actions">
+            <button>LOG AGAIN</button>
+            <button class="primary">SKIP</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar">
+        <span class="filter-chip active">ALL · 19</span>
+        <span class="filter-chip">ON TEAM · 4</span>
+        <span class="filter-chip">STORAGE · 12</span>
+        <span class="filter-chip">FALLEN · 3</span>
+        <div class="filter-search">
+          <input type="text" placeholder="Search nickname or species…" />
+        </div>
+      </div>
+
+      <!-- Box layout -->
+      <div class="box-layout">
+        <div class="box-grid">
+          <div class="box-cell team">
+            <span class="group-marker">★</span>
+            <div class="nick">TOMMY</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Route 201</div>
+          </div>
+          <div class="box-cell team">
+            <span class="group-marker">★</span>
+            <div class="nick">RACHEL</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Route 202</div>
+          </div>
+          <div class="box-cell team">
+            <span class="group-marker">★</span>
+            <div class="nick">PHOEBE</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Eterna Forest</div>
+          </div>
+          <div class="box-cell team">
+            <span class="group-marker">★</span>
+            <div class="nick">JOEY</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Floaroma Mead.</div>
+          </div>
+          <div class="box-cell">
+            <span class="group-marker">▣</span>
+            <div class="nick">MONICA</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Oreburgh Mine</div>
+          </div>
+          <div class="box-cell">
+            <span class="group-marker">▣</span>
+            <div class="nick">CHANDLER</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Route 203</div>
+          </div>
+          <div class="box-cell">
+            <span class="group-marker">▣</span>
+            <div class="nick">ROSS</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Jubilife City</div>
+          </div>
+          <div class="box-cell">
+            <span class="group-marker">▣</span>
+            <div class="nick">GUNTHER</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Route 204</div>
+          </div>
+          <div class="box-cell dead">
+            <span class="group-marker">☠</span>
+            <div class="nick">JANICE</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Eterna Gym</div>
+          </div>
+          <div class="box-cell dead">
+            <span class="group-marker">☠</span>
+            <div class="nick">UGLY NAKED</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Mt. Coronet</div>
+          </div>
+          <div class="box-cell dead">
+            <span class="group-marker">☠</span>
+            <div class="nick">MR. HECKLES</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Old Chateau</div>
+          </div>
+          <div class="box-cell">
+            <span class="group-marker">▣</span>
+            <div class="nick">MARCEL</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Solaceon Town</div>
+          </div>
+        </div>
+
+        <aside class="type-coverage">
+          <h3>TYPE COVERAGE</h3>
+          <div class="sub">COVERED · 9</div>
+          <div>
+            <span class="type-pill covered">NRM</span>
+            <span class="type-pill covered">FIR</span>
+            <span class="type-pill covered">WAT</span>
+            <span class="type-pill covered">GRA</span>
+            <span class="type-pill covered">ELE</span>
+            <span class="type-pill covered">FLY</span>
+            <span class="type-pill covered">FIG</span>
+            <span class="type-pill covered">BUG</span>
+            <span class="type-pill covered">RCK</span>
+          </div>
+          <div class="sub">GAPS · 4</div>
+          <div>
+            <span class="type-pill gap">GHO</span>
+            <span class="type-pill gap">DRG</span>
+            <span class="type-pill gap">DRK</span>
+            <span class="type-pill gap">STL</span>
+          </div>
+          <div class="sub">SHARED WEAKNESSES</div>
+          <div>
+            <span class="type-pill weak">FIG ×3</span>
+            <span class="type-pill weak">FIR ×2</span>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <span class="who">A · REVIEW TRAY</span>
+    Three things change vs. today: (1) badges are color-coded by intent — green for "log this," amber for "warning," neutral for "informational." (2) Each row has its own primary action — a button, not a label. (3) The recommended action is highlighted; user just hits Enter to accept the default.
+  </div>
+  <div class="annotation">
+    <span class="who">B · ONE GRID, FOUR FILTERS</span>
+    No more three separate sections that all use the same cell layout. Filter chips at the top scope the grid. Counts on the chips remove ambiguity. ALL is the default but URL hash (#fallen, #team) preserves filter state for deep links.
+  </div>
+  <div class="annotation">
+    <span class="who">C · GROUP MARKER ICON</span>
+    The corner glyph (★ team · ▣ storage · ☠ fallen) makes status legible at-a-glance even when filtered to ALL. Color-blind safe because each shape is distinct. Same icon set the timeline uses — visual vocabulary stays unified.
+  </div>
+  <div class="annotation">
+    <span class="who">D · TYPE COVERAGE RAIL</span>
+    Side rail (280px) instead of a footer. Covered/gap/weak read top-to-bottom in priority order: what we have → what we're missing → what kills us. Numbers right on the badges (FIG ×3) so the user doesn't have to count.
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 2</span>
+    <h2 class="section-title">Filter applied — FALLEN only</h2>
+    <p class="section-note">User clicked the FALLEN chip. Grid filters client-side, no page reload. Empty filter combinations show a contextual empty state ("no fallen — yet"). Other chips dim slightly to suggest "you can switch back."</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div><h2>PC BOX</h2><span class="count">3 OF 19 SHOWN</span></div>
+      <button class="new-catch-btn">+ NEW CATCH</button>
+    </div>
+    <div class="panel-body">
+
+      <div class="filter-bar">
+        <span class="filter-chip" style="opacity: 0.55;">ALL · 19</span>
+        <span class="filter-chip" style="opacity: 0.55;">ON TEAM · 4</span>
+        <span class="filter-chip" style="opacity: 0.55;">STORAGE · 12</span>
+        <span class="filter-chip active">FALLEN · 3</span>
+        <div class="filter-search">
+          <input type="text" placeholder="Search nickname or species…" />
+        </div>
+      </div>
+
+      <div class="box-layout">
+        <div class="box-grid">
+          <div class="box-cell dead">
+            <span class="group-marker">☠</span>
+            <div class="nick">JANICE</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Eterna Gym</div>
+          </div>
+          <div class="box-cell dead">
+            <span class="group-marker">☠</span>
+            <div class="nick">UGLY NAKED</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Mt. Coronet</div>
+          </div>
+          <div class="box-cell dead">
+            <span class="group-marker">☠</span>
+            <div class="nick">MR. HECKLES</div>
+            <div class="sprite">SPR</div>
+            <div class="loc">Old Chateau</div>
+          </div>
+        </div>
+
+        <aside class="type-coverage" style="opacity: 0.6;">
+          <h3>TYPE COVERAGE</h3>
+          <div class="sub" style="font-size: 10px; color: var(--d2);">computed against your 6-slot team — switch to ON TEAM to focus</div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <span class="who">A · CONTEXT-AWARE RAIL</span>
+    When filter ≠ ON TEAM, the type-coverage rail dims and explains its scope. Coverage is always computed against the team — saying so explicitly defuses the "why didn't the rail change?" question.
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 3</span>
+    <h2 class="section-title">Empty review tray</h2>
+    <p class="section-note">No new auto-detected catches. The tray collapses to a single line — visible enough that the feature is discoverable, quiet enough that it doesn't dominate.</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div><h2>PC BOX</h2><span class="count">19 TOTAL · ALL CAUGHT-UP</span></div>
+      <button class="new-catch-btn">+ NEW CATCH</button>
+    </div>
+    <div class="panel-body">
+
+      <div style="background: var(--d0); border: 1px dashed var(--d2); padding: 10px 14px; margin-bottom: 18px; color: var(--l1); font-size: 14px; display: flex; align-items: center; gap: 10px;">
+        <span style="font-family: 'Press Start 2P', monospace; font-size: 10px; color: var(--green-glow); letter-spacing: 1px;">✓</span>
+        No new parsed catches to review. New saves will land here for confirmation.
+      </div>
+
+      <div class="filter-bar">
+        <span class="filter-chip active">ALL · 19</span>
+        <span class="filter-chip">ON TEAM · 4</span>
+        <span class="filter-chip">STORAGE · 12</span>
+        <span class="filter-chip">FALLEN · 3</span>
+        <div class="filter-search">
+          <input type="text" placeholder="Search nickname or species…" />
+        </div>
+      </div>
+
+      <p style="color: var(--d2); font-size: 14px;">…grid omitted; same as Screen 1.</p>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <span class="who">A · DISCOVERABILITY OVER PROMINENCE</span>
+    The tray is dim but present. Users who haven't enabled save uploads yet still see a hint that the feature exists. A second click on the bar opens a help tooltip explaining how parsed catches work.
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 4</span>
+    <h2 class="section-title">Mobile — sticky filter chips, 3-col grid</h2>
+    <p class="section-note">Below 600px, the grid drops to 3 columns and the filter bar becomes sticky at the top of the panel body. Type-coverage rail moves below the grid (still visible, just deprioritized).</p>
+  </div>
+
+  <div class="phone">
+    <div class="phone-bezel"></div>
+
+    <div class="panel" style="margin-bottom: 0;">
+      <div class="panel-head" style="padding: 8px 10px;">
+        <div><h2 style="font-size: 10px;">PC BOX</h2><span class="count" style="font-size: 11px;">19 · 3 NEW</span></div>
+        <button class="new-catch-btn" style="font-size: 7px; padding: 4px 8px;">+ NEW</button>
+      </div>
+      <div class="panel-body" style="padding: 12px 10px;">
+
+        <div class="review-tray" style="padding: 10px 12px; margin-bottom: 14px;">
+          <div class="review-tray-head" style="margin-bottom: 6px;">
+            <h3 style="font-size: 9px;">REVIEW PARSED · 3</h3>
+          </div>
+
+          <div class="review-row first" style="grid-template-columns: 36px 1fr; padding: 6px 8px; gap: 8px;">
+            <div class="sprite" style="width: 36px; height: 36px;">SPR</div>
+            <div class="meta">
+              <div class="name" style="font-size: 9px;">STARLY <span class="badge first" style="font-size: 6px;">1ST</span></div>
+              <div class="loc" style="font-size: 12px;">Route 201 · Lv 4</div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 6px; margin-top: 6px;">
+            <button style="flex: 1; background: var(--green-glow); color: var(--d0); border: 1px solid var(--d0); padding: 5px; font-family: 'Press Start 2P', monospace; font-size: 7px;">LOG</button>
+            <button style="flex: 1; background: var(--d2); color: var(--l2); border: 1px solid var(--d0); padding: 5px; font-family: 'Press Start 2P', monospace; font-size: 7px;">EDIT</button>
+            <button style="flex: 1; background: var(--d2); color: var(--l2); border: 1px solid var(--d0); padding: 5px; font-family: 'Press Start 2P', monospace; font-size: 7px;">SKIP</button>
+          </div>
+        </div>
+
+        <div class="sticky-filter-hint">↓ STICKY ON SCROLL</div>
+        <div class="filter-bar">
+          <span class="filter-chip active">ALL·19</span>
+          <span class="filter-chip">TEAM·4</span>
+          <span class="filter-chip">STOR·12</span>
+          <span class="filter-chip">DEAD·3</span>
+        </div>
+
+        <div class="box-grid">
+          <div class="box-cell team">
+            <span class="group-marker">★</span>
+            <div class="nick">TOMMY</div>
+            <div class="sprite" style="width: 32px; height: 32px;">SPR</div>
+            <div class="loc">R201</div>
+          </div>
+          <div class="box-cell team">
+            <span class="group-marker">★</span>
+            <div class="nick">RACHEL</div>
+            <div class="sprite" style="width: 32px; height: 32px;">SPR</div>
+            <div class="loc">R202</div>
+          </div>
+          <div class="box-cell team">
+            <span class="group-marker">★</span>
+            <div class="nick">PHOEBE</div>
+            <div class="sprite" style="width: 32px; height: 32px;">SPR</div>
+            <div class="loc">EternaF</div>
+          </div>
+          <div class="box-cell">
+            <span class="group-marker">▣</span>
+            <div class="nick">JOEY</div>
+            <div class="sprite" style="width: 32px; height: 32px;">SPR</div>
+            <div class="loc">Floaroma</div>
+          </div>
+          <div class="box-cell">
+            <span class="group-marker">▣</span>
+            <div class="nick">MONICA</div>
+            <div class="sprite" style="width: 32px; height: 32px;">SPR</div>
+            <div class="loc">Oreburgh</div>
+          </div>
+          <div class="box-cell dead">
+            <span class="group-marker">☠</span>
+            <div class="nick">JANICE</div>
+            <div class="sprite" style="width: 32px; height: 32px;">SPR</div>
+            <div class="loc">Eterna G</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <span class="who">A · SINGLE-COLUMN ACTIONS</span>
+    On mobile, the per-row LOG/EDIT/SKIP buttons stretch full-width below the row instead of stacking next to it. Larger tap targets, less crowding.
+  </div>
+  <div class="annotation">
+    <span class="who">B · TYPE COVERAGE BELOW</span>
+    The rail moves to the bottom of the panel on mobile (not shown here for length). Users who care about coverage can scroll to it; users who don't get the grid above the fold.
+  </div>
+
+  <div class="annotation" style="margin-top: 32px;">
+    <span class="who">CLOSING NOTE</span>
+    Backend churn is minimal. Today's data is already grouped by status (`@on_team_groups`, `@storage_groups`, `@fallen_groups`); rendering them into one grid + filter chips is mostly a view change. The review tray needs `acquired_via` and `caught_off_feed` to round-trip on a "log" / "skip" action — that's a small controller/migration and doesn't fight the existing PartyParser pipeline.
+  </div>
+
+</div>
+</body>
+</html>

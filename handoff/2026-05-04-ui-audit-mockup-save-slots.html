@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>R3 — Save Slot Management Redesign</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --d0: #0a1a0a;
+    --d1: #1a2e1a;
+    --d2: #3a5a3a;
+    --l1: #8a9e6a;
+    --l2: #9aae7a;
+    --white: #c0d0a0;
+    --amber: #d4b14a;
+    --crimson: #c75a5a;
+    --green-glow: #5fd45f;
+    --border: 3px solid var(--d1);
+    --border-thin: 2px solid var(--d1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--d0);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(154, 174, 122, 0.025) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse at top, #142214 0%, #0a1a0a 70%);
+    color: var(--white);
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    line-height: 1.4;
+    min-height: 100vh;
+  }
+
+  .page { max-width: 1080px; margin: 0 auto; padding: 32px 16px 96px; }
+
+  .page-banner {
+    border: var(--border); background: var(--d1);
+    padding: 20px 24px; margin-bottom: 18px; position: relative;
+  }
+  .page-banner::before {
+    content: ""; position: absolute; inset: 4px;
+    border: 1px solid var(--d2); pointer-events: none;
+  }
+  .page-banner h1 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 16px; color: var(--white);
+    margin: 0 0 8px; letter-spacing: 1px;
+  }
+  .page-banner .sub { color: var(--l1); font-size: 16px; }
+
+  .legend {
+    background: var(--d1); border: var(--border-thin);
+    padding: 14px 18px; margin-bottom: 28px;
+    color: var(--l2); font-size: 16px;
+  }
+  .legend strong { color: var(--amber); }
+  .legend ul { margin: 6px 0 0; padding-left: 20px; }
+  .legend li { margin: 2px 0; }
+
+  .section-anchor {
+    margin: 56px 0 18px;
+    border-top: 1px dashed var(--d2);
+    padding-top: 24px;
+  }
+  .section-anchor:first-of-type { margin-top: 0; border-top: none; padding-top: 0; }
+  .section-tag {
+    display: inline-block;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; color: var(--d0); background: var(--amber);
+    padding: 4px 8px; margin-bottom: 8px; letter-spacing: 1px;
+  }
+  .section-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 13px; color: var(--white); margin: 0 0 4px;
+  }
+  .section-note {
+    color: var(--l1); font-size: 16px;
+    margin-bottom: 18px; max-width: 720px;
+  }
+
+  /* ── Save-slot column simulation ── */
+
+  .column-frame {
+    background: var(--d0);
+    border: var(--border);
+    padding: 14px;
+    width: 320px;
+  }
+  .column-frame h2 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px; color: var(--white);
+    margin: 0 0 10px; letter-spacing: 1px;
+  }
+
+  /* Banner that announces overwrite-pending mode */
+  .pending-banner {
+    background: var(--amber); color: var(--d0);
+    border: 2px solid var(--d0);
+    padding: 8px 10px; margin-bottom: 10px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; line-height: 1.5;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .pending-banner .icon {
+    font-size: 14px; line-height: 1;
+  }
+  .pending-banner button {
+    margin-left: auto;
+    background: var(--d0); color: var(--amber);
+    border: 1px solid var(--d0);
+    padding: 3px 6px; cursor: pointer;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; letter-spacing: 1px;
+  }
+
+  /* A single slot card */
+  .slot {
+    background: var(--d1);
+    border: var(--border-thin);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .slot.active { border: 4px solid var(--green-glow); padding: 8px 10px; }
+  .slot.overwriteTarget { border-color: var(--amber); cursor: pointer; }
+  .slot.empty .slot-meta { color: var(--d2); }
+
+  .slot-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .slot-num {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px; color: var(--l2);
+    letter-spacing: 1px;
+  }
+  .state-pill {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    padding: 2px 5px;
+    letter-spacing: 1px;
+    border: 1px solid;
+  }
+  .state-pill.empty { color: var(--d2); border-color: var(--d2); }
+  .state-pill.saved { color: var(--l2); border-color: var(--l2); background: var(--d2); }
+  .state-pill.active { color: var(--d0); border-color: var(--green-glow); background: var(--green-glow); }
+  .state-pill.target { color: var(--d0); border-color: var(--amber); background: var(--amber); }
+  .state-pill.confirm { color: var(--white); border-color: var(--crimson); background: var(--crimson); }
+
+  .slot-meta { color: var(--l1); font-size: 14px; line-height: 1.5; }
+  .slot-meta .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .slot-meta .row .lbl { color: var(--d2); font-size: 11px; font-family: 'Press Start 2P', monospace; letter-spacing: 0.5px; }
+  .slot-meta .row .val { color: var(--white); }
+  .slot-meta strong { color: var(--white); font-size: 16px; }
+
+  .slot-actions {
+    display: flex; gap: 6px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--d2);
+  }
+  .slot-actions button {
+    flex: 1;
+    background: var(--d2); color: var(--l2);
+    border: 1px solid var(--d0);
+    padding: 6px 8px; cursor: pointer;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; letter-spacing: 1px;
+  }
+  .slot-actions button:hover { background: var(--d0); color: var(--white); }
+  .slot-actions button.primary { background: var(--green-glow); color: var(--d0); }
+  .slot-actions button.danger { color: var(--crimson); }
+  .slot-actions button.danger:hover { background: var(--crimson); color: var(--white); }
+  .slot-actions button.confirm { background: var(--crimson); color: var(--white); }
+
+  /* Confirmation inline state */
+  .confirm-inline {
+    background: var(--d0); color: var(--white);
+    border: 2px solid var(--crimson);
+    padding: 10px;
+    margin-top: 10px;
+  }
+  .confirm-inline .q {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px; color: var(--crimson);
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+  }
+  .confirm-inline .body {
+    font-size: 14px; color: var(--l1);
+    margin-bottom: 8px;
+  }
+  .confirm-inline .actions { display: flex; gap: 6px; }
+
+  .footer-actions {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--d2);
+  }
+  .footer-actions button {
+    width: 100%;
+    background: transparent; color: var(--crimson);
+    border: 1px dashed var(--crimson);
+    padding: 8px 10px; cursor: pointer;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; letter-spacing: 1px;
+  }
+  .footer-actions button:hover { background: var(--crimson); color: var(--white); border-style: solid; }
+
+  /* Roster card redesign */
+  .roster-card {
+    background: var(--d1);
+    border: var(--border-thin);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .roster-card.you { border: 4px solid var(--amber); padding: 10px 12px; }
+  .roster-card .head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .roster-card .name {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px; color: var(--white);
+    letter-spacing: 1px;
+  }
+  .roster-card .name .you-badge {
+    background: var(--amber); color: var(--d0);
+    font-size: 7px; padding: 2px 4px; margin-left: 6px;
+    letter-spacing: 1px;
+  }
+  .roster-card .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .roster-card .stat {
+    background: var(--d0);
+    border: 1px solid var(--d2);
+    padding: 6px;
+    text-align: center;
+  }
+  .roster-card .stat .lbl {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px; color: var(--l1);
+    letter-spacing: 1px; margin-bottom: 2px;
+  }
+  .roster-card .stat .val {
+    color: var(--white); font-size: 16px;
+  }
+  .roster-card details {
+    margin-top: 6px;
+    border-top: 1px dashed var(--d2); padding-top: 6px;
+  }
+  .roster-card summary {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; color: var(--l2);
+    letter-spacing: 1px; cursor: pointer;
+    list-style: none; user-select: none;
+  }
+  .roster-card summary::after { content: "  ▾"; color: var(--d2); }
+  .roster-card details[open] summary::after { content: "  ▴"; }
+  .roster-card .extra { color: var(--l1); font-size: 14px; margin-top: 6px; }
+  .roster-card .extra .row { display: flex; justify-content: space-between; }
+  .roster-card .extra .row .lbl { font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--d2); letter-spacing: 0.5px; }
+  .roster-card .seed {
+    font-family: monospace;
+    font-size: 11px; color: var(--d2);
+    background: var(--d0);
+    border: 1px solid var(--d2);
+    padding: 4px 6px;
+    margin-top: 6px;
+    word-break: break-all;
+    cursor: copy;
+    position: relative;
+  }
+  .roster-card .seed:hover { color: var(--l1); }
+  .roster-card .seed::after {
+    content: "click to copy"; position: absolute;
+    right: 6px; top: 50%; transform: translateY(-50%);
+    background: var(--d0); color: var(--amber);
+    font-family: 'Press Start 2P', monospace; font-size: 7px;
+    padding: 2px 4px;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .roster-card .seed:hover::after { opacity: 1; }
+
+  .conflict-warning {
+    background: #4a3a1c; color: var(--amber);
+    border: 1px solid var(--amber);
+    padding: 6px 8px;
+    margin-top: 6px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; line-height: 1.5;
+    letter-spacing: 0.5px;
+  }
+
+  .hof-pill {
+    display: inline-block;
+    background: var(--amber); color: var(--d0);
+    font-family: 'Press Start 2P', monospace; font-size: 7px;
+    padding: 2px 5px; letter-spacing: 1px;
+    margin-left: 4px;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 320px 320px;
+    gap: 28px;
+    align-items: flex-start;
+  }
+  .three-col {
+    display: grid;
+    grid-template-columns: 320px 320px 320px;
+    gap: 24px;
+    align-items: flex-start;
+  }
+
+  .annotation {
+    color: var(--amber);
+    font-size: 14px; line-height: 1.5;
+    background: rgba(212, 177, 74, 0.08);
+    border-left: 3px solid var(--amber);
+    padding: 8px 12px;
+    margin-top: 10px;
+  }
+  .annotation .who {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; letter-spacing: 1px;
+    color: var(--amber); display: block; margin-bottom: 2px;
+  }
+
+  /* Mobile preview */
+  .phone {
+    width: 320px;
+    border: 6px solid var(--d2);
+    border-radius: 24px;
+    background: var(--d0);
+    padding: 14px 12px 22px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  }
+  .phone-bezel {
+    width: 80px; height: 4px;
+    background: var(--d1); border-radius: 2px;
+    margin: 0 auto 12px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="page-banner">
+    <h1>R3 — Save Slot Management</h1>
+    <div class="sub">Emulator left sidebar · 2026-05-04 audit · architect-only redesign pass</div>
+  </div>
+
+  <div class="legend">
+    <strong>What changes here</strong>
+    <ul>
+      <li>Every slot has a visible <strong>STATE PILL</strong> (EMPTY · SAVED · ACTIVE · TARGET · CONFIRM). No more hidden overlay for overwrite-pending mode.</li>
+      <li>Overwrite-pending mode is announced by a <strong>sticky banner</strong> at the top of the column. Targetable slots glow amber. The user explicitly opts in or cancels.</li>
+      <li>DELETE swaps the slot into an inline <strong>"Confirm delete?"</strong> state — the second click is the destructive one. Same pattern for CLEAR ALL SLOTS.</li>
+      <li>Roster cards re-typeset with a real hierarchy: name + status pill on top · 3 stat tiles · everything else collapsed behind STATS.</li>
+      <li>Seed becomes <strong>click-to-copy</strong> with a hover hint.</li>
+      <li>Money symbol removed (Pokédollars don't have a universal Unicode glyph).</li>
+    </ul>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 1</span>
+    <h2 class="section-title">Default state — 5 slots, one active, one empty</h2>
+    <p class="section-note">No overwrite mode active. Active slot has a 4px green-glow border + ACTIVE pill. Empty slot is dimmed but still shows the slot number — users can drop a save into it from the emulator.</p>
+  </div>
+
+  <div class="two-col">
+    <div class="column-frame">
+      <h2>SAVE SLOTS</h2>
+
+      <div class="slot active">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 1</span>
+          <span class="state-pill active">ACTIVE</span>
+        </div>
+        <div class="slot-meta">
+          <strong>GLENN</strong>
+          <div class="row"><span class="lbl">PLAY</span> <span class="val">04:23</span> <span class="lbl">BADGES</span> <span class="val">2</span></div>
+          <div class="row"><span class="lbl">MAP</span> <span class="val">Eterna Forest</span></div>
+          <div class="row"><span class="lbl">DEX</span> <span class="val">42 caught · 71 seen</span></div>
+        </div>
+        <div class="slot-actions">
+          <button>DOWNLOAD</button>
+          <button class="danger">DELETE</button>
+        </div>
+      </div>
+
+      <div class="slot">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 2</span>
+          <span class="state-pill saved">SAVED</span>
+        </div>
+        <div class="slot-meta">
+          <strong>GLENN</strong>
+          <div class="row"><span class="lbl">PLAY</span> <span class="val">04:01</span> <span class="lbl">BADGES</span> <span class="val">2</span></div>
+          <div class="row"><span class="lbl">MAP</span> <span class="val">Floaroma Town</span></div>
+        </div>
+        <div class="slot-actions">
+          <button>DOWNLOAD</button>
+          <button class="primary">MAKE ACTIVE</button>
+          <button class="danger">DELETE</button>
+        </div>
+      </div>
+
+      <div class="slot">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 3</span>
+          <span class="state-pill saved">SAVED</span>
+        </div>
+        <div class="slot-meta">
+          <strong>GLENN</strong>
+          <div class="row"><span class="lbl">PLAY</span> <span class="val">02:48</span> <span class="lbl">BADGES</span> <span class="val">1</span></div>
+          <div class="row"><span class="lbl">MAP</span> <span class="val">Oreburgh Mine</span></div>
+        </div>
+        <div class="slot-actions">
+          <button>DOWNLOAD</button>
+          <button class="primary">MAKE ACTIVE</button>
+          <button class="danger">DELETE</button>
+        </div>
+      </div>
+
+      <div class="slot">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 4</span>
+          <span class="state-pill saved">SAVED</span>
+        </div>
+        <div class="slot-meta">
+          <strong>GLENN</strong>
+          <div class="row"><span class="lbl">PLAY</span> <span class="val">00:42</span> <span class="lbl">BADGES</span> <span class="val">0</span></div>
+          <div class="row"><span class="lbl">MAP</span> <span class="val">Sandgem Town</span></div>
+        </div>
+        <div class="slot-actions">
+          <button>DOWNLOAD</button>
+          <button class="primary">MAKE ACTIVE</button>
+          <button class="danger">DELETE</button>
+        </div>
+      </div>
+
+      <div class="slot empty">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 5</span>
+          <span class="state-pill empty">EMPTY</span>
+        </div>
+        <div class="slot-meta">
+          — drop a save here from the emulator —
+        </div>
+      </div>
+
+      <div class="footer-actions">
+        <button>CLEAR ALL SLOTS</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="annotation">
+        <span class="who">A · STATE PILLS</span>
+        Always visible. EMPTY (border only) · SAVED (filled neutral) · ACTIVE (green) · TARGET (amber, only during overwrite mode) · CONFIRM (red, only mid-confirmation). The save state is glanceable without reading body copy.
+      </div>
+      <div class="annotation">
+        <span class="who">B · ASYMMETRY OK</span>
+        The ACTIVE row hides the MAKE ACTIVE button (no-op anyway). Today this leaves a small visual gap; here we make the row narrower instead — DOWNLOAD and DELETE stretch.
+      </div>
+      <div class="annotation">
+        <span class="who">C · EMPTY SLOT IS A CTA</span>
+        The empty slot's body copy is the call-to-action — "drop a save here" — instead of just the word "Empty" on a dimmed row.
+      </div>
+      <div class="annotation">
+        <span class="who">D · CLEAR ALL SLOTS</span>
+        Dashed-border, bottom of column, separated by a divider. Reads as "yes this is destructive." First click triggers the same inline-confirm pattern (Screen 4).
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 2</span>
+    <h2 class="section-title">Overwrite-pending mode</h2>
+    <p class="section-note">User attempted to save from the emulator; all 5 slots were full. We surface a sticky banner explaining the situation and offering CANCEL. Targetable slots get the amber TARGET pill and an amber border. Clicking a slot writes there. The user can always back out.</p>
+  </div>
+
+  <div class="two-col">
+    <div class="column-frame">
+      <h2>SAVE SLOTS</h2>
+
+      <div class="pending-banner">
+        <span class="icon">⚠</span>
+        SAVE FULL — PICK A SLOT TO OVERWRITE
+        <button>CANCEL</button>
+      </div>
+
+      <div class="slot active overwriteTarget">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 1</span>
+          <span class="state-pill target">TARGET</span>
+        </div>
+        <div class="slot-meta">
+          <strong>GLENN</strong>
+          <div class="row"><span class="lbl">PLAY</span> <span class="val">04:23</span></div>
+          <div class="row"><span class="lbl">MAP</span> <span class="val">Eterna Forest</span></div>
+        </div>
+      </div>
+
+      <div class="slot overwriteTarget">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 2</span>
+          <span class="state-pill target">TARGET</span>
+        </div>
+        <div class="slot-meta">
+          <strong>GLENN</strong>
+          <div class="row"><span class="lbl">PLAY</span> <span class="val">04:01</span></div>
+          <div class="row"><span class="lbl">MAP</span> <span class="val">Floaroma Town</span></div>
+        </div>
+      </div>
+
+      <div class="slot overwriteTarget">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 3</span>
+          <span class="state-pill target">TARGET</span>
+        </div>
+        <div class="slot-meta">
+          <strong>GLENN</strong>
+          <div class="row"><span class="lbl">PLAY</span> <span class="val">02:48</span></div>
+          <div class="row"><span class="lbl">MAP</span> <span class="val">Oreburgh Mine</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="annotation">
+        <span class="who">A · BANNER IS THE ANNOUNCEMENT</span>
+        Replaces today's spring-loaded overlay. The user always knows they're in overwrite mode because the banner is right there.
+      </div>
+      <div class="annotation">
+        <span class="who">B · TARGET PILL + BORDER</span>
+        Both border color (amber) and pill (amber) signal targetability. Color-blind safe because the pill text "TARGET" is also explicit.
+      </div>
+      <div class="annotation">
+        <span class="who">C · ACTION BUTTONS HIDE</span>
+        While in TARGET mode, per-slot DOWNLOAD/MAKE ACTIVE/DELETE hide. The whole slot is now a click target. Removes the ambiguity of "what does clicking the slot do?"
+      </div>
+      <div class="annotation">
+        <span class="who">D · ESCAPE HATCH</span>
+        CANCEL is on the banner, never more than one click away. ESC key does the same (focus-trap utility we add in Phase 1 of the audit).
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 3</span>
+    <h2 class="section-title">Inline DELETE confirmation</h2>
+    <p class="section-note">User clicked DELETE on slot 3. Instead of opening a modal, the slot's action row swaps into an inline "Are you sure?" state. The destructive button is now red and labelled DELETE FOREVER. CANCEL returns to the previous state. No data lost on misclicks.</p>
+  </div>
+
+  <div class="two-col">
+    <div class="column-frame">
+      <h2>SAVE SLOTS</h2>
+
+      <div class="slot active">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 1</span>
+          <span class="state-pill active">ACTIVE</span>
+        </div>
+        <div class="slot-meta">
+          <strong>GLENN</strong>
+          <div class="row"><span class="lbl">PLAY</span> <span class="val">04:23</span></div>
+          <div class="row"><span class="lbl">MAP</span> <span class="val">Eterna Forest</span></div>
+        </div>
+        <div class="slot-actions">
+          <button>DOWNLOAD</button>
+          <button class="danger">DELETE</button>
+        </div>
+      </div>
+
+      <div class="slot">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 3</span>
+          <span class="state-pill confirm">CONFIRM</span>
+        </div>
+        <div class="slot-meta">
+          <strong>GLENN</strong>
+          <div class="row"><span class="lbl">PLAY</span> <span class="val">02:48</span></div>
+          <div class="row"><span class="lbl">MAP</span> <span class="val">Oreburgh Mine</span></div>
+        </div>
+        <div class="confirm-inline">
+          <div class="q">DELETE THIS SLOT?</div>
+          <div class="body">04 hours of progress. There's no undo — the save file is gone after this.</div>
+          <div class="actions">
+            <button class="" style="flex: 1; background: var(--d2); color: var(--l2); border: 1px solid var(--d0); padding: 6px 8px; cursor: pointer; font-family: 'Press Start 2P', monospace; font-size: 8px;">CANCEL</button>
+            <button class="confirm" style="flex: 1; padding: 6px 8px; cursor: pointer; font-family: 'Press Start 2P', monospace; font-size: 8px; border: 1px solid var(--d0);">DELETE FOREVER</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="slot">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 4</span>
+          <span class="state-pill saved">SAVED</span>
+        </div>
+        <div class="slot-meta">
+          <strong>GLENN</strong>
+          <div class="row"><span class="lbl">PLAY</span> <span class="val">00:42</span></div>
+          <div class="row"><span class="lbl">MAP</span> <span class="val">Sandgem Town</span></div>
+        </div>
+        <div class="slot-actions">
+          <button>DOWNLOAD</button>
+          <button class="primary">MAKE ACTIVE</button>
+          <button class="danger">DELETE</button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="annotation">
+        <span class="who">A · INLINE > MODAL</span>
+        The user is already looking at this slot. A modal would obscure the row and force a context switch. Inline confirmation reads as "I changed my mind one button to undo."
+      </div>
+      <div class="annotation">
+        <span class="who">B · BUTTON LABELS</span>
+        DELETE FOREVER is more honest than CONFIRM DELETE. Tells the user what actually happens.
+      </div>
+      <div class="annotation">
+        <span class="who">C · BODY COPY = STAKES</span>
+        "04 hours of progress" makes the loss concrete. If the slot is small, copy adapts to "30 minutes of progress" — keeps the cost legible.
+      </div>
+      <div class="annotation">
+        <span class="who">D · KEYBOARD</span>
+        ENTER targets the cancel (safe-default), with TAB → ENTER for delete. ESC also cancels. Same pattern as MARK DEAD modal — consistency wins.
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 4</span>
+    <h2 class="section-title">Roster card — restructured</h2>
+    <p class="section-note">Run roster (right sidebar) cards re-typeset with a real hierarchy. Name (12px Press Start 2P) first, then a 3-tile stat strip with the most-glanced numbers (BADGES · DEX · PLAY), then everything else hidden behind a STATS disclosure. Hall of Fame pill, TID conflict warning, and seed get their own treatments.</p>
+  </div>
+
+  <div class="three-col">
+
+    <div class="roster-card you">
+      <div class="head">
+        <span class="name">GLENN<span class="you-badge">YOU</span></span>
+        <span class="state-pill saved">READY</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="lbl">BADGES</div><div class="val">2</div></div>
+        <div class="stat"><div class="lbl">DEX</div><div class="val">42</div></div>
+        <div class="stat"><div class="lbl">PLAY</div><div class="val">04:23</div></div>
+      </div>
+      <details>
+        <summary>STATS</summary>
+        <div class="extra">
+          <div class="row"><span class="lbl">TRAINER</span><span>Glenn</span></div>
+          <div class="row"><span class="lbl">MAP</span><span>Eterna Forest</span></div>
+          <div class="row"><span class="lbl">MONEY</span><span>4,231</span></div>
+          <div class="row"><span class="lbl">TID/SID</span><span>12345/4321</span></div>
+          <div class="row"><span class="lbl">DEX SEEN</span><span>71</span></div>
+          <div class="seed">Seed: 0xAB12CD34EF567890</div>
+        </div>
+      </details>
+    </div>
+
+    <div class="roster-card">
+      <div class="head">
+        <span class="name">RICHARD</span>
+        <span class="state-pill saved">READY</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="lbl">BADGES</div><div class="val">2</div></div>
+        <div class="stat"><div class="lbl">DEX</div><div class="val">38</div></div>
+        <div class="stat"><div class="lbl">PLAY</div><div class="val">04:11</div></div>
+      </div>
+      <div class="conflict-warning">⚠ TID CONFLICT WITH BOB · re-roll the seed</div>
+      <details>
+        <summary>STATS</summary>
+        <div class="extra">
+          <div class="row"><span class="lbl">TRAINER</span><span>Richard</span></div>
+          <div class="row"><span class="lbl">MAP</span><span>Eterna City</span></div>
+          <div class="row"><span class="lbl">TID/SID</span><span>12345/9999</span></div>
+          <div class="seed">Seed: 0xCD34EF567890AB12</div>
+        </div>
+      </details>
+    </div>
+
+    <div class="roster-card">
+      <div class="head">
+        <span class="name">BOB <span class="hof-pill">🏆 HOF</span></span>
+        <span class="state-pill saved">READY</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="lbl">BADGES</div><div class="val">8</div></div>
+        <div class="stat"><div class="lbl">DEX</div><div class="val">130</div></div>
+        <div class="stat"><div class="lbl">PLAY</div><div class="val">38:14</div></div>
+      </div>
+      <details>
+        <summary>STATS</summary>
+        <div class="extra">
+          <div class="row"><span class="lbl">TRAINER</span><span>Bob</span></div>
+          <div class="row"><span class="lbl">MAP</span><span>Hall of Fame</span></div>
+          <div class="row"><span class="lbl">TID/SID</span><span>54321/1111</span></div>
+          <div class="seed">Seed: 0xEF567890AB12CD34</div>
+        </div>
+      </details>
+    </div>
+
+  </div>
+
+  <div style="margin-top: 18px;">
+    <div class="annotation">
+      <span class="who">A · YOU MARKER</span>
+      4px amber border + small "YOU" pill on the name. Survives Turbo Stream re-renders because it's CSS-only — no JS overlay needed.
+    </div>
+    <div class="annotation">
+      <span class="who">B · 3-TILE STAT STRIP</span>
+      The three numbers everyone glances at first: BADGES (gym progress), DEX (caught), PLAY (hours). Readable from across the room. Other fields move into &lt;details&gt;.
+    </div>
+    <div class="annotation">
+      <span class="who">C · TID CONFLICT</span>
+      Inline warning band, not a state pill. Tells the user what to do ("re-roll the seed") not just that something's wrong. Survives the read at 8px because it's high-contrast amber-on-dark-amber.
+    </div>
+    <div class="annotation">
+      <span class="who">D · HALL OF FAME</span>
+      Inline pill next to the trainer name. Small enough that it doesn't dominate but visible enough to celebrate.
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 5</span>
+    <h2 class="section-title">Mobile — single column with the same patterns</h2>
+    <p class="section-note">On phones, the emulator-grid stacks (already supported in CSS — `grid-template-columns: 1fr` below 900px). Save slots become a vertical column above the canvas. Same state pills, same banner, same inline confirm — just narrower.</p>
+  </div>
+
+  <div class="phone">
+    <div class="phone-bezel"></div>
+
+    <div style="background: var(--d0);">
+      <h2 style="font-family: 'Press Start 2P', monospace; font-size: 11px; color: var(--white); margin: 0 0 10px; letter-spacing: 1px;">SAVE SLOTS</h2>
+
+      <div class="pending-banner">
+        <span class="icon">⚠</span>
+        SAVE FULL
+        <button>CANCEL</button>
+      </div>
+
+      <div class="slot active overwriteTarget" style="margin-bottom: 8px;">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 1</span>
+          <span class="state-pill target">TARGET</span>
+        </div>
+        <div class="slot-meta">
+          <strong>GLENN</strong>
+          <div class="row"><span class="lbl">PLAY</span> <span class="val">04:23</span> <span class="lbl">BADGES</span> <span class="val">2</span></div>
+          <div class="row"><span class="lbl">MAP</span> <span class="val">Eterna Forest</span></div>
+        </div>
+      </div>
+
+      <div class="slot overwriteTarget" style="margin-bottom: 8px;">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 2</span>
+          <span class="state-pill target">TARGET</span>
+        </div>
+        <div class="slot-meta">
+          <strong>GLENN</strong>
+          <div class="row"><span class="lbl">PLAY</span> <span class="val">04:01</span></div>
+          <div class="row"><span class="lbl">MAP</span> <span class="val">Floaroma Town</span></div>
+        </div>
+      </div>
+
+      <div class="slot overwriteTarget" style="margin-bottom: 8px;">
+        <div class="slot-head">
+          <span class="slot-num">SLOT 3</span>
+          <span class="state-pill target">TARGET</span>
+        </div>
+        <div class="slot-meta">
+          <strong>GLENN</strong>
+          <div class="row"><span class="lbl">PLAY</span> <span class="val">02:48</span></div>
+          <div class="row"><span class="lbl">MAP</span> <span class="val">Oreburgh Mine</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="margin-top: 28px;">
+    <div class="annotation">
+      <span class="who">CLOSING NOTE</span>
+      None of these patterns require new dependencies. State pills are spans with classes; inline confirm is a Stimulus action that swaps the row's internals; banner uses a sticky div. The CSS reuses the existing GB palette. Estimated implementation: 1.5 days for everything in this mock.
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

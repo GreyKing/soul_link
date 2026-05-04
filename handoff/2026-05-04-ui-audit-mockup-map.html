@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>R4 — Map / Route Timeline Redesign</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --d0: #0a1a0a;
+    --d1: #1a2e1a;
+    --d2: #3a5a3a;
+    --l1: #8a9e6a;
+    --l2: #9aae7a;
+    --white: #c0d0a0;
+    --amber: #d4b14a;
+    --crimson: #c75a5a;
+    --green-glow: #5fd45f;
+    --border: 3px solid var(--d1);
+    --border-thin: 2px solid var(--d1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--d0);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(154, 174, 122, 0.025) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse at top, #142214 0%, #0a1a0a 70%);
+    color: var(--white);
+    font-family: 'VT323', monospace;
+    font-size: 18px; line-height: 1.4;
+    min-height: 100vh;
+  }
+
+  .page { max-width: 1280px; margin: 0 auto; padding: 32px 16px 96px; }
+
+  .page-banner { border: var(--border); background: var(--d1); padding: 20px 24px; margin-bottom: 18px; position: relative; }
+  .page-banner::before { content: ""; position: absolute; inset: 4px; border: 1px solid var(--d2); pointer-events: none; }
+  .page-banner h1 { font-family: 'Press Start 2P', monospace; font-size: 16px; color: var(--white); margin: 0 0 8px; letter-spacing: 1px; }
+  .page-banner .sub { color: var(--l1); font-size: 16px; }
+
+  .legend { background: var(--d1); border: var(--border-thin); padding: 14px 18px; margin-bottom: 28px; color: var(--l2); font-size: 16px; }
+  .legend strong { color: var(--amber); }
+  .legend ul { margin: 6px 0 0; padding-left: 20px; }
+  .legend li { margin: 2px 0; }
+
+  .section-anchor { margin: 56px 0 18px; border-top: 1px dashed var(--d2); padding-top: 24px; }
+  .section-anchor:first-of-type { margin-top: 0; border-top: none; padding-top: 0; }
+  .section-tag { display: inline-block; font-family: 'Press Start 2P', monospace; font-size: 9px; color: var(--d0); background: var(--amber); padding: 4px 8px; margin-bottom: 8px; letter-spacing: 1px; }
+  .section-title { font-family: 'Press Start 2P', monospace; font-size: 13px; color: var(--white); margin: 0 0 4px; }
+  .section-note { color: var(--l1); font-size: 16px; margin-bottom: 18px; max-width: 760px; }
+
+  /* ── Map header bar ── */
+
+  .map-head {
+    background: var(--d1);
+    border: var(--border);
+    padding: 12px 18px;
+    margin-bottom: 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+  }
+  .map-head h2 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 13px; color: var(--white);
+    margin: 0; letter-spacing: 1px;
+  }
+  .map-head .sub { color: var(--l1); font-size: 14px; margin-top: 4px; }
+
+  .badge-strip { display: flex; gap: 4px; align-items: center; }
+  .badge-strip .lbl { font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--l1); margin-right: 6px; letter-spacing: 1px; }
+  .badge-strip .badge {
+    width: 28px; height: 28px;
+    border: 2px solid var(--d0);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Press Start 2P', monospace; font-size: 10px;
+    cursor: pointer;
+    background: var(--l2); color: var(--d0);
+    transition: all 0.1s;
+  }
+  .badge-strip .badge.earned { background: var(--amber); color: var(--d0); border-color: var(--amber); box-shadow: 0 0 6px rgba(212, 177, 74, 0.4); }
+  .badge-strip .badge:hover { transform: translateY(-1px); }
+
+  /* ── Status bar ── */
+
+  .status-bar {
+    background: var(--d2);
+    border: var(--border-thin);
+    padding: 8px 14px;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 14px;
+    flex-wrap: wrap;
+    font-size: 14px;
+    color: var(--l2);
+  }
+  .status-bar .item .lbl {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; color: var(--l1);
+    letter-spacing: 1px; margin-right: 6px;
+  }
+  .status-bar .item .val { color: var(--white); }
+  .status-bar .jump-btn {
+    margin-left: auto;
+    background: var(--amber); color: var(--d0);
+    border: 2px solid var(--d0);
+    padding: 6px 12px; cursor: pointer;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; letter-spacing: 1px;
+    animation: subtleBlink 2.4s ease-in-out infinite;
+  }
+  @keyframes subtleBlink {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(212, 177, 74, 0.45); }
+    50% { box-shadow: 0 0 0 6px rgba(212, 177, 74, 0); }
+  }
+
+  /* ── Node legend (always visible) ── */
+
+  .node-legend {
+    display: flex; align-items: center; gap: 14px;
+    padding: 8px 12px;
+    background: var(--d1);
+    border: 1px dashed var(--d2);
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--l1);
+  }
+  .node-legend .item { display: flex; align-items: center; gap: 6px; }
+  .node-legend .glyph {
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--d2);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+  }
+  .node-legend .glyph.caught { background: var(--d2); color: var(--green-glow); border-color: var(--green-glow); }
+  .node-legend .glyph.dead { background: #4a1c1c; color: var(--white); border-color: var(--crimson); }
+  .node-legend .glyph.uncaught { background: var(--l2); color: var(--d2); }
+  .node-legend .glyph.special { background: var(--d1); color: var(--amber); border-color: var(--amber); }
+  .node-legend .glyph.gym { background: var(--amber); color: var(--d0); border-color: var(--d0); font-size: 11px; }
+
+  /* ── The timeline track ── */
+
+  .timeline-frame {
+    background: var(--d1);
+    border: var(--border);
+    padding: 0;
+    margin-bottom: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .timeline-frame::after {
+    content: ''; position: absolute;
+    top: 0; right: 0; bottom: 0; width: 64px;
+    background: linear-gradient(to right, transparent, var(--d1) 80%);
+    pointer-events: none; z-index: 5;
+  }
+  .timeline-frame::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; bottom: 0; width: 36px;
+    background: linear-gradient(to left, transparent, var(--d1) 80%);
+    pointer-events: none; z-index: 5;
+  }
+
+  .timeline-scroll {
+    overflow-x: auto;
+    overflow-y: visible;
+    padding: 22px 12px 16px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--d2) var(--d1);
+  }
+  .timeline-track {
+    display: flex; align-items: flex-start; gap: 0;
+    min-width: max-content;
+  }
+
+  .timeline-line {
+    height: 3px; flex-shrink: 0;
+    margin-top: 32px;
+    align-self: flex-start;
+  }
+  .timeline-line.done { width: 24px; background: var(--green-glow); }
+  .timeline-line.todo { width: 24px; background: var(--d2); }
+
+  .timeline-segment-divider {
+    width: 2px; min-height: 100px;
+    background: var(--d2);
+    margin: 0 18px;
+    position: relative;
+  }
+  .timeline-segment-divider::after {
+    content: attr(data-segment);
+    position: absolute; top: -16px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--d2); color: var(--l1);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px; padding: 2px 6px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .node {
+    flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 4px;
+    min-width: 84px;
+    cursor: pointer;
+    background: none; border: none; padding: 0;
+    font-family: 'VT323', monospace;
+  }
+  .node .glyph {
+    width: 56px; height: 56px;
+    border: 2px solid var(--d0);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.1s, border-color 0.1s, box-shadow 0.1s;
+    position: relative;
+  }
+  .node:hover .glyph { transform: translateY(-2px); border-color: var(--amber); box-shadow: 0 4px 0 rgba(212, 177, 74, 0.3); }
+  .node:focus-visible .glyph { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+  .node.caught .glyph { background: var(--d2); border-color: var(--green-glow); color: var(--white); }
+  .node.dead .glyph { background: #4a1c1c; border-color: var(--crimson); color: var(--white); }
+  .node.uncaught .glyph { background: var(--l2); border-color: var(--d2); color: var(--d2); opacity: 0.85; }
+  .node.special .glyph { background: var(--d1); border-color: var(--amber); color: var(--amber); }
+  .node.next .glyph {
+    border-color: var(--amber); border-width: 3px;
+    box-shadow: 0 0 0 2px var(--d0), 0 0 0 5px var(--amber), 0 0 16px rgba(212, 177, 74, 0.4);
+    animation: pulseNext 2s ease-in-out infinite;
+  }
+  @keyframes pulseNext {
+    0%, 100% { box-shadow: 0 0 0 2px var(--d0), 0 0 0 5px var(--amber), 0 0 16px rgba(212, 177, 74, 0.4); }
+    50% { box-shadow: 0 0 0 2px var(--d0), 0 0 0 5px var(--amber), 0 0 28px rgba(212, 177, 74, 0.7); }
+  }
+
+  .node.gym .glyph {
+    width: 64px; height: 64px;
+    background: var(--amber); color: var(--d0);
+    border-color: var(--d0); border-width: 3px;
+    font-family: 'Press Start 2P', monospace; font-size: 16px;
+  }
+  .node.gym.beaten .glyph { background: var(--d1); color: var(--amber); border-color: var(--amber); }
+
+  .node .label {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: var(--l2);
+    text-align: center;
+    line-height: 1.4;
+    max-width: 84px;
+    word-break: break-word;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+  .node.uncaught .label { color: var(--d2); }
+  .node.dead .label { color: var(--crimson); }
+
+  .node .nick {
+    font-size: 13px; color: var(--white);
+    line-height: 1.2; margin-top: 2px;
+    max-width: 84px; word-break: break-word;
+    text-align: center;
+  }
+  .node.dead .nick { color: var(--crimson); text-decoration: line-through; }
+
+  .node-now-pin {
+    position: absolute; top: -16px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--amber); color: var(--d0);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px; padding: 2px 6px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    box-shadow: 0 0 8px rgba(212, 177, 74, 0.4);
+  }
+  .node-now-pin::after {
+    content: ''; position: absolute;
+    bottom: -5px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--amber);
+  }
+
+  /* ── Special encounters bar ── */
+
+  .special-bar {
+    margin-top: 28px;
+    background: var(--d1);
+    border: var(--border-thin);
+    padding: 14px 16px;
+  }
+  .special-bar h3 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px; color: var(--white);
+    margin: 0 0 10px; letter-spacing: 1px;
+  }
+  .special-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .special-cell {
+    background: var(--d2);
+    border: var(--border-thin);
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: border-color 0.1s, transform 0.1s;
+  }
+  .special-cell:hover { border-color: var(--amber); transform: translateY(-2px); }
+  .special-cell .head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .special-cell .name { font-family: 'Press Start 2P', monospace; font-size: 10px; color: var(--white); letter-spacing: 0.5px; }
+  .special-cell .glyph-mini { font-family: 'Press Start 2P', monospace; font-size: 9px; color: var(--amber); }
+  .special-cell .body { color: var(--l1); font-size: 13px; }
+
+  /* ── Right rail (sheet) ── */
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 22px;
+    align-items: flex-start;
+  }
+  .sheet {
+    background: var(--d1);
+    border: var(--border);
+    padding: 0;
+    position: sticky; top: 16px;
+  }
+  .sheet-head {
+    background: var(--d0);
+    padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: var(--border-thin);
+  }
+  .sheet-head h3 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px; color: var(--white);
+    margin: 0; letter-spacing: 1px;
+  }
+  .sheet-head .close {
+    background: none; color: var(--l2);
+    border: 1px solid var(--d2);
+    padding: 4px 8px; cursor: pointer;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; letter-spacing: 1px;
+  }
+  .sheet-head .close:hover { background: var(--crimson); color: var(--white); border-color: var(--crimson); }
+
+  .sheet-body { padding: 16px; }
+
+  .sheet-status {
+    display: flex; align-items: center; gap: 6px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; letter-spacing: 1px;
+    color: var(--l1);
+    margin-bottom: 10px;
+  }
+  .sheet-status .pill {
+    background: var(--green-glow); color: var(--d0);
+    padding: 3px 6px;
+  }
+
+  .form-row { margin-bottom: 12px; }
+  .form-row label {
+    display: block;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; color: var(--l1);
+    letter-spacing: 1px; margin-bottom: 4px;
+  }
+  .form-row input, .form-row select {
+    width: 100%;
+    background: var(--d0); color: var(--white);
+    border: 2px solid var(--d2);
+    padding: 6px 10px;
+    font-family: 'VT323', monospace;
+    font-size: 16px;
+  }
+  .player-row {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 10px;
+    margin-bottom: 8px;
+    align-items: center;
+  }
+  .player-row .pname {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; color: var(--l1);
+    letter-spacing: 0.5px;
+  }
+  .player-row .pinput {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .player-row .preview {
+    width: 28px; height: 28px;
+    background: var(--d0);
+    border: 1px solid var(--d2);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;
+    flex-shrink: 0;
+  }
+  .player-row input { flex: 1; padding: 4px 8px; font-size: 14px; }
+
+  .submit-btn {
+    width: 100%;
+    background: var(--green-glow); color: var(--d0);
+    border: 2px solid var(--d0);
+    padding: 10px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px; letter-spacing: 1px;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .submit-btn:hover { filter: brightness(1.1); }
+
+  .annotation {
+    color: var(--amber);
+    font-size: 14px; line-height: 1.5;
+    background: rgba(212, 177, 74, 0.08);
+    border-left: 3px solid var(--amber);
+    padding: 8px 12px;
+    margin: 10px 0;
+  }
+  .annotation .who {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; letter-spacing: 1px;
+    color: var(--amber); display: block; margin-bottom: 2px;
+  }
+
+  /* ── Mobile accordion ── */
+
+  .phone {
+    width: 360px;
+    border: 6px solid var(--d2);
+    border-radius: 24px;
+    background: var(--d0);
+    padding: 14px 12px 22px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    margin: 18px auto 0;
+  }
+  .phone-bezel { width: 80px; height: 4px; background: var(--d1); border-radius: 2px; margin: 0 auto 12px; }
+
+  .accordion-segment {
+    background: var(--d1);
+    border: var(--border-thin);
+    margin-bottom: 8px;
+  }
+  .accordion-segment summary {
+    background: var(--d2);
+    padding: 10px 14px;
+    cursor: pointer;
+    list-style: none;
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; color: var(--white);
+    letter-spacing: 1px;
+  }
+  .accordion-segment summary::after { content: "▾"; color: var(--l1); }
+  .accordion-segment[open] summary::after { content: "▴"; }
+  .accordion-segment[open] summary { background: var(--amber); color: var(--d0); }
+  .accordion-segment .seg-progress { font-size: 7px; color: var(--l1); margin-left: auto; padding-right: 8px; }
+  .accordion-segment[open] .seg-progress { color: var(--d0); }
+
+  .acc-rows {
+    padding: 6px 8px;
+  }
+  .acc-row {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px;
+    border-bottom: 1px dashed var(--d2);
+    cursor: pointer;
+  }
+  .acc-row:last-child { border-bottom: none; }
+  .acc-row:hover { background: var(--d2); }
+  .acc-row .glyph {
+    width: 36px; height: 36px;
+    border: 2px solid var(--d0);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Press Start 2P', monospace; font-size: 10px;
+  }
+  .acc-row .glyph.caught { background: var(--d2); border-color: var(--green-glow); color: var(--white); }
+  .acc-row .glyph.dead { background: #4a1c1c; border-color: var(--crimson); color: var(--white); }
+  .acc-row .glyph.uncaught { background: var(--l2); border-color: var(--d2); color: var(--d2); }
+  .acc-row .glyph.next { border-color: var(--amber); animation: pulseNext 2s ease-in-out infinite; }
+  .acc-row .meta .loc { font-family: 'Press Start 2P', monospace; font-size: 9px; color: var(--white); letter-spacing: 0.5px; margin-bottom: 2px; }
+  .acc-row .meta .nick { font-size: 12px; color: var(--l1); }
+  .acc-row .meta .nick.dead { color: var(--crimson); text-decoration: line-through; }
+  .acc-row .chev { color: var(--d2); font-family: 'Press Start 2P', monospace; font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="page-banner">
+    <h1>R4 — Map / Route Timeline</h1>
+    <div class="sub">Standalone /map · 2026-05-04 audit · architect-only redesign pass</div>
+  </div>
+
+  <div class="legend">
+    <strong>What changes here</strong>
+    <ul>
+      <li><strong>Right-edge gradient fade</strong> on the timeline — visual cue that there's more to scroll. Plus a sticky <strong>"JUMP TO NOW"</strong> pill that anchors scroll on the next-uncaught route.</li>
+      <li><strong>Pulse ring</strong> on the next-uncaught node + a "↓ NOW ↓" pin floating above it. The user always knows where to look.</li>
+      <li>Larger touch targets — 84px node minimum (vs. today's 56px). Two-line labels instead of `text-overflow: ellipsis`.</li>
+      <li><strong>Always-visible legend</strong> — caught · dead · uncaught · special · gym — top of the page so the iconography is self-explanatory.</li>
+      <li>Slide-out becomes a <strong>right-rail sheet</strong> (sticky on desktop, half-height bottom-sheet on mobile). Per-player species inputs use the existing combobox controller, not `&lt;datalist&gt;`.</li>
+      <li>Mobile: a <strong>per-segment accordion</strong> replaces the horizontal track. Open the current segment, see vertical rows. Honest mobile UX.</li>
+    </ul>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 1</span>
+    <h2 class="section-title">Desktop — full timeline + pulse-ring on next route</h2>
+    <p class="section-note">User loaded /map. They've earned 2 badges. The next-uncaught node (Route 205) pulses amber with a "NOW" pin. Edge fade and JUMP TO NOW pill make the scrollability obvious.</p>
+  </div>
+
+  <div class="map-head">
+    <div>
+      <h2>ROUTE PROGRESSION</h2>
+      <div class="sub">Click any node to view catches or add a new one.</div>
+    </div>
+    <div class="badge-strip">
+      <span class="lbl">BADGES</span>
+      <button class="badge earned" title="Oreburgh — Roark (Rock)">1</button>
+      <button class="badge earned" title="Eterna — Gardenia (Grass)">2</button>
+      <button class="badge" title="Veilstone — Maylene (Fighting)">3</button>
+      <button class="badge" title="Pastoria — Crasher Wake (Water)">4</button>
+      <button class="badge" title="Hearthome — Fantina (Ghost)">5</button>
+      <button class="badge" title="Canalave — Byron (Steel)">6</button>
+      <button class="badge" title="Snowpoint — Candice (Ice)">7</button>
+      <button class="badge" title="Sunyshore — Volkner (Electric)">8</button>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="item"><span class="lbl">NEXT GYM</span><span class="val">Veilstone — Maylene (Fighting)</span></div>
+    <div class="item"><span class="lbl">LEVEL CAP</span><span class="val">30</span></div>
+    <div class="item"><span class="lbl">CURRENT SEG</span><span class="val">After Eterna · Before Veilstone</span></div>
+    <button class="jump-btn">↓ JUMP TO NOW</button>
+  </div>
+
+  <div class="node-legend">
+    <div class="item"><div class="glyph caught">●</div> caught</div>
+    <div class="item"><div class="glyph dead">☠</div> dead</div>
+    <div class="item"><div class="glyph uncaught">○</div> uncaught</div>
+    <div class="item"><div class="glyph special">★</div> special</div>
+    <div class="item"><div class="glyph gym">G</div> gym</div>
+  </div>
+
+  <div class="timeline-frame">
+    <div class="timeline-scroll">
+      <div class="timeline-track">
+
+        <!-- Segment 1: Twinleaf → Oreburgh -->
+        <button class="node caught">
+          <div class="glyph"><span style="font-size: 12px;">●</span></div>
+          <div class="label">Twinleaf</div>
+          <div class="nick">starter</div>
+        </button>
+        <div class="timeline-line done"></div>
+        <button class="node caught">
+          <div class="glyph"><span style="font-size: 12px;">●</span></div>
+          <div class="label">Route 201</div>
+          <div class="nick">TOMMY</div>
+        </button>
+        <div class="timeline-line done"></div>
+        <button class="node caught">
+          <div class="glyph"><span style="font-size: 12px;">●</span></div>
+          <div class="label">Sandgem</div>
+          <div class="nick">RACHEL</div>
+        </button>
+        <div class="timeline-line done"></div>
+        <button class="node caught">
+          <div class="glyph"><span style="font-size: 12px;">●</span></div>
+          <div class="label">Route 202</div>
+          <div class="nick">PHOEBE</div>
+        </button>
+        <div class="timeline-line done"></div>
+        <button class="node uncaught">
+          <div class="glyph"><span style="font-size: 12px;">○</span></div>
+          <div class="label">Jubilife</div>
+        </button>
+        <div class="timeline-line done"></div>
+        <button class="node caught">
+          <div class="glyph"><span style="font-size: 12px;">●</span></div>
+          <div class="label">Route 203</div>
+          <div class="nick">CHANDLER</div>
+        </button>
+
+        <!-- Gym 1 -->
+        <div class="timeline-line done"></div>
+        <button class="node gym beaten">
+          <div class="glyph">1</div>
+          <div class="label">ROARK<br>Lv 14</div>
+        </button>
+        <div class="timeline-line done"></div>
+
+        <button class="node caught">
+          <div class="glyph"><span style="font-size: 12px;">●</span></div>
+          <div class="label">Route 204</div>
+          <div class="nick">JOEY</div>
+        </button>
+        <div class="timeline-segment-divider" data-segment="ETERNA"></div>
+
+        <!-- Segment 2: Eterna -->
+        <button class="node caught">
+          <div class="glyph"><span style="font-size: 12px;">●</span></div>
+          <div class="label">Floaroma</div>
+          <div class="nick">JANICE</div>
+        </button>
+        <div class="timeline-line done"></div>
+        <button class="node dead">
+          <div class="glyph"><span style="font-size: 12px;">☠</span></div>
+          <div class="label">Mead.</div>
+          <div class="nick">UGLY NK</div>
+        </button>
+        <div class="timeline-line done"></div>
+        <button class="node caught">
+          <div class="glyph"><span style="font-size: 12px;">●</span></div>
+          <div class="label">Eterna<br>Forest</div>
+          <div class="nick">PHOEBE</div>
+        </button>
+        <div class="timeline-line done"></div>
+        <button class="node caught">
+          <div class="glyph"><span style="font-size: 12px;">●</span></div>
+          <div class="label">Eterna City</div>
+          <div class="nick">MONICA</div>
+        </button>
+
+        <div class="timeline-line done"></div>
+        <button class="node gym beaten">
+          <div class="glyph">2</div>
+          <div class="label">GARDEN<br>Lv 22</div>
+        </button>
+        <div class="timeline-segment-divider" data-segment="VEILSTONE"></div>
+
+        <!-- Segment 3: Veilstone (current) -->
+        <button class="node caught">
+          <div class="glyph"><span style="font-size: 12px;">●</span></div>
+          <div class="label">Route 211</div>
+          <div class="nick">ROSS</div>
+        </button>
+        <div class="timeline-line todo"></div>
+        <button class="node next uncaught" style="position: relative;">
+          <div class="node-now-pin">↓ NOW</div>
+          <div class="glyph"><span style="font-size: 12px;">○</span></div>
+          <div class="label">Route 205</div>
+        </button>
+        <div class="timeline-line todo"></div>
+        <button class="node uncaught">
+          <div class="glyph"><span style="font-size: 12px;">○</span></div>
+          <div class="label">Valor Lake.</div>
+        </button>
+        <div class="timeline-line todo"></div>
+        <button class="node uncaught">
+          <div class="glyph"><span style="font-size: 12px;">○</span></div>
+          <div class="label">Route 212</div>
+        </button>
+        <div class="timeline-line todo"></div>
+        <button class="node special">
+          <div class="glyph"><span style="font-size: 11px;">★</span></div>
+          <div class="label">Pastoria<br>Safari</div>
+        </button>
+        <div class="timeline-line todo"></div>
+        <button class="node uncaught">
+          <div class="glyph"><span style="font-size: 12px;">○</span></div>
+          <div class="label">Veilstone</div>
+        </button>
+
+        <div class="timeline-line todo"></div>
+        <button class="node gym">
+          <div class="glyph">3</div>
+          <div class="label">MAYLENE<br>Lv 30</div>
+        </button>
+
+        <div class="timeline-segment-divider" data-segment="…"></div>
+
+        <button class="node uncaught" style="opacity: 0.5;">
+          <div class="glyph"><span style="font-size: 12px;">○</span></div>
+          <div class="label">…</div>
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <span class="who">A · ALWAYS-VISIBLE LEGEND</span>
+    Sat right above the track. Five glyphs, five labels. New users learn the iconography in 3 seconds; returning users glance over it. No tooltip-only knowledge.
+  </div>
+  <div class="annotation">
+    <span class="who">B · PULSE RING + "NOW" PIN</span>
+    Two redundant signals on the next-uncaught route. Color (amber pulse), motion (animation), and a literal "↓ NOW" caption. Color-blind safe because the caption + pulse pair is enough on its own.
+  </div>
+  <div class="annotation">
+    <span class="who">C · SEGMENT DIVIDERS</span>
+    Vertical line + label between segments. Today's timeline has gym milestones serving as dividers; this preserves them but adds a textual marker for users who want to navigate by major arc, not by gym number.
+  </div>
+  <div class="annotation">
+    <span class="who">D · EDGE GRADIENT FADE</span>
+    Two pseudo-elements on the frame: 64px right gradient + 36px left gradient. Visually announces "more here." Plus a translucent scroll cursor visible on hover.
+  </div>
+  <div class="annotation">
+    <span class="who">E · "JUMP TO NOW" PILL</span>
+    On the status bar. Subtle pulse animation. One click scrolls the timeline so the pulse-ring node is centered. Reverses by hitting it again (back to leftmost).
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 2</span>
+    <h2 class="section-title">Sheet open — adding a catch</h2>
+    <p class="section-note">User clicked Route 205 (the NOW node). Right-rail sheet slides in (or, on mobile, a half-height bottom-sheet — Screen 4). Per-player species inputs use the combobox controller already used elsewhere.</p>
+  </div>
+
+  <div class="layout">
+    <div>
+      <div class="map-head">
+        <div>
+          <h2 style="font-size: 12px;">ROUTE PROGRESSION</h2>
+          <div class="sub">Click any node to view catches or add a new one.</div>
+        </div>
+        <div class="badge-strip">
+          <span class="lbl">BADGES</span>
+          <button class="badge earned">1</button>
+          <button class="badge earned">2</button>
+          <button class="badge">3</button>
+          <button class="badge">4</button>
+          <button class="badge">5</button>
+          <button class="badge">6</button>
+          <button class="badge">7</button>
+          <button class="badge">8</button>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <div class="item"><span class="lbl">NEXT GYM</span><span class="val">Maylene · Lv 30</span></div>
+        <button class="jump-btn">↓ JUMP TO NOW</button>
+      </div>
+
+      <p style="color: var(--d2); font-size: 14px; padding: 12px;">…timeline omitted; same as Screen 1 with sheet open on the right.</p>
+
+      <div class="special-bar">
+        <h3>SPECIAL ENCOUNTERS</h3>
+        <div class="special-grid">
+          <div class="special-cell">
+            <div class="head"><span class="name">GIFT</span><span class="glyph-mini">★</span></div>
+            <div class="body">Eevee — Hearthome</div>
+          </div>
+          <div class="special-cell">
+            <div class="head"><span class="name">EGG</span><span class="glyph-mini">★</span></div>
+            <div class="body">No catch yet</div>
+          </div>
+          <div class="special-cell">
+            <div class="head"><span class="name">TRADE</span><span class="glyph-mini">★</span></div>
+            <div class="body">Chatot — Eterna</div>
+          </div>
+          <div class="special-cell">
+            <div class="head"><span class="name">OTHER</span><span class="glyph-mini">★</span></div>
+            <div class="body">No catch yet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="sheet">
+      <div class="sheet-head">
+        <h3>ROUTE 205</h3>
+        <button class="close">CLOSE ✕</button>
+      </div>
+      <div class="sheet-body">
+
+        <div class="sheet-status">
+          <span class="pill">UNCAUGHT</span>
+          first encounter slot · 4 players
+        </div>
+
+        <p style="color: var(--l1); font-size: 14px; margin: 0 0 14px;">
+          No group recorded for this route yet. Drop your first encounter below — every player's species is logged together.
+        </p>
+
+        <div class="form-row">
+          <label>GROUP NICKNAME</label>
+          <input type="text" placeholder="e.g. CARTER, MELANIE…" />
+        </div>
+
+        <div class="form-row">
+          <label>YOUR SPECIES (GLENN)</label>
+          <div class="player-row">
+            <span class="pname">GLENN</span>
+            <div class="pinput">
+              <span class="preview">SPR</span>
+              <input type="text" placeholder="Search species…" value="bidoof" />
+            </div>
+          </div>
+          <div class="player-row">
+            <span class="pname">RICHARD</span>
+            <div class="pinput">
+              <span class="preview" style="color: var(--d2);">—</span>
+              <input type="text" placeholder="Search species…" />
+            </div>
+          </div>
+          <div class="player-row">
+            <span class="pname">BOB</span>
+            <div class="pinput">
+              <span class="preview" style="color: var(--d2);">—</span>
+              <input type="text" placeholder="Search species…" />
+            </div>
+          </div>
+          <div class="player-row">
+            <span class="pname">JESS</span>
+            <div class="pinput">
+              <span class="preview" style="color: var(--d2);">—</span>
+              <input type="text" placeholder="Search species…" />
+            </div>
+          </div>
+        </div>
+
+        <button class="submit-btn">+ LOG GROUP</button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="annotation">
+    <span class="who">A · STICKY SHEET, NOT MODAL</span>
+    The sheet is sticky-positioned to the right column, not an overlay. Users see the timeline and the form simultaneously — common interaction is "look at the route, then fill in catches" without context-switching.
+  </div>
+  <div class="annotation">
+    <span class="who">B · PER-PLAYER ROW WITH PREVIEW</span>
+    The 28px sprite preview lights up as soon as the species is recognized. Gives feedback without a "Confirm species" step. Matches today's `speciesPreview` target — controller already exists.
+  </div>
+  <div class="annotation">
+    <span class="who">C · COMBOBOX, NOT DATALIST</span>
+    Drop the `&lt;datalist&gt;` (Safari renders it as an OS dropdown that vanishes on tap). Reuse `timeline_controller.js#filterSpecies` which already does a custom dropdown. Consistent UX across browsers.
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 3</span>
+    <h2 class="section-title">Sheet open — viewing existing catches</h2>
+    <p class="section-note">User clicked Route 201 (already has a catch group). The sheet shows the group with its 4 player slots, each with sprite + nickname + species. Edit and Mark Dead actions inline.</p>
+  </div>
+
+  <div class="layout">
+    <div>
+      <div class="map-head">
+        <div><h2 style="font-size: 12px;">ROUTE PROGRESSION</h2></div>
+      </div>
+      <p style="color: var(--d2); font-size: 14px; padding: 12px;">…timeline omitted; sheet on right is the focus.</p>
+    </div>
+
+    <aside class="sheet">
+      <div class="sheet-head">
+        <h3>ROUTE 201</h3>
+        <button class="close">CLOSE ✕</button>
+      </div>
+      <div class="sheet-body">
+
+        <div class="sheet-status">
+          <span class="pill">CAUGHT</span>
+          group · TOMMY · 4 players linked
+        </div>
+
+        <div style="background: var(--d0); border: 2px solid var(--green-glow); padding: 12px; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <span style="font-family: 'Press Start 2P', monospace; font-size: 12px; color: var(--white); letter-spacing: 1px;">TOMMY</span>
+            <span style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--green-glow); border: 1px solid var(--green-glow); padding: 2px 5px; letter-spacing: 1px;">ALIVE</span>
+          </div>
+
+          <div class="player-row">
+            <span class="pname">GLENN</span>
+            <div class="pinput">
+              <span class="preview">SPR</span>
+              <span style="font-size: 14px; color: var(--white);">Starly · Lv 12</span>
+            </div>
+          </div>
+          <div class="player-row">
+            <span class="pname">RICHARD</span>
+            <div class="pinput">
+              <span class="preview">SPR</span>
+              <span style="font-size: 14px; color: var(--white);">Bidoof · Lv 11</span>
+            </div>
+          </div>
+          <div class="player-row">
+            <span class="pname">BOB</span>
+            <div class="pinput">
+              <span class="preview">SPR</span>
+              <span style="font-size: 14px; color: var(--white);">Shinx · Lv 10</span>
+            </div>
+          </div>
+          <div class="player-row">
+            <span class="pname">JESS</span>
+            <div class="pinput">
+              <span class="preview">SPR</span>
+              <span style="font-size: 14px; color: var(--white);">Kricketot · Lv 11</span>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--d2);">
+            <button class="submit-btn" style="background: var(--d2); color: var(--l2); margin-top: 0;">EDIT</button>
+            <button class="submit-btn" style="background: var(--crimson); color: var(--white); margin-top: 0;">MARK DEAD</button>
+          </div>
+        </div>
+
+        <button style="width: 100%; background: transparent; color: var(--l1); border: 1px dashed var(--d2); padding: 10px; font-family: 'Press Start 2P', monospace; font-size: 9px; cursor: pointer; letter-spacing: 1px;">+ ANOTHER ENCOUNTER (DUPES CLAUSE)</button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="annotation">
+    <span class="who">A · GROUP CARD AS THE PRIMARY OBJECT</span>
+    Today the modal mixes "edit one Pokémon" with "edit a group." Here the sheet shows the whole group — all 4 players' species in one card — and edits are scoped to the group. Single Pokémon edit happens in a stacked overlay if needed.
+  </div>
+  <div class="annotation">
+    <span class="who">B · INLINE MARK DEAD</span>
+    MARK DEAD lives at the bottom of the group card. Click triggers the same inline-confirm pattern as save-slot delete (R3) — first click swaps to "Confirm: this kills all 4 linked Pokémon." Consistency across destructive actions.
+  </div>
+  <div class="annotation">
+    <span class="who">C · DUPES CLAUSE BUTTON</span>
+    Dashed-border button at the bottom for "another encounter" (e.g. Nuzlocke Dupes Clause re-rolls). Visible but visually quiet. Today there's no UX for this; users either re-write the catch or live with it.
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 4</span>
+    <h2 class="section-title">Mobile — accordion of segments</h2>
+    <p class="section-note">Below 720px the horizontal timeline becomes impractical. We replace it with a per-segment accordion. Open the current segment by default; nodes become vertical rows. Same icon vocabulary — caught · dead · uncaught · pulse-ring on next.</p>
+  </div>
+
+  <div class="phone">
+    <div class="phone-bezel"></div>
+
+    <div class="map-head" style="padding: 8px 10px; margin-bottom: 8px;">
+      <div>
+        <h2 style="font-size: 11px;">ROUTES</h2>
+        <div class="sub" style="font-size: 12px;">Tap a row to view / add catches.</div>
+      </div>
+      <div class="badge-strip" style="gap: 2px;">
+        <button class="badge earned" style="width: 22px; height: 22px; font-size: 8px;">1</button>
+        <button class="badge earned" style="width: 22px; height: 22px; font-size: 8px;">2</button>
+        <button class="badge" style="width: 22px; height: 22px; font-size: 8px;">3</button>
+        <button class="badge" style="width: 22px; height: 22px; font-size: 8px;">4</button>
+      </div>
+    </div>
+
+    <div class="status-bar" style="padding: 6px 10px; gap: 8px; font-size: 12px;">
+      <div class="item"><span class="lbl" style="font-size: 7px;">NEXT</span><span class="val" style="font-size: 13px;">Maylene · Lv 30</span></div>
+      <button class="jump-btn" style="font-size: 7px; padding: 4px 8px;">↓ NOW</button>
+    </div>
+
+    <details class="accordion-segment">
+      <summary>SEG 1 · TWINLEAF → ORE.<span class="seg-progress">5/6 ✓</span></summary>
+    </details>
+
+    <details class="accordion-segment">
+      <summary>SEG 2 · ETERNA<span class="seg-progress">4/4 ✓</span></summary>
+    </details>
+
+    <details class="accordion-segment" open>
+      <summary>SEG 3 · VEILSTONE<span class="seg-progress">1/6 NOW</span></summary>
+      <div class="acc-rows">
+        <div class="acc-row">
+          <div class="glyph caught">●</div>
+          <div class="meta">
+            <div class="loc">ROUTE 211</div>
+            <div class="nick">ROSS</div>
+          </div>
+          <span class="chev">›</span>
+        </div>
+        <div class="acc-row">
+          <div class="glyph uncaught next">○</div>
+          <div class="meta">
+            <div class="loc">ROUTE 205</div>
+            <div class="nick" style="color: var(--amber);">↓ NOW · log first encounter</div>
+          </div>
+          <span class="chev">›</span>
+        </div>
+        <div class="acc-row">
+          <div class="glyph uncaught">○</div>
+          <div class="meta">
+            <div class="loc">VALOR LAKEFRONT</div>
+            <div class="nick">— uncaught —</div>
+          </div>
+          <span class="chev">›</span>
+        </div>
+        <div class="acc-row">
+          <div class="glyph uncaught">○</div>
+          <div class="meta">
+            <div class="loc">ROUTE 212</div>
+            <div class="nick">— uncaught —</div>
+          </div>
+          <span class="chev">›</span>
+        </div>
+        <div class="acc-row">
+          <div class="glyph uncaught" style="background: var(--d1); border-color: var(--amber); color: var(--amber);">★</div>
+          <div class="meta">
+            <div class="loc">PASTORIA SAFARI</div>
+            <div class="nick">— uncaught — special</div>
+          </div>
+          <span class="chev">›</span>
+        </div>
+        <div class="acc-row">
+          <div class="glyph uncaught">○</div>
+          <div class="meta">
+            <div class="loc">VEILSTONE</div>
+            <div class="nick">— uncaught —</div>
+          </div>
+          <span class="chev">›</span>
+        </div>
+      </div>
+    </details>
+
+    <details class="accordion-segment">
+      <summary>SEG 4 · CANALAVE<span class="seg-progress">0/6</span></summary>
+    </details>
+
+  </div>
+
+  <div class="annotation">
+    <span class="who">A · ACCORDION OVER SCROLL</span>
+    The horizontal track makes sense on a 1280px monitor; on a 360px phone it becomes 5 minutes of swiping. Per-segment accordion lets the user collapse what they're done with and focus on the current arc.
+  </div>
+  <div class="annotation">
+    <span class="who">B · OPEN-BY-DEFAULT</span>
+    The current segment opens automatically. Past segments collapse. The user lands directly on the row they need.
+  </div>
+  <div class="annotation">
+    <span class="who">C · SEG SUMMARY</span>
+    Each summary shows progress (`5/6 ✓`, `1/6 NOW`). Glanceable: progress without expanding. The active segment carries an amber background to draw the eye.
+  </div>
+  <div class="annotation">
+    <span class="who">D · TAPPING A ROW</span>
+    On mobile, tapping a row opens the bottom-sheet (full-screen below 480px) instead of a side rail. Same content as the desktop sheet. Submit closes the sheet, refreshes the row in place.
+  </div>
+
+  <div class="annotation" style="margin-top: 32px;">
+    <span class="who">CLOSING NOTE</span>
+    The desktop timeline keeps the same Stimulus controller (`timeline_controller.js`) — view changes are mostly markup + CSS. The accordion fallback is a single ERB conditional + CSS rule (`@media (max-width: 720px) { .timeline-frame { display: none; } .accordion-frame { display: block; } }`). The combobox per player is already implemented — `data-action="input->timeline#filterSpecies"`. So the implementation is mostly visual and IA, not new infrastructure.
+  </div>
+
+</div>
+</body>
+</html>

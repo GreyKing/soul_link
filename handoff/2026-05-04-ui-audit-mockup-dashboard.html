@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>R1 — Dashboard Shell + Tab Navigation Redesign</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --d0: #0a1a0a;
+    --d1: #1a2e1a;
+    --d2: #3a5a3a;
+    --l1: #8a9e6a;
+    --l2: #9aae7a;
+    --white: #c0d0a0;
+    --amber: #d4b14a;
+    --crimson: #c75a5a;
+    --green-glow: #5fd45f;
+    --border: 3px solid var(--d1);
+    --border-thin: 2px solid var(--d1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--d0);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(154, 174, 122, 0.025) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse at top, #142214 0%, #0a1a0a 70%);
+    color: var(--white);
+    font-family: 'VT323', monospace;
+    font-size: 18px; line-height: 1.4;
+    min-height: 100vh;
+  }
+
+  .page { max-width: 1280px; margin: 0 auto; padding: 32px 16px 96px; }
+
+  .page-banner { border: var(--border); background: var(--d1); padding: 20px 24px; margin-bottom: 18px; position: relative; }
+  .page-banner::before { content: ""; position: absolute; inset: 4px; border: 1px solid var(--d2); pointer-events: none; }
+  .page-banner h1 { font-family: 'Press Start 2P', monospace; font-size: 16px; color: var(--white); margin: 0 0 8px; letter-spacing: 1px; }
+  .page-banner .sub { color: var(--l1); font-size: 16px; }
+
+  .legend { background: var(--d1); border: var(--border-thin); padding: 14px 18px; margin-bottom: 28px; color: var(--l2); font-size: 16px; }
+  .legend strong { color: var(--amber); }
+  .legend ul { margin: 6px 0 0; padding-left: 20px; }
+  .legend li { margin: 2px 0; }
+
+  .section-anchor { margin: 56px 0 18px; border-top: 1px dashed var(--d2); padding-top: 24px; }
+  .section-anchor:first-of-type { margin-top: 0; border-top: none; padding-top: 0; }
+  .section-tag { display: inline-block; font-family: 'Press Start 2P', monospace; font-size: 9px; color: var(--d0); background: var(--amber); padding: 4px 8px; margin-bottom: 8px; letter-spacing: 1px; }
+  .section-title { font-family: 'Press Start 2P', monospace; font-size: 13px; color: var(--white); margin: 0 0 4px; }
+  .section-note { color: var(--l1); font-size: 16px; margin-bottom: 18px; max-width: 760px; }
+
+  /* ── Top nav simulation (existing chrome — kept) ── */
+
+  .topnav {
+    background: var(--d2);
+    border-bottom: var(--border);
+    padding: 8px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px;
+  }
+  .topnav-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .topnav-logo {
+    font-size: 16px; color: var(--l2);
+    letter-spacing: 0.08em; font-family: 'Press Start 2P', monospace;
+  }
+  .topnav-link {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px; color: var(--l1);
+    text-decoration: none; letter-spacing: 0.05em;
+    padding: 4px 6px;
+    cursor: pointer;
+  }
+  .topnav-link:hover { color: var(--l2); text-decoration: underline; }
+  .topnav-link.active { color: var(--white); border-bottom: 2px solid var(--amber); }
+  .topnav-right { display: flex; align-items: center; gap: 10px; }
+  .topnav-user {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px; color: var(--white);
+  }
+  .topnav-avatar { width: 24px; height: 24px; border: var(--border-thin); background: var(--l2); }
+  .topnav-logout {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px; color: var(--l1);
+    background: none; border: var(--border-thin);
+    padding: 2px 6px; cursor: pointer;
+  }
+
+  /* ── Slim title bar ── */
+
+  .title-bar {
+    background: var(--d1);
+    border: var(--border);
+    padding: 10px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px;
+  }
+  .title-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .title-glyph {
+    width: 36px; height: 36px;
+    background: var(--amber); color: var(--d0);
+    border: 2px solid var(--d0);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Press Start 2P', monospace; font-size: 16px;
+    flex-shrink: 0;
+  }
+  .title-block .player {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 13px; color: var(--white);
+    letter-spacing: 1px;
+  }
+  .title-block .meta {
+    color: var(--l1); font-size: 13px; margin-top: 2px;
+  }
+
+  /* Run pill */
+  .run-pill {
+    background: var(--d2);
+    border: 2px solid var(--amber);
+    padding: 5px 10px;
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; letter-spacing: 1px;
+    color: var(--white);
+    cursor: pointer;
+  }
+  .run-pill .badge {
+    background: var(--green-glow); color: var(--d0);
+    padding: 2px 4px; font-size: 7px;
+  }
+  .run-pill .chev { color: var(--amber); margin-left: 4px; }
+  .run-pill:hover { background: var(--d0); }
+
+  /* Stat strip — single line, inline */
+  .stat-strip {
+    display: flex; align-items: center; gap: 14px;
+    flex-wrap: wrap;
+  }
+  .stat-strip .item {
+    display: flex; align-items: baseline; gap: 6px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; letter-spacing: 1px;
+    color: var(--l1);
+  }
+  .stat-strip .item .val { color: var(--white); font-size: 14px; }
+  .stat-strip .sep { color: var(--d2); font-size: 14px; }
+
+  /* ── Tab bar ── */
+
+  .tab-bar {
+    display: flex;
+    background: var(--d2);
+    border: var(--border);
+    border-top: none;
+    padding: 0;
+    flex-wrap: wrap;
+  }
+  .tab {
+    flex: 1; min-width: 90px;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--d0);
+    padding: 10px 8px;
+    cursor: pointer;
+    color: var(--l1);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; letter-spacing: 1px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    transition: background 0.1s, color 0.1s;
+    position: relative;
+  }
+  .tab:last-child { border-right: none; }
+  .tab .icon {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px; color: inherit;
+  }
+  .tab:hover { background: var(--d1); color: var(--l2); }
+  .tab[aria-selected="true"] {
+    background: var(--d1); color: var(--amber);
+  }
+  .tab[aria-selected="true"]::after {
+    content: ''; position: absolute; bottom: -3px; left: 0; right: 0;
+    height: 3px; background: var(--amber);
+  }
+  .tab .badge-dot {
+    position: absolute; top: 6px; right: 8px;
+    width: 6px; height: 6px;
+    background: var(--green-glow); border-radius: 50%;
+    box-shadow: 0 0 4px var(--green-glow);
+  }
+
+  /* ── Three-col layout ── */
+
+  .pc-layout {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr) 320px;
+    gap: 14px;
+    margin-top: 14px;
+    align-items: flex-start;
+  }
+
+  .col {
+    background: var(--d1);
+    border: var(--border);
+    padding: 14px;
+    min-height: 480px;
+  }
+  .col h3 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px; color: var(--white);
+    margin: 0 0 10px; letter-spacing: 1px;
+    border-bottom: 1px dashed var(--d2);
+    padding-bottom: 8px;
+  }
+  .col .h3-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+    border-bottom: 1px dashed var(--d2);
+    padding-bottom: 8px;
+  }
+  .col .h3-row h3 { margin: 0; padding: 0; border: none; }
+  .col .h3-row .count { font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--l1); letter-spacing: 1px; }
+
+  /* Party slot */
+  .party-slot {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 6px;
+    border-bottom: 1px dashed var(--d2);
+  }
+  .party-slot:last-child { border-bottom: none; }
+  .party-slot .sprite {
+    width: 36px; height: 36px;
+    background: var(--d0); border: 1px solid var(--d2);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 8px;
+  }
+  .party-slot .meta .name {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; color: var(--white);
+    letter-spacing: 0.5px;
+  }
+  .party-slot .meta .nick {
+    color: var(--l1); font-size: 13px; margin-top: 1px;
+  }
+  .party-slot.empty .sprite { border-style: dashed; }
+  .party-slot.empty .meta .name { color: var(--d2); }
+
+  /* Sidebar tabs */
+  .side-tabs {
+    display: flex;
+    border: 1px solid var(--d0);
+    margin-bottom: 12px;
+  }
+  .side-tab {
+    flex: 1;
+    background: var(--d2);
+    border: none;
+    border-right: 1px solid var(--d0);
+    padding: 6px 4px;
+    cursor: pointer;
+    color: var(--l1);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; letter-spacing: 1px;
+  }
+  .side-tab:last-child { border-right: none; }
+  .side-tab[aria-selected="true"] { background: var(--amber); color: var(--d0); }
+  .side-tab:hover:not([aria-selected="true"]) { background: var(--d1); color: var(--white); }
+
+  /* Mini-status card (gym leaders compact) */
+  .gym-list { font-size: 12px; color: var(--l1); }
+  .gym-list .gym-row {
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    gap: 6px;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--d2);
+  }
+  .gym-list .gym-row:last-child { border-bottom: none; }
+  .gym-list .gym-row .num {
+    width: 24px; height: 24px;
+    background: var(--d2); color: var(--l2);
+    border: 1px solid var(--d0);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Press Start 2P', monospace; font-size: 9px;
+  }
+  .gym-list .gym-row.beaten .num { background: var(--amber); color: var(--d0); border-color: var(--amber); }
+  .gym-list .gym-row.next .num { border-color: var(--amber); border-width: 2px; animation: pulseNext 2s ease-in-out infinite; }
+  @keyframes pulseNext {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(212,177,74,0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(212,177,74,0); }
+  }
+  .gym-list .gym-row .name {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; color: var(--white);
+    letter-spacing: 0.5px;
+  }
+  .gym-list .gym-row .lvl {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; color: var(--l1);
+  }
+  .gym-list .gym-row.upcoming .name { color: var(--d2); }
+
+  /* Center main panel (PC BOX example content) */
+  .main-panel {
+    background: var(--d1);
+    border: var(--border);
+    min-height: 480px;
+    padding: 0;
+  }
+  .main-head {
+    background: var(--d2);
+    padding: 12px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: var(--border-thin);
+    flex-wrap: wrap; gap: 8px;
+  }
+  .main-head h2 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px; color: var(--white);
+    margin: 0; letter-spacing: 1px;
+  }
+  .main-head .count { color: var(--l1); font-size: 14px; margin-left: 8px; }
+  .main-body { padding: 18px; color: var(--l1); font-size: 14px; }
+
+  .placeholder-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  }
+  .placeholder-cell {
+    background: var(--d2); border: 2px solid var(--d0);
+    padding: 8px; text-align: center;
+    color: var(--l2); font-family: 'Press Start 2P', monospace;
+    font-size: 8px; letter-spacing: 0.5px;
+  }
+  .placeholder-cell .sp {
+    width: 32px; height: 32px;
+    background: var(--d0); border: 1px solid var(--d2);
+    margin: 4px auto;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 7px;
+  }
+
+  /* Annotation */
+  .annotation {
+    color: var(--amber);
+    font-size: 14px; line-height: 1.5;
+    background: rgba(212, 177, 74, 0.08);
+    border-left: 3px solid var(--amber);
+    padding: 8px 12px;
+    margin: 10px 0;
+  }
+  .annotation .who {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; letter-spacing: 1px;
+    color: var(--amber); display: block; margin-bottom: 2px;
+  }
+
+  /* ── Tablet preview ── */
+
+  .tablet {
+    width: 768px; max-width: 100%;
+    border: 6px solid var(--d2);
+    border-radius: 16px;
+    background: var(--d0);
+    padding: 14px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    margin: 18px auto 0;
+  }
+
+  .tablet .pc-layout {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 10px;
+  }
+  .tablet .col-party-merge {
+    display: none;
+  }
+  .tablet .placeholder-grid { grid-template-columns: repeat(3, 1fr); }
+
+  /* ── Phone preview ── */
+
+  .phone {
+    width: 360px;
+    border: 6px solid var(--d2);
+    border-radius: 24px;
+    background: var(--d0);
+    padding: 14px 12px 22px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    margin: 18px auto 0;
+  }
+  .phone-bezel { width: 80px; height: 4px; background: var(--d1); border-radius: 2px; margin: 0 auto 12px; }
+
+  .phone .title-bar { padding: 8px 10px; gap: 8px; }
+  .phone .title-block .player { font-size: 10px; }
+  .phone .title-block .meta { font-size: 11px; }
+  .phone .stat-strip { font-size: 8px; gap: 8px; }
+  .phone .stat-strip .item { font-size: 7px; }
+  .phone .stat-strip .item .val { font-size: 11px; }
+
+  .phone .tab-bar { overflow-x: auto; flex-wrap: nowrap; }
+  .phone .tab { min-width: 80px; padding: 8px 4px; font-size: 8px; }
+  .phone .tab .icon { font-size: 12px; }
+
+  .phone .pc-layout { grid-template-columns: 1fr; gap: 10px; }
+  .phone .col, .phone .main-panel { min-height: auto; }
+  .phone .placeholder-grid { grid-template-columns: repeat(3, 1fr); }
+  .phone .placeholder-cell { font-size: 7px; padding: 6px; }
+  .phone .placeholder-cell .sp { width: 26px; height: 26px; }
+
+  .keyboard-hint {
+    background: rgba(95, 212, 95, 0.12);
+    border: 1px dashed var(--green-glow);
+    color: var(--green-glow);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 6px 10px;
+    margin: 14px 0;
+    letter-spacing: 1px;
+  }
+  .keyboard-hint kbd {
+    background: var(--d0); color: var(--green-glow);
+    border: 1px solid var(--green-glow);
+    padding: 1px 4px;
+    font-family: monospace; font-size: 11px;
+    margin: 0 2px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="page-banner">
+    <h1>R1 — Dashboard Shell + Tab Navigation</h1>
+    <div class="sub">Main dashboard `/` · 2026-05-04 audit · architect-only redesign pass</div>
+  </div>
+
+  <div class="legend">
+    <strong>What changes here</strong>
+    <ul>
+      <li>Tab bar becomes a real <strong>tablist</strong> — `role="tablist"` + `role="tab"` + `aria-selected` + `aria-controls`. Icon + text + active underline + (optional) live-update dot.</li>
+      <li>Title bar slimmed: stats become a <strong>single inline strip</strong>, run dropdown becomes a <strong>pill with chevron</strong> showing the current run number + status pill (ACTIVE / VIEWING / COMPLETE). One row instead of two.</li>
+      <li>Right rail consolidates today's three stacked panels (Party / Map / Gyms) into <strong>one card with sub-tabs</strong>. Saves ~200 vertical pixels and removes the duplication between sidebar and main-tab content.</li>
+      <li>Mobile: layout collapses to <strong>single column</strong> — title bar → tab bar (horizontal-scrollable) → main panel → right rail at the bottom. Left party sidebar folds into the main PARTY tab on phones.</li>
+      <li>Tablet: <strong>two columns</strong> — left party sidebar merges into PARTY tab; main panel + right rail side-by-side.</li>
+      <li>Keyboard navigation: <kbd>←</kbd> / <kbd>→</kbd> moves between tabs; <kbd>1</kbd>–<kbd>7</kbd> jumps directly. <kbd>Esc</kbd> closes any open modal.</li>
+    </ul>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 1</span>
+    <h2 class="section-title">Desktop — three columns, slim title, real tablist</h2>
+    <p class="section-note">User loaded the dashboard. Run pill at top-right of title bar. Tab bar below it as a real tablist with icons. Left = party (read-only quick view). Center = active tab content. Right = consolidated status rail with sub-tabs.</p>
+  </div>
+
+  <div class="topnav">
+    <div class="topnav-left">
+      <span class="topnav-logo">⚒ SOUL LINK</span>
+      <a class="topnav-link active">DASHBOARD</a>
+      <a class="topnav-link">MAP</a>
+      <a class="topnav-link">SPECIES</a>
+      <a class="topnav-link">MY TEAM</a>
+      <a class="topnav-link">RUNS</a>
+      <a class="topnav-link">PLAY</a>
+    </div>
+    <div class="topnav-right">
+      <div class="topnav-avatar"></div>
+      <span class="topnav-user">GLENN</span>
+      <button class="topnav-logout">LOGOUT</button>
+    </div>
+  </div>
+
+  <div class="title-bar" style="margin-top: 10px;">
+    <div class="title-left">
+      <div class="title-glyph">PC</div>
+      <div class="title-block">
+        <div class="player">GLENN'S PC</div>
+        <div class="meta">PLATINUM · SOUL LINK</div>
+      </div>
+      <button class="run-pill">
+        RUN #4 <span class="badge">ACTIVE</span>
+        <span class="chev">▾</span>
+      </button>
+    </div>
+
+    <div class="stat-strip">
+      <div class="item">CAUGHT <span class="val">19</span></div>
+      <span class="sep">·</span>
+      <div class="item">ALIVE <span class="val" style="color: var(--green-glow);">16</span></div>
+      <span class="sep">·</span>
+      <div class="item">DEAD <span class="val" style="color: var(--crimson);">3</span></div>
+      <span class="sep">·</span>
+      <div class="item">BADGES <span class="val" style="color: var(--amber);">2/8</span></div>
+    </div>
+  </div>
+
+  <div class="tab-bar" role="tablist" aria-label="Dashboard sections">
+    <button class="tab" role="tab" aria-selected="false" aria-controls="panel-party">
+      <span class="icon">▣</span>
+      PARTY
+    </button>
+    <button class="tab" role="tab" aria-selected="true" aria-controls="panel-pcbox">
+      <span class="icon">▦</span>
+      PC BOX
+      <span class="badge-dot" title="3 new parsed catches"></span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="panel-map">
+      <span class="icon">⛰</span>
+      MAP
+    </button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="panel-gyms">
+      <span class="icon">★</span>
+      GYMS
+    </button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="panel-strategy">
+      <span class="icon">⚔</span>
+      STRATEGY
+    </button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="panel-runs">
+      <span class="icon">⚙</span>
+      RUNS
+    </button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="panel-calc">
+      <span class="icon">∑</span>
+      CALC
+    </button>
+  </div>
+
+  <div class="pc-layout">
+
+    <!-- LEFT: party -->
+    <aside class="col col-party" aria-label="Party quick view">
+      <div class="h3-row">
+        <h3>PARTY</h3>
+        <span class="count">4/6</span>
+      </div>
+
+      <div class="party-slot">
+        <div class="sprite">SPR</div>
+        <div class="meta"><div class="name">STARLY</div><div class="nick">"TOMMY"</div></div>
+      </div>
+      <div class="party-slot">
+        <div class="sprite">SPR</div>
+        <div class="meta"><div class="name">BIDOOF</div><div class="nick">"RACHEL"</div></div>
+      </div>
+      <div class="party-slot">
+        <div class="sprite">SPR</div>
+        <div class="meta"><div class="name">KRICKETOT</div><div class="nick">"PHOEBE"</div></div>
+      </div>
+      <div class="party-slot">
+        <div class="sprite">SPR</div>
+        <div class="meta"><div class="name">SHINX</div><div class="nick">"JOEY"</div></div>
+      </div>
+      <div class="party-slot empty">
+        <div class="sprite" style="color: var(--d2);">—</div>
+        <div class="meta"><div class="name">— EMPTY —</div></div>
+      </div>
+      <div class="party-slot empty">
+        <div class="sprite" style="color: var(--d2);">—</div>
+        <div class="meta"><div class="name">— EMPTY —</div></div>
+      </div>
+
+      <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--d2); display: flex; justify-content: space-between; font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--l1); letter-spacing: 1px;">
+        <span>SURVIVAL <span style="color: var(--green-glow); font-size: 11px;">84%</span></span>
+        <span>COVERAGE <span style="color: var(--white); font-size: 11px;">9/18</span></span>
+      </div>
+    </aside>
+
+    <!-- CENTER: main panel (showing PC BOX) -->
+    <section class="main-panel" role="tabpanel" id="panel-pcbox" aria-labelledby="tab-pcbox">
+      <div class="main-head">
+        <div><h2>PC BOX</h2><span class="count">19 TOTAL · 3 NEW</span></div>
+        <button style="background: var(--amber); color: var(--d0); border: 2px solid var(--d0); padding: 6px 12px; font-family: 'Press Start 2P', monospace; font-size: 9px; letter-spacing: 1px; cursor: pointer;">+ NEW CATCH</button>
+      </div>
+      <div class="main-body">
+        <p style="margin: 0 0 12px; color: var(--d2); font-size: 13px;">…center content (per R2 mockup) renders here.</p>
+        <div class="placeholder-grid">
+          <div class="placeholder-cell">TOMMY<div class="sp">SPR</div>R201</div>
+          <div class="placeholder-cell">RACHEL<div class="sp">SPR</div>R202</div>
+          <div class="placeholder-cell">PHOEBE<div class="sp">SPR</div>EternaF</div>
+          <div class="placeholder-cell">JOEY<div class="sp">SPR</div>Floaroma</div>
+          <div class="placeholder-cell">MONICA<div class="sp">SPR</div>Oreburgh</div>
+          <div class="placeholder-cell">CHANDLER<div class="sp">SPR</div>R203</div>
+          <div class="placeholder-cell">ROSS<div class="sp">SPR</div>Jubilife</div>
+          <div class="placeholder-cell">JANICE<div class="sp">SPR</div>EternaG</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: consolidated status rail -->
+    <aside class="col col-status" aria-label="Live status">
+      <div class="side-tabs" role="tablist" aria-label="Status panels">
+        <button class="side-tab" role="tab" aria-selected="false" aria-controls="status-party">PARTY</button>
+        <button class="side-tab" role="tab" aria-selected="true" aria-controls="status-gyms">GYMS</button>
+        <button class="side-tab" role="tab" aria-selected="false" aria-controls="status-map">MAP</button>
+      </div>
+
+      <div role="tabpanel" id="status-gyms">
+        <div class="h3-row" style="margin-bottom: 8px;">
+          <h3 style="font-size: 10px;">GYM LEADERS</h3>
+          <span class="count">2/8</span>
+        </div>
+
+        <div class="gym-list">
+          <div class="gym-row beaten">
+            <div class="num">1</div>
+            <span class="name">ROARK</span>
+            <span class="lvl">14</span>
+          </div>
+          <div class="gym-row beaten">
+            <div class="num">2</div>
+            <span class="name">GARDEN.</span>
+            <span class="lvl">22</span>
+          </div>
+          <div class="gym-row next">
+            <div class="num">3</div>
+            <span class="name">MAYLENE</span>
+            <span class="lvl">30</span>
+          </div>
+          <div class="gym-row upcoming">
+            <div class="num">4</div>
+            <span class="name">WAKE</span>
+            <span class="lvl">37</span>
+          </div>
+          <div class="gym-row upcoming">
+            <div class="num">5</div>
+            <span class="name">FANTINA</span>
+            <span class="lvl">41</span>
+          </div>
+          <div class="gym-row upcoming">
+            <div class="num">6</div>
+            <span class="name">BYRON</span>
+            <span class="lvl">39</span>
+          </div>
+          <div class="gym-row upcoming">
+            <div class="num">7</div>
+            <span class="name">CANDICE</span>
+            <span class="lvl">42</span>
+          </div>
+          <div class="gym-row upcoming">
+            <div class="num">8</div>
+            <span class="name">VOLKNER</span>
+            <span class="lvl">49</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--d2);">
+          <div style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--amber); letter-spacing: 1px; margin-bottom: 6px;">↓ NEXT BATTLE</div>
+          <div style="color: var(--white); font-size: 14px;">MAYLENE · Veilstone · Lv 30</div>
+          <div style="color: var(--l1); font-size: 13px; margin-top: 2px;">Fighting type — bring Flying / Psychic.</div>
+          <button style="margin-top: 10px; width: 100%; background: var(--amber); color: var(--d0); border: 2px solid var(--d0); padding: 8px; font-family: 'Press Start 2P', monospace; font-size: 9px; letter-spacing: 1px; cursor: pointer;">START GYM DRAFT →</button>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <div class="annotation">
+    <span class="who">A · TABLIST WITH KEYBOARD</span>
+    `role="tablist"` on the bar, `role="tab"` on each button, `aria-selected="true"` only on the active tab, `aria-controls` pointing at the panel. ←/→ move focus, ENTER/SPACE activate, 1-7 jump. Currently each tab is a button with class-only state — screen readers see "row of buttons."
+  </div>
+  <div class="annotation">
+    <span class="who">B · LIVE-UPDATE DOT</span>
+    Small green dot in the top-right of a tab when there's something fresh worth seeing — e.g. PC BOX has 3 newly-parsed catches, GYMS has a draft your turn. Removes the user's need to poll every tab.
+  </div>
+  <div class="annotation">
+    <span class="who">C · RUN PILL</span>
+    Replaces today's `&lt;select onchange="window.location.href"&gt;` (XSS-adjacent inline JS) with a proper Stimulus dropdown. Pill shows run # + status pill inline; clicking opens a panel listing all runs with start/end dates and status.
+  </div>
+  <div class="annotation">
+    <span class="who">D · STAT STRIP</span>
+    Today: 4 vertical stat boxes consuming a lot of vertical real estate. Here: a single inline strip with separators. ALIVE colored green, DEAD colored crimson, BADGES amber — color carries meaning without a legend because each label is also there.
+  </div>
+  <div class="annotation">
+    <span class="who">E · CONSOLIDATED RIGHT RAIL</span>
+    Today the right sidebar stacks ASCII map + current location + badge case + gym leaders + recent routes. That duplicates the MAP tab and the GYMS tab. Here it's one card with sub-tabs (PARTY / GYMS / MAP). User picks what they want to glance at, no scrolling.
+  </div>
+  <div class="annotation">
+    <span class="who">F · "↓ NEXT BATTLE" CTA</span>
+    On the GYMS sub-tab. Always visible. The most common dashboard journey — "what's next, let me prep" — gets a single button: START GYM DRAFT. Today this button lives inside the GYMS main tab; here it's also in the rail so it's reachable from any tab.
+  </div>
+
+  <div class="keyboard-hint">
+    KEYBOARD · <kbd>1</kbd>–<kbd>7</kbd> jump to tab · <kbd>←</kbd> <kbd>→</kbd> move focus · <kbd>Esc</kbd> close modal · <kbd>/</kbd> focus search
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 2</span>
+    <h2 class="section-title">Right-rail sub-tab — PARTY view</h2>
+    <p class="section-note">User clicked the PARTY sub-tab on the right rail. Same column, different content. Shows the same data as the left sidebar but for any player on the run, not just yourself — useful for coordinating mid-game.</p>
+  </div>
+
+  <div style="background: var(--d1); border: var(--border); padding: 14px; max-width: 320px;">
+    <div class="side-tabs" role="tablist">
+      <button class="side-tab" role="tab" aria-selected="true" aria-controls="status-party">PARTY</button>
+      <button class="side-tab" role="tab" aria-selected="false" aria-controls="status-gyms">GYMS</button>
+      <button class="side-tab" role="tab" aria-selected="false" aria-controls="status-map">MAP</button>
+    </div>
+
+    <div role="tabpanel" id="status-party">
+      <div class="h3-row" style="margin-bottom: 8px;">
+        <h3 style="font-size: 10px;">LIVE PARTIES</h3>
+        <span class="count">4 PLAYERS</span>
+      </div>
+
+      <div style="margin-bottom: 10px; padding: 8px; background: var(--d0); border: 2px solid var(--amber);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+          <span style="font-family: 'Press Start 2P', monospace; font-size: 9px; color: var(--white); letter-spacing: 0.5px;">GLENN <span style="background: var(--amber); color: var(--d0); padding: 1px 4px; font-size: 6px;">YOU</span></span>
+          <span style="font-family: 'Press Start 2P', monospace; font-size: 7px; color: var(--green-glow); letter-spacing: 1px;">2 BADGES</span>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <div style="width: 28px; height: 28px; background: var(--d2); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d2); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d2); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d2); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d0); border: 1px dashed var(--d2);"></div>
+          <div style="width: 28px; height: 28px; background: var(--d0); border: 1px dashed var(--d2);"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 10px; padding: 8px; background: var(--d2); border: 1px solid var(--d0);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+          <span style="font-family: 'Press Start 2P', monospace; font-size: 9px; color: var(--white); letter-spacing: 0.5px;">RICHARD</span>
+          <span style="font-family: 'Press Start 2P', monospace; font-size: 7px; color: var(--green-glow); letter-spacing: 1px;">2 BADGES</span>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <div style="width: 28px; height: 28px; background: var(--d1); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d1); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d1); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 10px; padding: 8px; background: var(--d2); border: 1px solid var(--d0);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+          <span style="font-family: 'Press Start 2P', monospace; font-size: 9px; color: var(--white); letter-spacing: 0.5px;">BOB <span style="background: var(--amber); color: var(--d0); padding: 1px 4px; font-size: 6px;">🏆 HOF</span></span>
+          <span style="font-family: 'Press Start 2P', monospace; font-size: 7px; color: var(--amber); letter-spacing: 1px;">8 BADGES</span>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <div style="width: 28px; height: 28px; background: var(--d1); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d1); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d1); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d1); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d1); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d1); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+        </div>
+      </div>
+
+      <div style="padding: 8px; background: var(--d2); border: 1px solid var(--d0);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+          <span style="font-family: 'Press Start 2P', monospace; font-size: 9px; color: var(--white); letter-spacing: 0.5px;">JESS</span>
+          <span style="font-family: 'Press Start 2P', monospace; font-size: 7px; color: var(--green-glow); letter-spacing: 1px;">3 BADGES</span>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <div style="width: 28px; height: 28px; background: var(--d1); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d1); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d1); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+          <div style="width: 28px; height: 28px; background: var(--d1); border: 1px solid var(--d0); display: flex; align-items: center; justify-content: center; color: var(--l2); font-family: 'Press Start 2P', monospace; font-size: 7px;">SPR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <span class="who">A · NEW DATA, NOT MOVED DATA</span>
+    Today the right rail shows your-player party only. This sub-tab shows ALL FOUR players' parties — useful when planning a gym battle. Bob is at 8 badges with HOF (showing the run nearing complete); Jess is ahead of Glenn/Richard by one badge. Everyone sees the run state at a glance.
+  </div>
+  <div class="annotation">
+    <span class="who">B · SAME DATA, COMPACT</span>
+    Each player gets one row: name + badges + party sprites. No location/types/etc — that's main-panel territory. Sidebar = glance, main = work.
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 3</span>
+    <h2 class="section-title">Tablet — left party folds into PARTY tab</h2>
+    <p class="section-note">Below 1024px the left party sidebar disappears — its content lives inside the PARTY main tab anyway. Center main + right rail share the viewport.</p>
+  </div>
+
+  <div class="tablet">
+    <div class="topnav">
+      <div class="topnav-left">
+        <span class="topnav-logo">⚒ SOUL LINK</span>
+        <a class="topnav-link active">DASH</a>
+        <a class="topnav-link">MAP</a>
+        <a class="topnav-link">SPECIES</a>
+        <a class="topnav-link">PLAY</a>
+      </div>
+      <div class="topnav-right">
+        <span class="topnav-user">GLENN</span>
+        <button class="topnav-logout">LOGOUT</button>
+      </div>
+    </div>
+
+    <div class="title-bar" style="margin-top: 10px;">
+      <div class="title-left">
+        <div class="title-glyph">PC</div>
+        <div class="title-block">
+          <div class="player">GLENN'S PC</div>
+          <div class="meta">PLATINUM · SOUL LINK</div>
+        </div>
+        <button class="run-pill">RUN #4 <span class="badge">ACTIVE</span><span class="chev">▾</span></button>
+      </div>
+      <div class="stat-strip">
+        <div class="item">CAUGHT <span class="val">19</span></div>
+        <div class="item">ALIVE <span class="val" style="color: var(--green-glow);">16</span></div>
+        <div class="item">DEAD <span class="val" style="color: var(--crimson);">3</span></div>
+        <div class="item">BADGES <span class="val" style="color: var(--amber);">2/8</span></div>
+      </div>
+    </div>
+
+    <div class="tab-bar" role="tablist">
+      <button class="tab" role="tab" aria-selected="false"><span class="icon">▣</span>PARTY</button>
+      <button class="tab" role="tab" aria-selected="true"><span class="icon">▦</span>PC BOX<span class="badge-dot"></span></button>
+      <button class="tab" role="tab" aria-selected="false"><span class="icon">⛰</span>MAP</button>
+      <button class="tab" role="tab" aria-selected="false"><span class="icon">★</span>GYMS</button>
+      <button class="tab" role="tab" aria-selected="false"><span class="icon">⚔</span>STRAT</button>
+      <button class="tab" role="tab" aria-selected="false"><span class="icon">⚙</span>RUNS</button>
+      <button class="tab" role="tab" aria-selected="false"><span class="icon">∑</span>CALC</button>
+    </div>
+
+    <div class="pc-layout">
+      <section class="main-panel">
+        <div class="main-head">
+          <div><h2 style="font-size: 11px;">PC BOX</h2><span class="count" style="font-size: 12px;">19 · 3 NEW</span></div>
+          <button style="background: var(--amber); color: var(--d0); border: 2px solid var(--d0); padding: 4px 10px; font-family: 'Press Start 2P', monospace; font-size: 8px; letter-spacing: 1px;">+ NEW</button>
+        </div>
+        <div class="main-body" style="padding: 12px;">
+          <div class="placeholder-grid">
+            <div class="placeholder-cell">TOMMY<div class="sp">SPR</div>R201</div>
+            <div class="placeholder-cell">RACHEL<div class="sp">SPR</div>R202</div>
+            <div class="placeholder-cell">PHOEBE<div class="sp">SPR</div>EternaF</div>
+            <div class="placeholder-cell">JOEY<div class="sp">SPR</div>Floaroma</div>
+            <div class="placeholder-cell">MONICA<div class="sp">SPR</div>Oreburgh</div>
+            <div class="placeholder-cell">CHANDLER<div class="sp">SPR</div>R203</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="col col-status" style="min-height: auto;">
+        <div class="side-tabs">
+          <button class="side-tab" role="tab" aria-selected="true">PARTY</button>
+          <button class="side-tab" role="tab" aria-selected="false">GYMS</button>
+          <button class="side-tab" role="tab" aria-selected="false">MAP</button>
+        </div>
+        <div style="font-size: 12px; color: var(--l1);">…compact party rail content…</div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <span class="who">A · ONE COLUMN LESS</span>
+    Below 1024px we lose the dedicated party sidebar. Its content already lives at the top of the PARTY main tab; users open that tab when they need the deeper view. Saves ~280px of horizontal space.
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 4</span>
+    <h2 class="section-title">Phone — single column, scrollable tab strip</h2>
+    <p class="section-note">Below 720px the layout becomes a single column. Tab bar becomes horizontally-scrollable (active tab auto-scrolls into view). Right rail moves to the bottom.</p>
+  </div>
+
+  <div class="phone">
+    <div class="phone-bezel"></div>
+
+    <div class="topnav" style="padding: 6px 10px;">
+      <span class="topnav-logo" style="font-size: 11px;">⚒ SOUL LINK</span>
+      <button class="topnav-logout" style="font-size: 8px;">≡</button>
+    </div>
+
+    <div class="title-bar" style="margin-top: 8px; flex-direction: column; align-items: flex-start;">
+      <div class="title-left" style="width: 100%;">
+        <div class="title-glyph" style="width: 28px; height: 28px; font-size: 12px;">PC</div>
+        <div class="title-block">
+          <div class="player">GLENN'S PC</div>
+          <div class="meta">PLATINUM</div>
+        </div>
+        <button class="run-pill" style="margin-left: auto; font-size: 8px;">RUN #4 <span class="badge" style="font-size: 6px;">ACT</span><span class="chev">▾</span></button>
+      </div>
+      <div class="stat-strip" style="width: 100%; padding-top: 6px; border-top: 1px dashed var(--d2);">
+        <div class="item">CAUGHT <span class="val">19</span></div>
+        <div class="item">ALIVE <span class="val" style="color: var(--green-glow);">16</span></div>
+        <div class="item">DEAD <span class="val" style="color: var(--crimson);">3</span></div>
+        <div class="item">BADGES <span class="val" style="color: var(--amber);">2/8</span></div>
+      </div>
+    </div>
+
+    <div class="tab-bar" role="tablist">
+      <button class="tab" role="tab" aria-selected="false"><span class="icon">▣</span>PARTY</button>
+      <button class="tab" role="tab" aria-selected="true"><span class="icon">▦</span>PC BOX<span class="badge-dot"></span></button>
+      <button class="tab" role="tab" aria-selected="false"><span class="icon">⛰</span>MAP</button>
+      <button class="tab" role="tab" aria-selected="false"><span class="icon">★</span>GYMS</button>
+      <button class="tab" role="tab" aria-selected="false"><span class="icon">⚔</span>STRAT</button>
+      <button class="tab" role="tab" aria-selected="false"><span class="icon">⚙</span>RUNS</button>
+      <button class="tab" role="tab" aria-selected="false"><span class="icon">∑</span>CALC</button>
+    </div>
+
+    <div class="pc-layout">
+      <section class="main-panel">
+        <div class="main-head" style="padding: 8px 10px;">
+          <div><h2 style="font-size: 10px;">PC BOX</h2><span class="count" style="font-size: 11px;">19 · 3 NEW</span></div>
+          <button style="background: var(--amber); color: var(--d0); border: 2px solid var(--d0); padding: 3px 8px; font-family: 'Press Start 2P', monospace; font-size: 7px;">+ NEW</button>
+        </div>
+        <div class="main-body" style="padding: 10px;">
+          <div class="placeholder-grid">
+            <div class="placeholder-cell">TOMMY<div class="sp">SPR</div>R201</div>
+            <div class="placeholder-cell">RACHEL<div class="sp">SPR</div>R202</div>
+            <div class="placeholder-cell">PHOEBE<div class="sp">SPR</div>EternaF</div>
+            <div class="placeholder-cell">JOEY<div class="sp">SPR</div>Floaroma</div>
+            <div class="placeholder-cell">MONICA<div class="sp">SPR</div>Oreburgh</div>
+            <div class="placeholder-cell">CHANDLER<div class="sp">SPR</div>R203</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="col" style="min-height: auto;">
+        <div class="side-tabs">
+          <button class="side-tab" role="tab" aria-selected="true">PARTY</button>
+          <button class="side-tab" role="tab" aria-selected="false">GYMS</button>
+          <button class="side-tab" role="tab" aria-selected="false">MAP</button>
+        </div>
+        <div style="font-size: 12px; color: var(--l1);">…compact rail at the bottom…</div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <span class="who">A · TAB STRIP IS SCROLLABLE</span>
+    All seven tabs visible on a 1280px screen; on a 360px phone they fit ~4. The strip becomes horizontally scrollable; when the user activates a tab via JS (or via swipe) it `scrollIntoView({ inline: "center" })` so the active tab is centered. Edge fade hints at scrollability.
+  </div>
+  <div class="annotation">
+    <span class="who">B · NAV BECOMES A HAMBURGER</span>
+    The top nav with 6 links becomes a `≡` button on phones. Tapping opens a stacked menu with the same links + user info. Frees the title bar to keep its hierarchy.
+  </div>
+  <div class="annotation">
+    <span class="who">C · STATS WRAP TO TWO LINES</span>
+    On phones the stat strip wraps; player + run pill on top, stats below with a divider. Both stay visible without horizontal scroll.
+  </div>
+  <div class="annotation">
+    <span class="who">D · RIGHT RAIL AT THE BOTTOM</span>
+    The status rail is below the main panel on mobile. Users who don't need it scroll past; users who do find the same sub-tabs (PARTY/GYMS/MAP) they had on desktop. No data loss — just stacked.
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 5</span>
+    <h2 class="section-title">Run pill — open state</h2>
+    <p class="section-note">User clicked the run pill. A small dropdown shows all runs with status pills, dates, and a switcher. No more `&lt;select onchange="..."&gt;`. Stimulus controller handles the interaction; arrow keys move between runs; Enter switches.</p>
+  </div>
+
+  <div style="position: relative; max-width: 360px; margin: 0 auto;">
+    <button class="run-pill" style="margin-bottom: 0;">
+      RUN #4 <span class="badge">ACTIVE</span>
+      <span class="chev" style="transform: rotate(180deg); display: inline-block;">▾</span>
+    </button>
+
+    <div style="margin-top: 4px; background: var(--d1); border: var(--border); padding: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.5);">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--d0); border: 2px solid var(--green-glow); margin-bottom: 4px; cursor: pointer;">
+        <span style="font-family: 'Press Start 2P', monospace; font-size: 10px; color: var(--white); letter-spacing: 0.5px;">RUN #4 <span style="background: var(--green-glow); color: var(--d0); padding: 1px 4px; font-size: 7px; margin-left: 4px;">ACTIVE</span></span>
+        <span style="color: var(--l1); font-size: 12px;">Apr 12 — now</span>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; cursor: pointer;">
+        <span style="font-family: 'Press Start 2P', monospace; font-size: 9px; color: var(--l1); letter-spacing: 0.5px;">RUN #3 <span style="background: var(--amber); color: var(--d0); padding: 1px 4px; font-size: 6px; margin-left: 4px;">🏆 HOF</span></span>
+        <span style="color: var(--d2); font-size: 12px;">Mar 4 — Apr 11</span>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; cursor: pointer;">
+        <span style="font-family: 'Press Start 2P', monospace; font-size: 9px; color: var(--l1); letter-spacing: 0.5px;">RUN #2</span>
+        <span style="color: var(--d2); font-size: 12px;">Feb 1 — Mar 3</span>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; cursor: pointer;">
+        <span style="font-family: 'Press Start 2P', monospace; font-size: 9px; color: var(--l1); letter-spacing: 0.5px;">RUN #1</span>
+        <span style="color: var(--d2); font-size: 12px;">Jan 5 — Jan 31</span>
+      </div>
+
+      <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--d2);">
+        <button style="width: 100%; background: var(--d2); color: var(--l2); border: 1px dashed var(--l1); padding: 6px; cursor: pointer; font-family: 'Press Start 2P', monospace; font-size: 8px; letter-spacing: 1px;">+ START NEW RUN</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <span class="who">A · ACTIVE RUN HIGHLIGHTED</span>
+    Green-glow border + larger size signals "this is the one you're playing." Past runs are dimmer + smaller. The HOF run (#3) keeps a subtle amber pill for prestige.
+  </div>
+  <div class="annotation">
+    <span class="who">B · "+ START NEW RUN" AT THE BOTTOM</span>
+    Same affordance as today's RUNS tab, but reachable from any page via the run pill. One click of friction reduced for the most-blocking action.
+  </div>
+  <div class="annotation">
+    <span class="who">C · KEYBOARD</span>
+    `↑/↓` cycles runs. ENTER navigates. ESC closes. Pill button has `aria-haspopup="listbox"` + `aria-expanded` — assistive tech announces it correctly.
+  </div>
+
+  <!-- ─────────────────────────────────────────────────── -->
+  <div class="section-anchor">
+    <span class="section-tag">SCREEN 6</span>
+    <h2 class="section-title">Tab focus + ARIA spec sheet</h2>
+    <p class="section-note">For implementers — exact ARIA wiring for the tablist + tabpanels. Today's tabs use class-based active state with no semantics; this brings them up to standard.</p>
+  </div>
+
+  <div style="background: var(--d1); border: var(--border-thin); padding: 18px; font-size: 14px; line-height: 1.6; color: var(--l1);">
+
+    <div style="font-family: 'Press Start 2P', monospace; font-size: 10px; color: var(--white); letter-spacing: 1px; margin-bottom: 10px;">TAB BAR</div>
+    <pre style="background: var(--d0); border: 1px solid var(--d2); padding: 10px; color: var(--l2); font-size: 13px; font-family: monospace; line-height: 1.5; overflow-x: auto;">
+&lt;div role="tablist" aria-label="Dashboard sections"&gt;
+  &lt;button role="tab" id="tab-pcbox"
+          aria-selected="true"
+          aria-controls="panel-pcbox"
+          tabindex="0"&gt;
+    &lt;span class="icon"&gt;▦&lt;/span&gt; PC BOX
+  &lt;/button&gt;
+  &lt;button role="tab" id="tab-map"
+          aria-selected="false"
+          aria-controls="panel-map"
+          tabindex="-1"&gt;
+    &lt;span class="icon"&gt;⛰&lt;/span&gt; MAP
+  &lt;/button&gt;
+  ...
+&lt;/div&gt;
+
+&lt;section role="tabpanel" id="panel-pcbox"
+         aria-labelledby="tab-pcbox"
+         tabindex="0"&gt;
+  ... content ...
+&lt;/section&gt;</pre>
+
+    <div style="font-family: 'Press Start 2P', monospace; font-size: 10px; color: var(--white); letter-spacing: 1px; margin: 18px 0 10px;">KEYBOARD CONTRACT</div>
+    <ul style="padding-left: 20px;">
+      <li><kbd style="background: var(--d0); color: var(--green-glow); border: 1px solid var(--green-glow); padding: 1px 4px; font-family: monospace; font-size: 12px;">←</kbd> / <kbd style="background: var(--d0); color: var(--green-glow); border: 1px solid var(--green-glow); padding: 1px 4px; font-family: monospace; font-size: 12px;">→</kbd> — move focus, wrap at edges; <code>aria-selected</code> updates immediately</li>
+      <li><kbd style="background: var(--d0); color: var(--green-glow); border: 1px solid var(--green-glow); padding: 1px 4px; font-family: monospace; font-size: 12px;">Home</kbd> / <kbd style="background: var(--d0); color: var(--green-glow); border: 1px solid var(--green-glow); padding: 1px 4px; font-family: monospace; font-size: 12px;">End</kbd> — first / last tab</li>
+      <li><kbd style="background: var(--d0); color: var(--green-glow); border: 1px solid var(--green-glow); padding: 1px 4px; font-family: monospace; font-size: 12px;">1</kbd>–<kbd style="background: var(--d0); color: var(--green-glow); border: 1px solid var(--green-glow); padding: 1px 4px; font-family: monospace; font-size: 12px;">7</kbd> — jump (only when no input has focus)</li>
+      <li><kbd style="background: var(--d0); color: var(--green-glow); border: 1px solid var(--green-glow); padding: 1px 4px; font-family: monospace; font-size: 12px;">Tab</kbd> — moves into the active panel (skipping inactive tabs because of <code>tabindex="-1"</code>)</li>
+      <li><kbd style="background: var(--d0); color: var(--green-glow); border: 1px solid var(--green-glow); padding: 1px 4px; font-family: monospace; font-size: 12px;">Esc</kbd> — close any open modal; falls through to cancelling drags if no modal</li>
+    </ul>
+
+    <div style="font-family: 'Press Start 2P', monospace; font-size: 10px; color: var(--white); letter-spacing: 1px; margin: 18px 0 10px;">FOCUS MGMT</div>
+    <p>Activating a tab moves focus to the tab itself (not the panel — WAI-ARIA recommends user opts in via Tab). The panel has <code>tabindex="0"</code> so it's reachable but not auto-focused.</p>
+
+    <div style="font-family: 'Press Start 2P', monospace; font-size: 10px; color: var(--white); letter-spacing: 1px; margin: 18px 0 10px;">STIMULUS WIRING</div>
+    <p>Single Stimulus controller `tablist`, two targets: <code>tab</code> + <code>panel</code>. Action <code>click->tablist#activate keydown->tablist#navigate</code>. URL hash (<code>#pcbox</code>, <code>#map</code>) preserves tab across reloads — already partially supported in `pixeldex_controller.js`; this generalizes it.</p>
+  </div>
+
+  <div class="annotation" style="margin-top: 32px;">
+    <span class="who">CLOSING NOTE</span>
+    Implementation roadmap: ① factor a `_tab_bar` partial that takes a list of tab specs and renders the correct ARIA. ② extract the right-rail consolidation into a `dashboard/_status_rail.html.erb` partial that reuses the existing `_party_panel`, `_map_panel`, and gym-leaders sections — one wrapper, one Stimulus controller for the sub-tabs. ③ replace `_title_bar.html.erb` `&lt;select onchange="..."&gt;` with a Stimulus dropdown component that doubles as the keyboard-navigated run picker. Total estimated work: 2–3 days; mostly view/CSS, no model or migration changes. The PARTY and GYMS rendering stays in the existing partials — we're just changing how they're hosted.
+  </div>
+
+</div>
+</body>
+</html>
