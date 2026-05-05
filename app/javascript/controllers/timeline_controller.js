@@ -1,9 +1,19 @@
 import { Controller } from "@hotwired/stimulus"
 
+// Step 23 R4 — extended for the standalone /map redesign.
+// Targets renamed `panel*` → `sheet*`; `backdrop` removed. New
+// targets `emptyState`, `groupList`, `jumpBtn`, `accordionSegment`.
+// New actions: `jumpToNow`, `showCatchFormForCurrent`. Hash sync:
+// `#route=<key>` is read in `connect()` and written in
+// `selectLocation`; cleared in `closePanel`. All existing actions
+// (`submitCatch`, `toggleGym`, `filterSpecies`, `selectSpecies`,
+// `closeAllDropdowns`, `handleKeydown`, `scrollToCurrentProgress`)
+// are preserved.
 export default class extends Controller {
   static targets = [
     "scrollContainer", "track", "locationNode",
-    "panel", "panelTitle", "panelBody", "panelForm", "backdrop",
+    "sheet", "sheetTitle", "sheetBody", "sheetForm",
+    "emptyState", "groupList", "jumpBtn", "accordionSegment",
     "formLocationKey", "nicknameInput", "formStatus",
     "speciesSearchWrapper", "speciesHidden", "speciesDropdown", "speciesPreview"
   ]
@@ -22,7 +32,21 @@ export default class extends Controller {
     this._closeAllDropdowns = this.closeAllDropdowns.bind(this)
     document.addEventListener("keydown", this._handleKeydown)
     document.addEventListener("click", this._closeAllDropdowns)
+
+    // Hide the JUMP TO NOW button if no `.next` node exists (every
+    // route caught — late game). Always-on otherwise.
+    if (this.hasJumpBtnTarget) {
+      const hasNext = this.locationNodeTargets.some(n => n.classList.contains("next"))
+      if (!hasNext) this.jumpBtnTarget.classList.add("hidden")
+    }
+
     this.scrollToCurrentProgress()
+
+    // `#route=<key>` URL hash → re-open the sheet on that route.
+    // Step 22 precedent (`pc_box_filter_controller.js`). Wrapped in
+    // requestAnimationFrame so the sheet markup is laid out before
+    // we synthesize the click.
+    this.applyHashRoute()
   }
 
   disconnect() {
@@ -30,7 +54,19 @@ export default class extends Controller {
     document.removeEventListener("click", this._closeAllDropdowns)
   }
 
-  // ── Timeline: Auto-scroll to first uncaught ──
+  // ── Hash sync ─────────────────────────────────────────────────────
+
+  applyHashRoute() {
+    const hash = window.location.hash.replace(/^#/, "")
+    if (!hash.startsWith("route=")) return
+    const key = hash.slice("route=".length)
+    if (!key) return
+    const node = this.locationNodeTargets.find(n => n.dataset.locationKey === key)
+    if (!node) return
+    requestAnimationFrame(() => this._openSheetFromNode(node))
+  }
+
+  // ── Timeline: Auto-scroll to first uncaught ──────────────────────
 
   scrollToCurrentProgress() {
     // Restore scroll position after catch submission reload
@@ -58,137 +94,209 @@ export default class extends Controller {
     }
   }
 
-  // ── Location Click → Open Panel ──
+  // ── Location Click → Open Sheet ──────────────────────────────────
 
   selectLocation(event) {
     event.stopPropagation()
     const node = event.currentTarget
+    this._openSheetFromNode(node)
+    // Write hash so refresh / share-link survives.
+    const key = node.dataset.locationKey
+    if (key) {
+      history.replaceState(null, "", "#route=" + encodeURIComponent(key))
+    }
+  }
+
+  _openSheetFromNode(node) {
     const key = node.dataset.locationKey
     const name = node.dataset.locationName
-    const status = node.dataset.status
+    let groups = []
+    try { groups = JSON.parse(node.dataset.groups || "[]") } catch (_) {}
 
-    // Highlight selected node
     this.highlightNode(node)
 
-    if (status === "uncaught") {
-      this.openPanelWithForm(key, name)
+    if (this.hasSheetTitleTarget) this.sheetTitleTarget.textContent = name || key
+
+    if (groups.length === 0) {
+      this._renderSheetCatchForm(key, name)
     } else {
-      this.openPanelWithDetails(key, name, node)
+      this._renderSheetGroupList(key, name, groups)
     }
   }
 
   highlightNode(node) {
-    // Remove previous highlight
+    // Drop highlight from every node, then add to the clicked one.
     this.locationNodeTargets.forEach(n => {
-      const circle = n.querySelector(".timeline-node")
-      if (circle) {
-        circle.classList.remove("ring-2", "ring-indigo-400", "ring-offset-2", "ring-offset-gray-800")
-      }
+      n.classList.remove("selected")
     })
-    // Add highlight to selected
-    const circle = node.querySelector(".timeline-node")
-    if (circle) {
-      circle.classList.add("ring-2", "ring-indigo-400", "ring-offset-2", "ring-offset-gray-800")
-    }
+    node.classList.add("selected")
   }
 
-  // ── Slide-Out Panel ──
-
-  openPanel() {
-    this.panelTarget.classList.remove("translate-x-full")
-    this.panelTarget.classList.add("translate-x-0")
-    this.backdropTarget.classList.remove("hidden")
-    document.body.classList.add("overflow-hidden", "sm:overflow-auto")
-  }
+  // ── Sheet rendering ──────────────────────────────────────────────
 
   closePanel() {
-    this.panelTarget.classList.add("translate-x-full")
-    this.panelTarget.classList.remove("translate-x-0")
-    this.backdropTarget.classList.add("hidden")
-    document.body.classList.remove("overflow-hidden", "sm:overflow-auto")
-    this.resetForm()
-
-    // Remove node highlights
-    this.locationNodeTargets.forEach(n => {
-      const circle = n.querySelector(".timeline-node")
-      if (circle) {
-        circle.classList.remove("ring-2", "ring-indigo-400", "ring-offset-2", "ring-offset-gray-800")
-      }
-    })
-  }
-
-  openPanelWithForm(key, name) {
-    this.panelTitleTarget.textContent = name
-    this.panelBodyTarget.innerHTML = `
-      <p class="text-gray-400 text-sm">No catch yet at this location.</p>
-    `
-    this.panelFormTarget.classList.remove("hidden")
-    this.formLocationKeyTarget.value = key
-    this.openPanel()
-    requestAnimationFrame(() => this.nicknameInputTarget.focus())
-  }
-
-  openPanelWithDetails(key, name, node) {
-    this.panelTitleTarget.textContent = name
-
-    // Parse groups from data attribute
-    let groups = []
-    try { groups = JSON.parse(node.dataset.groups || "[]") } catch (_) {}
-
-    this.panelBodyTarget.innerHTML = this.buildDetailsHtml(groups)
-
-    // Show form for "Add Another Catch"
-    this.panelFormTarget.classList.remove("hidden")
-    this.panelFormTarget.querySelector("h3").textContent = groups.length > 0 ? "Add Another Catch" : "New Catch"
-    this.formLocationKeyTarget.value = key
-    this.openPanel()
-  }
-
-  buildDetailsHtml(groups) {
-    if (!groups || groups.length === 0) {
-      return '<p class="text-gray-500 text-sm">No catches recorded.</p>'
+    if (this.hasGroupListTarget) {
+      this.groupListTarget.classList.add("hidden")
+      this.groupListTarget.innerHTML = ""
+    }
+    if (this.hasSheetFormTarget) {
+      this.sheetFormTarget.classList.add("hidden")
+      this.resetForm()
+    }
+    if (this.hasEmptyStateTarget) {
+      this.emptyStateTarget.classList.remove("hidden")
+    }
+    if (this.hasSheetTitleTarget) {
+      this.sheetTitleTarget.textContent = "Select a route"
     }
 
-    return groups.map(group => {
-      const isDead = group.status === "dead"
-      const statusBadge = isDead
-        ? '<span class="text-xs text-red-400 font-medium">💀 Dead</span>'
-        : '<span class="text-xs text-green-400 font-medium">✓ Caught</span>'
+    // Clear hash without touching scroll.
+    if (window.location.hash.startsWith("#route=")) {
+      history.replaceState(null, "", window.location.pathname + window.location.search)
+    }
 
-      let pokemonHtml = ""
-      if (group.pokemon && group.pokemon.length > 0) {
-        pokemonHtml = group.pokemon.map(p => {
-          const spriteHtml = p.sprite
-            ? `<img src="/assets/sprites/${p.sprite}.png" alt="${p.species}" width="24" height="24" class="inline-block" loading="lazy" onerror="this.style.display='none'">`
-            : ""
-          return `
-            <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-700/50">
-              ${spriteHtml}
-              <div>
-                <div class="text-sm font-medium text-white">${p.species}</div>
-                <div class="text-xs text-gray-400">${p.player}</div>
-              </div>
-            </div>
-          `
-        }).join("")
-      } else {
-        pokemonHtml = '<span class="text-xs text-gray-500">No species assigned yet</span>'
+    // Drop selection highlight.
+    this.locationNodeTargets.forEach(n => n.classList.remove("selected"))
+  }
+
+  _renderSheetCatchForm(key, name) {
+    if (this.hasEmptyStateTarget) this.emptyStateTarget.classList.add("hidden")
+    if (this.hasGroupListTarget) {
+      this.groupListTarget.classList.add("hidden")
+      this.groupListTarget.innerHTML = ""
+    }
+    if (!this.hasSheetFormTarget) {
+      // Read-only mode — no form available. Show a quiet message
+      // in the group list area.
+      if (this.hasGroupListTarget) {
+        this.groupListTarget.classList.remove("hidden")
+        this.groupListTarget.innerHTML = `
+          <div class="empty-state" style="color: var(--l1);">
+            No catches recorded for ${this._escape(name || key)}.
+            This run is read-only — new catches cannot be logged.
+          </div>`
       }
+      return
+    }
+    this.sheetFormTarget.classList.remove("hidden")
+    if (this.hasFormLocationKeyTarget) this.formLocationKeyTarget.value = key
+    if (this.hasNicknameInputTarget) {
+      requestAnimationFrame(() => this.nicknameInputTarget.focus())
+    }
+  }
 
+  _renderSheetGroupList(key, name, groups) {
+    if (this.hasEmptyStateTarget) this.emptyStateTarget.classList.add("hidden")
+    if (this.hasSheetFormTarget) this.sheetFormTarget.classList.add("hidden")
+    if (!this.hasGroupListTarget) return
+
+    const readOnly = !this.hasSheetFormTarget
+    const cardsHtml = [...groups].reverse().map(g => this._buildGroupCardHtml(g, readOnly)).join("")
+    const dupesBtnHtml = readOnly ? "" : `
+      <button type="button"
+              class="dupes-btn"
+              data-action="click->timeline#showCatchFormForCurrent"
+              data-location-key="${this._escape(key)}">
+        + ANOTHER ENCOUNTER (DUPES CLAUSE)
+      </button>`
+
+    const aliveCount = groups.filter(g => g.status === "caught").length
+    const statusPill = aliveCount > 0
+      ? `<span class="pill">CAUGHT</span>`
+      : `<span class="pill dead">DEAD</span>`
+
+    this.groupListTarget.innerHTML = `
+      <div class="sheet-status">
+        ${statusPill}
+        ${groups.length} group${groups.length === 1 ? "" : "s"} &middot; ${this._escape(name || key)}
+      </div>
+      ${cardsHtml}
+      ${dupesBtnHtml}
+    `
+    this.groupListTarget.classList.remove("hidden")
+
+    // The form's location-key needs to track the selected route so
+    // the dupes-clause button can swap to form mode in place.
+    if (this.hasFormLocationKeyTarget) this.formLocationKeyTarget.value = key
+  }
+
+  _buildGroupCardHtml(group, readOnly) {
+    const isDead = group.status === "dead"
+    const cardClass = isDead ? "group-card dead" : "group-card"
+    const pillText = isDead ? "DEAD" : "ALIVE"
+
+    const playerRows = (group.pokemon || []).map(p => {
+      const sprite = p.sprite_url
+        ? `<img src="${this._escape(p.sprite_url)}" alt="${this._escape(p.species || "")}" width="24" height="24" style="image-rendering: pixelated;" loading="lazy" onerror="this.style.display='none'">`
+        : "&mdash;"
+      const speciesText = p.species
+        ? `${this._escape(p.species)}${p.level ? " &middot; Lv " + Number(p.level) : ""}`
+        : "&mdash;"
+      const playerName = p.player_name || p.player || ""
       return `
-        <div class="mb-4 pb-4 border-b border-gray-700 last:border-0 last:mb-0 last:pb-0">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-base font-semibold ${isDead ? 'text-red-300' : 'text-white'}">${group.nickname}</span>
-            ${statusBadge}
+        <div class="player-row">
+          <span class="pname">${this._escape(playerName.toString().toUpperCase())}</span>
+          <div class="pinput">
+            <span class="preview">${sprite}</span>
+            <span style="font-size: 14px; color: var(--white);">${speciesText}</span>
           </div>
-          ${group.caught_at ? `<div class="text-xs text-gray-500 mb-2">Caught: ${group.caught_at}</div>` : ""}
-          ${group.eulogy ? `<div class="text-xs text-gray-400 italic mb-2">"${group.eulogy}"</div>` : ""}
-          <div class="grid gap-2">
-            ${pokemonHtml}
-          </div>
-        </div>
-      `
+        </div>`
     }).join("")
+
+    const myPokemon = (group.pokemon || []).find(p => p.is_mine) || {}
+    const types = group.types_for_user || ""
+    const pokemonJson = this._escape(JSON.stringify(group.pokemon || []))
+
+    const actionsHtml = readOnly ? "" : `
+      <div class="actions">
+        <button type="button"
+                class="submit-btn muted"
+                data-action="click->pixeldex#selectPokemon"
+                data-group-id="${group.id}"
+                data-group-nickname="${this._escape(group.nickname || "")}"
+                data-group-species="${this._escape(group.species_for_user || "")}"
+                data-group-location="${this._escape(group.location || "")}"
+                data-group-status="${this._escape(group.status || "caught")}"
+                data-group-types="${this._escape(types)}"
+                data-group-pokemon="${pokemonJson}">EDIT</button>
+        <button type="button"
+                class="submit-btn danger"
+                data-action="click->dashboard#openMarkDeadModal"
+                data-group-id="${group.id}"
+                data-group-nickname="${this._escape(group.nickname || "")}">MARK DEAD</button>
+      </div>`
+
+    return `
+      <div class="${cardClass}">
+        <div class="head">
+          <span class="nickname">${this._escape((group.nickname || "").toString().toUpperCase())}</span>
+          <span class="pill">${pillText}</span>
+        </div>
+        ${playerRows}
+        ${actionsHtml}
+      </div>`
+  }
+
+  // Shows the catch form in place of the group-list (dupes-clause flow).
+  showCatchFormForCurrent(event) {
+    event.stopPropagation()
+    if (!this.hasSheetFormTarget) return
+    const key = event.currentTarget.dataset.locationKey
+    if (this.hasGroupListTarget) this.groupListTarget.classList.add("hidden")
+    this.sheetFormTarget.classList.remove("hidden")
+    if (key && this.hasFormLocationKeyTarget) this.formLocationKeyTarget.value = key
+    if (this.hasNicknameInputTarget) {
+      requestAnimationFrame(() => this.nicknameInputTarget.focus())
+    }
+  }
+
+  // ── JUMP TO NOW ──────────────────────────────────────────────────
+
+  jumpToNow(event) {
+    if (event) event.stopPropagation()
+    const next = this.locationNodeTargets.find(n => n.classList.contains("next"))
+    if (!next) return
+    next.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })
   }
 
   handleKeydown(event) {
@@ -198,23 +306,25 @@ export default class extends Controller {
   }
 
   resetForm() {
-    const form = this.panelFormTarget.querySelector("form")
-    if (form) form.reset()
+    if (!this.hasSheetFormTarget) return
+    const form = this.sheetFormTarget
+    if (form && form.tagName === "FORM") form.reset()
     this.speciesHiddenTargets.forEach(h => (h.value = ""))
     this.speciesPreviewTargets.forEach(p => (p.innerHTML = ""))
     if (this.hasFormStatusTarget) {
       this.formStatusTarget.textContent = ""
-      this.formStatusTarget.className = "text-xs text-gray-500"
     }
   }
 
-  // ── Species Search/Autocomplete (ported from sinnoh_map_controller) ──
+  // ── Species Search/Autocomplete (preserved) ─────────────────────
 
   filterSpecies(event) {
     const input = event.target
     const query = input.value.toLowerCase().trim()
     const wrapper = input.closest("[data-timeline-target='speciesSearchWrapper']")
+    if (!wrapper) return
     const dropdown = wrapper.querySelector("[data-timeline-target='speciesDropdown']")
+    if (!dropdown) return
 
     if (query.length < 1) {
       dropdown.classList.add("hidden")
@@ -235,17 +345,12 @@ export default class extends Controller {
     const matches = [...startsWith, ...includes].slice(0, 20)
 
     if (matches.length === 0) {
-      dropdown.innerHTML = '<div class="px-3 py-2 text-xs text-gray-500">No species found</div>'
+      dropdown.innerHTML = `<div>No species found</div>`
     } else {
       dropdown.innerHTML = matches
-        .map(
-          species => `
-        <div class="px-3 py-1.5 text-sm text-gray-200 hover:bg-indigo-600 hover:text-white cursor-pointer transition"
-             data-action="click->timeline#selectSpecies"
-             data-species="${species}">
-          ${species}
-        </div>`
-        )
+        .map(species => `
+          <div data-action="click->timeline#selectSpecies"
+               data-species="${this._escape(species)}">${this._escape(species)}</div>`)
         .join("")
     }
 
@@ -256,20 +361,21 @@ export default class extends Controller {
     event.stopPropagation()
     const species = event.currentTarget.dataset.species
     const wrapper = event.currentTarget.closest("[data-timeline-target='speciesSearchWrapper']")
+    if (!wrapper) return
     const input = wrapper.querySelector("input[type='text']")
     const hidden = wrapper.querySelector("[data-timeline-target='speciesHidden']")
     const dropdown = wrapper.querySelector("[data-timeline-target='speciesDropdown']")
     const preview = wrapper.querySelector("[data-timeline-target='speciesPreview']")
 
-    input.value = species
-    hidden.value = species
-    dropdown.classList.add("hidden")
+    if (input) input.value = species
+    if (hidden) hidden.value = species
+    if (dropdown) dropdown.classList.add("hidden")
 
     if (preview) {
-      preview.innerHTML = `<img src="/assets/sprites/${this.getSpriteFilename(species)}.png"
-                                alt="${species}" width="28" height="28"
-                                class="inline-block" loading="lazy"
-                                onerror="this.style.display='none'">`
+      const file = this.getSpriteFilename(species)
+      preview.innerHTML = file
+        ? `<img src="/assets/sprites/${file}.png" alt="${this._escape(species)}" width="24" height="24" style="image-rendering: pixelated;" loading="lazy" onerror="this.style.display='none'">`
+        : "&mdash;"
     }
   }
 
@@ -283,7 +389,7 @@ export default class extends Controller {
     }
   }
 
-  // ── Form Submission (ported from sinnoh_map_controller) ──
+  // ── Form Submission (preserved) ─────────────────────────────────
 
   async submitCatch(event) {
     event.preventDefault()
@@ -292,10 +398,8 @@ export default class extends Controller {
 
     if (this.hasFormStatusTarget) {
       this.formStatusTarget.textContent = "Saving..."
-      this.formStatusTarget.className = "text-xs text-yellow-400"
     }
 
-    // Save scroll position before reload
     if (this.hasScrollContainerTarget) {
       sessionStorage.setItem("timeline-scroll", this.scrollContainerTarget.scrollLeft)
     }
@@ -311,28 +415,19 @@ export default class extends Controller {
       })
 
       if (response.ok) {
-        if (this.hasFormStatusTarget) {
-          this.formStatusTarget.textContent = "Saved!"
-          this.formStatusTarget.className = "text-xs text-green-400"
-        }
+        if (this.hasFormStatusTarget) this.formStatusTarget.textContent = "Saved!"
         setTimeout(() => window.location.reload(), 500)
       } else {
         const data = await response.json().catch(() => ({}))
         const msg = data.error || "Save failed"
-        if (this.hasFormStatusTarget) {
-          this.formStatusTarget.textContent = msg
-          this.formStatusTarget.className = "text-xs text-red-400"
-        }
+        if (this.hasFormStatusTarget) this.formStatusTarget.textContent = msg
       }
     } catch (error) {
-      if (this.hasFormStatusTarget) {
-        this.formStatusTarget.textContent = "Network error"
-        this.formStatusTarget.className = "text-xs text-red-400"
-      }
+      if (this.hasFormStatusTarget) this.formStatusTarget.textContent = "Network error"
     }
   }
 
-  // ── Gym Toggle (ported from sinnoh_map_controller) ──
+  // ── Gym Toggle (preserved) ──────────────────────────────────────
 
   async toggleGym(event) {
     event.stopPropagation()
@@ -351,7 +446,6 @@ export default class extends Controller {
       if (response.ok) {
         const data = await response.json()
         this.gymsDefeatedValue = data.gyms_defeated
-        // Save scroll position before reload
         if (this.hasScrollContainerTarget) {
           sessionStorage.setItem("timeline-scroll", this.scrollContainerTarget.scrollLeft)
         }
@@ -360,5 +454,21 @@ export default class extends Controller {
     } catch (error) {
       console.error("Failed to toggle gym:", error)
     }
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────
+
+  // Minimal HTML-attr escape — for templated strings that may carry
+  // user-entered nicknames. Stimulus values pre-escaped server-side
+  // would be cleaner, but the JS-only group-card path needs a small
+  // safety net.
+  _escape(value) {
+    if (value == null) return ""
+    return value.toString()
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
   }
 }

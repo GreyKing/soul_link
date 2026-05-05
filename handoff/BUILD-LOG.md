@@ -11,36 +11,65 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 22 — R2 PC Box redesign (Phase 2 R2 of the 2026-05-04 audit). Locked mockup `handoff/2026-05-04-ui-audit-mockup-pc-box.html`, 4 screens. Single bucket per Bob's plan + Ava's inline endorsement of the catch-modal-target wiring correction:
-- Wrapping div `.pc-box-r2` namespaces every new selector under `.pc-box-r2 …` so the legacy `.box-grid` / `.box-cell` rules used by `_pc_box_panel.html.erb` (sidebar) are untouched.
-- View `_pc_box_content.html.erb` full body rewrite: panel head + REVIEW PARSED CATCHES tray (badge legend + per-row LOG/EDIT/SKIP, recommended-action highlighted) + filter chip bar + free-text search + unified `[on_team, storage, fallen]` grid with corner glyphs + 280px type-coverage rail.
-- New section `/* ── R2 PC Box ── */` in `pixeldex.css` (~265 lines, mockup-verbatim with the `.pc-box-r2` prefix), plus 11 lines extending the existing `@media (max-width: 900px)` and `@media (max-width: 520px)` blocks. **Zero new design tokens.**
-- New `app/javascript/controllers/pc_box_filter_controller.js` (76 lines): chip filter + 150ms-debounced search + URL hash + rail-dim + count target + (Should Fix #1 inline) wrapper-level `.filter-active` toggle so non-active chips dim to opacity 0.55 when a non-ALL filter is active.
-- New `app/javascript/controllers/review_tray_controller.js` (38 lines): `prefillCatch` action looks up the catch-modal Stimulus targets (`[data-dashboard-target="catchSpecies|catchLocation"]`) and writes values; `dismiss` toggles `.dismissed` + decrements the count pill. Action chain on LOG/EDIT is `dashboard#openCatchModal` first (clears + focuses) then `review-tray#prefillCatch` (populates) — reverse order would have the prefill wiped.
-- New `recommended_review_action(p)` helper in `pixeldex_helper.rb`: pure-function `:log`/`:skip` decision (event_gift / trade_in → `:skip`; else `:log`).
+**Active step:** Step 23 — R4 Map redesign (Phase 2 R4 of the 2026-05-04 audit). Locked mockup `handoff/2026-05-04-ui-audit-mockup-map.html`, 4 screens (desktop full timeline · sheet open / new catch · sheet open / existing catches · mobile accordion). Six buckets per Bob's plan + Ava's six question-by-question answers (`handoff/ARCHITECT-BRIEF.md` § Architect endorsement):
+- Wrapping div `.map-r4` namespaces every new selector under `.map-r4 …` so existing timeline/route surfaces (e.g. dashboard MAP tab `_map_content.html.erb`) are untouched. `data-controller="timeline dashboard pixeldex"` triple-attached so the dashboard's `_pokemon_modal` and `_mark_dead_modal` partials work without bespoke wiring.
+- View `app/views/map/show.html.erb` full body rewrite: `.map-head` (h2 + sub + badge strip) + `.status-bar` (NEXT GYM · LEVEL CAP · CURRENT SEG + JUMP TO NOW pill) + `.node-legend` (5 always-visible glyph items) + `.layout` grid (left = `.timeline-frame` desktop / `.accordion-frame` mobile + `.special-bar`; right = sticky `.sheet`). Pulse-ring + `↓ NOW` pin on next-uncaught route. Segment dividers between segments (label = upcoming gym's bare-city name; final divider = "ELITE FOUR"). Endpoint Elite Four node preserved.
+- New section `/* ── R4 Map ── */` in `pixeldex.css` (~545 lines, mockup-verbatim with the `.map-r4` prefix; mockup-document chrome `.page` / `.page-banner` / `.legend` / `.section-anchor` / `.annotation` / `.phone` / `.phone-bezel` stripped). New `@media (max-width: 720px)` block (timeline → accordion swap + sheet drops `position: sticky` + layout collapses to single column). Existing `@media (max-width: 520px)` extended (`.map-r4 .special-grid` reflows to 2 columns). **Zero new design tokens.**
+- `app/helpers/map_helper.rb` extended with five Step 23 helpers: `next_uncaught_route_key`, `current_segment_label`, `segment_divider_label`, `segment_progress`, `segment_open_by_default?`, plus `node_status_class`. `groups_json_for(groups, current_user_id)` extended additively per Ava Q1 (added per-pokemon `id`, `is_mine`, `level`, `ability`, `nature`, `sprite_url`, `types` plus per-group `id`, `species_for_user`, `types_for_user` so the JS-built EDIT button mirrors the dashboard's `pixeldex#selectPokemon` payload without controller surgery).
+- `app/javascript/controllers/timeline_controller.js` extended (not replaced). Targets renamed `panel*` → `sheet*`, `backdrop` removed, new targets `emptyState` / `groupList` / `jumpBtn` / `accordionSegment`. Rewrote `closePanel` for the in-flow sheet (no `translateX`, no body lock, no backdrop; clears `#route=<key>` hash). New actions `jumpToNow` (smooth-scrolls to `.next` node), `showCatchFormForCurrent` (dupes-clause: swaps sheet from group-list to form mode for the same loc_key). New internal `_renderSheetCatchForm` / `_renderSheetGroupList` / `_buildGroupCardHtml` paths; group cards JS-built carry the `pixeldex#selectPokemon` + `dashboard#openMarkDeadModal` data attributes. URL hash `#route=<key>` synced via `connect()` → `applyHashRoute()` and `selectLocation` writes. Existing actions (`submitCatch`, `toggleGym`, `filterSpecies`, `selectSpecies`, `closeAllDropdowns`, `handleKeydown`, `scrollToCurrentProgress`) all preserved verbatim. Read-only mode gate is `hasSheetFormTarget` (single source of truth per Ava Q5/Q6).
+- Modal partials rendered at the bottom: `<%= render "dashboard/pokemon_modal" %>` + `<%= render "dashboard/mark_dead_modal" %>` (explicit dashboard/ prefix, partials live under `app/views/dashboard/`).
 
-**Reviewed by Richard:** **0 Must Fix, 1 Should Fix (fixed inline), Step 22 clear.** Should Fix: mockup Screen 2's "non-active chips dim to opacity 0.55" behaviour wasn't implemented. Fixed inline at `pc_box_filter_controller.js:65` (`this.element.classList.toggle("filter-active", this.status !== "all")` after the chip loop) + `pixeldex.css:1191` (`.pc-box-r2.filter-active .filter-chip:not(.active) { opacity: 0.55; }` with a 2-line WHY comment). Two new KGs logged (KG-35 SKIP non-persistence is client-only; KG-36 mockup-locked filter scope = no route/player chips).
+**Reviewed by Richard:** **0 Must Fix, 2 Should Fix (both fixed inline), 1 Escalate (resolved by Ava — fixed inline alongside Should Fix #1).** `handoff/REVIEW-FEEDBACK.md` updated with Architect resolution + inline-fix annotations. Awaiting Ava's deploy gate.
 
-**Test count:** 697 → **712** (+15). 0 failures, 0 errors.
-**Lint:** rubocop clean (199 files, 0 offenses; +2 files: new `pc_box_filter_controller.js` + `review_tray_controller.js`).
-**Brakeman:** Clean (no new warnings; same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess unchanged from Steps 18/19/20/21).
-**Migrations:** None. **Zero new gem deps. Zero new design tokens.**
+**Inline fixes folded in mid-review:**
+- *Should Fix #1 + Escalate (multi-group rendering order)* — fixed inline at `app/javascript/controllers/timeline_controller.js:194` by reverse-iterating: `[...groups].reverse().map(...)` instead of `groups.map(...)`. Resolves Richard's "render most-recent prominently" Should Fix and Ava's product-call escalate (`position: asc` shows oldest-first; reversing puts the latest dupes-clause re-roll at the top of the sheet stack). No primary/secondary CSS decoration — top-of-stack is the prominence.
+- *Should Fix #2 (history bloat)* — fixed inline at `app/javascript/controllers/timeline_controller.js:106` by replacing `window.location.hash = "#route=" + ...` with `history.replaceState(null, "", "#route=" + ...)` in `selectLocation`. Same one-line spirit; no back-stack pollution. The `connect()` hash read via `location.hash.startsWith("#route=")` still works identically (closePanel already used `history.replaceState`).
 
-**Pre-existing context:** Step 22 is the second Phase 2 redesign per § 5 of `handoff/2026-05-04-ui-audit.md` (locked R3 → **R2** → R4 → R1 ship order). Step 21 (R3 Save Slots) shipped at `3c001ed` and FF-merged to main at `9cd2009`. R4 Map gets its own session next; R1 Dashboard last.
+**Test count:** 712 → **754** (+42). 0 failures, 0 errors.
+**Lint:** rubocop clean (201 files, 0 offenses).
+**Brakeman:** Clean (no new warnings; same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess unchanged from Steps 18/19/20/21/22).
+**Migrations:** None. **Zero new gem deps. Zero new design tokens. Zero controller/model/service changes.**
 
-**Step 22 highlights:**
-- **Mockup wins on every visual detail** (Step 21 precedent): the prompt's gist mentioned "route / status / player" filters but the mockup ships only status (team/storage/fallen) + free-text search. Locked to mockup; richer filters logged as KG-36.
-- **No backend changes** — none. No new column, no migration, no new endpoint, no model method. LOG/EDIT route into the existing `+ NEW CATCH` modal pre-filled (the audit's "small migration" hand-wave was explicitly out-of-scope per the prompt). SKIP is a client-side dismiss only (KG-35).
-- **CSS namespace under `.pc-box-r2`** is the lock that prevents collision with the sidebar partial's existing `.box-grid` / `.box-cell` rules. Architect-locked decision; Richard verified namespace integrity grep.
-- **Architect correction folded inline:** the brief assumed the catch modal used `name=` attributes; Bob's "Files to verify" pass discovered Stimulus targets, AND that `openCatchModal` blanks fields before opening. Action chain reversed (open first, prefill second) and `prefillCatch` re-keyed at `[data-dashboard-target="catch*"]` selectors. Brief Constraint #5 corrected inline by Ava.
+**Pre-existing context:** Step 23 is the third Phase 2 redesign per § 5 of `handoff/2026-05-04-ui-audit.md` (locked R3 ✓ → R2 ✓ → **R4** → R1 ship order). Step 22 (R2 PC Box) shipped at `1375335` and FF-merged to main at `d442568`. R1 Dashboard gets its own session next.
 
-**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — KG-7 (real-save offset verification for `MAP_ID_OFFSET`) still open. KG-25 (real-SRAM smoke test for `BoxParser` + `PkmDecoder` field reads) still open. UI/UX audit `handoff/2026-05-04-ui-audit.md` Phase 1 shipped in Step 20; Phase 2 R3 shipped in Step 21; Phase 2 R2 shipped in Step 22. Remaining: R4 Map (Step 23), R1 Dashboard (Step 24).
+**Step 23 highlights:**
+- **Mockup wins on every visual detail** (Steps 21 + 22 precedent): the prompt's gist suggested overlay "+" / eye-icon click affordances; the mockup ships hover-lift + amber border + box-shadow + pulse-ring (color-blind safe via motion + caption + amber). Locked to mockup.
+- **No backend changes** — none. No new column, no migration, no new endpoint, no model method. `MapController#show`'s instance variables (`@locations / @progression / @gym_info / @groups_by_location / @players / @gyms_defeated / @pokedex_species`) cover everything the new view needs. Reusing `_pokemon_modal` + `_mark_dead_modal` partials avoids duplicated modal markup; the wrapper picks up `data-controller="timeline dashboard pixeldex"` so the modals' Stimulus targets resolve.
+- **`groups_json_for` extended additively, not replaced** (Ava Q1). Per-pokemon payload now mirrors `pixeldex_group_pokemon_json`'s shape so the JS-built EDIT button can dispatch `pixeldex#selectPokemon` with the correct `data-group-pokemon` JSON without a parallel helper or a controller change. Existing `buildDetailsHtml` callers (legacy `species` / `player` / `sprite` fields) still see what they expect; new fields are pure-additive.
+- **Single read-only gate via `hasSheetFormTarget`** (Ava Q5/Q6). The view conditionally renders the catch form `<form data-timeline-target="sheetForm">` only when `!dashboard_read_only?(@run)`; absent target means read-only mode → JS skips rendering EDIT, MARK DEAD, and `+ ANOTHER ENCOUNTER (DUPES CLAUSE)` in the JS-built group cards. No parallel `readOnlyValue`. One gate.
+- **Mockup-document chrome stripped from CSS** (Ava nudge). The mockup HTML had ~340 lines of CSS including page-styling chrome (`.page`, `.page-banner`, `.legend`, `.section-anchor`, `.annotation`, `.phone`, `.phone-bezel`) that styles the mockup document, not the production component. New CSS keeps only the actual component styles, namespaced under `.map-r4`.
+- **Two breakpoint extensions, one new breakpoint.** Existing `@media (max-width: 900px)` is unchanged for R4 (the layout's already 1-col there because the sheet is 380px wide → 720px is the right swap point). Existing `@media (max-width: 520px)` extended with `.map-r4 .special-grid` 2-col reflow. New `@media (max-width: 720px)` block handles the timeline → accordion swap + sheet de-stickifies + layout collapses. Same pattern as Step 22 (extend existing blocks for shared concerns; add a new block only for R4-specific breakpoints).
+- **Final segment divider label is "ELITE FOUR"** (Ava Q3 override). The mockup's `data-segment="…"` was a truncation artifact (mockup only renders 3 segments). For real implementation, the divider before the null-gym (Victory Road) segment names the destination as "ELITE FOUR".
+- **Existing `<datalist>`-prose in the audit was wrong** (Architect locked already): `filterSpecies` / `selectSpecies` / `speciesPreview` are already a custom Stimulus combobox, not a `<datalist>`. No conversion work needed; the new sheet form re-uses them verbatim.
+
+**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — KG-7 (real-save offset verification for `MAP_ID_OFFSET`) still open. KG-25 (real-SRAM smoke test for `BoxParser` + `PkmDecoder` field reads) still open. UI/UX audit `handoff/2026-05-04-ui-audit.md` Phase 1 shipped in Step 20; Phase 2 R3 shipped in Step 21; Phase 2 R2 shipped in Step 22; Phase 2 R4 shipped in Step 23. Remaining: R1 Dashboard (Step 24).
 
 **Parked plan:** FactoryBot conversion fully shipped through Step 8.
 
 ---
 
-## Step 21 — Status archive
+## Step 22 — Status archive
+*Kept here for one-step lookback; will fold into archive at session end.*
+
+**Step 22:** R2 PC Box redesign (Phase 2 R2 of the 2026-05-04 audit). Locked mockup `handoff/2026-05-04-ui-audit-mockup-pc-box.html`, 4 screens. Single bucket per Bob's plan + Ava's inline endorsement of the catch-modal-target wiring correction:
+- Wrapping div `.pc-box-r2` namespaces every new selector under `.pc-box-r2 …` so the legacy `.box-grid` / `.box-cell` rules used by `_pc_box_panel.html.erb` (sidebar) are untouched.
+- View `_pc_box_content.html.erb` full body rewrite: panel head + REVIEW PARSED CATCHES tray (badge legend + per-row LOG/EDIT/SKIP, recommended-action highlighted) + filter chip bar + free-text search + unified `[on_team, storage, fallen]` grid with corner glyphs + 280px type-coverage rail.
+- New section `/* ── R2 PC Box ── */` in `pixeldex.css` (~265 lines, mockup-verbatim with the `.pc-box-r2` prefix), plus 11 lines extending the existing `@media (max-width: 900px)` and `@media (max-width: 520px)` blocks. **Zero new design tokens.**
+- New `app/javascript/controllers/pc_box_filter_controller.js` (76 lines): chip filter + 150ms-debounced search + URL hash + rail-dim + count target + (Should Fix #1 inline) wrapper-level `.filter-active` toggle so non-active chips dim to opacity 0.55 when a non-ALL filter is active.
+- New `app/javascript/controllers/review_tray_controller.js` (38 lines): `prefillCatch` action looks up the catch-modal Stimulus targets and writes values; `dismiss` toggles `.dismissed` + decrements the count pill.
+- New `recommended_review_action(p)` helper in `pixeldex_helper.rb`: pure-function `:log`/`:skip` decision (event_gift / trade_in → `:skip`; else `:log`).
+
+**Reviewed by Richard:** **0 Must Fix, 1 Should Fix (fixed inline), Step 22 clear.** Should Fix: mockup Screen 2's "non-active chips dim to opacity 0.55" behaviour wasn't implemented. Fixed inline at `pc_box_filter_controller.js:65` + `pixeldex.css:1191`. Two new KGs logged (KG-35 SKIP non-persistence is client-only; KG-36 mockup-locked filter scope = no route/player chips).
+
+**Test count:** 697 → **712** (+15). 0 failures, 0 errors.
+**Lint:** rubocop clean. **Brakeman:** Clean (same 2 pre-existing weak-confidence warnings).
+**Migrations:** None. **Zero new gem deps. Zero new design tokens.**
+
+**Shipped:** Step 22 committed at `1375335` on branch `claude/agitated-lewin-d445ec`, FF-merged to `origin/main` at `d442568` and pushed.
+
+---
+
+## Step 21 — Status archive — older
 *Kept here for one-step lookback; will fold into archive at session end.*
 
 **Step 21:** R3 Save Slots redesign (Phase 2 R3 of the 2026-05-04 audit). Locked mockup `handoff/2026-05-04-ui-audit-mockup-save-slots.html`, 5 screens. Five buckets per Bob's plan + Ava's approved answers:
@@ -89,6 +118,83 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 23 — R4 Map redesign (Phase 2 R4 of the 2026-05-04 audit) — 2026-05-05
+**Status:** Built; awaiting Richard's review (`REVIEW-REQUEST.md` posted). **No KGs close** (Phase 2 redesigns are surface-level UX work, not backlog items).
+
+Third Phase 2 redesign per § 5 of `handoff/2026-05-04-ui-audit.md`. Four locked screens in `handoff/2026-05-04-ui-audit-mockup-map.html` (desktop full timeline · sheet open / new catch · sheet open / existing catches · mobile accordion). Pure frontend ship — view + CSS + 1 extended Stimulus controller + 1 extended helper. Architect-locked decisions tracked under § Architecture Decisions.
+
+**Architecture decisions (durable — see § Architecture Decisions):**
+- **CSS namespace under `.map-r4`** (Step 22 `.pc-box-r2` precedent). The mockup's class names (`.timeline-frame`, `.node`, `.sheet`, `.accordion-segment`, `.special-cell`, etc.) are fresh — namespace prevents accidental collision with future `.timeline-*` rules elsewhere AND scopes the redesign cleanly.
+- **The mockup's right-rail sticky SHEET replaces the old overlay slide-out panel.** No `position: fixed`, no backdrop, no `translateX` transition, no body lock. The sheet sits in a CSS Grid column on desktop (`grid-template-columns: minmax(0, 1fr) 380px`); below 720px the layout drops to single-column and the sheet de-stickifies. Default empty state ("Select a route to view or log catches.") is rendered server-side in the `.empty-state` block, gated visible by JS when no key is selected.
+- **Mobile breakpoint = 720px for the timeline → accordion swap; 520px for special-encounters reflow.** Two-tier: 720px hides `.map-r4 .timeline-frame`, shows `.map-r4 .accordion-frame`, drops the layout to single column, drops `.map-r4 .sheet`'s `position: sticky`. 520px also reflows `.map-r4 .special-grid` from 4 cols to 2. **Both breakpoints extend existing blocks; new 720px block is fresh.**
+- **`data-controller="timeline dashboard pixeldex"` triple-attached on the wrapper.** Both `dashboard` and `pixeldex` `connect()` methods are benign on `/map`: dashboard has no `connect`; pixeldex's `#initSortables()` is a no-op without on-team grids and `#applyHashTab()` looks for a tab-button matching the hash (no `tab=route_205` button → no-op). The wrapper carries every value attr the dashboard's `<div data-controller="dashboard pixeldex">` carries (`groups-url`, `csrf`, `user-id`, `abilities-data`, `evolutions-data`, `sprite-map`, `natures-data`, `pokemon-update-url`, `group-update-url`, `update-slots-url`). Single source of truth — no parallel modal copies.
+- **Pulse-ring + "↓ NOW" pin on the next-uncaught route.** Identification rule (locked): walk `@progression["segments"]` in order, then `(segment["locations"] || []).each`, find the first location whose `location_status(...)` is `"uncaught"` AND whose `loc_data["type"]` is `"route"` (skip cities, dungeons, lakes, special). The first match wins. Cities + dungeons + lakes + specials are skipped because the pin marks "next ROUTE encounter" — late-game runs that have caught every route but no dungeons see no `.next` class anywhere; the JUMP TO NOW button hides via `.hidden` class.
+- **Always-visible legend strip** between the status bar and the timeline frame. Five glyphs + labels: caught (●) · dead (☠) · uncaught (○) · special (★) · gym (G). Mockup-verbatim. Not collapsible.
+- **Segment dividers between segments.** Helper `MapHelper#segment_divider_label(progression, gym_info, seg_idx)` returns the bare-city label of the UPCOMING segment's gym (e.g. between segment 1 and 2, the divider says `"ETERNA"` because segment 2's gym is `second_gym = eterna_city`). Final divider before the null-gym segment returns `"ELITE FOUR"` (Ava Q3 override; mockup's `"…"` was a truncation artifact).
+- **`groups_json_for(groups, current_user_id)` extended additively** (Ava Q1). Per-pokemon: added `id`, `is_mine`, `level`, `ability`, `nature`, `sprite_url`, `types`. Per-group: added top-level `id`, `species_for_user`, `types_for_user`. Existing legacy fields (`species`, `player`, `sprite`) retained so the controller's `buildDetailsHtml` legacy reader (replaced in Step 23 but kept additive for safety) sees what it expects. The signature now requires `current_user_id` as the second arg — only call site is the rewritten map view.
+- **Read-only mode JS detection via `hasSheetFormTarget`** (Ava Q5). The view conditionally renders `<form data-timeline-target="sheetForm">` only when `!dashboard_read_only?(@run)`; absent target means read-only mode → JS `_renderSheetGroupList` skips rendering EDIT, MARK DEAD, and `+ ANOTHER ENCOUNTER (DUPES CLAUSE)`. No parallel `readOnlyValue` (Ava Q6 override).
+- **JUMP TO NOW button is conditionally hidden via `.hidden` class** (Ava Q3-adjacent). Helper returns `nil` when no uncaught route exists → ERB renders `class="jump-btn hidden"` server-side; the `connect()` method also re-runs the check JS-side as a safety net (`if (!hasNext) this.jumpBtnTarget.classList.add("hidden")`).
+- **`.selected` class on `.glyph` replaces inline Tailwind ring-* classes.** CSS owns the visual (`outline: 3px solid var(--amber)`); Stimulus owns the state. Cleaner than inline class manipulation.
+- **`#route=<key>` URL hash persistence is JS-only — no integration test.** Step 22's KG-35-style decision: Stimulus hash logic is hard to assert without a headless driver. The hash is read in `connect() → applyHashRoute()` and written in `selectLocation`; cleared in `closePanel`. Documented in the controller; no unit test.
+- **The `+ ANOTHER ENCOUNTER (DUPES CLAUSE)` button reuses `submitCatch` verbatim.** Clicking it toggles `.sheet-body` from group-list mode to form mode for the same `loc_key` (`showCatchFormForCurrent` action). No new endpoint, no new modal. The form submits and reloads, the new group appears as an additional card next time the route's sheet opens.
+- **Mockup-document chrome stripped from CSS** (Ava nudge). The `.page` / `.page-banner` / `.legend` / `.section-anchor` / `.annotation` / `.phone` / `.phone-bezel` styles in the mockup HTML style the mockup document, not the production component. New CSS keeps only actual component styles.
+
+**Test count:** 712 → 754 (+42). 0 failures, 0 errors.
+
+**Files (new):** 2 —
+- `test/integration/map_redesign_test.rb` (217 lines, 13 tests).
+- `test/helpers/map_helper_test.rb` (303 lines, 25 tests).
+
+**Files (modified):** 6 —
+- `app/views/map/show.html.erb` (full body rewrite, ~280 lines).
+- `app/assets/stylesheets/pixeldex.css` (+~545 lines new R4 section above the R2 marker; +6 lines extending `@media (max-width: 520px)`; +7 lines new `@media (max-width: 720px)` block).
+- `app/javascript/controllers/timeline_controller.js` (full extension; targets renamed, sheet logic rewritten, `jumpToNow` + `showCatchFormForCurrent` + `applyHashRoute` + `_renderSheetCatchForm` + `_renderSheetGroupList` + `_buildGroupCardHtml` + `_escape` added; ~430 lines total, ~120 new).
+- `app/helpers/map_helper.rb` (+~155 lines: 6 new helpers + extended `groups_json_for`; private `bare_city_label` helper).
+- `test/integration/responsive_grids_test.rb` (+38 lines: 4 new Step 23 R4 assertions).
+- `handoff/BUILD-LOG.md` + `handoff/ARCHITECT-BRIEF.md` (Architect endorsement appended) updated. `handoff/REVIEW-REQUEST.md` posted at end of step.
+
+**Tests added (42 new):**
+1–8. `MapHelperTest`: `location_status` (uncaught/caught/dead branches), `primary_group` (caught preference + dead fallback + nil/empty).
+9–13. `MapHelperTest`: `next_uncaught_route_key` (first-uncaught-route, skip non-routes, all-caught nil, earlier-segment-wins).
+14–16. `MapHelperTest`: `current_segment_label` (FINAL STRETCH for nil, bare-city for next-uncaught-key, ELITE FOUR for null-gym segment).
+17–19. `MapHelperTest`: `segment_divider_label` (upcoming bare-city, ELITE FOUR before null-gym, nil after last segment).
+20–22. `MapHelperTest`: `segment_progress` (catchable types only in total, caught+dead toward caught total, zero/zero edge case).
+23–24. `MapHelperTest`: `segment_open_by_default?` (matches segment containing key, false for nil).
+25–26. `MapHelperTest`: `node_status_class` (special only for uncaught specials, fallthrough for non-special).
+27–28. `MapHelperTest`: `groups_json_for` blank case + additive per-pokemon `id` / `is_mine` / `level` fields.
+29. `MapRedesignTest`: `.map-r4` wrapper + timeline + dashboard + pixeldex controllers attached.
+30. `MapRedesignTest`: always-visible legend with all 5 glyph items (caught/dead/uncaught/special/gym).
+31. `MapRedesignTest`: next-uncaught route receives `.next` class + `.node-now-pin` (exactly once).
+32. `MapRedesignTest`: JUMP TO NOW button is `.hidden` when every route is caught.
+33–34. `MapRedesignTest`: status bar renders NEXT GYM + LEVEL CAP + CURRENT SEG; em-dash fallback when 8 gyms earned.
+35. `MapRedesignTest`: sheet renders `emptyState` + `groupList` + `sheetForm` targets (with one species input per Soul Link player).
+36. `MapRedesignTest`: `data-groups` carries a 2-element JSON array when 2 groups exist on the same location (dupes-clause).
+37. `MapRedesignTest`: read-only mode hides `sheetForm` + `+ LOG GROUP`.
+38. `MapRedesignTest`: special-encounters bar renders 4 cells (gift / egg / trade / other) all wired to `click->timeline#selectLocation`.
+39. `MapRedesignTest`: accordion frame renders one details element per progression segment, with exactly one `[open]` attribute on the segment containing the next-uncaught route; each `.acc-row` carries the click chain.
+40. `MapRedesignTest`: pokemon + mark-dead modal partials are rendered on `/map` (`data-pixeldex-target="pokemonModal"`, `data-dashboard-target="markDeadModal"`, `aria-labelledby` matches partial's `<span id>`).
+41. `MapRedesignTest`: every timeline node carries `data-action="click->timeline#selectLocation"`.
+42. `ResponsiveGridsTest`: `.map-r4` namespace declared outside any media block.
+43. `ResponsiveGridsTest`: 720px breakpoint hides `.map-r4 .timeline-frame` + shows `.map-r4 .accordion-frame` + collapses `.map-r4 .layout` to single column.
+44. `ResponsiveGridsTest`: 520px breakpoint reflows `.map-r4 .special-grid` to `repeat(2, 1fr)`.
+45. `ResponsiveGridsTest`: 520/720/900px breakpoints do NOT collapse `.map-r4 .node`, `.map-r4 .sheet`, `.map-r4 .acc-row` (display: none guard).
+
+**Backward-compat invariants exercised:**
+- `MapController#show` is unchanged. All instance variables (`@locations / @progression / @gym_info / @groups_by_location / @players / @gyms_defeated / @pokedex_species / @run`) preserved.
+- `_pokemon_modal.html.erb` + `_mark_dead_modal.html.erb` partials are unchanged. They were already ARIA-wired (Step 20) and rendered on the dashboard — rendering them on `/map` reuses the same partial paths (`<%= render "dashboard/pokemon_modal" %>`).
+- All existing Stimulus actions on `timeline_controller.js` (`selectLocation`, `submitCatch`, `toggleGym`, `filterSpecies`, `selectSpecies`, `closeAllDropdowns`, `handleKeydown`, `scrollToCurrentProgress`) preserved. Existing `scrollContainerTarget` + `track` + `locationNode` + form targets all preserved with same names. `panel*` family renamed to `sheet*` (deleted from view, deleted from controller, no orphan references).
+- `groups_json_for(groups)` → `groups_json_for(groups, current_user_id)`: signature change is required (second arg) but ALL existing fields are retained, ADDITIVE only. Only call site is the map view, which is being rewritten in this step.
+- `MapHelper#location_status` / `primary_group` / `timeline_node_size` public API unchanged. Tests added for the previously-untested ones.
+- The dashboard MAP tab (`_map_content.html.erb`) is unchanged — out of scope per brief (R1 reshapes the dashboard chrome).
+
+**Diff scope:** 2 new + 6 modified files. Inside the brief's stated scope (≤7 files outside `handoff/`). Zero changes under `app/controllers/`, `app/models/`, `db/`, `app/services/`, `app/jobs/`, `config/`.
+
+**KG closures logged:** none.
+
+**New Known Gaps logged this step:** none. (`#route=<key>` hash JS-only contract documented inline in the controller; not a gap, an architectural choice consistent with Step 22's KG-35 SKIP non-persistence pattern.)
+
+---
 
 ### Step 22 — R2 PC Box redesign (Phase 2 R2 of the 2026-05-04 audit) — 2026-05-04
 **Status:** Shipped. **No KGs close** (Phase 2 redesigns are surface-level UX work, not backlog items). Two new KGs logged (KG-35, KG-36).

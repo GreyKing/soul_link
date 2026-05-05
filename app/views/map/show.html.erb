@@ -1,275 +1,370 @@
-<div data-controller="timeline"
+<%# Step 23 R4 — standalone /map redesign per
+    handoff/2026-05-04-ui-audit-mockup-map.html. All visual styles
+    namespaced under `.map-r4`. The dashboard + pixeldex controllers
+    are attached so the rendered `_pokemon_modal.html.erb` and
+    `_mark_dead_modal.html.erb` partials at the bottom of this view
+    work without bespoke wiring. Existing timeline actions are
+    preserved verbatim; new sheet / hash / jumpToNow logic layers
+    on top in `timeline_controller.js`. %>
+<%
+  next_uncaught_key = next_uncaught_route_key(@progression, @locations, @groups_by_location)
+  next_gym = SoulLink::GameState.next_gym_info(@gyms_defeated)
+  current_seg_label = current_segment_label(@progression, @gym_info, next_uncaught_key)
+%>
+<div class="map-r4"
+     data-controller="timeline dashboard pixeldex"
      data-timeline-gyms-defeated-value="<%= @gyms_defeated %>"
      data-timeline-csrf-value="<%= form_authenticity_token %>"
      data-timeline-gym-progress-url-value="<%= gym_progress_path %>"
      data-timeline-create-group-url-value="<%= pokemon_groups_path %>"
      data-timeline-pokedex-species-value="<%= @pokedex_species.to_json %>"
      data-timeline-sprite-map-value="<%= SoulLink::GameState.pokedex.to_json %>"
-     style="position: relative;">
+     data-dashboard-groups-url-value="<%= pokemon_groups_path %>"
+     data-dashboard-csrf-value="<%= form_authenticity_token %>"
+     data-dashboard-user-id-value="<%= current_user_id %>"
+     data-pixeldex-abilities-data-value="<%= SoulLink::GameState.pokemon_abilities.to_json %>"
+     data-pixeldex-evolutions-data-value="<%= SoulLink::GameState.evolutions.to_json %>"
+     data-pixeldex-sprite-map-value="<%= pixeldex_sprite_urls.to_json %>"
+     data-pixeldex-natures-data-value="<%= PixeldexHelper::NATURES.to_json %>"
+     data-pixeldex-pokemon-update-url-value="/pokemon"
+     data-pixeldex-group-update-url-value="<%= pokemon_groups_path %>"
+     data-pixeldex-update-slots-url-value="<%= update_slots_team_path %>"
+     data-pixeldex-csrf-value="<%= form_authenticity_token %>">
 
-  <%# ── HEADER: Title + Gym Badges ── %>
-  <div style="margin-bottom: 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+  <%# ── Map header bar ── %>
+  <div class="map-head">
     <div>
-      <div class="gb-page-title">ROUTE PROGRESSION</div>
-      <div class="gb-page-subtitle">Click a location to view catches or add new ones.</div>
+      <h2>ROUTE PROGRESSION</h2>
+      <div class="sub">Click any node to view catches or add a new one.</div>
     </div>
 
-    <%# Gym badges %>
-    <div style="display: flex; align-items: center; gap: 4px;">
-      <span style="font-size: 10px; color: var(--d2); margin-right: 4px;">Badges:</span>
-      <% SoulLink::GameState.gym_info.each do |key, gym| %>
-        <% num = gym['number'] %>
+    <div class="badge-strip">
+      <span class="lbl">BADGES</span>
+      <% SoulLink::GameState.gym_info.each do |_key, gym| %>
+        <% num = gym["number"] %>
         <% beaten = @gyms_defeated >= num %>
-        <button style="width: 28px; height: 28px; border: var(--border-thin); display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer;
-                       <%= beaten ? 'background: var(--d1); color: var(--l2);' : 'background: var(--l2); color: var(--d2);' %>"
+        <button type="button"
+                class="badge<%= beaten ? ' earned' : '' %>"
                 data-action="click->timeline#toggleGym"
                 data-gym-number="<%= num %>"
-                title="<%= gym['name'] %> — <%= gym['leader'] %> (<%= gym['type'] %>) — Lv. <%= gym['max_level'] %>">
+                title="<%= gym['name'] %> &mdash; <%= gym['leader'] %> (<%= gym['type'] %>) &mdash; Lv. <%= gym['max_level'] %>">
           <%= num %>
         </button>
       <% end %>
     </div>
   </div>
 
-  <%# ── LEVEL CAP INFO ── %>
-  <% next_gym = SoulLink::GameState.next_gym_info(@gyms_defeated) %>
-  <% if next_gym %>
-    <div class="gb-card-dark" style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; margin-bottom: 12px; font-size: 10px;">
-      <span style="color: var(--l1);">Next Gym:</span>
-      <span style="color: var(--l2);"><%= next_gym['name'] %></span>
-      <span style="color: var(--l1);">(<%= next_gym['leader'] %> &mdash; <%= next_gym['type'] %>)</span>
-      <span style="color: var(--l2); margin-left: 6px;">Level Cap: <%= next_gym['max_level'] %></span>
+  <%# ── Status bar ── %>
+  <div class="status-bar">
+    <% if next_gym %>
+      <div class="item">
+        <span class="lbl">NEXT GYM</span>
+        <span class="val"><%= next_gym["leader"] %> &middot; <%= next_gym["type"] %></span>
+      </div>
+      <div class="item">
+        <span class="lbl">LEVEL CAP</span>
+        <span class="val"><%= next_gym["max_level"] %></span>
+      </div>
+    <% else %>
+      <div class="item">
+        <span class="lbl">NEXT GYM</span>
+        <span class="val">All 8 earned &middot; Elite Four ahead</span>
+      </div>
+      <div class="item">
+        <span class="lbl">LEVEL CAP</span>
+        <span class="val">&mdash;</span>
+      </div>
+    <% end %>
+    <div class="item">
+      <span class="lbl">CURRENT SEG</span>
+      <span class="val"><%= current_seg_label %></span>
     </div>
-  <% else %>
-    <div class="gb-card-dark" style="display: inline-flex; padding: 6px 12px; margin-bottom: 12px; font-size: 10px;">
-      <span style="color: var(--l2);">All 8 badges earned! Prepare for the Elite Four.</span>
-    </div>
-  <% end %>
+    <button type="button"
+            class="jump-btn<%= next_uncaught_key.nil? ? ' hidden' : '' %>"
+            data-timeline-target="jumpBtn"
+            data-action="click->timeline#jumpToNow">&#x2193; JUMP TO NOW</button>
+  </div>
 
-  <%# ── HORIZONTAL TIMELINE ── %>
-  <div class="gb-card" style="overflow: hidden; padding: 0;">
-    <div style="overflow-x: auto; overflow-y: hidden; padding-bottom: 8px; scrollbar-width: thin; scrollbar-color: var(--d2) var(--l1);"
-         class="timeline-scroll"
-         data-timeline-target="scrollContainer">
-      <div style="display: flex; align-items: flex-start; gap: 0; padding: 24px 16px 12px; min-width: max-content;"
-           data-timeline-target="track">
+  <%# ── Always-visible legend ── %>
+  <div class="node-legend">
+    <div class="item"><div class="glyph caught">&#9679;</div> caught</div>
+    <div class="item"><div class="glyph dead">&#9760;</div> dead</div>
+    <div class="item"><div class="glyph uncaught">&#9675;</div> uncaught</div>
+    <div class="item"><div class="glyph special">&#9733;</div> special</div>
+    <div class="item"><div class="glyph gym">G</div> gym</div>
+  </div>
 
-        <% segments = @progression['segments'] || [] %>
-        <% segments.each_with_index do |segment, seg_idx| %>
-          <% (segment['locations'] || []).each_with_index do |loc_key, loc_idx| %>
-            <% loc_data = @locations[loc_key] %>
-            <% next unless loc_data %>
-            <% groups = @groups_by_location[loc_key] %>
-            <% status = location_status(groups) %>
-            <% loc_type = loc_data['type'] || 'route' %>
-            <% group = primary_group(groups) %>
+  <%# ── Layout: timeline + sticky sheet ── %>
+  <div class="layout">
+    <div>
+      <%# ── Desktop: horizontal timeline ── %>
+      <div class="timeline-frame">
+        <div class="timeline-scroll" data-timeline-target="scrollContainer">
+          <div class="timeline-track" data-timeline-target="track">
 
-            <%# Connecting line %>
-            <% unless seg_idx == 0 && loc_idx == 0 %>
-              <div style="width: 24px; height: 2px; flex-shrink: 0; margin-top: 16px;
-                          background: <%= status != 'uncaught' ? 'var(--d2)' : 'var(--l1)' %>;"></div>
+            <% segments = @progression["segments"] || [] %>
+            <% segments.each_with_index do |segment, seg_idx| %>
+              <% (segment["locations"] || []).each_with_index do |loc_key, loc_idx| %>
+                <% loc_data = @locations[loc_key] %>
+                <% next unless loc_data %>
+                <% groups = @groups_by_location[loc_key] %>
+                <% status = location_status(groups) %>
+                <% loc_type = loc_data["type"] || "route" %>
+                <% group = primary_group(groups) %>
+                <% node_class = node_status_class(loc_data, status) %>
+                <% is_next = (loc_key == next_uncaught_key) %>
+
+                <%# Connecting line — between every node within a segment %>
+                <% unless seg_idx == 0 && loc_idx == 0 %>
+                  <div class="timeline-line <%= status == 'uncaught' ? 'todo' : 'done' %>"></div>
+                <% end %>
+
+                <%# Location node %>
+                <button type="button"
+                        class="node <%= node_class %><%= is_next ? ' next' : '' %>"
+                        data-action="click->timeline#selectLocation"
+                        data-timeline-target="locationNode"
+                        data-location-key="<%= loc_key %>"
+                        data-location-name="<%= loc_data['name'] %>"
+                        data-status="<%= status %>"
+                        data-groups="<%= groups_json_for(groups, current_user_id) %>">
+                  <% if is_next %>
+                    <span class="node-now-pin">&#x2193; NOW</span>
+                  <% end %>
+                  <div class="glyph">
+                    <% if status == "dead" %>
+                      <span style="font-size: 12px;">&#9760;</span>
+                    <% elsif status == "caught" && group %>
+                      <% first_pokemon = group.soul_link_pokemon.first %>
+                      <% if first_pokemon %>
+                        <%= pokemon_sprite_tag(first_pokemon.species, size: 36) %>
+                      <% else %>
+                        <span style="font-size: 12px;">&#9679;</span>
+                      <% end %>
+                    <% elsif loc_type == "special" %>
+                      <span style="font-size: 11px;">&#9733;</span>
+                    <% else %>
+                      <span style="font-size: 12px;">&#9675;</span>
+                    <% end %>
+                  </div>
+                  <div class="label"><%= loc_data["name"] %></div>
+                  <% if group %>
+                    <div class="nick"><%= group.nickname.to_s.truncate(10) %></div>
+                  <% end %>
+                </button>
+              <% end %>
+
+              <%# Gym milestone (per-segment, before the divider) %>
+              <% if segment["gym"] %>
+                <% gym = @gym_info[segment["gym"]] %>
+                <% if gym %>
+                  <% beaten = @gyms_defeated >= gym["number"] %>
+                  <div class="timeline-line <%= beaten ? 'done' : 'todo' %>"></div>
+                  <button type="button"
+                          class="node gym<%= beaten ? ' beaten' : '' %>"
+                          data-action="click->timeline#toggleGym"
+                          data-gym-number="<%= gym['number'] %>"
+                          title="<%= gym['name'] %> &mdash; <%= gym['leader'] %> (<%= gym['type'] %>)">
+                    <div class="glyph"><%= gym["number"] %></div>
+                    <div class="label"><%= gym["leader"].to_s.upcase %><br>Lv <%= gym["max_level"] %></div>
+                  </button>
+                <% end %>
+              <% end %>
+
+              <%# Segment divider (between segments — not after the last) %>
+              <% divider_label = segment_divider_label(@progression, @gym_info, seg_idx) %>
+              <% if divider_label %>
+                <div class="timeline-segment-divider" data-segment="<%= divider_label %>"></div>
+              <% end %>
             <% end %>
 
-            <%# Location Node %>
-            <button style="flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; min-width: 56px; background: none; border: none; font-family: 'Press Start 2P', monospace; position: relative;"
+            <%# Endpoint: Elite Four %>
+            <div class="timeline-line todo"></div>
+            <div class="node">
+              <div class="glyph" style="width: 56px; height: 56px; background: var(--d2); border-color: var(--d1); color: var(--white); font-family: 'Press Start 2P', monospace; font-size: 12px;">EF</div>
+              <div class="label">ELITE FOUR</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <%# ── Mobile: per-segment accordion ── %>
+      <div class="accordion-frame">
+        <% (@progression["segments"] || []).each_with_index do |segment, seg_idx| %>
+          <% prog = segment_progress(segment, @locations, @groups_by_location) %>
+          <% summary_marker = if prog[:total].zero?
+                                ""
+                              elsif prog[:caught] >= prog[:total]
+                                "&#10003;".html_safe
+                              elsif segment_open_by_default?(segment, next_uncaught_key)
+                                "NOW"
+                              else
+                                ""
+                              end %>
+          <% gym_for_label = @gym_info[segment["gym"]] %>
+          <% seg_label = if gym_for_label
+                          gym_for_label["location"].to_s.sub(/_city\z/, "").sub(/_town\z/, "").upcase
+                        elsif segment["gym"].nil?
+                          "VICTORY ROAD"
+                        else
+                          "SEG #{seg_idx + 1}"
+                        end %>
+          <details class="accordion-segment"<%= ' open'.html_safe if segment_open_by_default?(segment, next_uncaught_key) %>
+                   data-timeline-target="accordionSegment">
+            <summary>
+              SEG <%= seg_idx + 1 %> &middot; <%= seg_label %>
+              <span class="seg-progress"><%= prog[:caught] %>/<%= prog[:total] %> <%= summary_marker %></span>
+            </summary>
+            <div class="acc-rows">
+              <% (segment["locations"] || []).each do |loc_key| %>
+                <% loc_data = @locations[loc_key] %>
+                <% next unless loc_data %>
+                <% groups = @groups_by_location[loc_key] %>
+                <% status = location_status(groups) %>
+                <% group = primary_group(groups) %>
+                <% node_class = node_status_class(loc_data, status) %>
+                <% is_next = (loc_key == next_uncaught_key) %>
+                <button type="button"
+                        class="acc-row"
+                        data-action="click->timeline#selectLocation"
+                        data-timeline-target="locationNode"
+                        data-location-key="<%= loc_key %>"
+                        data-location-name="<%= loc_data['name'] %>"
+                        data-status="<%= status %>"
+                        data-groups="<%= groups_json_for(groups, current_user_id) %>">
+                  <div class="glyph <%= node_class %><%= is_next ? ' next' : '' %>">
+                    <% if status == "dead" %>
+                      &#9760;
+                    <% elsif status == "caught" %>
+                      &#9679;
+                    <% elsif loc_data["type"] == "special" %>
+                      &#9733;
+                    <% else %>
+                      &#9675;
+                    <% end %>
+                  </div>
+                  <div class="meta">
+                    <div class="loc"><%= loc_data["name"].to_s.upcase %></div>
+                    <% if group %>
+                      <div class="nick<%= group.dead? ? ' dead' : '' %>"><%= group.nickname %></div>
+                    <% elsif is_next %>
+                      <div class="nick" style="color: var(--amber);">&#x2193; NOW &middot; log first encounter</div>
+                    <% else %>
+                      <div class="nick">&mdash; uncaught &mdash;</div>
+                    <% end %>
+                  </div>
+                  <span class="chev">&#x203A;</span>
+                </button>
+              <% end %>
+            </div>
+          </details>
+        <% end %>
+      </div>
+
+      <%# ── Special encounters bar ── %>
+      <div class="special-bar">
+        <h3>SPECIAL ENCOUNTERS</h3>
+        <div class="special-grid">
+          <% %w[gift egg trade other].each do |key| %>
+            <% groups = @groups_by_location[key] %>
+            <% status = location_status(groups) %>
+            <% loc = @locations[key] %>
+            <% group = primary_group(groups) %>
+            <% display_name = loc&.dig("name") || key.titleize %>
+            <button type="button"
+                    class="special-cell"
                     data-action="click->timeline#selectLocation"
                     data-timeline-target="locationNode"
-                    data-location-key="<%= loc_key %>"
-                    data-location-name="<%= loc_data['name'] %>"
+                    data-location-key="<%= key %>"
+                    data-location-name="<%= display_name %>"
                     data-status="<%= status %>"
-                    data-groups="<%= groups_json_for(groups) %>">
-
-              <%# Node circle %>
-              <div class="timeline-node" style="<%= timeline_node_size(loc_type) == 'w-8 h-8' ? 'width: 32px; height: 32px;' : 'width: 28px; height: 28px;' %>
-                          border: var(--border-thin); display: flex; align-items: center; justify-content: center;
-                          <% if status == 'caught' %>
-                            background: var(--d2); border-color: var(--d1);
-                          <% elsif status == 'dead' %>
-                            background: #4a1c1c; border-color: #6b2c2c;
-                          <% else %>
-                            background: var(--l2); border-color: var(--d2); opacity: 0.6;
-                          <% end %>">
-                <% if status == 'dead' %>
-                  <span style="font-size: 10px;">&#9760;</span>
-                <% elsif status == 'caught' && group %>
-                  <% first_pokemon = group.soul_link_pokemon.first %>
-                  <% if first_pokemon %>
-                    <%= pokemon_sprite_tag(first_pokemon.species, size: 20) %>
-                  <% else %>
-                    <span style="color: var(--l2); font-size: 10px;">&#10003;</span>
-                  <% end %>
-                <% elsif loc_type == 'special' %>
-                  <span style="color: var(--d2); font-size: 10px;">&#9733;</span>
+                    data-groups="<%= groups_json_for(groups, current_user_id) %>">
+              <div class="head">
+                <span class="name"><%= key.upcase %></span>
+                <span class="glyph-mini">&#9733;</span>
+              </div>
+              <div class="body">
+                <% if group %>
+                  <%= group.dead? ? "\u{1F480} ".html_safe : "" %><%= group.nickname %>
+                <% else %>
+                  No catch yet
                 <% end %>
               </div>
-
-              <%# Location label %>
-              <span style="font-size: 9px; color: var(--d2); white-space: nowrap; max-width: 56px; overflow: hidden; text-overflow: ellipsis; text-align: center; line-height: 1.3;">
-                <%= loc_data['name'] %>
-              </span>
-
-              <%# Nickname label %>
-              <% if group %>
-                <span style="font-size: 9px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 56px;
-                             <%= status == 'dead' ? 'color: #e8a0a0;' : 'color: var(--d1);' %>">
-                  <%= group.nickname&.truncate(10) %>
-                </span>
-              <% else %>
-                <span style="font-size: 9px; color: transparent; line-height: 1.3;">&nbsp;</span>
-              <% end %>
             </button>
           <% end %>
-
-          <%# ── GYM MILESTONE ── %>
-          <% if segment['gym'] %>
-            <% gym = @gym_info[segment['gym']] %>
-            <% if gym %>
-              <% beaten = @gyms_defeated >= gym['number'] %>
-
-              <div style="width: 16px; height: 2px; flex-shrink: 0; margin-top: 16px;
-                          background: <%= beaten ? 'var(--d1)' : 'var(--l1)' %>;"></div>
-
-              <div style="flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 56px;">
-                <button style="width: 36px; height: 36px; border: var(--border-thin); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; cursor: pointer; font-family: 'Press Start 2P', monospace;
-                               <%= beaten ? 'background: var(--d1); color: var(--l2); border-color: var(--d1);' : 'background: var(--l2); color: var(--d2); border-color: var(--d2);' %>"
-                        data-action="click->timeline#toggleGym"
-                        data-gym-number="<%= gym['number'] %>"
-                        title="<%= gym['name'] %> — <%= gym['leader'] %> (<%= gym['type'] %>)">
-                  <%= gym['number'] %>
-                </button>
-                <span style="font-size: 9px; white-space: nowrap; line-height: 1.3;
-                             <%= beaten ? 'color: var(--d1);' : 'color: var(--d2);' %>">
-                  <%= gym['leader'] %>
-                </span>
-                <span style="font-size: 9px; color: var(--d2); white-space: nowrap; line-height: 1.3;">
-                  Lv. <%= gym['max_level'] %>
-                </span>
-              </div>
-
-              <div style="width: 16px; height: 2px; flex-shrink: 0; margin-top: 16px;
-                          background: <%= beaten ? 'var(--d1)' : 'var(--l1)' %>;"></div>
-            <% end %>
-          <% end %>
-        <% end %>
-
-        <%# ── ENDPOINT: Elite Four ── %>
-        <div style="width: 24px; height: 2px; flex-shrink: 0; margin-top: 16px; background: var(--l1);"></div>
-        <div style="flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 56px;">
-          <div style="width: 40px; height: 40px; border: var(--border-thin); border-color: var(--d1); background: var(--d2); display: flex; align-items: center; justify-content: center; font-size: 16px;">
-            &#128081;
-          </div>
-          <span style="font-size: 9px; color: var(--d1); white-space: nowrap; line-height: 1.3;">Elite Four</span>
-          <span style="font-size: 9px; color: transparent; line-height: 1.3;">&nbsp;</span>
         </div>
       </div>
     </div>
-  </div>
 
-  <%# ── SPECIAL ENCOUNTERS ── %>
-  <div style="margin-top: 16px;">
-    <div class="gb-section-header">SPECIAL ENCOUNTERS</div>
-    <div class="gb-grid-4">
-      <% %w[gift egg trade other].each do |key| %>
-        <% groups = @groups_by_location[key] %>
-        <% status = location_status(groups) %>
-        <% loc = @locations[key] %>
-        <button class="<%= status == 'dead' ? 'gb-status-dead' : '' %>"
-                style="border: var(--border-thin); padding: 8px; text-align: left; cursor: pointer; font-family: 'Press Start 2P', monospace;
-                       <%= if status == 'caught' then 'background: var(--d2); color: var(--l2);'
-                           elsif status == 'dead' then 'background: #4a1c1c; border-color: #6b2c2c;'
-                           else 'background: var(--l1);'
-                           end %>"
-                data-action="click->timeline#selectLocation"
-                data-timeline-target="locationNode"
-                data-location-key="<%= key %>"
-                data-location-name="<%= loc&.dig('name') || key.titleize %>"
-                data-status="<%= status %>"
-                data-groups="<%= groups_json_for(groups) %>">
-          <div style="font-size: 11px; <%= status == 'caught' ? 'color: var(--l2);' : status == 'dead' ? 'color: #e8a0a0;' : '' %>">
-            <%= loc&.dig('name') || key.titleize %>
-          </div>
-          <% if groups.present? %>
-            <% group = primary_group(groups) %>
-            <div style="font-size: 9px; margin-top: 4px; <%= status == 'dead' ? 'color: #e8a0a0;' : 'color: var(--l1);' %>">
-              <%= group.dead? ? "\u{1F480} " : '' %><%= group.nickname %>
-            </div>
-            <div style="display: flex; flex-wrap: wrap; gap: 2px; margin-top: 4px;">
-              <% group.soul_link_pokemon.each do |pokemon| %>
-                <%= pokemon_sprite_tag(pokemon.species, size: 16) %>
-              <% end %>
-            </div>
-          <% else %>
-            <div style="font-size: 9px; color: var(--d2); margin-top: 4px;">No catch yet</div>
-          <% end %>
-        </button>
-      <% end %>
-    </div>
-  </div>
+    <%# ── Right rail: sticky sheet ── %>
+    <aside class="sheet" data-timeline-target="sheet">
+      <div class="sheet-head">
+        <h3 data-timeline-target="sheetTitle">Select a route</h3>
+        <button type="button"
+                class="close"
+                aria-label="Close sheet"
+                data-action="click->timeline#closePanel">CLOSE &#10005;</button>
+      </div>
+      <div class="sheet-body" data-timeline-target="sheetBody">
 
-  <%# ── SLIDE-OUT PANEL ── %>
-  <div data-timeline-target="panel"
-       style="position: fixed; inset: 0 0 0 auto; z-index: 40; width: 100%; max-width: 380px;
-              transform: translateX(100%); transition: transform 0.3s ease-in-out;
-              background: var(--l1); border-left: var(--border); overflow-y: auto;">
-
-    <%# Panel header %>
-    <div style="position: sticky; top: 0; background: var(--d1); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; z-index: 10;">
-      <span style="font-size: 14px; color: var(--l2);" data-timeline-target="panelTitle"></span>
-      <button data-action="click->timeline#closePanel"
-              aria-label="Close panel"
-              style="font-size: 18px; color: var(--l1); background: none; border: none; cursor: pointer; font-family: 'Press Start 2P', monospace;">&times;</button>
-    </div>
-
-    <%# Panel body (populated by JS) %>
-    <div data-timeline-target="panelBody" style="padding: 12px 16px;"></div>
-
-    <%# Catch form — hidden in read-only (wiped) mode for consistency with the dashboard surfaces. %>
-    <% unless dashboard_read_only?(@run) %>
-    <div data-timeline-target="panelForm" class="hidden" style="padding: 12px 16px; border-top: var(--border-thin);">
-      <div style="font-size: 12px; margin-bottom: 8px;">NEW CATCH</div>
-      <form data-action="submit->timeline#submitCatch">
-        <input type="hidden" name="location" data-timeline-target="formLocationKey">
-
-        <div style="margin-bottom: 10px;">
-          <label class="gb-label">GROUP NICKNAME</label>
-          <input type="text" name="nickname" required autocomplete="off"
-                 data-timeline-target="nicknameInput"
-                 class="gb-input"
-                 placeholder="e.g. Chandler, RACHEL...">
+        <%# Empty / idle state — visible until a route is selected. %>
+        <div class="empty-state" data-timeline-target="emptyState">
+          Select a route to view or log catches.
         </div>
 
-        <% @players.each do |player| %>
-          <div style="margin-bottom: 10px; position: relative;" data-timeline-target="speciesSearchWrapper">
-            <label class="gb-label"><%= player['display_name'].upcase %>'S SPECIES</label>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span data-timeline-target="speciesPreview" style="width: 28px; height: 28px; flex-shrink: 0;"></span>
+        <%# Group list — populated by JS (`_renderSheetGroupList`). %>
+        <div class="hidden" data-timeline-target="groupList"></div>
+
+        <%# Catch form — hidden in read-only (wiped) mode. %>
+        <% unless dashboard_read_only?(@run) %>
+          <form class="hidden"
+                data-timeline-target="sheetForm"
+                data-action="submit->timeline#submitCatch">
+            <input type="hidden" name="location" data-timeline-target="formLocationKey">
+
+            <div class="form-row">
+              <label>GROUP NICKNAME</label>
               <input type="text"
-                     placeholder="Search species..."
+                     name="nickname"
+                     required
                      autocomplete="off"
-                     data-action="input->timeline#filterSpecies focus->timeline#filterSpecies"
-                     data-player-id="<%= player['discord_user_id'] %>"
-                     class="gb-input" style="flex: 1;">
+                     data-timeline-target="nicknameInput"
+                     placeholder="e.g. Chandler, RACHEL...">
             </div>
-            <input type="hidden"
-                   name="species[<%= player['discord_user_id'] %>]"
-                   data-timeline-target="speciesHidden">
-            <div class="hidden" data-timeline-target="speciesDropdown"
-                 style="position: absolute; z-index: 10; left: 34px; right: 0; margin-top: 2px; max-height: 180px; overflow-y: auto;
-                        background: var(--l2); border: var(--border-thin);"></div>
-          </div>
-        <% end %>
 
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px;">
-          <span data-timeline-target="formStatus" style="font-size: 10px; color: var(--d2);"></span>
-          <button type="submit" class="gb-btn-primary gb-btn-sm">ADD CATCH</button>
-        </div>
-      </form>
-    </div>
-    <% end %>
+            <% @players.each do |player| %>
+              <div class="form-row" data-timeline-target="speciesSearchWrapper">
+                <label><%= player["display_name"].upcase %>&apos;S SPECIES</label>
+                <div class="player-row">
+                  <span class="pname"><%= player["display_name"].upcase %></span>
+                  <div class="pinput">
+                    <span class="preview" data-timeline-target="speciesPreview">SPR</span>
+                    <input type="text"
+                           placeholder="Search species&hellip;"
+                           autocomplete="off"
+                           data-action="input->timeline#filterSpecies focus->timeline#filterSpecies"
+                           data-player-id="<%= player['discord_user_id'] %>">
+                    <input type="hidden"
+                           name="species[<%= player['discord_user_id'] %>]"
+                           data-timeline-target="speciesHidden">
+                    <div class="species-dropdown hidden" data-timeline-target="speciesDropdown"></div>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+
+            <button type="submit" class="submit-btn">+ LOG GROUP</button>
+            <span class="form-status" data-timeline-target="formStatus"></span>
+          </form>
+        <% end %>
+      </div>
+    </aside>
   </div>
 
-  <%# Backdrop overlay %>
-  <div data-timeline-target="backdrop"
-       data-action="click->timeline#closePanel"
-       class="hidden" style="position: fixed; inset: 0; z-index: 30; background: rgba(15, 56, 15, 0.5);"></div>
+  <%# Render the dashboard's pokemon + mark-dead modals — Step 23 R4
+      reuses these partials so the in-sheet EDIT and MARK DEAD actions
+      dispatch into the same Stimulus targets the dashboard uses.
+      Both partials are ARIA-wired (Step 20). %>
+  <%= render "dashboard/pokemon_modal" %>
+  <%= render "dashboard/mark_dead_modal" %>
 </div>

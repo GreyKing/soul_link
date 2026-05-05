@@ -99,6 +99,44 @@ class ResponsiveGridsTest < ActiveSupport::TestCase
     end
   end
 
+  # ── Step 23 R4 — namespace + responsive contract for /map redesign ───
+
+  test "Step 23 R4 declares the .map-r4 namespace at least once outside any media block" do
+    css_no_media = @css.gsub(/@media[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/m, "")
+    assert_match(/\.map-r4\s/, css_no_media,
+      "expected .map-r4 namespaced selectors declared outside any media block")
+  end
+
+  test "Step 23 R4 hides the timeline and shows the accordion inside the 720px breakpoint" do
+    block = @css[/@media\s*\(max-width:\s*720px\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/m]
+    refute_nil block, "expected an `@media (max-width: 720px)` block (Step 23)"
+
+    assert_match(/\.map-r4\s+\.timeline-frame\s*\{\s*display:\s*none/m, block)
+    assert_match(/\.map-r4\s+\.accordion-frame\s*\{\s*display:\s*block/m, block)
+    # Single-column layout when the timeline collapses.
+    assert_match(/\.map-r4\s+\.layout\s*\{\s*grid-template-columns:\s*1fr/m, block)
+  end
+
+  test "Step 23 R4 reflows the special-grid to 2 columns inside the 520px breakpoint" do
+    block = @css[/@media\s*\(max-width:\s*520px\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/m]
+    refute_nil block, "expected an `@media (max-width: 520px)` block"
+
+    assert_match(/\.map-r4\s+\.special-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*1fr\)/m, block)
+  end
+
+  test "Step 23 R4 styles do NOT collapse .map-r4 .node, .sheet, or .acc-row inside any breakpoint" do
+    %w[520px 720px 900px].each do |bp|
+      block = @css[/@media\s*\(max-width:\s*#{bp}\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/m]
+      next if block.nil? # 720 is required; 520/900 are too. Tests above will catch missing blocks.
+      assert_no_match(/\.map-r4\s+\.node\s*\{[^}]*display:\s*none/m, block,
+        "the #{bp} breakpoint must not hide .map-r4 .node")
+      assert_no_match(/\.map-r4\s+\.sheet\s*\{[^}]*display:\s*none/m, block,
+        "the #{bp} breakpoint must not hide .map-r4 .sheet")
+      assert_no_match(/\.map-r4\s+\.acc-row\s*\{[^}]*display:\s*none/m, block,
+        "the #{bp} breakpoint must not hide .map-r4 .acc-row")
+    end
+  end
+
   test "emulator-grid stays single-column outside any media block AND three-column at 900px" do
     # Single-column default (outside any @media). Strip every @media
     # block before searching so we only match the top-level rule.
