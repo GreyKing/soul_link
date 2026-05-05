@@ -65,6 +65,40 @@ class ResponsiveGridsTest < ActiveSupport::TestCase
     assert_no_match(/\.roster-card\s*\{[^}]*display:\s*none/m, block)
   end
 
+  # ── Step 22 R2 — namespace + responsive contract for PC BOX redesign ──
+
+  test "Step 22 R2 declares the .pc-box-r2 namespace at least once outside any media block" do
+    css_no_media = @css.gsub(/@media[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/m, "")
+    assert_match(/\.pc-box-r2\s/, css_no_media,
+      "expected .pc-box-r2 namespaced selectors declared outside any media block")
+  end
+
+  test "Step 22 R2 reflows the box grid to 3 columns inside the 520px breakpoint" do
+    block = @css[/@media\s*\(max-width:\s*520px\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/m]
+    refute_nil block, "expected an `@media (max-width: 520px)` block (Step 20)"
+
+    assert_match(/\.pc-box-r2\s+\.box-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*1fr\)/, block)
+  end
+
+  test "Step 22 R2 stacks the type-coverage rail under the grid inside the 900px breakpoint" do
+    block = @css[/@media\s*\(max-width:\s*900px\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/m]
+    refute_nil block, "expected an `@media (max-width: 900px)` block"
+
+    assert_match(/\.pc-box-r2\s+\.box-layout\s*\{\s*grid-template-columns:\s*1fr\s*[;}]/, block)
+  end
+
+  test "Step 22 R2 styles do NOT collapse .pc-box-r2 cells or rows inside either breakpoint" do
+    %w[520px 900px].each do |bp|
+      block = @css[/@media\s*\(max-width:\s*#{bp}\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/m]
+      refute_nil block, "expected an `@media (max-width: #{bp})` block"
+      # Same shape as the Step 21 contract for `.slot` / `.roster-card`.
+      assert_no_match(/\.pc-box-r2\s+\.box-cell\s*\{[^}]*display:\s*none/m, block,
+        "the #{bp} breakpoint must not hide .pc-box-r2 .box-cell")
+      assert_no_match(/\.pc-box-r2\s+\.review-row\s*\{[^}]*display:\s*none/m, block,
+        "the #{bp} breakpoint must not hide .pc-box-r2 .review-row")
+    end
+  end
+
   test "emulator-grid stays single-column outside any media block AND three-column at 900px" do
     # Single-column default (outside any @media). Strip every @media
     # block before searching so we only match the top-level rule.

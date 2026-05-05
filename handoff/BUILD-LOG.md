@@ -11,7 +11,39 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 21 — R3 Save Slots redesign (Phase 2 R3 of the 2026-05-04 audit). Locked mockup `handoff/2026-05-04-ui-audit-mockup-save-slots.html`, 5 screens. Five buckets per Bob's plan + Ava's approved answers:
+**Active step:** Step 22 — R2 PC Box redesign (Phase 2 R2 of the 2026-05-04 audit). Locked mockup `handoff/2026-05-04-ui-audit-mockup-pc-box.html`, 4 screens. Single bucket per Bob's plan + Ava's inline endorsement of the catch-modal-target wiring correction:
+- Wrapping div `.pc-box-r2` namespaces every new selector under `.pc-box-r2 …` so the legacy `.box-grid` / `.box-cell` rules used by `_pc_box_panel.html.erb` (sidebar) are untouched.
+- View `_pc_box_content.html.erb` full body rewrite: panel head + REVIEW PARSED CATCHES tray (badge legend + per-row LOG/EDIT/SKIP, recommended-action highlighted) + filter chip bar + free-text search + unified `[on_team, storage, fallen]` grid with corner glyphs + 280px type-coverage rail.
+- New section `/* ── R2 PC Box ── */` in `pixeldex.css` (~265 lines, mockup-verbatim with the `.pc-box-r2` prefix), plus 11 lines extending the existing `@media (max-width: 900px)` and `@media (max-width: 520px)` blocks. **Zero new design tokens.**
+- New `app/javascript/controllers/pc_box_filter_controller.js` (76 lines): chip filter + 150ms-debounced search + URL hash + rail-dim + count target + (Should Fix #1 inline) wrapper-level `.filter-active` toggle so non-active chips dim to opacity 0.55 when a non-ALL filter is active.
+- New `app/javascript/controllers/review_tray_controller.js` (38 lines): `prefillCatch` action looks up the catch-modal Stimulus targets (`[data-dashboard-target="catchSpecies|catchLocation"]`) and writes values; `dismiss` toggles `.dismissed` + decrements the count pill. Action chain on LOG/EDIT is `dashboard#openCatchModal` first (clears + focuses) then `review-tray#prefillCatch` (populates) — reverse order would have the prefill wiped.
+- New `recommended_review_action(p)` helper in `pixeldex_helper.rb`: pure-function `:log`/`:skip` decision (event_gift / trade_in → `:skip`; else `:log`).
+
+**Reviewed by Richard:** **0 Must Fix, 1 Should Fix (fixed inline), Step 22 clear.** Should Fix: mockup Screen 2's "non-active chips dim to opacity 0.55" behaviour wasn't implemented. Fixed inline at `pc_box_filter_controller.js:65` (`this.element.classList.toggle("filter-active", this.status !== "all")` after the chip loop) + `pixeldex.css:1191` (`.pc-box-r2.filter-active .filter-chip:not(.active) { opacity: 0.55; }` with a 2-line WHY comment). Two new KGs logged (KG-35 SKIP non-persistence is client-only; KG-36 mockup-locked filter scope = no route/player chips).
+
+**Test count:** 697 → **712** (+15). 0 failures, 0 errors.
+**Lint:** rubocop clean (199 files, 0 offenses; +2 files: new `pc_box_filter_controller.js` + `review_tray_controller.js`).
+**Brakeman:** Clean (no new warnings; same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess unchanged from Steps 18/19/20/21).
+**Migrations:** None. **Zero new gem deps. Zero new design tokens.**
+
+**Pre-existing context:** Step 22 is the second Phase 2 redesign per § 5 of `handoff/2026-05-04-ui-audit.md` (locked R3 → **R2** → R4 → R1 ship order). Step 21 (R3 Save Slots) shipped at `3c001ed` and FF-merged to main at `9cd2009`. R4 Map gets its own session next; R1 Dashboard last.
+
+**Step 22 highlights:**
+- **Mockup wins on every visual detail** (Step 21 precedent): the prompt's gist mentioned "route / status / player" filters but the mockup ships only status (team/storage/fallen) + free-text search. Locked to mockup; richer filters logged as KG-36.
+- **No backend changes** — none. No new column, no migration, no new endpoint, no model method. LOG/EDIT route into the existing `+ NEW CATCH` modal pre-filled (the audit's "small migration" hand-wave was explicitly out-of-scope per the prompt). SKIP is a client-side dismiss only (KG-35).
+- **CSS namespace under `.pc-box-r2`** is the lock that prevents collision with the sidebar partial's existing `.box-grid` / `.box-cell` rules. Architect-locked decision; Richard verified namespace integrity grep.
+- **Architect correction folded inline:** the brief assumed the catch modal used `name=` attributes; Bob's "Files to verify" pass discovered Stimulus targets, AND that `openCatchModal` blanks fields before opening. Action chain reversed (open first, prefill second) and `prefillCatch` re-keyed at `[data-dashboard-target="catch*"]` selectors. Brief Constraint #5 corrected inline by Ava.
+
+**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — KG-7 (real-save offset verification for `MAP_ID_OFFSET`) still open. KG-25 (real-SRAM smoke test for `BoxParser` + `PkmDecoder` field reads) still open. UI/UX audit `handoff/2026-05-04-ui-audit.md` Phase 1 shipped in Step 20; Phase 2 R3 shipped in Step 21; Phase 2 R2 shipped in Step 22. Remaining: R4 Map (Step 23), R1 Dashboard (Step 24).
+
+**Parked plan:** FactoryBot conversion fully shipped through Step 8.
+
+---
+
+## Step 21 — Status archive
+*Kept here for one-step lookback; will fold into archive at session end.*
+
+**Step 21:** R3 Save Slots redesign (Phase 2 R3 of the 2026-05-04 audit). Locked mockup `handoff/2026-05-04-ui-audit-mockup-save-slots.html`, 5 screens. Five buckets per Bob's plan + Ava's approved answers:
 - B-1 — three new tokens (`--d0`, `--green-glow`, `--crimson`) + `/* ── R3 Save Slots ── */` scoped CSS section in `pixeldex.css` (~245 lines added; mockup CSS verbatim except `.slot.overwriteTarget` → `.slot.overwrite-target` kebab-rename).
 - B-2 — `_save_slots_sidebar.html.erb` rewrite: state pills always render, empty-slot CTA copy, inline DELETE confirm, `.pending-banner` overwrite mode, `.footer-actions` CLEAR ALL with inline confirm. Two `confirm_modal(...)` calls dropped; HOF pill kept on slot card per Ava #4.
 - B-3 — `save_slots_controller.js` overhaul: new targets (`slotPill`/`actionRow`/`confirmRow`/`clearAllAction`/`clearAllConfirm`), new actions (`confirmDelete`/`cancelDelete`/`confirmClearAll`/`cancelClearAll`/`cancelOverwrite`), wrapper-level click target replaces overlay button, `window.confirm` removed from `overwriteSlot`, `_actionButtons()` selector retargeted at `confirmDelete` triggers.
@@ -57,6 +89,72 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 22 — R2 PC Box redesign (Phase 2 R2 of the 2026-05-04 audit) — 2026-05-04
+**Status:** Shipped. **No KGs close** (Phase 2 redesigns are surface-level UX work, not backlog items). Two new KGs logged (KG-35, KG-36).
+
+Second Phase 2 redesign per § 5 of `handoff/2026-05-04-ui-audit.md`. Four locked screens in `handoff/2026-05-04-ui-audit-mockup-pc-box.html`. Pure frontend ship — view + CSS + 2 new Stimulus controllers + 1 helper. Architect-locked decisions tracked under § Architecture Decisions.
+
+**Architecture decisions (durable — see § Architecture Decisions):**
+- **CSS namespace under `.pc-box-r2`.** Mockup uses `.box-grid` / `.box-cell` / `.sprite` selectors that already exist in pixeldex.css and are referenced from the sidebar partial. The new view wraps in `<div class="pc-box-r2">…</div>` and every new CSS rule is prefixed `.pc-box-r2 …`. Zero impact on legacy surfaces.
+- **No backend changes — none.** No new column, no migration, no new endpoint, no model method. The audit's "small migration" hand-wave for `acquired_via` round-trip was explicitly out-of-scope per the prompt. LOG/EDIT route into the existing `+ NEW CATCH` modal pre-filled; SKIP is client-side dismiss only.
+- **Action-chain order reversed for LOG/EDIT.** `data-action="click->dashboard#openCatchModal click->review-tray#prefillCatch"` — open first (clears + focuses) THEN prefill (populates). Reverse would have `openCatchModal`'s `this.catchSpeciesTarget.value = ""` wipe the prefill. Discovered during Bob's "Files to verify" pass; brief Constraint #5 corrected inline.
+- **Catch modal is keyed by Stimulus targets, not `name=` attributes.** `prefillCatch` looks up `document.querySelector('[data-dashboard-target="catchSpecies"]')` and `[data-dashboard-target="catchLocation"]`. The modal nickname stays empty (auto-catches don't have a user-chosen nickname yet) and the `level` field doesn't exist on the modal — `level` param dropped from prefillCatch.
+- **Filter chips are status-only + free-text search (mockup-locked).** Four chips: ALL / ON TEAM / STORAGE / FALLEN with `· N` counts. URL hash (`#team`, `#storage`, `#fallen`, no hash for ALL) preserves state across reloads + Turbo morph. Mockup wins over the prompt's gist that mentioned route/player filters; richer filters logged as KG-36.
+- **Recommended-action highlight is computed view-side from badges.** Helper `recommended_review_action(p)` returns `:log` or `:skip`: event_gift / trade_in → `:skip`; else `:log`. View applies `class="primary"` to the matching button. First-encounter visual highlight (`.review-row.first` 3px green-glow border) keys off `first_ids_by_location` independently — and only fires when ALSO recommended `:log` (so a first-encounter trade-in row doesn't get the green border, matching mockup row 2).
+- **Empty review tray uses Screen 3's dashed-border ✓ bar, not a hidden empty `<div>`.** Locked copy: `No new parsed catches to review. New saves will land here for confirmation.` Panel-head right side switches from `N TOTAL · K NEW PARSED` to `N TOTAL · ALL CAUGHT-UP`.
+- **Mobile breakpoint = 520px (Step 20 contract), not the mockup's 600px prose.** Phone shell at 360px is well below 520; reflow rules apply. Inside `@media (max-width: 520px)`: 3-col grid, stacked review-row actions, single-col badge legend.
+- **Type-coverage rail layout is one grid that reflows.** Outside any media block, `.pc-box-r2 .box-layout` is `grid-template-columns: minmax(0, 1fr) 280px;`. Inside `@media (max-width: 900px)`, drops to `1fr` so the rail stacks below.
+- **Read-only mode gates LOG/EDIT but keeps SKIP.** `dashboard_read_only?(@run)` hides `+ NEW CATCH` (existing) AND the per-row LOG/EDIT actions (new). SKIP stays — it's client-only with no backend impact.
+- **Click affordance on cells stays as today.** `data-action="click->pixeldex#selectPokemon"` opens the existing pokemon modal exactly as before. The new R2 styles add `cursor: pointer` + hover lift purely in CSS.
+- **Mockup Screen 2 dim-on-non-active (Should Fix from review).** Wrapper-level `.filter-active` class toggled by Stimulus when filter ≠ ALL; CSS rule `.pc-box-r2.filter-active .filter-chip:not(.active) { opacity: 0.55; }` matches mockup's `style="opacity: 0.55"` annotation.
+
+**Test count:** 697 → 712 (+15). 0 failures, 0 errors.
+
+**Files (new):** 4 —
+- `app/javascript/controllers/pc_box_filter_controller.js` (76 lines).
+- `app/javascript/controllers/review_tray_controller.js` (38 lines).
+- `test/integration/pc_box_redesign_test.rb` (167 lines, 7 tests).
+- `test/helpers/pixeldex_helper_test.rb` (29 lines, 4 tests).
+
+**Files (modified):** 5 —
+- `app/views/dashboard/_pc_box_content.html.erb` (full body rewrite, 283 lines).
+- `app/assets/stylesheets/pixeldex.css` (+265 lines new R2 section above the R3 marker; +12 lines extending the existing `@media (max-width: 900px)` and `@media (max-width: 520px)` blocks).
+- `app/helpers/pixeldex_helper.rb` (+11 lines: `recommended_review_action(p)` helper).
+- `test/integration/responsive_grids_test.rb` (+34 lines: 4 new Step 22 assertions).
+- `handoff/BUILD-LOG.md` + `handoff/SESSION-CHECKPOINT.md` + `handoff/ARCHITECT-BRIEF.md` + `handoff/REVIEW-REQUEST.md` + `handoff/REVIEW-FEEDBACK.md` updated.
+
+**Tests added (15 new):**
+1. Wrapper `.pc-box-r2` + dual `data-controller` (pc-box-filter + review-tray) attached.
+2. Review tray with `<h3>REVIEW PARSED CATCHES</h3>` + four-row badge legend + per-row LOG/EDIT/SKIP buttons.
+3. First-encounter row's LOG button has `class="primary"`; trade-in row's SKIP button has `class="primary"`; one SKIP button per review row.
+4. Four filter chips with correct `data-pc-box-filter-status-param` + counts; exactly one chip starts `.active`.
+5. Unified grid renders one cell per status (team / storage / fallen), each carrying `data-status`, all preserving `pixeldex#selectPokemon` click action.
+6. Type-coverage rail (`<aside class="type-coverage" data-pc-box-filter-target="rail">`) renders.
+7. Empty-tray bar + `ALL CAUGHT-UP` status when `@auto_detected_catches.empty?`.
+8. Read-only mode hides `+ NEW CATCH` + LOG/EDIT but keeps SKIP.
+9. `responsive_grids_test.rb`: `.pc-box-r2` declared outside any media block.
+10. 520px breakpoint reflows `.pc-box-r2 .box-grid` to `repeat(3, 1fr)`.
+11. 900px breakpoint collapses `.pc-box-r2 .box-layout` to `grid-template-columns: 1fr`.
+12. Neither breakpoint sets `display: none` on `.pc-box-r2 .box-cell` or `.pc-box-r2 .review-row`.
+13. `recommended_review_action`: event_gift → `:skip`.
+14. `recommended_review_action`: trade_in → `:skip`.
+15. `recommended_review_action`: ordinary catch → `:log`; event_gift takes precedence over trade_in.
+
+**Backward-compat invariants exercised:**
+- The sidebar partial `_pc_box_panel.html.erb` is unchanged — cross-cutting 6 sidebar/main consolidation is out-of-scope for this step (deferred IA decision).
+- All `data-group-*` attributes the existing pokemon modal needs are preserved on the new unified-grid cells (`data-group-id`, `data-group-nickname`, `data-group-species`, `data-group-location`, `data-group-status`, `data-group-types`, `data-group-pokemon`).
+- The `dashboard_controller.js#openCatchModal` action signature, `_catch_modal.html.erb` partial structure, `pixeldex_controller.js#selectPokemon` flow, and the `_pokemon_modal.html.erb` partial are all untouched.
+- Existing `format_move_name(id)` helper is reused for the new in-tray STATS one-liner; the legacy `<details>STATS</details>` block from Step 18 is replaced by the new `.review-row .meta .stats` row.
+- `SoulLinkPokemon#broadcasts_refreshes_to ->(p) { [p.soul_link_run, :dashboard] }` continues to drive Turbo morphs on auto-catch arrival; Stimulus controllers re-instantiate on morph and `connect()` re-applies hash-based filter state, so behaviour survives broadcast refreshes.
+
+**Diff scope:** 4 new + 5 modified files. Inside the brief's stated scope. Zero changes under `app/controllers/`, `app/models/`, `db/`, `app/services/`, `app/jobs/`, `config/`.
+
+**KG closures logged:** none.
+
+**New Known Gaps logged this step:** see § Known Gaps below — KG-35 (SKIP non-persistence — client-side dismiss only), KG-36 (filter chips are mockup-locked at status-only; richer filtering deferred).
+
+---
 
 ### Step 21 — R3 Save Slots redesign (Phase 2 R3 of the 2026-05-04 audit) — 2026-05-04
 **Status:** Built; awaiting Richard's review (`REVIEW-REQUEST.md` posted). **No KGs close** (Phase 2 redesigns are surface-level UX work, not backlog items). Two new KGs logged (KG-33, KG-34) per Ava's answer #3.
@@ -1161,6 +1259,10 @@ ALL FACTORY SMOKE CHECKS PASSED
 - **`window.alert()` for Tier-A error toasts** (Step 9). Smallest user-facing change that closed the silent-failure gap; a styled toast component (matching the `gb-flash gb-flash-alert` palette) would be cleaner. Track if alerts feel intrusive in real use.
 - **Bot-process broadcasts not yet supported.** The async cable adapter is in-process; Discord modal updates (which run in the bot process via `rake soul_link:bot`) don't propagate to web clients in real time. Switching to a redis cable adapter would unlock this.
 - **Pre-existing soft points from `handoff/PROJECT-REVIEW-2026-04-30.md`** — 20 items, ranked by ROI in that document. Top-priority structural cleanups: (1) `discord_bot.rb` god-object decomposition; (2) zero test coverage on services/channels; (3) `SoulLinkRun.current(guild_id)` lacks a hard "one active per guild" invariant; (4) `DashboardController#show` needs presenter extraction; (5) `SoulLinkEmulatorSession::GzipCoder` should move to a concern. None of these are urgent — Tier-1 refactor work, fresh-session candidate.
+
+### New — From Step 22 (2026-05-04)
+- **KG-35: SKIP in the PC BOX REVIEW PARSED CATCHES tray does not persist.** Step 22 R2's per-row SKIP button toggles a `.dismissed` class on the row (opacity 0.4 + count decrement), client-side only. Reload resurfaces the row. Mockup-driven: the mockup shows opacity-dim styling but no backend round-trip; the audit's "small migration" hand-wave for `acquired_via` / `caught_off_feed` round-trip was explicitly out-of-scope per the Step 22 brief (no schema / controller / endpoint changes). Future v2 if SKIP feedback proves persistent: add a `skipped_at:datetime` column on `soul_link_pokemon`, hide SKIPped rows from `@auto_detected_catches`, surface an "UNDO SKIP" affordance somewhere. Adjacent to KG-23.
+- **KG-36: PC BOX filter chips are status-only — no route, player, or species filters.** The Step 22 R2 mockup ships four chips (`ALL` / `ON TEAM` / `STORAGE` / `FALLEN`) plus a free-text search; the prompt's gist mentioned "route / status / player" filters but the locked mockup doesn't. Mockup wins (Step 21 precedent). If a future redesign needs richer filtering — e.g. "show me only fallen catches from Eterna Forest" — extend the chip strip. The new `pc_box_filter_controller.js` is structured to take additional chip targets without a rewrite (just add new `data-status="..."` cell tags + new chip with matching `data-pc-box-filter-status-param`).
 
 ### New — From Step 21 (2026-05-04)
 - **KG-33: Slot card no longer shows "saved Xm ago" or byte count.** Step 21 R3's mockup omits the `time_ago_in_words` "saved … ago" footer + the `number_to_human_size` byte count from the per-slot card. Mockup-driven decision (Ava answer #3), not a parser regression — `slot.updated_at` and `save_data.bytesize` are still queried by the controller and persisted; they're just not rendered on the slot column. If anyone misses the time-since-last-save signal, surface again in a follow-up. Adjacent to KG-34.

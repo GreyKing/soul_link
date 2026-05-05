@@ -1043,6 +1043,262 @@ body::after {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   ── R2 PC Box ──
+   Step 22 — dashboard PC BOX tab redesign per
+   handoff/2026-05-04-ui-audit-mockup-pc-box.html. All selectors are
+   namespaced under `.pc-box-r2` so the existing `.box-grid` / `.box-cell`
+   rules used by `_pc_box_panel.html.erb` (sidebar) and other surfaces are
+   not affected. Mockup CSS is transcribed verbatim except for the
+   namespace prefix and a few project conventions called out inline.
+   ═══════════════════════════════════════════════════════════ */
+
+.pc-box-r2 { display: block; }
+
+/* Review tray for auto-detected catches */
+.pc-box-r2 .review-tray {
+  background: var(--d0);
+  border: 2px solid var(--amber);
+  padding: 14px 16px;
+  margin-bottom: 22px;
+}
+.pc-box-r2 .review-tray-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+  flex-wrap: wrap; gap: 8px;
+}
+.pc-box-r2 .review-tray-head h3 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px; color: var(--amber);
+  margin: 0; letter-spacing: 1px;
+}
+.pc-box-r2 .review-tray-head .count {
+  background: var(--amber); color: var(--d0);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px; padding: 3px 6px; letter-spacing: 1px;
+}
+
+.pc-box-r2 .badge-legend {
+  background: var(--d1);
+  border: 1px dashed var(--d2);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: var(--l1);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 16px;
+}
+.pc-box-r2 .badge-legend .row { display: flex; align-items: center; gap: 8px; }
+.pc-box-r2 .badge-legend .badge {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  padding: 2px 5px;
+  letter-spacing: 1px;
+  border: 1px solid;
+  flex-shrink: 0;
+  min-width: 56px; text-align: center;
+}
+.pc-box-r2 .badge.first   { color: var(--green-glow); border-color: var(--green-glow); }
+.pc-box-r2 .badge.trade   { color: var(--amber); border-color: var(--amber); }
+.pc-box-r2 .badge.event   { color: var(--d2); border-color: var(--d2); background: var(--l1); }
+.pc-box-r2 .badge.offfeed { color: var(--l1); border-color: var(--l1); }
+
+/* A single review row */
+.pc-box-r2 .review-row {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 14px; align-items: center;
+  background: var(--d1);
+  border: var(--border-thin);
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+.pc-box-r2 .review-row.first { border-color: var(--green-glow); border-width: 3px; padding: 8px 12px; }
+.pc-box-r2 .review-row.dismissed { opacity: 0.4; }
+
+.pc-box-r2 .review-row .sprite {
+  width: 56px; height: 56px;
+  background: var(--d0);
+  border: 1px solid var(--d2);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--l2);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+}
+.pc-box-r2 .review-row .meta .name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  color: var(--white);
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+}
+.pc-box-r2 .review-row .meta .loc   { color: var(--l1); font-size: 14px; }
+.pc-box-r2 .review-row .meta .stats { color: var(--d2); font-size: 13px; margin-top: 2px; }
+.pc-box-r2 .review-row .meta .stats span { color: var(--l1); }
+
+.pc-box-r2 .review-row .actions {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.pc-box-r2 .review-row .actions button {
+  background: var(--d2); color: var(--l2);
+  border: 1px solid var(--d0);
+  padding: 6px 14px;
+  cursor: pointer;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px; letter-spacing: 1px;
+  min-width: 92px;
+}
+.pc-box-r2 .review-row .actions button.primary { background: var(--green-glow); color: var(--d0); }
+.pc-box-r2 .review-row .actions button:hover   { filter: brightness(1.15); }
+
+/* Empty review-tray bar (Screen 3) */
+.pc-box-r2 .empty-tray-bar {
+  background: var(--d0);
+  border: 1px dashed var(--d2);
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  color: var(--l1);
+  font-size: 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.pc-box-r2 .empty-tray-bar .check {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px; color: var(--green-glow); letter-spacing: 1px;
+}
+
+/* Filter chip bar */
+.pc-box-r2 .filter-bar {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.pc-box-r2 .filter-chip {
+  background: var(--d1); color: var(--l1);
+  border: 1px solid var(--d2);
+  padding: 6px 12px;
+  cursor: pointer;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px; letter-spacing: 1px;
+}
+.pc-box-r2 .filter-chip.active {
+  background: var(--amber); color: var(--d0);
+  border-color: var(--amber);
+}
+.pc-box-r2 .filter-chip:hover:not(.active) { color: var(--white); }
+/* Mockup Screen 2: dim inactive chips when a non-ALL filter is active.
+   `.filter-active` is toggled on the wrapper by pc_box_filter_controller. */
+.pc-box-r2.filter-active .filter-chip:not(.active) { opacity: 0.55; }
+.pc-box-r2 .filter-search {
+  margin-left: auto;
+  flex: 1; min-width: 200px;
+}
+.pc-box-r2 .filter-search input {
+  width: 100%;
+  background: var(--d0); color: var(--white);
+  border: 2px solid var(--d2);
+  padding: 6px 10px;
+  font-family: 'VT323', monospace;
+  font-size: 16px;
+}
+.pc-box-r2 .filter-search input::placeholder { color: var(--d2); }
+
+/* Pokemon grid layout (namespace shadows the legacy .box-grid / .box-cell
+   used by _pc_box_panel.html.erb — those rules are unchanged). */
+.pc-box-r2 .box-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 22px;
+  align-items: flex-start;
+}
+.pc-box-r2 .box-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.pc-box-r2 .box-cell {
+  background: var(--d2);
+  border: 2px solid var(--d0);
+  padding: 8px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.1s, transform 0.1s;
+}
+.pc-box-r2 .box-cell:hover { border-color: var(--amber); transform: translateY(-2px); }
+.pc-box-r2 .box-cell.team { background: var(--d1); border-color: var(--green-glow); }
+.pc-box-r2 .box-cell.dead { background: #2a1a1a; border-color: #4a1c1c; opacity: 0.7; }
+.pc-box-r2 .box-cell .nick {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  color: var(--white);
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  word-break: break-word;
+}
+.pc-box-r2 .box-cell .sprite {
+  width: 40px; height: 40px;
+  margin: 0 auto;
+  background: var(--d0);
+  border: 1px solid var(--d2);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--l2);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+}
+.pc-box-r2 .box-cell .loc {
+  color: var(--l1); font-size: 12px; margin-top: 6px;
+  word-break: break-word; line-height: 1.3;
+}
+.pc-box-r2 .box-cell .group-marker {
+  position: absolute; top: 4px; left: 4px;
+  font-size: 9px; color: var(--amber);
+  font-family: 'Press Start 2P', monospace;
+}
+.pc-box-r2 .box-cell.dead .group-marker { color: var(--crimson); }
+.pc-box-r2 .box-cell.team .group-marker { color: var(--green-glow); }
+
+.pc-box-r2 .box-cell.search-hidden,
+.pc-box-r2 .box-cell.filter-hidden { display: none; }
+
+/* Type-coverage rail */
+.pc-box-r2 .type-coverage {
+  background: var(--d2);
+  border: var(--border-thin);
+  padding: 14px;
+}
+.pc-box-r2 .type-coverage h3 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px; color: var(--white);
+  margin: 0 0 10px; letter-spacing: 1px;
+}
+.pc-box-r2 .type-coverage .sub {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px; color: var(--l1);
+  letter-spacing: 1px; margin: 10px 0 6px;
+}
+.pc-box-r2 .type-coverage.dimmed { opacity: 0.6; }
+.pc-box-r2 .type-coverage .dimmed-explainer {
+  display: none;
+  font-size: 11px; color: var(--d2); line-height: 1.4;
+  margin-bottom: 8px;
+}
+.pc-box-r2 .type-coverage.dimmed .dimmed-explainer { display: block; }
+
+.pc-box-r2 .type-pill {
+  display: inline-block;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  padding: 3px 6px;
+  margin: 2px;
+  letter-spacing: 1px;
+  border: 1px solid;
+}
+.pc-box-r2 .type-pill.covered { background: var(--green-glow); color: var(--d0); border-color: var(--green-glow); }
+.pc-box-r2 .type-pill.gap     { color: var(--crimson); border-color: var(--crimson); border-style: dashed; }
+.pc-box-r2 .type-pill.weak    { background: var(--crimson); color: var(--white); border-color: var(--crimson); }
+
+/* ═══════════════════════════════════════════════════════════
    ── R3 Save Slots ──
    Step 21 — emulator left sidebar redesign + roster-card restyle.
    Mockup: handoff/2026-05-04-ui-audit-mockup-save-slots.html.
@@ -1300,11 +1556,23 @@ body::after {
 
   .gb-grid-3 { grid-template-columns: repeat(2, 1fr); }
   .gb-grid-4 { grid-template-columns: repeat(2, 1fr); }
+
+  /* Step 22 R2 — type-coverage rail stacks below the grid on narrower viewports. */
+  .pc-box-r2 .box-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 520px) {
   .gb-grid-3 { grid-template-columns: 1fr; }
   .gb-grid-4 { grid-template-columns: 1fr; }
+
+  /* Step 22 R2 — phone reflow per mockup Screen 4. */
+  .pc-box-r2 .box-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .pc-box-r2 .box-cell { padding: 6px; }
+  .pc-box-r2 .review-row { grid-template-columns: 36px 1fr; padding: 8px 10px; }
+  .pc-box-r2 .review-row .sprite { width: 36px; height: 36px; }
+  .pc-box-r2 .review-row .actions { grid-column: 1 / -1; flex-direction: row; gap: 6px; margin-top: 6px; }
+  .pc-box-r2 .review-row .actions button { flex: 1; min-width: 0; }
+  .pc-box-r2 .badge-legend { grid-template-columns: 1fr; }
 }
 
 @media (min-width: 901px) and (max-width: 1200px) {

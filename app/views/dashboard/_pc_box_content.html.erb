@@ -1,198 +1,283 @@
-<%
-  total_count = @on_team_groups.size + @storage_groups.size + @fallen_groups.size
-%>
-<div class="panel-header">
-  <span>PC BOX - ALL POKEMON</span>
-  <span style="display: flex; align-items: center; gap: 8px;">
-    <span class="panel-header-sub"><%= total_count %> TOTAL</span>
-    <%# Step 19 — hide the catch modal trigger in read-only mode. %>
-    <% unless dashboard_read_only?(@run) %>
-      <button type="button"
-              data-action="click->dashboard#openCatchModal"
-              class="gb-btn-primary gb-btn-sm" style="font-size: 9px; padding: 3px 8px;">
-        + NEW CATCH
-      </button>
-    <% end %>
-  </span>
-</div>
-<div class="panel-body">
+<%#
+  Step 22 R2 — PC Box redesign per handoff/2026-05-04-ui-audit-mockup-pc-box.html.
 
-  <%# Step 17 — AUTO-DETECTED CATCHES (per-player) %>
-  <%
-    auto_catches = @auto_detected_catches || []
-    # First-encounter computation: per (location), pick the earliest by caught_at.
-    # Done here so the view stays a pure render — controller doesn't need to
-    # ship a precomputed set just for this badge.
-    first_ids_by_location = auto_catches
-      .group_by { |p| p.location.to_s }
-      .each_with_object({}) { |(loc, list), out| out[loc] = list.min_by { |p| p.caught_at || Time.at(0) }.id }
-  %>
-  <% if auto_catches.any? %>
-    <div class="box-section-label" title="Auto-detected from your save file (PartyParser)">
-      AUTO-DETECTED CATCHES (<%= auto_catches.size %>)
+  Surfaces:
+    1. REVIEW PARSED CATCHES tray (auto-detected catches with badge legend
+       + per-row LOG / EDIT / SKIP actions).
+    2. Filter chip bar (ALL · ON TEAM · STORAGE · FALLEN) + free-text search.
+    3. Unified box grid (merged on-team + storage + fallen with corner glyphs).
+    4. Type-coverage rail (right side; stacks below at <900px).
+
+  Implementation notes:
+    - Wrapping `.pc-box-r2` namespaces every new CSS rule so we don't
+      regress the sidebar (`_pc_box_panel.html.erb`) which still uses
+      `.box-grid` / `.box-cell` from the legacy rules.
+    - LOG/EDIT chain: `dashboard#openCatchModal` first (clears + focuses),
+      then `review-tray#prefillCatch` (populates targets). Reversing this
+      order would have the pre-fill wiped. The catch modal is keyed by
+      Stimulus targets (`data-dashboard-target=*`), not `name=`.
+    - SKIP is client-side only: toggles `.dismissed` + decrements the
+      tray count. Does not persist (KG-35).
+%>
+<%
+  total = @on_team_groups.size + @storage_groups.size + @fallen_groups.size
+  auto_catches = (@auto_detected_catches || []).reject { |p| p.id.nil? }
+  first_ids_by_location = auto_catches
+    .group_by { |p| p.location.to_s }
+    .each_with_object({}) { |(loc, list), out| out[loc] = list.min_by { |p| p.caught_at || Time.at(0) }.id }
+  read_only = dashboard_read_only?(@run)
+
+  status_groups = []
+  @on_team_groups.each  { |g| status_groups << [ g, "team" ] }
+  @storage_groups.each  { |g| status_groups << [ g, "storage" ] }
+  @fallen_groups.each   { |g| status_groups << [ g, "fallen" ] }
+%>
+
+<div class="pc-box-r2"
+     data-controller="pc-box-filter review-tray"
+     data-pc-box-filter-total-value="<%= total %>">
+
+  <div class="panel-header">
+    <span>PC BOX</span>
+    <span style="display: flex; align-items: center; gap: 8px;">
+      <span class="panel-header-sub" data-pc-box-filter-target="count">
+        <%= total %> TOTAL ·
+        <% if auto_catches.any? %>
+          <%= auto_catches.size %> NEW PARSED
+        <% else %>
+          ALL CAUGHT-UP
+        <% end %>
+      </span>
+      <% unless read_only %>
+        <button type="button"
+                data-action="click->dashboard#openCatchModal"
+                class="gb-btn-primary gb-btn-sm" style="font-size: 9px; padding: 3px 8px;">
+          + NEW CATCH
+        </button>
+      <% end %>
+    </span>
+  </div>
+
+  <div class="panel-body">
+
+    <% if auto_catches.any? %>
+      <div class="review-tray">
+        <div class="review-tray-head">
+          <h3>REVIEW PARSED CATCHES</h3>
+          <span class="count" data-review-tray-target="count"><%= auto_catches.size %> NEW</span>
+        </div>
+
+        <div class="badge-legend" aria-label="Badge legend">
+          <div class="row"><span class="badge first">1ST</span> first encounter on a route — log it</div>
+          <div class="row"><span class="badge trade">TRADE-IN</span> obtained via trade — usually skip</div>
+          <div class="row"><span class="badge event">EVENT</span> mystery gift / event — not a real encounter</div>
+          <div class="row"><span class="badge offfeed">OFF-FEED</span> from PC box, not active party</div>
+        </div>
+
+        <% auto_catches.each do |p| %>
+          <%
+            is_first = first_ids_by_location[p.location.to_s] == p.id
+            is_event = p.acquired_via == "event_gift"
+            recommended = recommended_review_action(p)
+            highlight = is_first && recommended == :log
+            log_label = is_event ? "LOG AGAIN" : "LOG CATCH"
+            stats_bits = []
+            stats_bits << p.nature.to_s.upcase if p.nature.present?
+            if p.ivs.is_a?(Hash)
+              ivs = [ p.ivs["hp"], p.ivs["atk"], p.ivs["def"], p.ivs["spe"], p.ivs["spa"], p.ivs["spd"] ].compact
+              stats_bits << "IVS #{ivs.join('/')}" if ivs.any?
+            end
+            if p.moves.is_a?(Array)
+              move_names = p.moves.first(4).filter_map { |m| format_move_name(m["id"]) if m.is_a?(Hash) && m["id"].to_i.positive? }
+              stats_bits << move_names.join(" · ") if move_names.any?
+            end
+          %>
+          <div class="review-row<%= ' first' if highlight %>"
+               data-review-tray-target="row"
+               data-pid="<%= p.pid %>">
+            <div class="sprite">
+              <% if p.species.present? %>
+                <%= pokemon_sprite_tag(p.species, size: 56) %>
+              <% else %>
+                SPR
+              <% end %>
+            </div>
+            <div class="meta">
+              <div class="name">
+                <%= p.species.to_s.upcase.presence || "???" %>
+                <% if is_first %>
+                  <span class="badge first">1ST</span>
+                <% end %>
+                <% if p.trade_in %>
+                  <span class="badge trade">TRADE-IN</span>
+                <% end %>
+                <% if is_event %>
+                  <span class="badge event">EVENT</span>
+                <% end %>
+                <% if p.caught_off_feed %>
+                  <span class="badge offfeed">OFF-FEED</span>
+                <% end %>
+              </div>
+              <div class="loc">
+                <%= p.location %><% if p.level %> · Lv <%= p.level %><% end %>
+              </div>
+              <% if stats_bits.any? %>
+                <div class="stats"><%= stats_bits.join(" · ") %></div>
+              <% end %>
+            </div>
+            <div class="actions">
+              <% unless read_only %>
+                <button type="button"
+                        class="<%= 'primary' if recommended == :log %>"
+                        data-action="click->dashboard#openCatchModal click->review-tray#prefillCatch"
+                        data-review-tray-prefill-species-param="<%= p.species %>"
+                        data-review-tray-prefill-location-param="<%= p.location %>">
+                  <%= log_label %>
+                </button>
+                <button type="button"
+                        data-action="click->dashboard#openCatchModal click->review-tray#prefillCatch"
+                        data-review-tray-prefill-species-param="<%= p.species %>"
+                        data-review-tray-prefill-location-param="<%= p.location %>">
+                  EDIT
+                </button>
+              <% end %>
+              <button type="button"
+                      class="<%= 'primary' if recommended == :skip %>"
+                      data-action="click->review-tray#dismiss">
+                SKIP
+              </button>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div class="empty-tray-bar" role="status">
+        <span class="check" aria-hidden="true">✓</span>
+        No new parsed catches to review. New saves will land here for confirmation.
+      </div>
+    <% end %>
+
+    <div class="filter-bar">
+      <button type="button"
+              class="filter-chip active"
+              data-action="click->pc-box-filter#applyFilter"
+              data-pc-box-filter-target="chip"
+              data-pc-box-filter-status-param="all"
+              data-status="all">
+        ALL · <%= total %>
+      </button>
+      <button type="button"
+              class="filter-chip"
+              data-action="click->pc-box-filter#applyFilter"
+              data-pc-box-filter-target="chip"
+              data-pc-box-filter-status-param="team"
+              data-status="team">
+        ON TEAM · <%= @on_team_groups.size %>
+      </button>
+      <button type="button"
+              class="filter-chip"
+              data-action="click->pc-box-filter#applyFilter"
+              data-pc-box-filter-target="chip"
+              data-pc-box-filter-status-param="storage"
+              data-status="storage">
+        STORAGE · <%= @storage_groups.size %>
+      </button>
+      <button type="button"
+              class="filter-chip"
+              data-action="click->pc-box-filter#applyFilter"
+              data-pc-box-filter-target="chip"
+              data-pc-box-filter-status-param="fallen"
+              data-status="fallen">
+        FALLEN · <%= @fallen_groups.size %>
+      </button>
+      <div class="filter-search">
+        <input type="search"
+               class="filter-search-input"
+               aria-label="Search nicknames or species"
+               placeholder="Search nickname or species…"
+               data-action="input->pc-box-filter#applySearch"
+               data-pc-box-filter-target="searchInput">
+      </div>
     </div>
-    <div class="box-grid box-grid-wide" data-pixeldex-target="autoCatchesGrid">
-      <% auto_catches.each do |p| %>
-        <% first = first_ids_by_location[p.location.to_s] == p.id %>
-        <div class="box-cell <%= 'on-team' if first %>"
-             data-group-pid="<%= p.pid %>"
-             data-group-species="<%= p.species %>"
-             data-group-location="<%= p.location %>"
-             data-group-status="auto">
-          <div class="box-cell-name" style="margin-bottom: 4px;">
-            <%= p.species.to_s.upcase %>
-            <% if first %>
-              <span class="type-text" style="margin-left:4px; border-color: var(--amber); color: var(--amber);" title="First encounter on this route">1ST</span>
+
+    <div class="box-layout">
+      <div class="box-grid">
+        <% status_groups.each do |group, status| %>
+          <%
+            my_pokemon = group.soul_link_pokemon.find { |g| g.discord_user_id == current_user_id }
+            cell_class = if status == "team" then "team"
+            elsif status == "fallen" then "dead"
+            end
+            marker = case status
+                     when "team"    then "★"
+                     when "storage" then "▣"
+                     when "fallen"  then "☠"
+            end
+            search_haystack = [ group.nickname, my_pokemon&.species ].compact.join(" ").downcase
+          %>
+          <div class="box-cell <%= cell_class %>"
+               data-pc-box-filter-target="cell"
+               data-status="<%= status %>"
+               data-search-haystack="<%= search_haystack %>"
+               data-action="click->pixeldex#selectPokemon"
+               data-group-id="<%= group.id %>"
+               data-group-nickname="<%= group.nickname %>"
+               data-group-species="<%= my_pokemon&.species || '' %>"
+               data-group-location="<%= group.location %>"
+               data-group-status="<%= group.dead? ? 'dead' : 'caught' %>"
+               data-group-types="<%= my_pokemon&.species.present? ? SoulLink::GameState.types_for(my_pokemon.species).join(',') : '' %>"
+               data-group-pokemon="<%= pixeldex_group_pokemon_json(group, current_user_id) %>"
+               aria-label="<%= group.nickname %>, <%= status %>, <%= group.location %>">
+            <span class="group-marker" aria-hidden="true"><%= marker %></span>
+            <div class="nick"><%= group.nickname.upcase %></div>
+            <div class="sprite">
+              <% if my_pokemon&.species.present? %>
+                <%= pokemon_sprite_tag(my_pokemon.species, size: 40) %>
+              <% end %>
+            </div>
+            <div class="loc"><%= group.location %></div>
+          </div>
+        <% end %>
+      </div>
+
+      <%
+        coverage = pixeldex_type_coverage(@type_analysis)
+        weaknesses = (@type_analysis[:shared_weaknesses] || []).first(3)
+      %>
+      <aside class="type-coverage" data-pc-box-filter-target="rail">
+        <h3>TYPE COVERAGE</h3>
+        <div class="dimmed-explainer">computed against your 6-slot team — switch to ON TEAM to focus</div>
+
+        <div class="sub">COVERED · <%= coverage[:covered].size %></div>
+        <div>
+          <% if coverage[:covered].any? %>
+            <% coverage[:covered].each do |abbr| %>
+              <span class="type-pill covered"><%= abbr %></span>
             <% end %>
-            <% if p.trade_in %>
-              <span class="type-text" style="margin-left:4px; border-color: var(--amber); color: var(--amber);" title="Acquired via trade">TRADE-IN</span>
-            <% end %>
-            <% if p.acquired_via == "event_gift" %>
-              <span class="type-text" style="margin-left:4px; border-color: var(--d2); color: var(--d2);" title="Event / mystery-gift Pokemon — not a Soul Link encounter">EVENT</span>
-            <% end %>
-            <% if p.caught_off_feed %>
-              <span class="type-text" style="margin-left:4px; border-color: var(--d2); color: var(--d2);" title="Detected from PC box rather than the active party">OFF-FEED</span>
+          <% else %>
+            <span style="color: var(--d2); font-size: 11px;">No coverage yet</span>
+          <% end %>
+        </div>
+
+        <% if coverage[:gaps].any? %>
+          <div class="sub">GAPS · <%= coverage[:gaps].size %></div>
+          <div>
+            <% coverage[:gaps].each do |abbr| %>
+              <span class="type-pill gap"><%= abbr %></span>
             <% end %>
           </div>
-          <div class="box-cell-loc"><%= p.location %><% if p.level %> &middot; Lv <%= p.level %><% end %></div>
-          <%# Step 18 — collapsible per-Pokémon stats. <details> keeps the
-              UX zero-Stimulus and read-only. Step-17 rows render unchanged
-              (every guard collapses to false → no <details> block). %>
-          <% if p.nature.present? || p.ivs.present? || p.evs.present? || p.moves.present? %>
-            <details class="box-cell-detail" style="margin-top: 4px; font-size: 9px; color: var(--d2);">
-              <summary style="cursor: pointer;">STATS</summary>
-              <% if p.nature.present? %><div>NATURE: <%= p.nature.to_s.upcase %></div><% end %>
-              <% if p.ivs.is_a?(Hash) %>
-                <div>IVS: <%= [ p.ivs["hp"], p.ivs["atk"], p.ivs["def"], p.ivs["spe"], p.ivs["spa"], p.ivs["spd"] ].compact.join("/") %></div>
-              <% end %>
-              <% if p.evs.is_a?(Hash) %>
-                <div>EVS: <%= [ p.evs["hp"], p.evs["atk"], p.evs["def"], p.evs["spe"], p.evs["spa"], p.evs["spd"] ].compact.join("/") %></div>
-              <% end %>
-              <% if p.moves.is_a?(Array) %>
-                <% p.moves.each_with_index do |m, i| %>
-                  <% next unless m.is_a?(Hash) && m["id"].to_i.positive? %>
-                  <div>MOVE <%= i + 1 %>: <%= format_move_name(m["id"]) %> &middot; PP <%= m["pp"] %> &middot; &uarr;<%= m["pp_up"] %></div>
-                <% end %>
-              <% end %>
-            </details>
-          <% end %>
-        </div>
-      <% end %>
-      <% ((3 - auto_catches.size % 3) % 3).times do %>
-        <div class="box-cell empty"></div>
-      <% end %>
+        <% end %>
+
+        <% if weaknesses.any? %>
+          <div class="sub">SHARED WEAKNESSES</div>
+          <div>
+            <% weaknesses.each do |w| %>
+              <span class="type-pill weak"><%= (PixeldexHelper::TYPE_ABBREVIATIONS[w[:type]] || w[:type].to_s[0..2].upcase) %> ×<%= w[:count] %></span>
+            <% end %>
+          </div>
+        <% end %>
+      </aside>
     </div>
-  <% end %>
 
-  <%# ON TEAM section %>
-  <div class="box-section-label">&#9733; ON TEAM (<%= @on_team_groups.size %>)</div>
-  <div class="box-grid box-grid-wide" data-pixeldex-target="onTeamGrid">
-    <% @on_team_groups.each do |group| %>
-      <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
-      <div class="box-cell on-team"
-           data-action="click->pixeldex#selectPokemon"
-           data-group-id="<%= group.id %>"
-           data-group-nickname="<%= group.nickname %>"
-           data-group-species="<%= my_pokemon&.species || '' %>"
-           data-group-location="<%= group.location %>"
-           data-group-status="caught"
-           data-group-types="<%= my_pokemon&.species.present? ? SoulLink::GameState.types_for(my_pokemon.species).join(',') : '' %>"
-           data-group-pokemon="<%= pixeldex_group_pokemon_json(group, current_user_id) %>">
-        <div class="box-cell-name" style="margin-bottom: 4px;"><%= group.nickname.upcase %></div>
-        <div class="box-cell-players">
-          <%= pixeldex_player_sprites(group, current_user_id) %>
-        </div>
-        <div class="box-cell-loc"><%= group.location %></div>
-      </div>
-    <% end %>
-    <% ((3 - @on_team_groups.size % 3) % 3).times do %>
-      <div class="box-cell empty"></div>
-    <% end %>
-  </div>
-
-  <%# IN STORAGE section %>
-  <div class="box-section-label" style="margin-top: 14px;">IN STORAGE (<%= @storage_groups.size %>)</div>
-  <div class="box-grid box-grid-wide" data-pixeldex-target="storageGrid">
-    <% @storage_groups.each do |group| %>
-      <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
-      <div class="box-cell"
-           data-action="click->pixeldex#selectPokemon"
-           data-group-id="<%= group.id %>"
-           data-group-nickname="<%= group.nickname %>"
-           data-group-species="<%= my_pokemon&.species || '' %>"
-           data-group-location="<%= group.location %>"
-           data-group-status="caught"
-           data-group-types="<%= my_pokemon&.species.present? ? SoulLink::GameState.types_for(my_pokemon.species).join(',') : '' %>"
-           data-group-pokemon="<%= pixeldex_group_pokemon_json(group, current_user_id) %>">
-        <div class="box-cell-name" style="margin-bottom: 4px;"><%= group.nickname.upcase %></div>
-        <div class="box-cell-players">
-          <%= pixeldex_player_sprites(group, current_user_id) %>
-        </div>
-        <div class="box-cell-loc"><%= group.location %></div>
-      </div>
-    <% end %>
-    <% if @storage_groups.empty? %>
-      <% 3.times do %><div class="box-cell empty"></div><% end %>
-    <% else %>
-      <% ((3 - @storage_groups.size % 3) % 3).times do %><div class="box-cell empty"></div><% end %>
-    <% end %>
-  </div>
-
-  <%# FALLEN section %>
-  <div class="box-section-label" style="margin-top: 14px;" title="Pokemon that died this run">FALLEN (<%= @fallen_groups.size %>)</div>
-  <div class="box-grid box-grid-wide" data-pixeldex-target="fallenGrid">
-    <% @fallen_groups.each do |group| %>
-      <% my_pokemon = group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id } %>
-      <div class="box-cell dead"
-           data-action="click->pixeldex#selectPokemon"
-           data-group-id="<%= group.id %>"
-           data-group-nickname="<%= group.nickname %>"
-           data-group-species="<%= my_pokemon&.species || '' %>"
-           data-group-location="<%= group.location %>"
-           data-group-status="dead"
-           data-group-types=""
-           data-group-pokemon="<%= pixeldex_group_pokemon_json(group, current_user_id) %>">
-        <div class="box-cell-name" style="margin-bottom: 4px;"><%= group.nickname.upcase %></div>
-        <div class="box-cell-players">
-          <%= pixeldex_player_sprites(group, current_user_id) %>
-        </div>
-        <div class="box-cell-loc"><%= group.location %></div>
-      </div>
-    <% end %>
-    <% if @fallen_groups.empty? %>
-      <% 3.times do %><div class="box-cell empty"></div><% end %>
-    <% else %>
-      <% ((3 - @fallen_groups.size % 3) % 3).times do %><div class="box-cell empty"></div><% end %>
-    <% end %>
-  </div>
-
-  <%# Type coverage %>
-  <div style="margin-top: 16px; padding-top: 10px; border-top: var(--border-thin);">
-    <div class="box-section-label" style="margin-bottom: 6px;">TYPE COVERAGE</div>
-    <% coverage = pixeldex_type_coverage(@type_analysis) %>
-    <div style="font-size: 10px; line-height: 2.2;">
-      <% coverage[:covered].each do |abbr| %>
-        <span class="type-text"><%= abbr %></span>
-      <% end %>
-      <% if coverage[:covered].empty? %>
-        <span style="color: var(--d2); font-size: 10px;">No coverage yet</span>
-      <% end %>
-    </div>
-    <% if coverage[:gaps].any? %>
-      <div style="margin-top: 6px; font-size: 10px;">
-        <span class="type-coverage-gap">
-          NO COVERAGE:
-          <% coverage[:gaps].each do |abbr| %>
-            <span class="type-text" style="border-color: var(--l1);"><%= abbr %></span>
-          <% end %>
-        </span>
-      </div>
-    <% end %>
-    <% worst = (@type_analysis[:shared_weaknesses] || []).first %>
-    <% if worst %>
-      <div style="margin-top: 6px; font-size: 10px; color: var(--d2);">
-        WEAKNESS: <%= worst[:type].upcase %> x<%= worst[:count] %>
-      </div>
-    <% end %>
   </div>
 </div>

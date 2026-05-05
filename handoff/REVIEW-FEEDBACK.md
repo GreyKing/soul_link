@@ -1,128 +1,82 @@
-# Review Feedback — Step 21
-Date: 2026-05-04
-Ready for Builder: YES
+# Review Feedback — Step 22
+**Reviewer:** Richard
+**Date:** 2026-05-04
+**Ready for Builder:** YES — Step 22 is clear.
+
+**Resolution:** Should Fix #1 landed inline (`pixeldex.css:1191` + `pc_box_filter_controller.js:65`). Tests still 712/712 / 0 failures, Rubocop still clean (199 files). Mockup-fidelity gap closed.
+
+---
 
 ## Must Fix
 
-None.
+*None.*
+
+---
 
 ## Should Fix
 
-- **`app/javascript/controllers/save_slots_controller.js:166-189` and `:191-209`** —
-  `_enterOverwriteMode` and `_exitOverwriteMode` don't reconcile a slot whose
-  inline DELETE confirm is already open. Sequence: user clicks DELETE on slot 3
-  (action row hidden, `.confirm-inline` revealed, pill flipped to red CONFIRM);
-  then triggers Save File in the emulator while five slots are full → 409 fires
-  `_enterOverwriteMode`. Slot 3's `confirmRow` stays visible and its pill is
-  overwritten to amber TARGET, so the slot reads as both "confirm delete?" AND
-  "click to overwrite" simultaneously. On exit, the pill restores from the
-  cached dataset (which captured the original SAVED text, not the in-flight
-  CONFIRM text) and the confirm row is still visible. Recommendation: in
-  `_enterOverwriteMode`'s `slotTargets.forEach`, also hide each slot's
-  `confirmRow` (`slot.querySelector("[data-save-slots-target='confirmRow']")`)
-  before swapping the pill. Symmetric reconciliation on `_exitOverwriteMode` is
-  already covered by the dataset-cached pill class restoring to the rendered
-  original. Edge case, not a daily flow — fix inline if quick, otherwise log to
-  BUILD-LOG.
-  Fixed inline at <commit-pending>.
+**1. Mockup Screen 2 contract — non-active chips must dim when a non-ALL filter is active.** `handoff/2026-05-04-ui-audit-mockup-pc-box.html` lines 631-633 show:
+```html
+<span class="filter-chip" style="opacity: 0.55;">ALL · 19</span>
+<span class="filter-chip" style="opacity: 0.55;">ON TEAM · 4</span>
+<span class="filter-chip" style="opacity: 0.55;">STORAGE · 12</span>
+<span class="filter-chip active">FALLEN · 3</span>
+```
+The mockup's annotation A under Screen 2 calls this out: *"Other chips dim slightly to suggest 'you can switch back.'"* On default (Screen 1) all chips are full opacity; on a non-ALL filter (Screen 2) the inactive chips drop to opacity 0.55. The annotation is part of the locked design.
+
+The current build doesn't implement this. `pixeldex.css:1184` has only `.filter-chip.active { ... }` (full opacity); `.filter-chip:hover:not(.active)` only changes color on hover. `pc_box_filter_controller.js:_render` toggles `.active` on the right chip but does nothing to dim the others.
+
+**Fix** (5-line change, two files):
+
+`app/javascript/controllers/pc_box_filter_controller.js` — inside `_render()` after the chip loop:
+```js
+this.element.classList.toggle("filter-active", this.status !== "all")
+```
+
+`app/assets/stylesheets/pixeldex.css` — add inside the `/* ── R2 PC Box ── */` section (right after the existing `.filter-chip:hover:not(.active)` rule at line 1188):
+```css
+.pc-box-r2.filter-active .filter-chip:not(.active) { opacity: 0.55; }
+```
+
+This matches the mockup verbatim — opacity 0.55 on inactive chips iff a non-ALL filter is active. ALL-active-or-empty leaves all chips full opacity.
+
+Optional: extend `responsive_grids_test.rb`'s Step 22 block to assert the new selector exists. Not required — same shape as the existing test where Stimulus state mutations aren't covered by markup assertions.
+
+---
 
 ## Escalate to Architect
 
-None.
+*None.*
 
-## Cleared
+---
 
-Reviewed Step 21 R3 save-slot redesign across the 7 modified files + 1 new file
-(`app/javascript/controllers/roster_seed_controller.js`) at the line ranges
-called out in REVIEW-REQUEST.md, plus the four extended test files and the
-relevant cited sections of the architect brief and the locked mockup.
+## Cleared (passed audit)
 
-What passed:
+I read the files Bob listed in REVIEW-REQUEST.md and tested against the brief's 11-item acceptance checklist:
 
-- **Mockup parity.** All 5 state pills (EMPTY / SAVED / ACTIVE / TARGET /
-  CONFIRM) render with the locked colour mapping. Banner replaces the old
-  `gb-card` overwrite-pending banner. Per-slot `.confirm-inline` blocks render
-  hidden server-side and reveal inline (NOT a modal) — confirmed via the
-  inline-DELETE markup test at `test/controllers/emulator_controller_test.rb:193-208`
-  and the `assert_no_match(/id="delete-slot-#{n}-confirm"/)` test at lines
-  223-238. CLEAR ALL SLOTS uses the same inline pattern. Roster card has the
-  3-tile stat strip + `<details>STATS</details>` + TID conflict warning band as
-  a high-contrast amber-on-dark band (not a pill) + click-to-copy seed + no peso
-  glyph (locked at `:240-257`). HOF pill kept on slot card per Ava answer #4.
+1. **Visual fidelity** — Each of the 4 mockup screens has a 1:1 surface in the new view. Spacing / typography / colors transcribed faithfully, except the chip-dim issue (Should Fix #1 above).
+2. **Filter chip wiring** — All four chips carry correct `data-pc-box-filter-status-param` + `data-status` attributes. Cells carry matching `data-status`. URL hash logic in `pc_box_filter_controller.js:24-33` reads + writes correctly.
+3. **Badge legend** — All four rows (`1ST` / `TRADE-IN` / `EVENT` / `OFF-FEED`) present in `_pc_box_content.html.erb:71-74`, copy verbatim from the mockup.
+4. **Empty-state** — `_pc_box_content.html.erb:154-157` renders the dashed-border bar with the locked copy when `auto_catches.empty?`. Panel-head reads `ALL CAUGHT-UP` per the mockup.
+5. **Mobile breakpoint** — `responsive_grids_test.rb` extended with 4 new Step 22 assertions covering the namespace declaration, the 520px reflow to `repeat(3, 1fr)`, the 900px collapse to `1fr`, and the no-`display: none` contract on cells/rows. Pattern matches Step 21.
+6. **Read-only mode gating** — `+ NEW CATCH` (line 51-57), LOG (line 129-136), EDIT (line 137-142) all inside `<% unless read_only %>`. SKIP (line 144-148) outside the gate. Test `test "read-only mode hides..."` exercises the contract.
+7. **Accessibility** — Filter chips are real `<button type="button">`. Search input has `aria-label="Search nicknames or species"`. Group-marker glyphs are `aria-hidden="true"`. Cells have descriptive `aria-label`. Per-row LOG/EDIT/SKIP are real `<button>` elements with text content.
+8. **No backend drift** — `git diff --stat HEAD` shows zero changes under `app/controllers/`, `app/models/`, `db/`, `app/services/`, `app/jobs/`, `config/`. Helper change is non-mutating (pure function). Confirmed.
+9. **CSS namespace integrity** — Every new selector in pixeldex.css lines 1045-1296 is prefixed with `.pc-box-r2`. The legacy `.box-grid`, `.box-cell`, etc. rules (used by `_pc_box_panel.html.erb`) are untouched. Grep-confirmed.
+10. **Test suite** — 712 runs / 0 failures, Rubocop clean (199 files), Brakeman 0 errors with the same 2 pre-existing weak warnings. Verified.
+11. **Scope discipline** — KG-35 (SKIP non-persistence) and KG-36 (mockup-locked filter scope) logged in BUILD-LOG.md. No out-of-scope additions; no mark-dead button; no schema changes.
 
-- **Inline-confirm flow correctness.** `confirmDelete` reveals confirmRow,
-  hides actionRow, swaps the pill class/text, and focuses the cancel button
-  (annotation D, Screen 3 — `save_slots_controller.js:122-123`). `cancelDelete`
-  reverses cleanly using the dataset-cached original pill class/text.
-  `confirmClearAll`/`cancelClearAll` toggle the footer rows symmetrically and
-  also focus the cancel button (`:153-154`). Overwrite-pending mode walks every
-  filled slot via `slotTargets`, sets `.overwrite-target`, swaps the pill to
-  TARGET, hides the per-slot action row, and wires `data-action` on the slot
-  wrapper. `_actionButtons()` selector correctly retargets
-  `[data-action*='save-slots#confirmDelete']` so Tab focus during overwrite
-  mode still skips the (now hidden) DELETE triggers.
+**Logic correctness spot-checks:**
+- `is_first` derivation (line 79): `first_ids_by_location[p.location.to_s] == p.id`. With `auto_catches.reject { |p| p.id.nil? }` at line 24, no nil-id rows survive into the calc. Safe.
+- `highlight = is_first && recommended == :log` (line 82): a first-encounter trade-in row does NOT get the green-glow border because the recommendation flips to `:skip`. Matches mockup row 2 (Machop TRADE-IN at Eterna — has the trade badge but no first-row border).
+- `log_label = is_event ? "LOG AGAIN" : "LOG CATCH"` (line 83) — matches mockup row 3 (Piplup EVENT renders LOG AGAIN).
+- `recommended_review_action` precedence (helper test): event_gift wins over trade_in. ✓
+- `prefillCatch` action chain order (`dashboard#openCatchModal` first, then `review-tray#prefillCatch`): correct per the discovered Stimulus-target contract. ✓
 
-- **`window.confirm` removal.** Confirmed both the per-slot DELETE and the
-  overwrite path no longer call `window.confirm`. The banner-as-announcement +
-  click-as-consent contract holds.
+**Security spot-checks:**
+- All user-supplied strings (`nickname`, `location`, `species`) flow through `<%= %>` ERB auto-escape. ✓
+- `data-group-pokemon` uses `pixeldex_group_pokemon_json(...)` which calls `.to_json`; ERB auto-escapes the string into the attribute, browser parses it back. Matches existing pixeldex flow. ✓
+- No `raw`, no `html_safe`, no string interpolation into attribute names. ✓
+- The `data-search-haystack` is computed server-side from already-trusted `group.nickname` and `my_pokemon.species`; client-side `.toLowerCase().includes()` matching is innocuous. ✓
 
-- **Architectural locks honoured.** Inline confirm is genuinely inline (not
-  the Step 20 modal). The Step 20 `confirm_modal(...)` calls were removed only
-  from `_save_slots_sidebar.html.erb`; greppable consumers in
-  `app/views/runs/index.html.erb`, `app/views/dashboard/_runs_content.html.erb`,
-  `app/views/gym_schedules/show.html.erb`, and
-  `app/views/species_assignments/_group_card.html.erb` remain wired correctly.
-  `app/views/shared/_confirm_modal.html.erb`,
-  `app/javascript/controllers/confirm_modal_controller.js`, and
-  `ConfirmModalHelper` are untouched. Three new tokens (`--d0`, `--green-glow`,
-  `--crimson`) declared exactly once each in `:root` (`pixeldex.css:13-17`),
-  pinned by the responsive_grids_test at lines 44-48. No other tokens added.
-  `_run_sidebar_card.html.erb` keeps the `s`-only locals contract — no
-  `current_user_id` / `@run_sessions` references. YOU markers re-applied via
-  `roster_you_marker_controller.js#apply()` after each
-  `turbo:before-stream-render`. OFF-FEED stays out of scope (lives on PC BOX
-  tab). Roster cards show trainer stats per the mockup, not party Pokémon.
-
-- **Out-of-scope surfaces clean.** `git diff --stat HEAD` confirms only the 7
-  listed files + 1 new file plus the three handoff docs. Parser pipeline,
-  Discord notifier, R2/R4/R1 surfaces, the 6 "not ready" panels in
-  `emulator/show.html.erb:15-58`, `_pc_box_content.html.erb`, and the entire
-  Step 20 modal infrastructure are untouched.
-
-- **KG-33 + KG-34 in BUILD-LOG.md** at lines 1166-1167. Both accurately scoped
-  as mockup-driven UI omissions, not parser regressions; `slot.updated_at` and
-  `save_data.bytesize` still persist server-side.
-
-- **Tests.** 21 new test runs as claimed: 8 in
-  `test/helpers/emulator_helper_test.rb` pin every `format_progress_phrase`
-  boundary including singular/plural and integer truncation; 4 in
-  `test/integration/responsive_grids_test.rb` lock the token declarations and
-  the no-collapse contract; 5 in `test/controllers/emulator_controller_test.rb`
-  cover EMPTY/SAVED state pills, empty-slot CTA, inline DELETE markup, inline
-  CLEAR ALL markup, no Step 20 modal ids, and no peso glyph; 4 in
-  `test/models/soul_link_emulator_save_slot_test.rb` lock the roster-card
-  class, 3-tile strip, HOF inline regex, and the conflict-warning band on/off
-  paths. I could not run the suite locally (mise still resolves a stale Ruby
-  3.0.6 in this worktree shell for `bin/rails`), but the assertion shapes are
-  correct and Bob reports 0 failures / 0 errors. Trusting the claim.
-
-Bob's open questions, resolved:
-
-1. **TID conflict partner-name ordering** — current id-order rendering is fine
-   for v1. Mockup doesn't pin it and the only multi-partner case (3-player
-   conflict) is rare. Accept as is. If alphabetical reads better in real use,
-   future-step polish.
-2. **`Seed: ` prefix retained in element textContent** — locked. Mockup line
-   674 renders `<div class="seed">Seed: 0xAB12CD34EF567890</div>` verbatim;
-   `roster_seed_controller.js#copy` strips the prefix before the clipboard
-   write so users get just the hex. Implementation matches the mockup.
-3. **`format_progress_phrase` for negative seconds** — only caller is the
-   inline DELETE confirm body, fed by `parsed_play_seconds` from a real save
-   where negative values are not reachable. Cosmetic divergence from
-   `format_play_time`'s clamp-to-zero behaviour; locked test bench doesn't pin
-   it. Accept as is.
-4. **`.slot.empty .slot-meta` dimmed to `--d2`** — mockup-locked
-   (`pixeldex.css:1084` matches mockup line 130). Visual judgment call; if real
-   renders read too dim, future-step adjustment.
-
-`Step 21 is clear.`
+Once Bob lands the Should Fix, Step 22 is clear.

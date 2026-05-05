@@ -110,6 +110,17 @@ module PixeldexHelper
     end
   end
 
+  # Step 22 R2 — recommends the default action for an auto-detected catch
+  # in the PC BOX REVIEW PARSED CATCHES tray. Event-gift and trade-in rows
+  # default to SKIP (they aren't real Soul Link encounters); everything
+  # else defaults to LOG. The view applies `class="primary"` to the matching
+  # button. Pure function over the row's badges — no DB calls.
+  def recommended_review_action(pokemon)
+    return :skip if pokemon.acquired_via == "event_gift"
+    return :skip if pokemon.trade_in
+    :log
+  end
+
   # Type coverage display data: { covered: ["FIR", ...], gaps: ["ICE", ...] }
   def pixeldex_type_coverage(type_analysis)
     covered = (type_analysis[:offensive_coverage] || []).filter_map { |t| TYPE_ABBREVIATIONS[t] }

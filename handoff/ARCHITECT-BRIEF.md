@@ -1,303 +1,325 @@
 # Architect Brief
+*Written by Architect. Read by Builder and Reviewer.*
+*Overwrite this file each step — it is not a log, it is the current active brief.*
 
 > Locked instructions for the current step. Bob, this is your only source of truth.
 > If anything below contradicts the mockup HTML, **the mockup wins**. Tell Arch.
 
 ---
 
-## Step 21 — R3 Save Slots redesign (Phase 2 R3 of the 2026-05-04 audit)
+## Step 22 — R2 PC Box redesign (Phase 2 R2 of the 2026-05-04 UI/UX audit)
 
 ### Reference files (read in this order, then stop)
 
-1. `handoff/2026-05-04-ui-audit-mockup-save-slots.html` — **locked design**, 5 screens. Read end-to-end before touching code.
-2. `handoff/2026-05-04-ui-audit.md` § 4 R3 (lines 229–235) and § 2 Workflow 4 (lines 64–76) — rationale for what the redesign is fixing.
-3. Current implementation, before you change anything:
-   - `app/views/emulator/_save_slots_sidebar.html.erb` — server-rendered, 193 lines, this is the main file you're rewriting.
-   - `app/views/emulator/_run_sidebar.html.erb` + `_run_sidebar_card.html.erb` — broadcast-rendered roster card; Screen 4 of the mockup.
-   - `app/javascript/controllers/save_slots_controller.js` — overwrite-pending mode + per-slot actions.
-   - `app/javascript/controllers/roster_you_marker_controller.js` — already injects the YOU badge into the roster card after broadcast replacement; the mockup's `.you-badge` lives here.
-4. Step 20 surfaces you'll touch / coexist with:
-   - `app/views/shared/_confirm_modal.html.erb` + `app/javascript/controllers/confirm_modal_controller.js` — **stays as-is**. You will _stop using it_ for the per-slot DELETE and CLEAR ALL SLOTS (replaced by inline confirm per mockup), but other consumers (END RUN, group DEL, schedule cancel) keep using it untouched.
-   - `app/assets/stylesheets/pixeldex.css` lines 1043–1064 — Step 20 added `@media (max-width: 900px)` and `@media (max-width: 520px)` blocks for `gb-grid-N`. Layout regression test pattern lives in `test/integration/responsive_grids_test.rb`.
+1. `handoff/2026-05-04-ui-audit-mockup-pc-box.html` — **the locked design.** 4 screens (default / filter applied / empty tray / mobile). Mockup wins on every visual + interaction detail.
+2. `handoff/2026-05-04-ui-audit.md` § 4 R2 — narrative rationale (one paragraph, ~6 lines).
+3. `app/views/dashboard/_pc_box_content.html.erb` — the file you are rewriting. Read end-to-end before touching.
+4. `app/views/dashboard/_catch_modal.html.erb` — read-only. Confirm the input `name=` attributes for species/location/level (your `prefillCatch` Stimulus action depends on them).
+5. `app/javascript/controllers/dashboard_controller.js` — read-only. Confirm `openCatchModal` action exists and is dispatchable via `data-action="click->dashboard#openCatchModal"`.
+6. `app/javascript/controllers/pixeldex_controller.js` — read-only. Confirm `selectPokemon` action signature and which `data-group-*` attributes the cells supply today (so the new merged grid carries them through unchanged).
+7. `app/assets/stylesheets/pixeldex.css` — locate the existing `@media (max-width: 520px)` and `@media (max-width: 900px)` blocks. You'll **extend** these, not replace.
+8. `app/controllers/dashboard_controller.rb:54-72` — confirm the `@on_team_groups / @storage_groups / @fallen_groups / @auto_detected_catches` shape. **No change to this controller.**
+
+Do NOT load: domain-models docs, the bot, the auth concern, any service file beyond what's grep-required. The brief has the data shapes and column names you need.
+
+### Context
+
+Phase 2 R3 (Save Slots) shipped at `3c001ed` / merged to main at `9cd2009`. R2 is next in the audit's locked ship order: R3 → **R2** → R4 → R1. After R2 ships, the session ends — R4 gets its own session.
+
+**Surface in scope:** the dashboard PC BOX **tab** (`_pc_box_content.html.erb`). The sidebar partial (`_pc_box_panel.html.erb`, 5-col compact) is **out of scope** — that's the cross-cutting-6 sidebar/main duplication, deferred to a separate IA decision.
+
+**Data model is unchanged.** All needed columns already exist on `soul_link_pokemon`: `pid`, `acquired_via`, `caught_off_feed`, `trade_in`, `nature`, `ivs`, `evs`, `moves`. Controller already exposes `@on_team_groups / @storage_groups / @fallen_groups / @auto_detected_catches / @type_analysis`. **No migration. No controller change. No new endpoint.**
+
+### Architect decisions (locked — do not re-litigate)
+
+1. **LOG CATCH / EDIT route into the existing `+ NEW CATCH` modal pre-filled. SKIP is a client-side dismiss only — does NOT persist.** The mockup's per-row primary action is a click affordance, not a new round-trip. The audit's "small migration" hand-wave is **not in scope**: the prompt is explicit that backend pipelines (Steps 17/18/19) are not changing. Wiring spec:
+   - **LOG CATCH / LOG AGAIN / EDIT** → `data-action="click->review-tray#prefillCatch click->dashboard#openCatchModal"`. The new `prefillCatch` action populates the modal's species / location / level inputs from `data-*` params on the button, then the existing `dashboard#openCatchModal` opens the modal exactly as today.
+   - **SKIP** → toggles a `.dismissed` class on the row (opacity 0.4 per mockup CSS), and decrements the tray's count pill. Stays dismissed for the lifetime of the page; reload resurfaces it. Acknowledged v1 limitation — log as **KG-35**.
+
+2. **No backend changes — none.** No new column, no new endpoint, no migration, no model method. If you find yourself reaching for a controller change, **escalate**.
+
+3. **CSS namespace under `.pc-box-r2` wrapper.** The mockup's `.box-grid / .box-cell / .sprite` selectors collide with existing pixeldex.css rules (`.box-grid` is used by the sidebar partial; `.box-cell` is referenced from multiple places). Wrap the entire new view in `<div class="pc-box-r2">…</div>` and **prefix every new CSS rule with `.pc-box-r2 …`**. Mockup CSS transcribed verbatim except: (a) every selector gains the `.pc-box-r2` ancestor; (b) any kebab-case adjustment needed for project convention; (c) the `.first / .dismissed / .team / .dead` modifier classes stay as the mockup wrote them.
+
+4. **Mobile breakpoint = 520px (Step 20 contract), not the mockup's 600px prose.** The mockup's phone shell is 360px wide — well below 520 — so any sub-520 reflow rule applies. Inside the **existing** `@media (max-width: 520px)` block:
+   - `.pc-box-r2 .box-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }`
+   - `.pc-box-r2 .box-cell { padding: 6px; }`
+   - `.pc-box-r2 .review-row { grid-template-columns: 36px 1fr; padding: 8px 10px; }`
+   - `.pc-box-r2 .review-row .sprite { width: 36px; height: 36px; }`
+   - `.pc-box-r2 .review-row .actions { grid-column: 1 / -1; flex-direction: row; gap: 6px; margin-top: 6px; }`
+   - `.pc-box-r2 .review-row .actions button { flex: 1; min-width: 0; }`
+   - `.pc-box-r2 .badge-legend { grid-template-columns: 1fr; }`
+
+5. **Type-coverage rail layout uses a single grid that reflows.** Declare `.pc-box-r2 .box-layout` outside any media block as `grid-template-columns: minmax(0, 1fr) 280px;` (mockup-verbatim — desktop case). In the **existing** `@media (max-width: 900px)` block, add: `.pc-box-r2 .box-layout { grid-template-columns: 1fr; }` so the rail stacks below on narrower viewports. **No new design tokens.** Existing tokens (`--d0/--d1/--d2`, `--l1/--l2`, `--white`, `--amber`, `--crimson`, `--green-glow`, `--border`, `--border-thin`) cover everything. If you find a hex literal in the mockup CSS that doesn't map to an existing token, prefer the closest existing token over adding a new one. Inline literals are acceptable for one-off shadow / overlay values that don't cleanly token-map (matching Step 21's mockup-verbatim precedent for `rgba(...)` overlays).
+
+6. **One unified grid in `[on_team, storage, fallen]` order** with a corner `group-marker` glyph (`★` team / `▣` storage / `☠` fallen). Each cell carries `data-pc-box-filter-target="cell"` and `data-status="team"|"storage"|"fallen"` so the new Stimulus controller can hide/show by attribute. **The three existing controller arrays stay** (`@on_team_groups`, `@storage_groups`, `@fallen_groups`) — the partial just iterates them in sequence into one grid, no controller change.
+
+7. **Filter chips are status-only + a free-text search.** Chips: `ALL · N`, `ON TEAM · N`, `STORAGE · N`, `FALLEN · N`. The Project Owner's prompt mentioned "route / status / player" filters in the gist — that's prose drift; the mockup itself only shows status + search. **Mockup wins.** No route chip. No player chip. Logging not-in-mockup filter ideas as **KG-36**.
+
+8. **URL hash preserves filter state.** `#team / #storage / #fallen / #all`. Stimulus controller reads `location.hash` on `connect()` and applies; chip click writes `location.hash`. Empty hash = ALL.
+
+9. **Recommended-action highlight is computed view-side from the row's badges.** New helper `recommended_review_action(p)` returns `:log` or `:skip`:
+   - `acquired_via == "event_gift"` → `:skip`
+   - `trade_in == true` → `:skip`
+   - else → `:log`
+   The view applies `class="primary"` to the matching button (LOG for `:log`, SKIP for `:skip`). The first-encounter visual highlight (`.review-row.first` border treatment, green-glow 3px border) keys off the existing `first_ids_by_location` calc, independent of the helper.
+
+10. **Empty review tray = the dashed-border ✓ bar from Screen 3, NOT a hidden empty `<div>`.** When `@auto_detected_catches.empty?`, render a `.empty-tray-bar` block verbatim from the mockup (dashed border, green ✓ glyph, copy: `No new parsed catches to review. New saves will land here for confirmation.`). Panel-head right side switches from `N TOTAL · K NEW PARSED` (when catches present) to `N TOTAL · ALL CAUGHT-UP` (when empty).
+
+11. **Click affordance on cells stays as today** — `data-action="click->pixeldex#selectPokemon"` opens the existing pokemon modal. The mockup's `cursor: pointer` + `:hover` border-color shift + 2px lift is purely CSS in the new R2 section. **Don't touch `pixeldex_controller.js`** or the pokemon modal partial.
+
+12. **No mark-dead surface on the new tab.** The mockup has no inline mark-dead button. The existing `_mark_dead_modal.html.erb` flow stays untouched. Any prose in the prompt mentioning "mark dead" was drift — not in the mockup, not in scope.
+
+13. **Read-only mode: hide the `+ NEW CATCH` button AND the per-row LOG / EDIT actions.** SKIP can stay (it's client-only and dismissable, no backend impact). Existing helper `dashboard_read_only?(@run)` already governs the NEW CATCH button — extend the same gate to the review-row primary actions.
+
+### What to build
+
+#### A. View — `app/views/dashboard/_pc_box_content.html.erb` (full body rewrite)
+
+Wrap everything in `<div class="pc-box-r2" data-controller="pc-box-filter review-tray">…</div>`.
+
+Computed locals at the top of the partial:
+```erb
+<%
+  total = @on_team_groups.size + @storage_groups.size + @fallen_groups.size
+  auto_catches = (@auto_detected_catches || []).reject { |p| p.id.nil? }
+  first_ids_by_location = auto_catches
+    .group_by { |p| p.location.to_s }
+    .each_with_object({}) { |(loc, list), out| out[loc] = list.min_by { |p| p.caught_at || Time.at(0) }.id }
+  read_only = dashboard_read_only?(@run)
+%>
+```
+
+Hard requirements per region:
+
+- **Panel head** uses the existing `panel-header` class (don't rebuild that chrome). Right-side: `M TOTAL · K NEW PARSED` when `auto_catches.any?`; `N TOTAL · ALL CAUGHT-UP` when empty. NEW CATCH button gated by `read_only`.
+
+- **Review tray** (`.review-tray`) — render only when `auto_catches.any?`:
+  - Header: `<h3>REVIEW PARSED CATCHES</h3>` + count pill `<span class="count">K NEW</span>` (target: `data-review-tray-target="count"`).
+  - Badge legend (`.badge-legend`, 2-col grid) — exactly the four rows in the mockup, copied verbatim:
+    - `1ST` (green) — first encounter on a route — log it
+    - `TRADE-IN` (amber) — obtained via trade — usually skip
+    - `EVENT` (filled l1) — mystery gift / event — not a real encounter
+    - `OFF-FEED` (l1 outline) — from PC box, not active party
+  - One `.review-row` per auto-catch. Add `.first` class when the row IS a first-encounter (`first_ids_by_location[p.location.to_s] == p.id`) AND `recommended_review_action(p) == :log`. Each row carries:
+    - `data-review-tray-target="row"`, `data-pid="<%= p.pid %>"`
+    - 56×56 `.sprite` div containing `pokemon_sprite_tag(p.species, size: 56)` (or fallback "SPR" if helper doesn't accept size 56 — check first; reuse 40 if needed and let the CSS center it)
+    - `.meta .name` with species + the same badge pills the existing partial uses (1ST / TRADE-IN / EVENT / OFF-FEED — kept consistent with Step 17/18 logic)
+    - `.meta .loc` — `<%= p.location %><% if p.level %> · Lv <%= p.level %><% end %>`
+    - `.meta .stats` — Step 18 fields rendered inline if present: `NATURE · IVS h/a/d/sp/sa/sd · MOVE-NAMES (first 4 joined with ·)`. Use existing `format_move_name(id)` for moves. **Don't render the `<details>STATS</details>` block** — the new tray surfaces stats in one line.
+    - `.actions` column: three buttons — LOG CATCH / EDIT / SKIP (text "LOG AGAIN" instead of "LOG CATCH" when `acquired_via == "event_gift"`, per Screen 1 row 3). Recommended action gets `class="primary"`. Each LOG/EDIT button carries:
+      - `data-action="click->review-tray#prefillCatch click->dashboard#openCatchModal"`
+      - `data-review-tray-prefill-species-param="<%= p.species %>"`
+      - `data-review-tray-prefill-location-param="<%= p.location %>"`
+      - `data-review-tray-prefill-level-param="<%= p.level %>"`
+      - SKIP: `data-action="click->review-tray#dismiss"` (no params needed; reads the parent row).
+    - LOG/EDIT hidden when `read_only`. SKIP stays.
+
+- **Empty review-tray bar** — render only when `auto_catches.empty?`:
+  ```html
+  <div class="empty-tray-bar">
+    <span class="check">✓</span>
+    No new parsed catches to review. New saves will land here for confirmation.
+  </div>
+  ```
+
+- **Filter bar** (`.filter-bar`):
+  - Four `<button class="filter-chip" type="button">` elements (use `<button>`, not `<span>` — for keyboard accessibility): ALL / ON TEAM / STORAGE / FALLEN with `· N` counts. Each carries `data-action="click->pc-box-filter#applyFilter"`, `data-pc-box-filter-status-param="all|team|storage|fallen"`, `data-pc-box-filter-target="chip"`, `data-status="all|team|storage|fallen"`.
+  - The `ALL` chip starts with `class="filter-chip active"`. Stimulus controller toggles `.active` class when filter changes.
+  - Search input on the right: `<input type="search" class="filter-search-input" aria-label="Search nicknames or species" placeholder="Search nickname or species…" data-action="input->pc-box-filter#applySearch" data-pc-box-filter-target="searchInput">` wrapped in `<div class="filter-search">`.
+
+- **Box layout** (`.box-layout`):
+  - Left: `.box-grid` containing **all groups merged in `[on_team, storage, fallen]` order**. Each cell:
+    ```erb
+    <div class="box-cell <%= 'team' if status == 'team' %><%= 'dead' if status == 'fallen' %>"
+         data-pc-box-filter-target="cell"
+         data-status="<%= status %>"
+         data-action="click->pixeldex#selectPokemon"
+         data-group-id="<%= group.id %>"
+         data-group-nickname="<%= group.nickname %>"
+         data-group-species="<%= my_pokemon&.species || '' %>"
+         data-group-location="<%= group.location %>"
+         data-group-status="<%= group.dead? ? 'dead' : 'caught' %>"
+         data-group-types="<%= my_pokemon&.species.present? ? SoulLink::GameState.types_for(my_pokemon.species).join(',') : '' %>"
+         data-group-pokemon="<%= pixeldex_group_pokemon_json(group, current_user_id) %>">
+      <span class="group-marker" aria-hidden="true"><%= status == 'team' ? '★' : status == 'storage' ? '▣' : '☠' %></span>
+      <div class="nick"><%= group.nickname.upcase %></div>
+      <div class="sprite"><%= pokemon_sprite_tag(my_pokemon.species, size: 40) if my_pokemon&.species.present? %></div>
+      <div class="loc"><%= group.location %></div>
+    </div>
+    ```
+    (The exact iteration shape is up to you — this is illustrative; match the existing partial's `data-group-*` set so the pokemon modal opens correctly.)
+  - Right: `<aside class="type-coverage" data-pc-box-filter-target="rail">` per mockup — three sub-sections: COVERED (filled green pills), GAPS (dashed crimson pills), SHARED WEAKNESSES (filled crimson with `× N`). Use the existing `pixeldex_type_coverage(@type_analysis)` helper for covered/gaps; iterate `@type_analysis[:shared_weaknesses]` (already shaped as `[{type:, count:}, …]`) for the weaknesses section.
+  - When the active filter ≠ `team` AND ≠ `all`, the rail dims (Stimulus toggles `.dimmed` on the rail, CSS sets `opacity: 0.6`) and shows the explainer `computed against your 6-slot team — switch to ON TEAM to focus`. The explainer block is inside the rail; CSS hides it by default and shows it when `.dimmed`.
+
+#### B. CSS — `app/assets/stylesheets/pixeldex.css`
+
+Add a new section block, placed **above** the existing `/* ── R3 Save Slots ── */` section so each redesign reads chronologically. Header comment: `/* ── R2 PC Box ── */`.
+
+Selectors to declare, mockup-verbatim **except** all wrapped under `.pc-box-r2` parent selector:
+- `.pc-box-r2` (block-level reset; no own visual treatment beyond `display: block` if needed)
+- `.pc-box-r2 .review-tray`, `.review-tray-head`, `.review-tray-head h3`, `.review-tray-head .count`
+- `.pc-box-r2 .badge-legend`, `.badge-legend .row`, `.badge-legend .badge`, `.badge.first`, `.badge.trade`, `.badge.event`, `.badge.offfeed`
+- `.pc-box-r2 .review-row`, `.review-row.first`, `.review-row.dismissed`, `.review-row .sprite`, `.review-row .meta .name`, `.review-row .meta .loc`, `.review-row .meta .stats`, `.review-row .meta .stats span`, `.review-row .actions`, `.review-row .actions button`, `.review-row .actions button.primary`, `.review-row .actions button:hover`
+- `.pc-box-r2 .empty-tray-bar`, `.empty-tray-bar .check` (the Screen 3 dashed bar — give it a meaningful class name; mockup left it inline-styled)
+- `.pc-box-r2 .filter-bar`, `.filter-chip`, `.filter-chip.active`, `.filter-chip:hover:not(.active)`, `.filter-search`, `.filter-search input`, `.filter-search input::placeholder`
+- `.pc-box-r2 .box-layout`, `.box-grid`, `.box-cell`, `.box-cell:hover`, `.box-cell.team`, `.box-cell.dead`, `.box-cell .nick`, `.box-cell .sprite`, `.box-cell .loc`, `.box-cell .group-marker`, `.box-cell.dead .group-marker`, `.box-cell.team .group-marker`
+- `.pc-box-r2 .type-coverage`, `.type-coverage h3`, `.type-coverage .sub`, `.type-coverage.dimmed`, `.type-coverage.dimmed .dimmed-explainer` (display: block when dimmed; display: none otherwise)
+- `.pc-box-r2 .type-pill`, `.type-pill.covered`, `.type-pill.gap`, `.type-pill.weak`
+
+**Media queries** — extend existing blocks; do NOT open new ones:
+- In the existing `@media (max-width: 900px)` block, add: `.pc-box-r2 .box-layout { grid-template-columns: 1fr; }`
+- In the existing `@media (max-width: 520px)` block, add the rules listed under decision #4.
+
+#### C. Stimulus — two new controllers
+
+**`app/javascript/controllers/pc_box_filter_controller.js`** (new, ~80 lines):
+- Targets: `chip`, `cell`, `searchInput`, `rail`, `count` (panel-head count display — for Screen 2's `K OF N SHOWN` update).
+- `connect()` — read `location.hash`, apply matching filter (default `all`).
+- `applyFilter({ params: { status } })` — set `this.status`, write `location.hash = "#" + status`, then `_render()`.
+- `applySearch(event)` — debounce 150ms, set `this.search = event.target.value.toLowerCase().trim()`, call `_render()`.
+- `_render()` — for each cell:
+  - Hide if `this.status !== 'all'` AND `cell.dataset.status !== this.status`
+  - Hide if `this.search.length > 0` AND neither `data-group-nickname` nor `data-group-species` (lowercased) includes `this.search`
+  - Else show.
+  - Toggle chip `.active` class. Toggle rail `.dimmed` class when `this.status !== 'team' && this.status !== 'all'`. Update `count` target text.
+
+**`app/javascript/controllers/review_tray_controller.js`** (new, ~50 lines):
+- Targets: `row`, `count` (the "K NEW" pill).
+- `prefillCatch({ params: { species, location, level } })` — find the catch modal form and populate inputs by `name=`. Look up the modal via `document.getElementById('catch-modal')` if it has that id; otherwise via `[data-controller~="dashboard"]` ancestor + `[name=species]` etc. Verify the input names against `_catch_modal.html.erb` before writing (this is an `Files to verify` step). Doesn't open the modal — the second `data-action` handles that.
+- `dismiss(event)` — find the closest `[data-review-tray-target="row"]` ancestor of the click target, add `.dismissed` class, decrement `this.countTarget`'s text by parsing the number.
+- Keep the controllers decoupled — both attached to the same `.pc-box-r2` wrapper via space-separated `data-controller="pc-box-filter review-tray"`.
+
+**Don't touch `pixeldex_controller.js`** — the cell click for opening the pokemon modal flows through it as today via the merged-grid cells' data-action.
+
+#### D. Helper — `recommended_review_action(p)`
+
+Place in `app/helpers/pixeldex_helper.rb` if that file exists; else `app/helpers/dashboard_helper.rb`. Grep first; pick the closest existing surface — the helper file that already houses `pixeldex_type_coverage` or `format_move_name` is the right home. Definition:
+
+```ruby
+def recommended_review_action(pokemon)
+  return :skip if pokemon.acquired_via == "event_gift"
+  return :skip if pokemon.trade_in
+  :log
+end
+```
+
+#### E. Tests
+
+All tests under `test/integration/` (markup-assertion pattern, matching `confirm_modal_flow_test.rb` and `responsive_grids_test.rb`). System tests are not set up in this repo — don't introduce them.
+
+**`test/integration/pc_box_redesign_test.rb`** (new):
+- Setup: factory a run with the test user (`GREY = 153665622641737728` per the precedent test), one team_group on the team, one storage group, one fallen group, and two `@auto_detected_catches` (one first-encounter; one trade_in).
+- Test: GET `/dashboard` returns success and response body contains:
+  - The `class="pc-box-r2"` wrapper
+  - `data-controller=` containing both `pc-box-filter` and `review-tray`
+  - `class="review-tray"` and `<h3>REVIEW PARSED CATCHES</h3>`
+  - `class="badge-legend"` with the four legend rows for `1ST`, `TRADE-IN`, `EVENT`, `OFF-FEED`
+  - One `.review-row` per auto-catch, each with three `<button>` children
+  - The first-encounter row carries `class="review-row first"` AND its LOG button class includes `primary`
+  - The trade-in row's SKIP button class includes `primary`
+  - The four filter chips with the correct counts (`ALL · 3`, `ON TEAM · 1`, `STORAGE · 1`, `FALLEN · 1`)
+  - The unified grid contains exactly 3 cells, with `data-status` attributes covering `team`, `storage`, `fallen` (one each)
+  - The `aside` with class `type-coverage` is present
+- Test: with no auto-catches (factory the run without parsed catches), the `.empty-tray-bar` renders AND the panel-head includes `ALL CAUGHT-UP`.
+- Test: in read-only mode (mock `dashboard_read_only?(@run)` to return true via stub or factory the run into a state where the helper returns true), the `+ NEW CATCH` button is absent AND the LOG/EDIT buttons in the review tray are absent (SKIP stays).
+- Test: every grid cell's `data-action` is `click->pixeldex#selectPokemon` (preserves the existing modal flow).
+
+**`test/integration/responsive_grids_test.rb`** (extend existing):
+- Add `test "Step 22 R2 declares .pc-box-r2 selectors and reflows the grid at the 520px and 900px breakpoints"`:
+  - Assert `.pc-box-r2 ` (with trailing space — to distinguish from any future `.pc-box-r2-*` selectors) appears in `pixeldex.css` at least once.
+  - Assert the `@media (max-width: 520px)` block contains a `.pc-box-r2 .box-grid` rule with `repeat(3, 1fr)`.
+  - Assert the `@media (max-width: 900px)` block contains a `.pc-box-r2 .box-layout` rule with `grid-template-columns: 1fr`.
+  - Assert no `.pc-box-r2 .box-cell` rule with `display: none` exists in either breakpoint block (mockup-fidelity contract — same shape as the Step 21 contract for `.slot` / `.roster-card`).
+
+**Existing tests must stay green:** `confirm_modal_flow_test.rb`, `responsive_grids_test.rb`'s existing assertions, `wipe_flow_test.rb`, every model test, every catch-coordinator test, every parser test. The `_pc_box_panel.html.erb` sidebar partial is not touched — any test that references it stays green.
+
+### Constraints (do not violate)
+
+- **No backend changes.** No new column, no migration, no new endpoint, no model method. If you feel you need one to satisfy the mockup, **escalate**.
+- **No new design tokens.** Existing tokens cover the mockup. Closest existing token > new token. Inline literals OK only for one-off shadow / overlay values that don't cleanly token-map.
+- **No new CSS classes outside the `.pc-box-r2` namespace.** Only exception: extending the existing `@media (max-width: 520px)` and `@media (max-width: 900px)` blocks with `.pc-box-r2 …` rules.
+- **No edits to `_pc_box_panel.html.erb`** (sidebar). Cross-cutting 6 sidebar/main consolidation is out of scope.
+- **No edits to `pixeldex_controller.js`, `_pokemon_modal.html.erb`, or `_catch_modal.html.erb`.** The new controllers + the existing modals talk via `data-action` chaining and DOM attribute lookup; no upstream code change required.
+- **Read-only mode preserved.** `dashboard_read_only?(@run)` gates BOTH the `+ NEW CATCH` button (existing) AND the LOG/EDIT buttons in the review tray (new).
+- **Step 17 / 18 catch render unchanged at the data layer.** The view's per-row stats summary is a new one-liner; the underlying fields and pipeline are untouched. Existing `format_move_name` helper is reused.
+- **Brakeman + Rubocop clean.** No new offenses, no new warnings.
+- **Same broadcast contract.** `SoulLinkPokemon#broadcasts_refreshes_to ->(p) { [p.soul_link_run, :dashboard] }` already drives Turbo morphs on auto-catch arrival — the new view must render correctly under a morph (no Stimulus state lost on filter chip click → save parses → broadcast). Stimulus controllers re-instantiate on morph; since `connect()` reads `location.hash`, state survives. Don't depend on instance state outliving morph.
+
+### Acceptance — Reviewer's checklist (Richard, focus areas)
+
+1. **Visual fidelity to the mockup.** Each of the 4 mockup screens has a 1:1 surface in the new view (Screen 1 default / Screen 2 filter applied / Screen 3 empty tray / Screen 4 mobile). Compare side-by-side with the mockup HTML; flag any spacing / typography / color drift.
+2. **Filter chips actually filter.** Markup includes the four chips with correct status params + counts. `data-action` wires to `pc-box-filter#applyFilter`. Cells carry `data-status` matching their group classification. URL hash on chip click is part of the contract.
+3. **Badge legend visible AND each badge documented.** All four badge rows in the legend; copy matches the mockup verbatim.
+4. **Empty-state copy + CTA.** When no auto-catches: the dashed-border bar with the locked copy AND the panel-head reads `ALL CAUGHT-UP`.
+5. **Mobile breakpoint via `responsive_grids_test.rb`.** New assertions at 520px and 900px present. No `display: none` on cells / rows in either breakpoint.
+6. **Read-only mode honored.** `+ NEW CATCH` AND LOG/EDIT both gated by `dashboard_read_only?(@run)`. SKIP stays available (client-only).
+7. **Accessibility.** Each filter chip is a `<button type="button">`. Search input has an `aria-label`. The review tray's per-row buttons are real `<button>` elements with descriptive text. Group-marker glyphs have `aria-hidden="true"`.
+8. **No backend drift.** Search the diff for any change under `app/controllers/`, `app/models/`, `db/`, `config/routes.rb` — there should be **none**. Same for `app/services/soul_link/` and `app/jobs/`.
+9. **CSS namespace integrity.** Every new selector in pixeldex.css is prefixed with `.pc-box-r2`. The existing `.box-grid` / `.box-cell` rules used by the sidebar partial are untouched.
+10. **Existing test suite green.** Full run: 0 failures, 0 errors. Rubocop clean. Brakeman clean.
+11. **No scope creep.** No mark-dead button, no route filter, no player filter, no `skipped_at` column. KG-35 (SKIP non-persistence) and KG-36 (richer filters) logged in BUILD-LOG.
+
+### Build order (suggested)
+
+1. Read the four "Files to verify" — confirm the catch modal input names, the dashboard controller's `openCatchModal`, the existing `data-group-*` attributes on cells, and `pokemon_sprite_tag`'s acceptable size values.
+2. Add the `recommended_review_action` helper + a unit test (one test: event_gift → :skip; trade_in → :skip; otherwise :log).
+3. Write the new view (`_pc_box_content.html.erb`) — start with the panel-head + review-tray sections, then the filter bar, then the unified grid + rail. Manually render-smoke against a fixture (no auto-catches, with auto-catches, read-only).
+4. Add the CSS section to `pixeldex.css` (mockup-verbatim, namespaced) + the two media-query block extensions.
+5. Write the two Stimulus controllers (`pc_box_filter_controller.js`, `review_tray_controller.js`).
+6. Write the integration test (`pc_box_redesign_test.rb`) + extend `responsive_grids_test.rb` with the Step 22 assertions.
+7. Full test run (`PARALLEL_WORKERS=10 bin/rails test`) → 0 fail / 0 error. Rubocop + Brakeman clean.
+8. Write `REVIEW-REQUEST.md` with file list + line ranges + open questions.
+
+Flag immediately if: (a) the catch modal's input names don't match what `prefillCatch` expects, (b) any mockup selector collides with an existing rule outside `.pc-box-r2`'s scope, (c) the merged-grid + filter behavior breaks the existing `pixeldex_controller#selectPokemon` flow, (d) you find that backend changes are unavoidable for some part of the mockup.
 
 ---
 
-### Scope
+## Builder Plan — Step 22
 
-Redesign the save-slot column on `/emulator` (left sidebar) AND the run-roster card on the right sidebar to match the mockup. Five locked screens:
+### Findings from "Files to verify"
 
-- **Screen 1 — Default state.** Every slot has a visible STATE PILL (`EMPTY` / `SAVED` / `ACTIVE`). Active slot gets a 4px green-glow border. Empty slot copy is the call-to-action `— drop a save here from the emulator —` (not the word `Empty`). `CLEAR ALL SLOTS` lives at the bottom with a dashed-border treatment.
-- **Screen 2 — Overwrite-pending mode.** Sticky banner at the top of the column: `⚠ SAVE FULL — PICK A SLOT TO OVERWRITE` + a `CANCEL` button. Filled slots get the amber `TARGET` pill + amber border + the whole slot becomes a click target. Per-slot action buttons hide while in TARGET mode.
-- **Screen 3 — Inline DELETE confirmation.** Click DELETE → the slot's actions row swaps in-place into a `.confirm-inline` block with the question, a stakes line ("Xh of progress. There's no undo — the save file is gone after this."), `CANCEL`, and `DELETE FOREVER`. The slot's state pill flips to red `CONFIRM`. Same pattern for `CLEAR ALL SLOTS`.
-- **Screen 4 — Roster card restructured.** Name + state pill on top → 3-tile stat strip (`BADGES` / `DEX` / `PLAY`) → everything else collapsed inside `<details><summary>STATS</summary>` (TRAINER, MAP, MONEY, TID/SID, DEX SEEN, seed). HOF as inline pill next to the name. TID conflict as a high-contrast warning band ("⚠ TID CONFLICT WITH X · re-roll the seed"), not a tiny pill. Seed is click-to-copy with a hover hint. Money symbol removed.
-- **Screen 5 — Mobile.** At <520px the emulator-grid is already single-column (Step 20). The save-slot column itself just needs to render legibly inside that. Same patterns, narrower.
+**1. The catch modal uses Stimulus targets, NOT `name=` attributes.** From `_catch_modal.html.erb`:
+- Nickname input: `data-dashboard-target="catchNickname"` (no `name=`)
+- Location select: `data-dashboard-target="catchLocation"` (no `name=`)
+- Species input: `data-dashboard-target="catchSpecies"` (no `name=`)
 
----
+**2. `dashboard#openCatchModal` BLANKS the three fields before opening** (`dashboard_controller.js:17-24`). If `prefillCatch` runs first, `openCatchModal` wipes the values.
 
-### Resolved ambiguity #1 (Arch decision)
+**3. The brief's spec for `prefillCatch` needs three fixes**:
+- Look up inputs via the dashboard controller's targets, not `[name=...]`. Concretely: find the `[data-controller~="dashboard"]` ancestor, query for `[data-dashboard-target="catchNickname|catchLocation|catchSpecies"]`. Even simpler: query the document for those targets (there's only one dashboard controller per page).
+- The `data-action` chain must be **reversed**: `click->dashboard#openCatchModal click->review-tray#prefillCatch`. Stimulus runs actions in declaration order; opening first then prefilling means the user sees the modal pop with values already filled (no flicker).
+- The auto-catch row's "species" maps to the modal's SPECIES field. The modal's NICKNAME field has no obvious source from the auto-catch row (auto-catches don't have a user-chosen nickname yet) — leave nickname empty so the user types one. Pre-fill species + location only. The level field doesn't exist on the modal (modal has nickname / location / species; no level). Drop the `level` param from prefillCatch.
 
-The Project Owner's prompt said _"Inline DELETE confirmation — use the shared confirm-modal partial from Step 20."_ The mockup shows literal **inline** confirmation (the slot row swaps in place; no modal overlay). The mockup is locked design.
+**4. Helper homes (confirmed):**
+- `recommended_review_action` → `app/helpers/pixeldex_helper.rb` (alongside `pixeldex_type_coverage`)
+- `pokemon_sprite_tag(species, size:)` → ApplicationHelper, accepts any size, returns `"".html_safe` when no sprite mapping
+- `format_move_name(id)` → EmulatorHelper (Rails auto-includes; usable from dashboard render)
 
-**Decision:** match the mockup. Replace the existing Step 20 `confirm_modal` wiring on the per-slot DELETE button AND on CLEAR ALL SLOTS with inline confirmation. Remove their two `confirm_modal(...)` partial calls + the trigger buttons' `data-action="click->confirm-modal#open"` wiring. The Step 20 partial itself stays. Update `save_slots_controller.js#_actionButtons()` selector to target the new inline-confirm trigger instead of the old `[data-confirm-modal-id-param^='delete-slot-']`.
+**5. Catch modal location values:** the `<select>` `<option value="<%= key %>">` uses location *keys* (e.g. `route_201`), not display names (e.g. `Route 201`). Auto-catch `p.location` may be either depending on the Step 17/18 pipeline. **Best-effort prefill**: set the select value to `p.location` and let the browser silently fall back to "Select location..." if no match. User can correct before submitting; this is graceful.
 
-If you disagree on review, escalate before building.
+### Resolution
 
----
+Update the wiring spec in the brief to:
+- `data-action="click->dashboard#openCatchModal click->review-tray#prefillCatch"` (open first, then prefill)
+- `prefillCatch({ params: { species, location } })` — drop `level`
+- Stimulus implementation queries the document for `[data-dashboard-target="catchSpecies"]` and `[data-dashboard-target="catchLocation"]`, sets `.value` on each. Nickname stays empty (user types it). Status/feedback target unchanged.
 
-### Resolved ambiguity #2 (Arch decision)
+This is a JS implementation correction, not a scope change. Backend / data model / endpoint contracts all unchanged. **Architect endorsement requested inline below; if endorsed, code follows immediately.**
 
-The Project Owner's prompt mentioned `OFF-FEED` and `alive/dead` status pills "inline with the species." The mockup roster cards do not show party Pokémon — they show per-trainer stats. **OFF-FEED is a per-Pokémon pill on the PC BOX tab (Step 18), not on save-slot or roster cards.**
+### Architect endorsement
 
-**Decision:** mockup is authoritative — no party-Pokémon list and no OFF-FEED on the save-slot view this step. The roster-card state pill is the trainer's session status (`READY` / `PENDING` / `GENERATING` / `FAILED`), styled per `state-pill.saved` in the mockup. Don't reinvent that.
+✅ **Endorsed.** Reverse the action chain, drop `level`, look up via Stimulus targets, leave nickname empty. The brief's Constraints section (#5: "the catch modal partial's existing inputs (`name=...`) are the contract") is corrected — the contract is **Stimulus targets**, not `name=`. This is the correct mechanical fix; no scope movement. — Ava
 
----
+### Build plan (sequenced)
 
-### Build order
+1. Add `recommended_review_action(p)` to `pixeldex_helper.rb` + a one-pass helper test (`test/helpers/pixeldex_helper_test.rb`).
+2. Rewrite `app/views/dashboard/_pc_box_content.html.erb` per the brief, with the corrected action chain + dropped level param.
+3. Add the namespaced CSS section to `app/assets/stylesheets/pixeldex.css`. Extend the existing `@media (max-width: 520px)` and `@media (max-width: 900px)` blocks (don't open new ones).
+4. Write `app/javascript/controllers/pc_box_filter_controller.js` (chip + search + URL hash + rail-dim + count update).
+5. Write `app/javascript/controllers/review_tray_controller.js` (prefillCatch via Stimulus targets + dismiss + count decrement).
+6. Add `test/integration/pc_box_redesign_test.rb` per the brief's test list.
+7. Extend `test/integration/responsive_grids_test.rb` with the Step 22 selector + breakpoint assertions.
+8. Run full test suite + Rubocop + Brakeman. Fix any offenses inline.
+9. Append KG-35 (SKIP non-persistence) and KG-36 (richer filters out-of-mockup-scope) to BUILD-LOG.md.
+10. Write REVIEW-REQUEST.md with file list, line ranges, focus areas.
 
-Land in this order. Each item should leave the test suite green before you move on.
-
-#### B-1 — CSS tokens + scoped styles (no behavior yet)
-
-**File:** `app/assets/stylesheets/pixeldex.css`
-
-- Add three new design tokens to `:root` at the top of the file. Comment-tag them as Step 21 R3 additions and explain the role:
-  - `--d0: #0a1a0a;` — darker background, used for slot inner bezels, action-button bg, seed monospace bg. Mockup line 12.
-  - `--green-glow: #5fd45f;` — ACTIVE state pill bg + active-slot 4px border. Mockup line 21.
-  - `--crimson: #c75a5a;` — CONFIRM state pill + DELETE FOREVER button + inline-confirm border. Mockup line 19.
-- Add a new `/* ── R3 Save Slots ── */` section near the bottom of the file (above the existing `RESPONSIVE` block) with the styles you'll need: `.slot`, `.slot.active`, `.slot.overwrite-target`, `.slot-head`, `.slot-num`, `.state-pill` + `.state-pill.empty/saved/active/target/confirm`, `.slot-meta` + `.slot-meta .row .lbl/.val`, `.slot-actions`, `.slot-actions button` + `.primary/.danger/.confirm`, `.confirm-inline` + nested children, `.pending-banner` + button, `.footer-actions` + button, `.roster-card` + `.you/.head/.name/.you-badge/.stats/.stat`, `.roster-card details/summary/.extra/.seed`, `.conflict-warning`, `.hof-pill`. **Copy the mockup CSS verbatim** from `<style>` lines 85–322, then adjust to use Soul Link's existing tokens where they match (the mockup's `--d1`/`--d2`/`--l1`/`--l2`/`--white`/`--amber` are already identical to ours; only `--d0`, `--green-glow`, `--crimson` are new).
-- Do **not** introduce any other new tokens. The audit explicitly forbade it.
-
-Expected file delta: ~140 lines added to `pixeldex.css`. No removals, no edits to existing rules.
-
-#### B-2 — Save-slot sidebar markup (`_save_slots_sidebar.html.erb`)
-
-Replace the body of this partial with the mockup-aligned structure. Per-slot:
-
-- Wrapper: `<div class="slot[ active][ empty]" data-save-slots-target="slot" data-slot-number="N" data-filled="true|false">`. Drop the heavy inline `style="..."` blocks; use the new CSS classes.
-- `.slot-head` containing `.slot-num` (`SLOT N`) + `.state-pill.empty/saved/active`. State pill must be **always present** (not gated on `is_active`).
-- For empty slots: `.slot-meta` body is the call-to-action copy `— drop a save here from the emulator —` (use an em-dash, not two hyphens).
-- For filled slots: `.slot-meta` with the trainer name as `<strong>` (16px), then label/value rows. Render only the rows where the parsed field is present (existing gating rules — keep them). **Drop the peso-sign `&#8369;` from the money row** — the mockup's slot-meta money is `<span class="lbl">MONEY</span> <span class="val">4,231</span>`. Drop the `time_ago_in_words` "saved … ago" footer (the mockup omits it; recover it later via Project Owner ask if anyone misses it — log as a Known Gap if it survives Richard).
-- `.slot-actions` (only when filled): `DOWNLOAD` (still an `<a>` to `download_emulator_save_slot_path`), `MAKE ACTIVE` button (only when not active), `DELETE` button. Buttons use the mockup `.slot-actions button` styling (no inline `style="..."`).
-- For DELETE, do **not** wire to `confirm-modal#open`. Instead, wire it to a new Stimulus action `save-slots#confirmDelete` that hides the slot's `.slot-actions` and reveals a sibling `.confirm-inline` block (rendered server-side as `hidden` per slot). The CONFIRM state pill replaces the SAVED pill while in confirm mode (toggle via class swap or re-render).
-- Each filled slot also renders, server-side and `hidden` by default, the `.confirm-inline` block: `<div class="q">DELETE THIS SLOT?</div>`, `<div class="body">[Xh of progress | "30 minutes of progress" | "less than a minute of progress" depending on `parsed_play_seconds`]. There's no undo — the save file is gone after this.</div>`, two buttons: `CANCEL` (fires `save-slots#cancelDelete`) and `DELETE FOREVER` (fires the existing `save-slots#deleteSlot`, with `data-slot-number="N"`).
-  - Helper for the body copy: add a small private helper `format_progress_phrase(seconds)` to `app/helpers/emulator_helper.rb`. Returns `"#{n} hours of progress"` for `seconds >= 3600`, `"30 minutes of progress"` style for `seconds >= 60`, `"less than a minute of progress"` for tiny/nil. Test it.
-- For overwrite-pending mode: drop the per-slot absolutely-positioned `<button data-save-slots-target="overwriteOverlay">` overlay markup. Replace with: the slot itself becomes the click target (via `.slot.overwrite-target` class toggled by the Stimulus controller). The whole `<div>` slot wrapper picks up `data-action="click->save-slots#overwriteSlot"` only while in TARGET mode (controller-applied attribute, see B-3). The TARGET state pill (`.state-pill.target`) replaces the SAVED/ACTIVE pill while in TARGET mode (controller-applied class swap on the existing `[data-save-slots-target='slotPill']`).
-- Banner: replace the existing `<div data-save-slots-target="banner" hidden class="gb-card" style="...">` with the mockup's `.pending-banner` structure including the `⚠` icon span, the copy `SAVE FULL — PICK A SLOT TO OVERWRITE`, and a `CANCEL` button (`data-action="click->save-slots#cancelOverwrite"`).
-- CLEAR ALL SLOTS at the bottom: `.footer-actions` wrapper containing a single button styled per the mockup. Wire it to inline confirm too: `data-action="click->save-slots#confirmClearAll"` reveals a sibling `.confirm-inline` block (rendered server-side as `hidden`) with a CANCEL + a confirm button that fires the existing `clear-save#clear` action.
-- Remove the two existing `confirm_modal(...)` partial calls (per-slot DELETE and CLEAR ALL SLOTS).
-
-Constraints to preserve:
-- The page-level `data-controller="save-slots"` wrapper, `data-save-slots-slots-url-value`, `data-save-slots-csrf-value`, `data-save-slots-active-value` — all unchanged.
-- The DOWNLOAD link's URL, the MAKE ACTIVE PATCH path, the DELETE DELETE path — all unchanged. You're rewriting only the markup + styling + the gate that fires before DELETE/CLEAR-ALL is called.
-- Keep server-side conditional rendering for parsed_* fields (don't force a row when the field is `nil`).
-- HOF pill stays on the slot card (mockup line 116–120 shows it on the run-roster card; keep it on the slot card too where it currently lives — the mockup doesn't depict the HOF state on a slot card but the audit doesn't say to remove it. If in doubt, keep functionality, restyle only.)
-
-#### B-3 — `save_slots_controller.js` updates
-
-Update the existing controller. Don't replace — extend.
-
-- Add new targets: `slotPill` (one per slot, the `.state-pill` element), `actionRow` (one per slot, the `.slot-actions` div), `confirmRow` (one per slot, the `.confirm-inline` div), `clearAllAction` (the `.footer-actions` button row), `clearAllConfirm` (the inline-confirm block under it). Targets only — no values.
-- Replace `_enterOverwriteMode` body: instead of revealing per-slot `overwriteOverlay` buttons, walk each filled `.slot`, add `.overwrite-target` class, swap the slot pill's class from `saved`/`active` to `target` (and update its text content to `TARGET`), set `data-action="click->save-slots#overwriteSlot"` on the slot wrapper, and hide the action rows (`actionRow.hidden = true`). Keep the disabling of the action buttons (Tab/Enter safety) as-is.
-- Replace `_exitOverwriteMode`: undo the above — strip `.overwrite-target`, restore the pill's original class + text (cache them on `connect()`), remove the wrapper-level `data-action`, unhide action rows. Also called by the new `cancelOverwrite()` action wired to the banner's CANCEL button.
-- New action `confirmDelete(event)`: reads `slotNumber` from the trigger's dataset, finds the matching slot (`this.slotTargets.find(s => s.dataset.slotNumber === n)`), hides its `.slot-actions`, reveals its `.confirm-inline`, swaps its state pill to CONFIRM. Focus the cancel button inside the confirm-inline (safe-default).
-- New action `cancelDelete(event)`: reverses the above. Restores SAVED/ACTIVE pill (whichever it was — read from the original cached value).
-- New action `confirmClearAll`: hides the clear-all action button row, reveals the clear-all-confirm row.
-- New action `cancelClearAll`: reverses.
-- Existing `deleteSlot(event)` action: unchanged signature, still PATCHes — the only change is the trigger now lives inside `.confirm-inline` rather than being routed via the modal.
-- `_actionButtons()` selector: change the `[data-confirm-modal-id-param^='delete-slot-']` clause to match the new inline-confirm trigger (`[data-action*='save-slots#confirmDelete']`). Keep the `save-slots#makeActive` clause.
-- Remove the `CONFIRM_OVERWRITE` `window.confirm(...)` call from `overwriteSlot` — Step 20 already removed `window.confirm` from DELETE; the overwrite flow is the last `window.confirm` in the file. The banner's presence is the announcement; clicking a slot is the explicit consent. Confirm with Arch if you disagree.
-
-#### B-4 — Roster card (`_run_sidebar_card.html.erb`)
-
-Rewrite the card body to match Screen 4 of the mockup. Constraints:
-
-- The partial must continue to render with **only** the `s` local — no controller context. (Same constraint Step 9 locked in.)
-- Wrapper: `<div class="roster-card" data-discord-user-id="<%= s.discord_user_id %>">`. The `.you` class + `.you-badge` are still injected by `roster_you_marker_controller.js` after broadcast — extend that controller: when adding the YOU badge, also add `.you` to the wrapper, and inject the `.you-badge` span inside the `.name` element (not appended to the first `<div>`). Update the controller's selector so it knows where to put the badge (e.g. add a marker class like `.roster-card-name` on the name span and target it).
-- `.head` row: `.name` (`<span class="name">PLAYER<span class="hof-pill" if hof>🏆 HOF</span></span>`) + `.state-pill.saved` showing the session status (uppercased — `READY` / `PENDING` / `GENERATING` / `FAILED`; use a `.state-pill.confirm` style for failed, `.state-pill.target` style for pending/generating, `.state-pill.saved` style for ready).
-- `.stats` 3-tile grid: `BADGES` / `DEX` / `PLAY`. Show `—` for nil values. Always render all three tiles even when partial — the grid stays rectangular. Match `format_play_time` for PLAY (already exists).
-- TID conflict warning band — placed _outside_ the `<details>` block, above it, only when conflict applies. Copy: `⚠ TID CONFLICT WITH <other player names joined by ', '> · re-roll the seed`. Compute the conflict-partner labels inline from `s.soul_link_run.tid_conflict_groups` (the existing computation) — find the group containing `s.id`, filter out `s.id`, map to `SoulLink::GameState.player_name(other_session.discord_user_id)`. If `tid_conflict_groups` doesn't surface partner session ids in a usable shape, log a Known Gap and fall back to the existing single-line text "⚠ TID CONFLICT" (don't block the step).
-- `<details><summary>STATS</summary>` block: TRAINER (in-game name), MAP, MONEY (`number_with_delimiter` only, no symbol — drop `&#8369;`), TID/SID, DEX SEEN — each as `<div class="row"><span class="lbl">LABEL</span><span>value</span></div>`. Skip rows whose underlying field is nil.
-- Seed: `.seed` element with click-to-copy. Implementation: a tiny new Stimulus controller `roster_seed_controller.js` (~25 lines). On click, write the seed to clipboard via `navigator.clipboard.writeText`, briefly swap the text/style to `Copied!` then revert after 1s. Wire as `data-controller="roster-seed" data-action="click->roster-seed#copy"` on the `.seed` div. (Keep the `cursor: copy` + the CSS-only `:hover::after` "click to copy" hint from the mockup; the controller is the actual copy.)
-- Drop the `In-game:` prefix on the trainer name and the standalone "Active … ago" + "Save: …" rows. The mockup hides those — move "save bytes / saved-ago" out of the redesigned card. (If lost data is a problem, log a Known Gap.)
-- The existing turbo_frame_tag wrapper in `_run_sidebar.html.erb` stays. The broadcast contract on the model is unchanged.
-
-#### B-5 — Tests
-
-Layer new tests on top of existing ones; do not regress any existing assertion. New tests live in either `test/integration/`, `test/helpers/emulator_helper_test.rb`, or `test/models/soul_link_emulator_save_slot_test.rb` — pick whichever shape minimises factory churn. Use FactoryBot per project convention.
-
-Required coverage:
-
-1. **State pills always render.** Update the existing `emulator_controller_test.rb#show renders ACTIVE badge on the slot matching active_save_slot` to also assert `>SAVED<` on the non-active filled slots and `>EMPTY<` on the unfilled ones in the same render. Existing assertion `assert_match(/>ACTIVE</, response.body)` must continue to pass.
-2. **Empty-slot CTA copy.** New test: filled-slot rows render the trainer name; empty-slot rows render the call-to-action copy `drop a save here` (regex on `response.body`).
-3. **Inline DELETE confirm markup.** New test: page renders the per-slot `.confirm-inline` block as hidden (`hidden` attribute or `display: none` style — Bob's call). Assert the per-slot `data-action="click->save-slots#confirmDelete"` is on the trigger button. Assert `DELETE FOREVER` text appears in the response (proves the confirm row is rendered server-side, just hidden).
-4. **CLEAR ALL SLOTS inline confirm.** New test mirroring (3) for the footer action.
-5. **No `confirm_modal(...)` for save-slot DELETE or CLEAR ALL SLOTS.** New test: response body should NOT contain `id="delete-slot-1-confirm"` (or any of `1..5`) and should NOT contain `id="clear-all-slots-confirm"`. Defensive — locks the architecture decision.
-6. **No peso sign.** Existing test or new: response body for both the slot column and the roster sidebar contains `&#8369;` zero times.
-7. **Roster card structure.** Extend `soul_link_emulator_save_slot_test.rb#run_sidebar_card partial renders standalone with only \`s\` local`: assert the rendered partial contains `class="roster-card"`, contains the 3-tile stat grid (`class="stats"` and three `class="stat"` children), contains `<details>` and `STATS` summary text. Existing assertions on seed presence + `data-discord-user-id` must continue to pass.
-8. **HOF inline pill.** New test: when `parsed_hof_count >= 1`, rendered partial contains `class="hof-pill"` adjacent to the player name (assert the pill markup is inside the `.name` span).
-9. **TID conflict warning band.** New test: when the run's `tid_conflict_groups` reports the session, the partial contains `class="conflict-warning"` and the substring `re-roll the seed`. When there's no conflict, the warning is absent.
-10. **`format_progress_phrase`.** New helper test: `nil` → `"less than a minute of progress"`, `30` → `"less than a minute of progress"`, `1800` → `"30 minutes of progress"` (or whatever rounding rule you pick — pick one and lock it), `3600` → `"1 hour of progress"`, `4 * 3600 + 23 * 60` → `"4 hours of progress"`. Stake a single rule and document it inline.
-11. **Mobile breakpoint regression.** New test in `test/integration/responsive_grids_test.rb` (extend the existing class): assert the new R3 styles are scoped (no `@media (max-width: ...)` rule overrides `.slot` or `.roster-card` in a way that breaks at <520px). Pattern: read the CSS file, regex-match the breakpoint blocks, assert nothing inside them collapses `.slot`'s grid in a way that hides content. (This is a shape test, not a real headless-browser test — match the Step 20 pattern.) Also: assert the new tokens (`--d0`, `--green-glow`, `--crimson`) are declared exactly once each in `:root`.
-12. **Emulator-grid stays single-column at <900px.** New CSS-shape assertion: regex-match `.emulator-grid { grid-template-columns: 1fr; }` outside any media block AND `@media (min-width: 900px) { .emulator-grid { grid-template-columns: 280px minmax(0, 1fr) 280px; } }` inside the existing breakpoint. Ensures the redesign didn't accidentally break the existing collapse.
-
-Existing `roster_you_marker_controller`-touching tests don't exist as system tests, so no regression there. **Do not** add a JS unit test framework — this project doesn't use one. The behavior is exercised by integration tests asserting on rendered markup.
-
----
-
-### Out of scope (do NOT touch)
-
-- R2 (PC Box redesign) — Step 22.
-- R4 (Map redesign) — Step 23.
-- R1 (Dashboard restructure) — Step 24.
-- Any backend / parser pipeline change. The data model doesn't move.
-- Discord notifier — Step 19 already covers save-slot ingest events.
-- The Step 20 confirm-modal partial / helper / controller — leaves them alone except for removing the two save-slot wire sites. Other consumers (END RUN, group DEL, schedule cancel, mark-dead reuse) are NOT in scope.
-- The 6 "not ready" panels in `emulator/show.html.erb:15-58` — the audit flagged them but R3 mockup doesn't redesign them.
-- The `roster_you_marker_controller.js` extension is allowed (selector update for the new card structure, badge injection point) but don't refactor its broader contract.
-- Don't touch `_pc_box_content.html.erb` — that's the OFF-FEED surface; R3 is sidebar-only.
-
----
-
-### Things to flag (Known Gap candidates)
-
-If any of these come up during build, log them and ship anyway:
-
-- "Active … ago" + "Save: bytes" rows are removed from the roster card; the redesign doesn't show them. If anyone misses the time-since-last-save signal, that's a follow-up step.
-- TID conflict text: if `tid_conflict_groups` doesn't expose partner session ids in a usable shape, fall back to the bare "⚠ TID CONFLICT · re-roll the seed" without partner names — log as Known Gap.
-- The mockup HTML uses `--d0: #0a1a0a` for slot-card backgrounds; this is darker than Soul Link's existing `--d1`. If the contrast against the page background ends up too bright/dark in real renders, escalate before fudging the token value.
-- `data-confirm-modal-id-param^='delete-slot-'` references in any unrelated controller/test — grep before deleting the modal wiring.
-- If the `<details>` collapse animation looks bad with the GB pixel font, fall back to no animation (browser default). Don't pull in a JS lib for it.
-
----
-
-### Done criteria
-
-Bob, you are done when ALL of these are true:
-
-1. The redesigned save-slot column visually matches Screen 1, Screen 2, Screen 3 of the mockup — pills, banner, inline confirm, dashed-border CLEAR ALL, empty-slot CTA copy.
-2. The redesigned roster card visually matches Screen 4 — name + status pill, 3-tile stat strip, HOF inline pill, TID conflict warning band, `<details>STATS</details>` collapse, click-to-copy seed, no peso sign.
-3. Mobile single-column reflow holds at <520px (CSS-shape test passes).
-4. Per-slot DELETE and CLEAR ALL SLOTS use inline confirmation, not the Step 20 `_confirm_modal` partial. Other Step 20 consumers untouched.
-5. Overwrite-pending mode uses the sticky banner + whole-slot click target, not the absolutely-positioned overlay button.
-6. All 11 new test buckets from B-5 are green. All existing tests still pass. Rubocop clean. Brakeman clean (no new warnings).
-7. `_run_sidebar_card.html.erb` still renders standalone with only the `s` local — broadcast contract preserved (existing test `run_sidebar_card partial renders standalone with only \`s\` local` still passes).
-8. No new gems. No JS framework additions. No new design tokens beyond `--d0`, `--green-glow`, `--crimson`.
-
-When done: write `REVIEW-REQUEST.md`. Hand off to Richard. Stop until Richard returns `Ready for Builder: YES`.
-
----
-
-## Builder Plan — Bob
-
-> Drafted 2026-05-04 after reading the brief, mockup HTML end-to-end, audit § 4 R3 + Workflow 4, and the four current implementation files. Awaiting Ava's confirmation before B-1.
-
-### What I'm building (in execution order)
-
-**B-1 — Tokens + scoped CSS** (`app/assets/stylesheets/pixeldex.css`, ~140 lines added)
-- Add `--d0: #0a1a0a;`, `--green-glow: #5fd45f;`, `--crimson: #c75a5a;` to the existing `:root` block (~line 5–14), each with a `/* Step 21 R3 — <role> */` inline comment.
-- Insert a new `/* ── R3 Save Slots ── */` block immediately above the `RESPONSIVE` divider (line 1039). All selectors copied verbatim from mockup `<style>` lines 85–322 with one normalisation: rename the mockup's `.slot.overwriteTarget` to `.slot.overwrite-target` everywhere it appears, so the JS class-toggle reads as kebab-case (project convention — every existing modifier in pixeldex.css is kebab-cased). The mockup's `--d1`/`--d2`/`--l1`/`--l2`/`--white`/`--amber` line up 1:1 with ours; only the three new tokens need declaring.
-- Do not touch `.gb-card`, `.gb-grid-N`, the existing 900px / 520px / 1200px media blocks, or any other existing rule. Pure addition.
-
-**B-2 — `_save_slots_sidebar.html.erb`** (full body rewrite, same outer wrapper)
-- Keep the outer `<div data-controller="save-slots" ...>` wrapper and its three `*-value`s exactly as-is.
-- Replace the `SAVE SLOTS` heading row with a plain `<h2>SAVE SLOTS</h2>` styled by the new CSS (no inline `style=""`).
-- Replace the existing banner div with the mockup's `.pending-banner` markup (icon span + copy + CANCEL button wired to `save-slots#cancelOverwrite`). Banner stays `data-save-slots-target="banner"` so the existing show/hide logic in B-3 still finds it.
-- Per slot loop (`MIN_SLOT..MAX_SLOT`):
-  - Wrapper: `<div class="slot[ active][ empty]" data-save-slots-target="slot" data-slot-number="N" data-filled="true|false">`. Drop all inline `style=""`.
-  - `.slot-head` with `.slot-num` (`SLOT N`) + `.state-pill.<empty|saved|active>` carrying `data-save-slots-target="slotPill"`. Pill always present.
-  - For empty: `.slot-meta` body = literal `— drop a save here from the emulator —` (real em-dash, U+2014).
-  - For filled: `.slot-meta` containing `<strong>` trainer name (only when `parsed_trainer_name.present?`; if missing, fall through and show only the available rows — preserves existing nil-gating). Then label/value rows for PLAY+BADGES (one row, mockup line 392 stacks both), MAP, DEX (`X caught · Y seen`), TID/SID (only when `parsed_trainer_id.to_i.positive?`). Drop the peso glyph row entirely from the slot card — slot card has no MONEY row in the mockup. Drop the `time_ago_in_words` "saved … ago" footer (Known Gap candidate — log).
-  - HOF pill: keep on filled slot per the brief's "if in doubt, keep functionality, restyle only." Render as `<span class="hof-pill">🏆 HOF</span>` after the body rows.
-  - `.slot-actions` (only when filled, hidden via `data-save-slots-target="actionRow"`): DOWNLOAD `<a>` (existing href), MAKE ACTIVE `<button>` (only when not active, existing `save-slots#makeActive` wiring), DELETE `<button>` wired to `save-slots#confirmDelete` carrying `data-slot-number="N"`. No more `confirm-modal#open` action, no more `confirm_modal(...)` partial call.
-  - `.confirm-inline` block (only when filled, rendered with `hidden` attribute, `data-save-slots-target="confirmRow"`, `data-slot-number="N"`): `.q` "DELETE THIS SLOT?", `.body` with stake copy from `format_progress_phrase(parsed_play_seconds)`, `.actions` with CANCEL (`save-slots#cancelDelete`) + DELETE FOREVER (`save-slots#deleteSlot`, both carry `data-slot-number="N"`).
-- Footer: `.footer-actions` div containing the CLEAR ALL SLOTS button wired to `save-slots#confirmClearAll`, plus a sibling `.confirm-inline` rendered `hidden` with CANCEL (`save-slots#cancelClearAll`) + a confirm button firing the existing `clear-save#clear` action. Wrap both in the existing `data-controller="clear-save"` element so the inline confirm's button sees the controller's URL/CSRF values.
-- Gate filled-only sections with `next if slot.nil?` style guards. Keep server-side conditional rendering on every parsed_* field — never force a row when nil.
-
-**B-3 — `save_slots_controller.js`** (additive, no replacement of existing actions)
-- Static targets: extend to `["banner", "slot", "slotPill", "actionRow", "confirmRow", "clearAllAction", "clearAllConfirm"]`. Drop `overwriteOverlay` (the per-slot overlay button is gone — the slot itself becomes the click target).
-- New `connect()` work: cache the original pill class + text per slot in a WeakMap or a per-slot dataset attribute so `_exitOverwriteMode` and `cancelDelete` can restore them. Pick dataset (`data-original-pill-class`, `data-original-pill-text`) — survives broadcast replacements better than a JS-side WeakMap if the partial ever re-renders.
-- `_enterOverwriteMode`: walk every filled `slot` target. Cache pill state in dataset, swap pill class to `target` and textContent to `TARGET`, add `.overwrite-target` class to the slot wrapper, set `data-action="click->save-slots#overwriteSlot"` on the wrapper, hide its `actionRow`. Disable `_actionButtons()` for keyboard safety.
-- `_exitOverwriteMode`: reverses the above. Triggered both on success and by the new `cancelOverwrite()` action wired to the banner's CANCEL button.
-- `confirmDelete(event)` / `cancelDelete(event)`: locate the matching slot via `data-slot-number`, toggle its `actionRow.hidden` and `confirmRow.hidden`, swap the slot pill to `confirm` (and back). Focus the cancel button after revealing (safe-default keyboard behavior the mockup annotation calls out).
-- `confirmClearAll()` / `cancelClearAll()`: hide/show the two footer rows. No pill swap (the footer button has no pill).
-- `overwriteSlot`: drop the `window.confirm(CONFIRM_OVERWRITE)` line and the `CONFIRM_OVERWRITE` constant. Banner + amber slot border is the announcement; the click on a TARGET slot is the explicit consent. Keep the rest of the byte-grab + PATCH + reload flow untouched.
-- `_actionButtons()`: replace the `[data-confirm-modal-id-param^='delete-slot-']` clause with `[data-action*='save-slots#confirmDelete']`. Keep the makeActive clause.
-- Preserve all existing public action signatures (`makeActive`, `deleteSlot`, `overwriteSlot`) so the markup wiring just changes which trigger fires them.
-
-**B-4 — `_run_sidebar_card.html.erb`** (full body rewrite, same `s` local)
-- Wrapper: `<div class="roster-card" data-discord-user-id="<%= s.discord_user_id %>">`. Drop `gb-card` so the new `.roster-card` rules apply cleanly.
-- `.head` row: `<span class="name roster-card-name">PLAYER<span class="hof-pill">🏆 HOF</span></span>` (HOF only when `active_slot&.parsed_hof_count.to_i >= 1`) + `.state-pill` carrying the session status. Status → pill class mapping per the brief: `ready` → `saved`, `pending`/`generating` → `target`, `failed` → `confirm`, fallback → `saved`. Pill text is `s.status.upcase`.
-- `.stats` 3-tile grid: BADGES / DEX / PLAY. BADGES = `active_slot&.parsed_badges` (em-dash for nil), DEX = `active_slot&.parsed_pokedex_caught` (em-dash for nil), PLAY = `format_play_time(active_slot&.parsed_play_seconds)` which already returns `—` for nil. Always render the 3 tiles — empty tiles show `—` so the grid stays rectangular.
-- TID conflict warning band (outside the `<details>`, between `.stats` and `<details>`, only when applicable): compute partner labels from `s.soul_link_run.tid_conflict_groups` — find the group containing `s.id`, drop `s.id`, map remaining ids → `SoulLinkEmulatorSession.find_by(id: id)&.discord_user_id` → `SoulLink::GameState.player_name(...)`. The model returns session ids inside the conflict groups (confirmed in `app/models/soul_link_run.rb:98–113`), so this works without a fallback — but if the partner-session lookup yields no usable label list (e.g. all partner names are nil), I'll fall back to the bare `⚠ TID CONFLICT · re-roll the seed` and log a Known Gap. Inline N+1 risk noted: `find_by` per partner is at most 3 queries per render, only fires on the conflict path, and the partial is broadcast-rendered with no preload context. Acceptable per the existing partial contract; if Richard objects, escalate.
-- `<details><summary>STATS</summary><div class="extra">…</div></details>`: TRAINER (`parsed_trainer_name`, no "In-game:" prefix), MAP (`format_map_name(parsed_map_id)`), MONEY (`number_with_delimiter(parsed_money)` only — no peso glyph), TID/SID, DEX SEEN. Each row is `<div class="row"><span class="lbl">LABEL</span><span>value</span></div>`. Skip rows whose underlying field is nil. Drop the existing "Active … ago" + "Save: bytes" rows entirely (Known Gap candidate — log).
-- Seed: `<div class="seed" data-controller="roster-seed" data-action="click->roster-seed#copy">Seed: <%= s.seed %></div>` — placed inside the `<div class="extra">` block, after the row list, matching the mockup's structure. The `cursor: copy` + hover hint come from the new CSS; the controller does the actual copy.
-
-**B-4b — `roster_you_marker_controller.js`** (selector + injection update)
-- Update `apply()` so:
-  - When a card matches: add `you` class (not `gb-card--current-user`) to the wrapper to match `.roster-card.you` in the new CSS, and inject the `.you-badge` span inside the `.roster-card-name` element (not appended to `card.querySelector("div")`). Keep the data attribute `data-roster-you-marker-badge="true"` and the dedupe guard.
-  - When a card doesn't match: strip `you` class and remove any prior badge.
-- Drop the inline `style.cssText` on the badge — the new `.you-badge` CSS owns the styling.
-- The Stimulus controller name and registration stay; only the selector + class names change. Don't refactor the broader contract (per brief).
-
-**B-4c — `roster_seed_controller.js`** (new file, ~25 lines)
-- Stimulus controller. On click: read the seed text (strip the "Seed: " prefix or just copy the full element textContent), `await navigator.clipboard.writeText(seed)`, briefly swap the element's textContent to `Copied!` and a pulse class for 1 second, then revert. Catch failures (older browsers, secure-context restrictions) and `window.alert("Could not copy seed — copy it manually.")` to match the project's friendly-error pattern.
-- Register in `app/javascript/controllers/index.js` alongside the other controllers.
-
-**B-5 — Helper + tests**
-- `app/helpers/emulator_helper.rb`: add `format_progress_phrase(seconds)`. Locked rule:
-  - `nil` or `seconds.to_i < 60` → `"less than a minute of progress"`
-  - `60 <= seconds < 3600` → `"X minutes of progress"` where `X = (seconds / 60).round` (`60` → `1 minute`, `1800` → `30 minutes`, `3540` → `59 minutes`). Note: pluralisation handled by always-`s`-suffix is wrong for `1` minute — special-case 60 ≤ s < 120 → `"1 minute of progress"`.
-  - `seconds >= 3600` → `"X hours of progress"` where `X = seconds / 3600` (integer div, drops the partial hour to keep the phrase honest about "at least"). Special-case `3600 <= s < 7200` → `"1 hour of progress"`.
-  - Document the rule inline in the helper docstring so the test and the helper agree.
-- Tests (per the 12 buckets in B-5):
-  - Extend `test/controllers/emulator_controller_test.rb` `show renders ACTIVE badge…` (line 166) to also assert `>SAVED<` and `>EMPTY<` markers in the response body.
-  - New tests in `emulator_controller_test.rb` for: empty-slot CTA copy, inline DELETE confirm markup (hidden block + DELETE FOREVER substring + the `save-slots#confirmDelete` data-action regex), CLEAR ALL SLOTS inline confirm, no-`confirm_modal` lock (assert no `id="delete-slot-N-confirm"` and no `id="clear-all-slots-confirm"`), no peso sign anywhere in the response body.
-  - Extend `test/models/soul_link_emulator_save_slot_test.rb#run_sidebar_card partial renders standalone…` for: `class="roster-card"`, three `class="stat"` children, `<details>` + `STATS` summary, HOF inline pill inside `.name`, TID conflict band with `re-roll the seed` (build a 2-session conflict via two slots sharing TID/SID), conflict-absent path.
-  - New helper test file or extension to `emulator_helper_test.rb`: `format_progress_phrase` matrix.
-  - Extend `test/integration/responsive_grids_test.rb`: assert the three new tokens are declared exactly once in `:root`; assert no R3 rule inside the existing 520px/900px media blocks collapses `.slot` or `.roster-card` content; assert `.emulator-grid` declarations match the brief's pattern (need to grep for the existing rule first — if `.emulator-grid` lives elsewhere, log and adapt).
-
-### Open questions / decisions I want Ava to confirm before B-1
-
-1. **Status → pill-class mapping is a colour repurpose.** The brief says `ready` → `state-pill.saved`, `pending`/`generating` → `state-pill.target`, `failed` → `state-pill.confirm`. The CSS classes were named for the slot semantics (saved file / overwrite target / delete confirm) — repurposing them on the roster card is fine semantically (target=amber=in-progress, confirm=red=failure) but it means a future visual tweak to "delete confirm" colour also tweaks "session failed" colour. Acceptable trade-off, or do you want a parallel `.state-pill.ready/.pending/.failed` class set?
-2. **`format_progress_phrase` edge cases.** I'm picking integer-hour truncation (`3h 59m` → `"3 hours of progress"`, not `"4 hours"`). The mockup example uses `"04 hours"` for a 4h:23m slot which suggests truncation is fine, but it pads to two digits. I'm dropping the zero-pad — `"4 hours of progress"` reads cleaner in mid-sentence. Confirm or override.
-3. **Dropped fields' Known Gaps.** I plan to log two: (a) "saved Xm ago" footer dropped from slot card; (b) "Active … ago" + "Save: <bytes>" dropped from roster card. Both are mockup-omissions, not parser regressions. Confirm both are acceptable as Known Gaps without escalating to the Project Owner.
-4. **HOF pill on the slot card.** Brief says keep functionality, restyle only. I'll render it as `<span class="hof-pill">🏆 HOF</span>` after the slot body but before `.slot-actions`. The mockup doesn't depict a slot-card HOF, so I'm picking the placement that reads cleanly with the new CSS. Confirm or override.
-5. **`.emulator-grid` media-query test (B-5 #12).** The brief asserts a specific declaration shape but doesn't say which file owns `.emulator-grid`. I'll grep when I get there; if it lives in a partial-scoped `<style>` rather than `pixeldex.css`, I'll adjust the test target accordingly. Flagging early so you're not surprised if the test points at a different file.
-
-### Risk / scope check
-
-- **Test coverage shape.** I'm putting the controller-rendered assertions in `emulator_controller_test.rb` (already has the `>ACTIVE<` precedent at line 174). The partial-rendered assertions go in `soul_link_emulator_save_slot_test.rb` (already has the `run_sidebar_card partial renders standalone` precedent at line 227). No new test files unless `responsive_grids_test.rb` won't bear the token-declaration assertion (it will).
-- **No new JS framework, no new gems, no new design tokens beyond the three named.** Confirmed.
-- **Broadcast contract.** `_run_sidebar_card.html.erb` keeps its `s`-only locals contract. The `roster-seed` and `you-marker` Stimulus controllers attach client-side to the broadcast-rendered DOM the same way they do today.
-- **`window.confirm` removal in `overwriteSlot`.** The brief explicitly authorises this. I'll do it. If Richard pushes back I'll cite the brief.
-
-Awaiting Ava's confirm or redirect.
-
----
-
-## Architect response — Ava
-
-> 2026-05-04. Plan approved with the answers below. **Build per B-1 → B-5. Don't wait for further confirmation.**
-
-### Answers to your five questions
-
-1. **Pill-class repurposing — approved.** Keep one colour vocabulary (`saved`/`target`/`confirm`) across slots and roster. The visual language is "neutral / in-progress / failed" regardless of the surface it's on; that consolidation outweighs the small risk that a future tweak to one rule cascades to the other. If a future divergence is genuinely needed, that'll be a separate redesign step. Do not introduce parallel `.ready/.pending/.failed` classes.
-
-2. **`format_progress_phrase` rule — approved.** Integer-hour truncation, no zero-pad. `"4 hours of progress"` reads cleaner. The mockup's `04 hours` was decorative leftover from the `04:23` time format on stat tiles, not a copywriting choice. Lock the rule in the helper docstring. Special-cased singular ("1 minute" / "1 hour") is correct.
-
-3. **Dropped fields → Known Gaps — approved both, no escalation needed.** Log:
-   - **KG-33**: slot card no longer shows "saved Xm ago" footer or byte count. Mockup-driven, not a parser regression. Surface again if the Project Owner misses it.
-   - **KG-34**: roster card no longer shows "Active … ago" or "Save: bytes". Same shape.
-
-4. **HOF pill placement on slot card — approved.** After the body rows, before `.slot-actions`. The placement is consistent with how the mockup positions HOF on the roster card (inside the head, but the slot card has no head HOF slot — bottom of body is the next-best read).
-
-5. **`.emulator-grid` location confirmed.** Lives in `app/assets/stylesheets/pixeldex.css` lines 27–38. The default rule is `grid-template-columns: 1fr;` outside any media block; the 900px breakpoint sets `grid-template-columns: 280px minmax(0, 1fr) 280px;`. Test against that file. No grepping needed.
-
-### Two reminders for the build
-
-- **Singular minute / hour pluralisation:** stake your rule in the helper docstring. Test cases should pin both ends (`60 → 1 minute`, `120 → 2 minutes`, `3600 → 1 hour`, `7200 → 2 hours`). Tedious but locks behaviour.
-- **TID conflict partner-name lookup N+1 is fine.** Conflict path only fires when there's a real conflict (rare), max 3 partner lookups per render. No preload contortions for a cold path. If Richard asks, the trade is "broadcast partial has no preload context, conflict is rare, lookups are by primary key" — quote that and move on.
-
-### Build approved. Go.
-
----
