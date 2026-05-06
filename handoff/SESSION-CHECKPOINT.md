@@ -6,48 +6,47 @@
 
 ## Where We Stopped
 
-Step 26 (Rebase the design canon's main `--accent` token from `--amber` to `--green-glow` per user feedback) shipped on the worktree branch `claude/hungry-cray-ff4938`, FF-merged to `origin/main`, and pushed. Awaiting next brief from Project Owner.
+Step 27 (Restyle the four Phase-2 redesigns to the legacy `gb-*` idiom) shipped on the worktree branch `claude/quirky-franklin-ab7a54` at `9c83c8f`, FF-merged to `origin/main`, and pushed. Awaiting next brief from the Project Owner.
 
-Step 26 follows Step 25 (Site-wide design canon adoption, shipped at `1a5024d`). Step 26 does both halves of the canon's color story: swaps the alias *and* propagates `var(--accent)` across the codebase (Step 25 added the alias but never propagated it).
+Step 27 follows Step 26 (token-alias rebase `--accent` → `--green-glow`). The accent rebase made the green correct; Step 27 made the accent **rarer** — fewer chrome elements per screen, accent reserved for primary attention, matching the Game-Boy-menu-density dialect that `/species` + `/teams` (untouched reference surfaces) still speak.
 
 ---
 
 ## What Was Built
 
-**Step 26 — Rebase the canon `--accent` from `--amber` to `--green-glow`.** Pure presentation-layer rebase. 8 files touched: `pixeldex.css`, 4 view files (`_runs_content`, `_gyms_content`, `map/show`, `gym_drafts/show`), 1 JS file (`gym_draft_controller.js`), `design_canon.md`, `design_canon_test.rb`. Seven self-contained slices:
+**Step 27 — Restyle the four Phase-2 redesigns to the old (gb-*) idiom.** Pure visual restyle. Functional behavior unchanged.
 
-1. **Token alias swap (Slice A):** `:root` line 24, `--accent: var(--amber)` → `--accent: var(--green-glow)`. 1-line CSS change. `--amber: #d4b14a` and `--success: var(--green-glow)` left intact.
-2. **`pixeldex.css` `var(--amber)` sweep (Slice B):** 60 of 62 references → `var(--accent)`. 2 references on `.conflict-warning` (lines 2111-2112) preserved per `design_canon.md` § 9 (out-of-canon, intentional gold alarm).
-3. **rgba glow decompositions (Slice C):** 10 sites of `rgba(212, 177, 74, …)` → `rgba(95, 212, 95, …)`. Same alpha stops.
-4. **View inline-style sweep (Slice D):** 4 sites — HoF "🏆 COMPLETE" pill, NEXT pill, map "↓ NOW" caption, gym-draft coin-flip result text.
-5. **JS inline-style sweep (Slice E):** 4 sites in `gym_draft_controller.js` (lines 157, 262, 263, 572). Line 263 was a longer `box-shadow` literal — caught by Bob's post-edit grep audit before review submission.
-6. **`design_canon.md` prose updates (Slice F):** § 1 Accents table row, new Step 26 note, § 8 Borders parenthetical, opening sentence "amber accent" → "green accent".
-7. **Test update (Slice G):** `design_canon_test.rb` first assertion regex updated to expect `--accent: var(--green-glow)`.
+**Architect prep (Halves 1 + 2):**
+- `handoff/2026-05-06-old-style-canon-audit.md` — extracts the canon from `/species` + `/teams`, catalogues the drift across the 4 redesigns, and writes the per-surface directive table (§ 3.1 / 3.2 / 3.3 / 3.4) for Bob to apply mechanically.
+- `app/assets/stylesheets/design_canon.md` updated — added § 0 (Game-Boy-menu-density principle), re-pinned §§ 4-7 (buttons / pills / cards) to gb-* values, added § 11 (chrome-reduction rules: banned primitives, single tablist, ghost pills, no animations beyond `transition: 0.05s` color swaps).
 
-**Architect-prep doc:** `handoff/2026-05-06-accent-rebase-audit.md` (locked rationale + grep + scope + exception list).
+**Builder execution (Half 3):** four surfaces' chrome rebased in `app/assets/stylesheets/pixeldex.css` (4 namespace blocks: `.dash-r1`, `.pc-box-r2`, `.map-r4`, save-slots). 5 ERB views updated to drop decorative chrome (title-glyph, badge-dot DOM, you-pill / hof-pill-r1 / badges-pill, boxed node-legend, multi-row badge-legend, pending-banner icon-glyph, empty-tray-bar check glyph, run-pill inner status badge, stat-strip per-item modifier classes). All Stimulus targets, ARIA tablist wiring, dropdown menus, click-to-open, and modal pre-fill flows preserved verbatim.
 
-**Counts:** 782 → 782 tests (no count change; the first design-canon assertion regex changed). 0 failures, 0 errors. Rubocop clean (203 files). Brakeman: same 2 pre-existing weak-confidence warnings as Steps 18-25.
+**Animations dropped:** `pulseNext` (map nodes + dashboard gym row + map accordion row) and `subtleBlink` (jump-btn). Static border-color emphasis replaces them. `@keyframes pulseNext` retained as a no-op for safety; `subtleBlink` block deleted.
 
-**Acceptance grep checks (all green):**
-- `grep -c "var(--amber)" pixeldex.css` → `2` (the `.conflict-warning` exception only).
-- `grep -c "rgba(212, 177, 74" pixeldex.css` → `0`.
-- `grep -rn "var(--amber)" app/views/ app/javascript/` → 0 hits.
-- `grep -c "var(--accent)" pixeldex.css` → `59` (was `0` pre-Step-26).
-- `grep -c "rgba(95, 212, 95" pixeldex.css` → `10`.
+**Hover effects dropped:** translateY + box-shadow on 4 cell types (PC Box box-cell, map node, special-cell, badge-strip badge). One-frame border-color swaps replace them per canon § 11.2.
 
-**Review:** 0 Must Fix, 0 Should Fix, 0 Escalate, 0 Nits. "Step 26 is clear." Visual smoke (described, not rendered): every previously-amber surface — HoF COMPLETE pill, NEXT indicator, map NOW caption, run-pill border, gym-draft coin-flip text + ready-status + turn-indicator chip + glow, save-slot ACTIVE pill border, "next gym" pulse animation, focus rings, group-card / type-pill / box-cell hover borders — now renders green-glow `#5fd45f`. The four documented exceptions remain unchanged: `.conflict-warning` (amber bg+border), `--amber` token still defined in `:root`, coin-flip modal red `#c0392b` border, `--success` markers (already green-glow).
+**Counts:** 782 tests, 2629 assertions, 0 failures, 0 errors. Rubocop clean (203 files). Brakeman: same 2 pre-existing weak-confidence warnings (`emulator_controller.rb:79` SendFile, `gym_schedule_discord_update_job.rb:14` FileAccess); zero delta on Step-27-touched files.
+
+**Files:** `pixeldex.css` (~1102-2492 across 4 namespaces); 5 ERB views (`_save_slots_sidebar`, `_pc_box_content`, `map/show`, `_title_bar`, `_tab_bar`, `_status_rail`); 3 integration tests (`dashboard_redesign_test`, `pc_box_redesign_test`, `map_redesign_test`); `design_canon.md`; new audit doc.
+
+**Review:** Richard cleared 0 / 0 / 0 (Must Fix / Should Fix / Escalate). Aesthetic-consistency check verified all four restyled surfaces use canon primitives uniformly. Subjective "does this feel right" smoke deferred to PO per standing arrangement. Bob's 6 confirmed exceptions all harmless or helpful — none expand scope.
 
 ---
 
 ## What Was Decided This Session
 
-- **`--green-glow` is the right "lighter green" target.** Other Game Boy greens (`--d2`, `--l1`, `--l2`) are positional surface/text colors (chrome / page bg / muted text), not main-color candidates. `--green-glow` `#5fd45f` is the only "vibrant / fresh / lighter" green in the palette and it's the dominant green on the gym-draft view (slot.active border, state-pill.active bg, alive-count text, etc.). User's framing matched.
-- **`--accent` and `--success` now resolve to the same hex.** Both alias `var(--green-glow)`. Semantic distinction preserved in prose only. The Game Boy palette has only one bright-green slot — aliasing two roles to it keeps the canon honest. If a future step needs to split them, introduce a new positional green token and re-point one alias.
-- **`--amber: #d4b14a` token kept defined in `:root`** despite zero live references after Step 26. It's a positional palette token, kept for palette completeness and to allow a future opt-in "true gold" surface without re-adding the hex. Does *not* count as dead code under the canon's rules.
-- **`.conflict-warning` is the only legitimate `var(--amber)` site post-Step-26.** Per `design_canon.md` § 9 out-of-canon list — single-use save-slot warning, deliberate gold/yellow alarm. Lines 2111-2112 of `pixeldex.css` retain `var(--amber)`.
-- **rgba decompositions of the amber hex (10 sites) had to migrate together.** When border/bg becomes green-glow, the matching glow-shadow must also flip. `rgba(212, 177, 74, …)` → `rgba(95, 212, 95, …)`, same alpha stops. Mechanical.
-- **Trap caught:** `gym_draft_controller.js:263` had `"0 0 0 2px var(--amber)"` (amber embedded inside a longer string literal). Bob's bare-token `replace_all` initially missed it; the post-edit `grep -rn` audit caught it before review submission. Documented in REVIEW-REQUEST.md notes.
-- **No view / controller / model / service / config / migration touched.** Pure presentation-layer: 1 CSS file, 4 view files (inline-style attrs only), 1 JS file (string literals only), 1 Markdown doc, 1 test file.
+- **Game-Boy-menu-density principle codified.** § 0 of `design_canon.md`. The canon is text-first, fewer chrome elements per screen, accent color used sparingly for emphasis not decoration. `/species` + `/teams` are the reference surfaces; the four Phase-2 redesigns rebase to that dialect while keeping their functional improvements.
+- **Visual primitives re-pinned to gb-* values.** `.btn` rebases to `gb-btn` form (11 px font, 8 × 14 padding, single-line label, no `translateY`/glow). `.card` rebases to `gb-card` form (3 px solid `--ink` border, 12 px padding). `.pill` rebases to ghost-default (1 row → 1 colored pill maximum; ghost pills carry the rest).
+- **Chrome-reduction rules codified** in § 11 of `design_canon.md`. Banned primitives: title-glyph, badge-dot, multi-color inline pill stack, stacked chrome bars before content, sticky transient-mode banners, animations beyond `transition: 0.05s`, gradient-fade overlays, accent active-state outline rings, vertical 2-line buttons, per-item color coding inside stat strips.
+- **One step, not split.** All four restyled surfaces share the same primitive substitutions (mechanical), so a single bundle is the right shape over 4 review/commit cycles.
+- **`badge-dot` preserved as a non-chrome marker.** "PC BOX has new parsed catches" / "GYMS has an active draft" is a real affordance — escalated by Architect from "drop entirely" to "preserve as a `<span aria-label="Updates available">*</span>` text suffix" so the screen-reader signal stays without the glow chrome.
+- **Status-rail sub-tabs preserved structurally, restyled visually.** Controller targets + sub-tab toggle behavior stay; the `.side-tabs` CSS rebases to look like stacked `gb-section-header`s. The user can still switch panels — the visual hierarchy reads as section-headers, not as a colored-active mini-tablist. (Brief explicitly said "drop or downplay sub-tab pills" — interpretation: downplay the visual styling, not collapse the structure.)
+- **Run-pill rebased to gb-btn shape; status indicator inline as text** (`RUN #2 — ACTIVE ▾`). Run-option pills in the dropdown rebase to plain `[ACTIVE] / [HOF] / [PAST]` text suffix in the `.label` span.
+- **PC Box review-row badges rebased to a single ghost-pill family.** All 4 (1ST / TRADE-IN / EVENT / OFF-FEED) share the same rule — `1px --l1 border`, transparent bg, `--l1` text. The kind reads from the LABEL TEXT.
+- **Map node-legend collapsed inline into the `.map-head .sub` subtitle.** No separate boxed legend bar.
+- **Step 26 accent unchanged.** `--accent: var(--green-glow)`. Step 27 makes accent appearances rarer, not differently-colored.
+- **No token values changed.** Step 25's `design_canon_test.rb` keeps passing without modification.
 
 ---
 
@@ -55,7 +54,9 @@ Step 26 follows Step 25 (Site-wide design canon adoption, shipped at `1a5024d`).
 
 *See `handoff/BUILD-LOG.md` Known Gaps — running list maintained there.*
 
-Step 26 closed nothing — it was a value-rebase step, not a backlog item. No new gaps logged. The canon (`app/assets/stylesheets/design_canon.md`) is now fully aligned with the user's main-color preference.
+Step 27 closed nothing — it was a normalization / chrome-reduction step, not a backlog item. No new gaps logged. Two cosmetic-cleanup items Bob flagged as conservative-build leave-its (acceptable per Richard):
+- `@keyframes pulseNext` definition retained in `pixeldex.css` as a no-op (no consumers remain). Cheap to leave; future cleanup pass can prune.
+- Per-row badge modifier classes (`first` / `trade` / `event` / `offfeed`) left in PC Box ERB markup as inert hooks even though no CSS targets them. Harmless markup; future re-introduction-friendly if a redesign wants per-kind color back.
 
 KG-7, KG-19, KG-20, KG-23, KG-25, KG-26, KG-27, KG-28, KG-29, KG-30, KG-31, KG-32, KG-33, KG-34, KG-35, KG-36, KG-37, KG-38, KG-39 still open from earlier steps.
 

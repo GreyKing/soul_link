@@ -11,48 +11,43 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 27 — Restyle the four Phase-2 redesigns (R3 Save Slots, R2 PC Box review tray, R4 Map timeline, R1 Dashboard) to the legacy `gb-*` idiom (the visual language of `/species` and `/teams`) per user feedback that the dashboard had become busier-than-helpful and the old style felt more fitting. CSS-first, minor ERB visual restyle — functional behavior unchanged. Mechanical application of the audit's per-surface directive tables (`handoff/2026-05-06-old-style-canon-audit.md` § 3.1 / 3.2 / 3.3 / 3.4). The four surfaces' chrome rebased to gb-card-dark, gb-btn / gb-btn-primary / gb-btn-sm, gb-section-header, gb-flash-alert / gb-flash-notice, gb-page-title / gb-page-subtitle. The `.dash-r1`, `.pc-box-r2`, `.map-r4` namespaces stay (forward-path bound from Step 25); only the rules under them change.
-
-**Architect-prep docs:** `handoff/2026-05-06-old-style-canon-audit.md` (the directive table — source of truth for what changes) + Step 27 update to `app/assets/stylesheets/design_canon.md` § 0 / § 4-7 / § 11 (chrome-reduction rules).
-
-**Test count:** 782 → **782** (no count change). 0 failures, 0 errors. Three existing markup-assertion tests updated to match the new (Step 27) markup: `dashboard_redesign_test.rb` (3 tests — stat-strip per-item modifier classes dropped, badge-dot replaced by `*` text suffix, you-pill class dropped); `pc_box_redesign_test.rb` (1 test — badge-legend per-kind colour modifier classes dropped, kind reads from label); `map_redesign_test.rb` (1 test — boxed `.node-legend` collapsed into the `.map-head .sub` subtitle line). The Step 25 `design_canon_test.rb` keeps passing without modification (Step 27 doesn't change token values — assertions on `--accent: var(--green-glow)`, danger family, spacing scale, danger-token references on shared surfaces, and `design_canon.md` token references all still hold).
-**Lint:** rubocop clean (203 files, 0 offenses).
-**Brakeman:** Clean (same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess; zero delta on Step-27-touched files — Step 27 only edited CSS, ERB views, design_canon.md prose, and 3 integration tests).
-**Migrations:** None. **Zero new gem deps. Zero controller / model / service / config / job / channel code touched.** Pure presentation-layer restyle.
-
-**Pre-existing context:** Step 27 follows Step 26 (token-alias rebase `--accent` → `--green-glow`) at `1a5024d` / Step 26 ship at the prior session's HEAD. Step 26 made the accent green; Step 27 makes the accent **rarer** — the user's "use accent sparingly for emphasis not decoration" framing. The reference surfaces `/species` and `/teams` (untouched) demonstrate the canonical idiom: text-first, fewer chrome elements per screen, accent only for primary attention.
-
-**Step 27 highlights / decisions:**
-- **One step, not split into 27a/b/c/d.** All four surfaces share the same primitive substitutions (boxed bar → gb-page-title, custom buttons → gb-btn*, multi-pill stacks → single-color or removal, animations → static, sub-tabs → gb-section-header). Splitting would force 4 review/commit cycles for one design decision; mechanical bundling is the right shape.
-- **Build order: warm-up → highest-risk last.** Save Slots (3.2, smallest scope, mostly button + container restyle) → PC Box (3.3, badge collapse + filter rebase) → Map (3.4, header collapse + animation drop) → Dashboard (3.1, biggest scope, 12 directive rows). Each surface verified separately during build before moving on.
-- **`badge-dot` → inline `*` text suffix.** The audit's architect call flagged this as a real affordance ("PC BOX has new parsed catches" / "GYMS has an active draft"), recommending preservation as a non-chrome marker. Resolved as a `<span aria-label="Updates available">*</span>` text suffix on the tab text — same data, no glow chrome, same a11y label.
-- **Status-rail sub-tabs preserved structurally, restyled visually.** The `data-status-rail-target="tabButton"` / `tabPanel` controller wiring stays; the `.side-tabs` CSS rebases to look like stacked `gb-section-header`s (full-width caps bars, --d1 bg, --l2 text, no accent green). User can still switch panels — the visual hierarchy reads as section-headers, not as a coloured-active mini-tablist.
-- **Run-pill rebased to gb-btn shape; status indicator inline as text.** The trigger-button's `<span class="badge">` chrome is dropped. Status reads as inline text in the label (`RUN #2 — ACTIVE ▾`). Dropdown menu options' `<span class="pill">` rebases to plain inline `[ACTIVE] / [HOF] / [PAST]` text suffix in the `.label` span.
-- **Stat-strip per-item colour coding dropped.** `.alive` / `.dead` / `.badges` modifier classes removed from both ERB and CSS. ALIVE / DEAD / BADGES values are plain `--white` text; the labels do the work per canon § 11.2.
-- **PC Box review-row badges rebased to single ghost-pill family.** All 4 badges (1ST / TRADE-IN / EVENT / OFF-FEED) now share the same `.pc-box-r2 .badge` rule — 1 px `--l1` border, transparent bg, `--l1` text. The kind reads from the LABEL TEXT, not from a colour. Per-row badge modifier classes (`first` / `trade` / `event` / `offfeed`) left in markup as inert hooks for future re-introduction if needed; no CSS rules target them.
-- **Map node-legend collapsed inline into the subtitle.** No separate boxed legend bar. The 5 glyphs (●/☠/○/★/G) live as inline text characters in `.map-head .sub` per canon § 11.1 (no stacked chrome bars before content).
-- **Animations dropped: `pulseNext` (map nodes + dashboard gym row + map accordion row), `subtleBlink` (jump-btn).** All replaced by static border-color emphasis. The `@keyframes pulseNext` definition is retained in `pixeldex.css` (no longer referenced — left as a no-op for safety; can be pruned in a future cleanup pass). `subtleBlink` keyframes block deleted entirely.
-- **Drop hover translateY + box-shadow drops.** Across 4 sites (`.pc-box-r2 .box-cell`, `.map-r4 .node`, `.map-r4 .special-cell`, `.map-r4 .badge-strip .badge`). Replaced with one-frame border-color swaps per canon § 11.2.
-- **Three test files updated to match new markup.** None of the assertions tested functional contracts that changed — they all asserted *visual chrome* (per-item modifier classes, badge-dot DOM, you-pill DOM, badge-legend modifier classes, boxed node-legend) that the audit explicitly removed. Re-pinned each assertion to the new (Step 27) markup with a comment explaining the Step-27 rebase.
-- **`bin/rails` shim broken on this worktree** (same as Step 26 — mis-shimmed to ruby 3.0.6). Bob fell back to `PATH="…/ruby/3.4.5/bin:$PATH" bundle exec rails test` per the project memory's documented fallback.
-
-**Step 27 — Files touched (CSS + 4 ERB views + 3 tests):**
-- `app/assets/stylesheets/pixeldex.css` (CSS-only; lines ~1102-1640 R4 Map, ~1644-1893 R2 PC Box, ~1898-2030 R3 Save Slots, ~2137-2492 R1 Dashboard).
-- `app/views/emulator/_save_slots_sidebar.html.erb` (drop pending-banner `.icon` glyph).
-- `app/views/dashboard/_pc_box_content.html.erb` (collapse badge-legend rows to inline strip; drop empty-tray-bar `.check` glyph; drop count chip in tray-head).
-- `app/views/map/show.html.erb` (rebase `.map-head` to title+subtitle, hoist badge-strip to gb-section, drop boxed node-legend, inline legend into subtitle).
-- `app/views/dashboard/_title_bar.html.erb` (drop title-glyph, drop run-pill `<span class="badge">`, rebase run-option pills to inline text, drop stat-strip per-item modifier classes).
-- `app/views/dashboard/_tab_bar.html.erb` (replace `<span class="badge-dot">` with inline `*` text suffix; tab text now single-line — icon renders inline-prefix in the label, not stacked above).
-- `app/views/dashboard/_status_rail.html.erb` (drop you-pill / hof-pill-r1 / badges-pill — HOF prefix in name, BADGES count plain text).
-- `test/integration/dashboard_redesign_test.rb` (3 tests updated to new markup).
-- `test/integration/pc_box_redesign_test.rb` (1 test updated).
-- `test/integration/map_redesign_test.rb` (1 test updated).
-- `app/assets/stylesheets/design_canon.md` (Step 27 update — § 0 game-boy-menu-density principle, § 4-7 primitives re-pinned, § 11 chrome-reduction rules) — Architect-authored.
+**Awaiting next brief.** Step 27 (Restyle the four Phase-2 redesigns to the old `gb-*` idiom) shipped on branch `claude/quirky-franklin-ab7a54` at `9c83c8f`, FF-merged to `origin/main`, and pushed.
 
 ---
 
-## Step 25 — Status archive
+## Step 27 — Status archive
 *Kept here for one-step lookback; will fold into archive at session end.*
+
+**Step 27:** Restyle the four Phase-2 redesigns (R3 Save Slots, R2 PC Box review tray, R4 Map timeline, R1 Dashboard) to the legacy `gb-*` idiom. Pure CSS-first / minor-ERB visual restyle — functional behavior unchanged. Mechanical application of the audit's per-surface directive tables (`handoff/2026-05-06-old-style-canon-audit.md` § 3.1 / 3.2 / 3.3 / 3.4). The four surfaces' chrome rebased to `gb-card-dark`, `gb-btn` / `gb-btn-primary` / `gb-btn-sm`, `gb-section-header`, `gb-flash-alert` / `gb-flash-notice`, `gb-page-title` / `gb-page-subtitle`. The `.dash-r1`, `.pc-box-r2`, `.map-r4` namespaces stay (forward-path bound from Step 25); only the rules under them change.
+
+**Architect-prep docs:** `handoff/2026-05-06-old-style-canon-audit.md` (the directive table — source of truth for what changes) + Step 27 update to `app/assets/stylesheets/design_canon.md` § 0 / § 4-7 / § 11 (chrome-reduction rules).
+
+**Highlights / decisions:**
+- **One step, not split into 27a/b/c/d.** All four surfaces share the same primitive substitutions (boxed bar → gb-page-title, custom buttons → gb-btn*, multi-pill stacks → single-color or removal, animations → static, sub-tabs → gb-section-header). Mechanical bundling.
+- **Build order: warm-up → highest-risk last.** Save Slots (3.2) → PC Box (3.3) → Map (3.4) → Dashboard (3.1).
+- **`badge-dot` → inline `*` text suffix** with `aria-label="Updates available"` (preserves the affordance without the glow chrome).
+- **Status-rail sub-tabs preserved structurally, restyled visually.** Controller wiring stays; `.side-tabs` CSS rebases to look like stacked `gb-section-header`s.
+- **Run-pill rebased to gb-btn shape; status indicator inline as text** (`RUN #2 — ACTIVE ▾`). Run-option pills in the dropdown rebase to plain `[ACTIVE] / [HOF] / [PAST]` text suffix.
+- **Stat-strip per-item colour coding dropped.** ALIVE / DEAD / BADGES values are plain `--white`; the labels do the work per canon § 11.2.
+- **PC Box review-row badges rebased to single ghost-pill family.** All 4 badges (1ST / TRADE-IN / EVENT / OFF-FEED) share the same rule. The kind reads from the LABEL TEXT, not from a colour. Per-row badge modifier classes left in markup as inert hooks.
+- **Map node-legend collapsed inline into the subtitle.** No separate boxed legend bar.
+- **Animations dropped: `pulseNext` (map nodes + dashboard gym row + map accordion row), `subtleBlink` (jump-btn).** Replaced by static border-color emphasis. `@keyframes pulseNext` definition retained in `pixeldex.css` as a no-op (cheap to leave; can be pruned in a future cleanup pass). `subtleBlink` block deleted.
+- **Hover translateY + box-shadow drops** across 4 sites (`.pc-box-r2 .box-cell`, `.map-r4 .node`, `.map-r4 .special-cell`, `.map-r4 .badge-strip .badge`). One-frame border-color swaps replace them.
+- **Three test files updated to match new markup** — none of the assertions tested functional contracts that changed; they all asserted *visual chrome* the audit removes.
+
+**Files touched:** `app/assets/stylesheets/pixeldex.css` (~1102-2492 across 4 namespace blocks); 5 ERB views (`_save_slots_sidebar`, `_pc_box_content`, `map/show`, `_title_bar`, `_tab_bar`, `_status_rail`); 3 integration tests (`dashboard_redesign_test`, `pc_box_redesign_test`, `map_redesign_test`); `design_canon.md` (Architect-authored Step 27 update); plus the new audit doc.
+
+**Test count:** 782 → **782** (no count change). 0 failures, 0 errors.
+**Lint:** rubocop clean (203 files, 0 offenses).
+**Brakeman:** Clean (same 2 pre-existing weak-confidence warnings; zero delta on Step-27-touched files).
+**Migrations:** None. **Zero new gem deps. Zero controller / model / service / config / job / channel code touched.** Pure presentation-layer restyle.
+
+**Review:** Richard cleared 0 / 0 / 0 (Must Fix / Should Fix / Escalate). Aesthetic-consistency check verified all four restyled surfaces use canon primitives uniformly; manual visual smoke deferred to PO. Bob's 6 confirmed exceptions all harmless or helpful.
+
+---
+
+## Step 25 — Status archive (deeper lookback, kept this session)
+*Will fold into archive at session end.*
 
 **Step 25:** Site-wide design canon adoption (first step after Phase 2 closed at Step 24). Mechanical CSS-only normalization: single file edit (`app/assets/stylesheets/pixeldex.css`) + one new test (`test/integration/design_canon_test.rb`) + two new docs (`handoff/2026-05-06-design-canon-audit.md` + `app/assets/stylesheets/design_canon.md` — Architect-locked source of truth). Six self-contained slices per `handoff/ARCHITECT-BRIEF.md`:
 - **Slice 1 — Tokens:** Replaced the `:root` block (lines 5-21) with the canon-aligned version. Added 30+ new tokens (semantic aliases `--shadow/--ink/--shade/--moss/--canvas/--paper/--accent/--success/--danger`, danger family `--danger-bg/--danger-border/--danger-fg`, spacing scale `--s-1` through `--s-8`, type scale `--t-micro` through `--t-xl`, letter-spacing scale `--ls-tight/--ls-default/--ls-wide`, line-height scale `--lh-tight/--lh-snug/--lh-body`). Kept every existing token (`--d0/--d1/--d2/--l1/--l2/--white/--amber/--green-glow/--crimson`); semantic aliases point at them. `--border` / `--border-thin` / `--border-double` rewritten to use `var(--ink)` (still resolves to `--d1` — value-stable).
