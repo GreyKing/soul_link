@@ -2081,6 +2081,371 @@ body::after {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   ── R1 Dashboard ──
+   Step 24 — slim title bar + ARIA tablist + 3-col layout w/
+   consolidated right status rail. Every selector namespaced
+   under `.dash-r1` so Step 19/20/21/22/23 styles are untouched.
+   No new design tokens — the existing :root palette covers it.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Title bar ── */
+.dash-r1 .title-bar {
+  background: var(--d1);
+  border: var(--border);
+  padding: 10px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+}
+.dash-r1 .title-left {
+  display: flex; align-items: center; gap: 12px; min-width: 0;
+}
+.dash-r1 .title-glyph {
+  width: 36px; height: 36px;
+  background: var(--amber); color: var(--d0);
+  border: 2px solid var(--d0);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Press Start 2P', monospace; font-size: 14px;
+  flex-shrink: 0;
+}
+.dash-r1 .title-block .player {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 13px; color: var(--white);
+  letter-spacing: 1px;
+}
+.dash-r1 .title-block .meta {
+  color: var(--l1); font-size: 13px; margin-top: 2px;
+}
+
+/* ── Run pill (replaces the legacy <select onchange>) ── */
+.dash-r1 .run-pill-wrap {
+  position: relative;
+}
+.dash-r1 .run-pill {
+  background: var(--d2);
+  border: 2px solid var(--amber);
+  padding: 5px 10px;
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px; letter-spacing: 1px;
+  color: var(--white);
+  cursor: pointer;
+}
+.dash-r1 .run-pill:hover { background: var(--d0); }
+.dash-r1 .run-pill .badge {
+  background: var(--green-glow); color: var(--d0);
+  padding: 2px 4px; font-size: 7px;
+  font-family: 'Press Start 2P', monospace; letter-spacing: 1px;
+}
+.dash-r1 .run-pill .badge.hof { background: var(--amber); }
+.dash-r1 .run-pill .badge.dim { background: var(--d2); color: var(--l1); }
+.dash-r1 .run-pill .chev { color: var(--amber); margin-left: 4px; }
+.dash-r1 .run-pill[aria-expanded="true"] .chev { transform: rotate(180deg); display: inline-block; }
+
+.dash-r1 .run-pill-menu {
+  position: absolute; top: calc(100% + 4px); left: 0;
+  z-index: 30;
+  background: var(--d1);
+  border: var(--border);
+  padding: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  min-width: 280px;
+}
+.dash-r1 .run-pill-menu.hidden { display: none; }
+.dash-r1 .run-pill-menu .run-option {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px;
+  text-decoration: none;
+  cursor: pointer;
+  color: inherit;
+}
+.dash-r1 .run-pill-menu .run-option .label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px; color: var(--l1);
+  letter-spacing: 0.5px;
+}
+.dash-r1 .run-pill-menu .run-option .dates {
+  color: var(--d2); font-size: 12px;
+}
+.dash-r1 .run-pill-menu .run-option.active {
+  background: var(--d0);
+  border: 2px solid var(--green-glow);
+  margin-bottom: 4px;
+}
+.dash-r1 .run-pill-menu .run-option.active .label { color: var(--white); font-size: 10px; }
+.dash-r1 .run-pill-menu .run-option.active .dates { color: var(--l1); }
+.dash-r1 .run-pill-menu .run-option:hover,
+.dash-r1 .run-pill-menu .run-option:focus {
+  outline: none;
+  background: var(--d2);
+}
+.dash-r1 .run-pill-menu .run-option .pill {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px; padding: 1px 4px; margin-left: 6px;
+  letter-spacing: 1px;
+  background: var(--green-glow); color: var(--d0);
+}
+.dash-r1 .run-pill-menu .run-option .pill.hof { background: var(--amber); color: var(--d0); }
+.dash-r1 .run-pill-menu .start-row {
+  margin-top: 6px; padding-top: 6px;
+  border-top: 1px dashed var(--d2);
+}
+.dash-r1 .run-pill-menu .start-row .start-btn {
+  width: 100%;
+  background: var(--d2); color: var(--l2);
+  border: 1px dashed var(--l1);
+  padding: 6px;
+  cursor: pointer;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px; letter-spacing: 1px;
+}
+.dash-r1 .run-pill-menu .start-row .start-btn:hover { background: var(--d0); color: var(--white); }
+
+/* ── Stat strip (single inline row) ── */
+.dash-r1 .stat-strip {
+  display: flex; align-items: center; gap: 14px;
+  flex-wrap: wrap;
+}
+.dash-r1 .stat-strip .item {
+  display: flex; align-items: baseline; gap: 6px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px; letter-spacing: 1px;
+  color: var(--l1);
+}
+.dash-r1 .stat-strip .item .val { color: var(--white); font-size: 14px; }
+.dash-r1 .stat-strip .item.alive .val { color: var(--green-glow); }
+.dash-r1 .stat-strip .item.dead .val { color: var(--crimson); }
+.dash-r1 .stat-strip .item.badges .val { color: var(--amber); }
+.dash-r1 .stat-strip .sep { color: var(--d2); font-size: 14px; }
+
+/* ── Tab bar — real tablist ── */
+.dash-r1 .tab-bar {
+  display: flex;
+  background: var(--d2);
+  border: var(--border);
+  border-top: none;
+  padding: 0;
+  flex-wrap: wrap;
+}
+.dash-r1 .tab {
+  flex: 1; min-width: 90px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--d0);
+  padding: 10px 8px;
+  cursor: pointer;
+  color: var(--l1);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px; letter-spacing: 1px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  transition: background 0.1s, color 0.1s;
+  position: relative;
+}
+.dash-r1 .tab:last-child { border-right: none; }
+.dash-r1 .tab .icon {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px; color: inherit;
+}
+.dash-r1 .tab:hover { background: var(--d1); color: var(--l2); }
+.dash-r1 .tab[aria-selected="true"] {
+  background: var(--d1); color: var(--amber);
+}
+.dash-r1 .tab[aria-selected="true"]::after {
+  content: ''; position: absolute; bottom: -3px; left: 0; right: 0;
+  height: 3px; background: var(--amber);
+}
+.dash-r1 .tab .badge-dot {
+  position: absolute; top: 6px; right: 8px;
+  width: 6px; height: 6px;
+  background: var(--green-glow); border-radius: 50%;
+  box-shadow: 0 0 4px var(--green-glow);
+}
+
+/* ── Three-col layout (overrides the legacy .pc-layout shape) ── */
+.dash-r1 .pc-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 320px;
+  gap: 14px;
+  margin-top: 14px;
+  align-items: flex-start;
+  background: transparent;
+  animation: none;
+  flex: initial;
+  min-height: 0;
+}
+
+/* ── Status rail (right column with sub-tabs) ── */
+.dash-r1 .status-rail {
+  background: var(--d1);
+  border: var(--border);
+  padding: 14px;
+}
+.dash-r1 .side-tabs {
+  display: flex;
+  border: 1px solid var(--d0);
+  margin-bottom: 12px;
+}
+.dash-r1 .side-tab {
+  flex: 1;
+  background: var(--d2);
+  border: none;
+  border-right: 1px solid var(--d0);
+  padding: 6px 4px;
+  cursor: pointer;
+  color: var(--l1);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px; letter-spacing: 1px;
+}
+.dash-r1 .side-tab:last-child { border-right: none; }
+.dash-r1 .side-tab[aria-selected="true"] { background: var(--amber); color: var(--d0); }
+.dash-r1 .side-tab:hover:not([aria-selected="true"]) { background: var(--d1); color: var(--white); }
+
+.dash-r1 .status-panel.hidden { display: none; }
+.dash-r1 .status-panel .h3-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+  border-bottom: 1px dashed var(--d2);
+  padding-bottom: 8px;
+}
+.dash-r1 .status-panel h3 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px; color: var(--white);
+  margin: 0; letter-spacing: 1px;
+}
+.dash-r1 .status-panel .count {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px; color: var(--l1); letter-spacing: 1px;
+}
+
+/* PARTY sub-tab — one card per registered player */
+.dash-r1 .player-card {
+  margin-bottom: 10px; padding: 8px;
+  background: var(--d2);
+  border: 1px solid var(--d0);
+}
+.dash-r1 .player-card:last-child { margin-bottom: 0; }
+.dash-r1 .player-card.you {
+  background: var(--d0);
+  border: 2px solid var(--amber);
+}
+.dash-r1 .player-card .head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.dash-r1 .player-card .name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px; color: var(--white);
+  letter-spacing: 0.5px;
+}
+.dash-r1 .player-card .you-pill,
+.dash-r1 .player-card .hof-pill-r1 {
+  background: var(--amber); color: var(--d0);
+  padding: 1px 4px; font-size: 6px;
+  font-family: 'Press Start 2P', monospace; letter-spacing: 1px;
+  margin-left: 4px;
+}
+.dash-r1 .player-card .badges-pill {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px; color: var(--green-glow);
+  letter-spacing: 1px;
+}
+.dash-r1 .player-card .badges-pill.full { color: var(--amber); }
+.dash-r1 .player-card .sprites {
+  display: flex; gap: 4px;
+}
+.dash-r1 .player-card .sprite-cell {
+  width: 28px; height: 28px;
+  background: var(--d1); border: 1px solid var(--d0);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--l2);
+  font-family: 'Press Start 2P', monospace; font-size: 7px;
+}
+.dash-r1 .player-card .sprite-cell.empty {
+  background: var(--d0); border: 1px dashed var(--d2);
+}
+
+/* GYMS sub-tab — compact gym list + NEXT BATTLE CTA */
+.dash-r1 .gym-list { font-size: 12px; color: var(--l1); }
+.dash-r1 .gym-list .gym-row {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--d2);
+}
+.dash-r1 .gym-list .gym-row:last-child { border-bottom: none; }
+.dash-r1 .gym-list .gym-row .num {
+  width: 24px; height: 24px;
+  background: var(--d2); color: var(--l2);
+  border: 1px solid var(--d0);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Press Start 2P', monospace; font-size: 9px;
+}
+.dash-r1 .gym-list .gym-row.beaten .num {
+  background: var(--amber); color: var(--d0); border-color: var(--amber);
+}
+.dash-r1 .gym-list .gym-row.next .num {
+  border-color: var(--amber); border-width: 2px;
+  animation: pulseNext 2s ease-in-out infinite;
+}
+.dash-r1 .gym-list .gym-row .name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px; color: var(--white);
+  letter-spacing: 0.5px;
+}
+.dash-r1 .gym-list .gym-row.beaten .name { color: var(--amber); }
+.dash-r1 .gym-list .gym-row.upcoming .name { color: var(--d2); }
+.dash-r1 .gym-list .gym-row .lvl {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px; color: var(--l1);
+}
+
+@keyframes pulseNext {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 177, 74, 0.4); }
+  50%      { box-shadow: 0 0 0 4px rgba(212, 177, 74, 0); }
+}
+
+.dash-r1 .next-battle {
+  margin-top: 12px; padding-top: 10px;
+  border-top: 1px dashed var(--d2);
+}
+.dash-r1 .next-battle form { margin: 0; }
+.dash-r1 .next-battle .label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px; color: var(--amber);
+  letter-spacing: 1px; margin-bottom: 6px;
+}
+.dash-r1 .next-battle .leader {
+  color: var(--white); font-size: 14px;
+}
+.dash-r1 .next-battle .prep {
+  color: var(--l1); font-size: 12px; margin-top: 2px;
+}
+.dash-r1 .next-battle .draft-cta {
+  margin-top: 10px; width: 100%;
+  background: var(--amber); color: var(--d0);
+  border: 2px solid var(--d0);
+  padding: 8px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px; letter-spacing: 1px;
+  cursor: pointer;
+}
+.dash-r1 .next-battle .read-only {
+  margin-top: 10px;
+  background: var(--d2); color: var(--l1);
+  padding: 8px; text-align: center;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px; letter-spacing: 1px;
+}
+
+/* MAP sub-tab — compact ASCII map + cards (reuses .route-card etc.) */
+.dash-r1 .status-panel .map-area {
+  font-size: 9px; line-height: 1.4;
+  color: var(--l1);
+  white-space: pre;
+}
+
+/* ═══════════════════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════════════════ */
 
@@ -2103,6 +2468,12 @@ body::after {
 
   /* Step 22 R2 — type-coverage rail stacks below the grid on narrower viewports. */
   .pc-box-r2 .box-layout { grid-template-columns: 1fr; }
+
+  /* Step 24 R1 — tablet collapse. Left party col disappears (its content
+     lives in the PARTY main tab); main + right rail stack to 2 cols. */
+  .dash-r1 .pc-layout { grid-template-columns: minmax(0, 1fr) 280px; }
+  .dash-r1 .col-party { display: none; }
+  .dash-r1 .title-bar { flex-direction: column; align-items: flex-start; }
 }
 
 /* Step 23 R4 — timeline → accordion swap. The horizontal track is hidden
@@ -2113,6 +2484,19 @@ body::after {
   .map-r4 .timeline-frame { display: none; }
   .map-r4 .accordion-frame { display: block; }
   .map-r4 .sheet { position: static; }
+
+  /* Step 24 R1 — phone reflow. Single column; tab strip becomes
+     horizontally scrollable (active tab stays clickable). Title bar
+     wraps so the player block sits on top and stat strip on its
+     own row with a top border. */
+  .dash-r1 .pc-layout { grid-template-columns: 1fr; }
+  .dash-r1 .tab-bar { overflow-x: auto; flex-wrap: nowrap; }
+  .dash-r1 .tab { min-width: 80px; flex: 0 0 auto; }
+  .dash-r1 .title-bar { flex-direction: column; align-items: flex-start; }
+  .dash-r1 .stat-strip {
+    width: 100%; padding-top: 6px;
+    border-top: 1px dashed var(--d2);
+  }
 }
 
 @media (max-width: 520px) {
@@ -2130,6 +2514,9 @@ body::after {
 
   /* Step 23 R4 — special-bar reflows from 4 columns to 2 on phones. */
   .map-r4 .special-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* Step 24 R1 — preserve stat-strip readability on the smallest viewports. */
+  .dash-r1 .stat-strip { font-size: 7px; gap: 8px; }
 }
 
 @media (min-width: 901px) and (max-width: 1200px) {

@@ -1,39 +1,124 @@
-<div class="title-bar">
+<%# Step 24 R1 — slim title bar.
+    Left:  36×36 amber title-glyph (initials of player name) +
+           2-line player block + run-pill (Stimulus dropdown that
+           replaces the legacy <select onchange="..."> XSS-adjacent
+           inline JS — see audit annotation C).
+    Right: single inline stat strip with `·` separators. ALIVE
+           coloured green, DEAD crimson, BADGES amber.
+
+    The pill toggle + keyboard navigation are JS-only enhancements.
+    Each menu option is a real <a href="/?run_id=N"> so switching
+    runs works without JS. %>
+<%
+  player_label = (@player_name.presence || "Trainer").to_s
+  glyph_initials = player_label.split(/\s+/).map { |w| w[0] }.compact.join.upcase[0, 2]
+  glyph_initials = "PC" if glyph_initials.blank?
+
+  current_status_label, current_status_class =
+    if @run.completed?
+      [ "HOF", "badge hof" ]
+    elsif @run.read_only?
+      [ "ENDED", "badge dim" ]
+    elsif @run.active?
+      [ "ACTIVE", "badge" ]
+    else
+      [ "VIEWING", "badge dim" ]
+    end
+%>
+<header class="title-bar">
   <div class="title-left">
-    <span class="title-logo">&#9876;</span>
-    <div>
-      <div class="title-text"><%= @player_name&.upcase || "TRAINER" %>'s PC</div>
-      <div class="title-sub" style="display: flex; align-items: center; gap: 6px;">
-        PLATINUM SOUL LINK .
-        <select class="gb-select"
-                onchange="window.location.href = '/?run_id=' + this.value"
-                style="display: inline-block; width: auto; padding: 2px 6px; font-size: 11px; background: var(--d1); color: var(--l2); border-color: var(--l1);">
-          <% @all_runs.each do |r| %>
-            <option value="<%= r.id %>" <%= 'selected' if r.id == @run.id %>>
-              RUN #<%= r.run_number %><%= ' (ACTIVE)' if r.active? %>
-            </option>
-          <% end %>
-        </select>
+    <div class="title-glyph" aria-hidden="true"><%= glyph_initials %></div>
+
+    <div class="title-block">
+      <div class="player"><%= player_label.upcase %>'S PC</div>
+      <div class="meta">PLATINUM &middot; SOUL LINK</div>
+    </div>
+
+    <div class="run-pill-wrap"
+         data-controller="run-picker"
+         data-action="keydown->run-picker#navigate">
+      <button type="button"
+              class="run-pill"
+              data-run-picker-target="trigger"
+              data-action="click->run-picker#toggle"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-label="Switch run">
+        RUN #<%= @run.run_number %>
+        <span class="<%= current_status_class %>"><%= current_status_label %></span>
+        <span class="chev" aria-hidden="true">&#9662;</span>
+      </button>
+
+      <div class="run-pill-menu hidden"
+           data-run-picker-target="menu"
+           role="listbox"
+           aria-label="Available runs">
+        <% @all_runs.each do |r| %>
+          <%
+            opt_status_label, opt_status_class =
+              if r.completed?
+                [ "🏆 HOF", "pill hof" ]
+              elsif r.read_only?
+                [ "ENDED", "pill" ]
+              elsif r.active?
+                [ "ACTIVE", "pill" ]
+              else
+                [ "PAST", "pill" ]
+              end
+            opt_dates =
+              if r.read_only? || r.completed? || !r.active?
+                "#{r.created_at.strftime('%b %-d')} &mdash; #{r.updated_at.strftime('%b %-d, %Y')}".html_safe
+              else
+                "#{r.created_at.strftime('%b %-d')} &mdash; now".html_safe
+              end
+            is_current = r.id == @run.id
+          %>
+          <a href="<%= root_path(run_id: r.id) %>"
+             class="run-option <%= 'active' if is_current %>"
+             role="option"
+             aria-selected="<%= is_current ? 'true' : 'false' %>"
+             data-run-picker-target="option"
+             tabindex="-1">
+            <span class="label">RUN #<%= r.run_number %>
+              <span class="<%= opt_status_class %>"><%= opt_status_label %></span>
+            </span>
+            <span class="dates"><%= opt_dates %></span>
+          </a>
+        <% end %>
+
+        <div class="start-row">
+          <%# `+ START NEW RUN` reuses run-management's start_run handler.
+              The dashboard `_runs_content.html.erb` partial already
+              wraps the dashboard in `data-controller="run-management"`
+              so the action resolves up the DOM. %>
+          <button type="button"
+                  class="start-btn"
+                  role="option"
+                  aria-selected="false"
+                  data-run-picker-target="option"
+                  data-action="click->run-management#startRun"
+                  tabindex="-1">
+            + START NEW RUN
+          </button>
+        </div>
       </div>
     </div>
   </div>
-  <div class="title-right">
-    <a href="<%= species_path %>" style="font-size: 10px; color: var(--l1); text-decoration: none; border: var(--border-thin); padding: 4px 8px; margin-right: 8px;">SPECIES</a>
-    <div class="title-stat">
-      <div class="title-stat-num"><%= @caught_count %></div>
-      <div class="title-stat-label">CAUGHT</div>
-    </div>
-    <div class="title-stat">
-      <div class="title-stat-num"><%= @caught_count - @dead_count %></div>
-      <div class="title-stat-label">ALIVE</div>
-    </div>
-    <div class="title-stat">
-      <div class="title-stat-num"><%= @dead_count %></div>
-      <div class="title-stat-label">DEAD</div>
-    </div>
-    <div class="title-stat">
-      <div class="title-stat-num"><%= @gyms_defeated %>/8</div>
-      <div class="title-stat-label">BADGES</div>
-    </div>
+
+  <%# Step 24 R1 — mockup labels:
+        CAUGHT = total ever caught (currently alive + dead)
+        ALIVE  = `@caught_count` (controller defines this as status==caught)
+        DEAD   = `@dead_count`
+      Pre-Step-24 the title bar showed `@caught_count` next to "CAUGHT"
+      and `@caught_count - @dead_count` next to "ALIVE", which read as
+      a labeling inversion. Mockup locks the conventional reading. %>
+  <div class="stat-strip" aria-label="Run stats">
+    <div class="item"><span>CAUGHT</span> <span class="val"><%= @caught_count + @dead_count %></span></div>
+    <span class="sep" aria-hidden="true">&middot;</span>
+    <div class="item alive"><span>ALIVE</span> <span class="val"><%= @caught_count %></span></div>
+    <span class="sep" aria-hidden="true">&middot;</span>
+    <div class="item dead"><span>DEAD</span> <span class="val"><%= @dead_count %></span></div>
+    <span class="sep" aria-hidden="true">&middot;</span>
+    <div class="item badges"><span>BADGES</span> <span class="val"><%= @gyms_defeated %>/8</span></div>
   </div>
-</div>
+</header>

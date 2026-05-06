@@ -1,0 +1,240 @@
+<%# Step 24 R1 — consolidated right rail.
+    Replaces the old `_map_panel.html.erb` (which stacked ASCII map +
+    current location + badge case + gym leaders + recent routes — duplicating
+    MAP and GYMS main-tab content). Single card with 3 sub-tabs: PARTY ·
+    GYMS · MAP. GYMS is the default-active (mockup screen 1, "next battle"
+    is the most-frequent dashboard journey). %>
+<aside class="status-rail"
+       data-controller="status-rail"
+       aria-label="Live status">
+
+  <div class="side-tabs"
+       role="tablist"
+       aria-label="Status panels"
+       data-action="keydown->status-rail#keydown">
+    <button type="button"
+            class="side-tab"
+            role="tab"
+            id="status-tab-party"
+            aria-controls="status-panel-party"
+            aria-selected="false"
+            tabindex="-1"
+            data-status-rail-target="tabButton"
+            data-status-rail-tab-param="party"
+            data-action="click->status-rail#switch">
+      PARTY
+    </button>
+    <button type="button"
+            class="side-tab"
+            role="tab"
+            id="status-tab-gyms"
+            aria-controls="status-panel-gyms"
+            aria-selected="true"
+            tabindex="0"
+            data-status-rail-target="tabButton"
+            data-status-rail-tab-param="gyms"
+            data-action="click->status-rail#switch">
+      GYMS
+    </button>
+    <button type="button"
+            class="side-tab"
+            role="tab"
+            id="status-tab-map"
+            aria-controls="status-panel-map"
+            aria-selected="false"
+            tabindex="-1"
+            data-status-rail-target="tabButton"
+            data-status-rail-tab-param="map"
+            data-action="click->status-rail#switch">
+      MAP
+    </button>
+  </div>
+
+  <%# ── PARTY sub-tab — one row per registered player ── %>
+  <%
+    teams_by_user = @all_player_teams.index_by(&:discord_user_id)
+  %>
+  <section class="status-panel hidden"
+           role="tabpanel"
+           id="status-panel-party"
+           aria-labelledby="status-tab-party"
+           tabindex="0"
+           data-status-rail-target="tabPanel"
+           data-status="party">
+    <div class="h3-row">
+      <h3>LIVE PARTIES</h3>
+      <span class="count"><%= SoulLink::GameState.players.size %> PLAYERS</span>
+    </div>
+
+    <% SoulLink::GameState.players.each do |player|
+         uid = player["discord_user_id"]
+         display_name = player["display_name"].to_s
+         is_you = uid == current_user_id
+         team = teams_by_user[uid]
+         slot_groups = team ? team.soul_link_team_slots.sort_by(&:position).map(&:soul_link_pokemon_group).compact : []
+
+         # Per-player badge variance is out of scope (KG-39); all rows show
+         # the run's `gyms_defeated` for now.
+         badges_count = @gyms_defeated
+         shows_hof = @run.completed? && badges_count == 8
+    %>
+      <div class="player-card<%= ' you' if is_you %>">
+        <div class="head">
+          <span class="name">
+            <%= display_name.upcase %>
+            <% if is_you %><span class="you-pill">YOU</span><% end %>
+            <% if shows_hof %><span class="hof-pill-r1">&#127942; HOF</span><% end %>
+          </span>
+          <span class="badges-pill<%= ' full' if badges_count >= 8 %>">
+            <%= badges_count %> BADGES
+          </span>
+        </div>
+        <div class="sprites">
+          <% (0...SoulLinkTeam::MAX_SLOTS).each do |i|
+               group = slot_groups[i]
+               my_pkmn = group&.soul_link_pokemon&.find { |p| p.discord_user_id == uid }
+          %>
+            <% if group && my_pkmn&.species.present? %>
+              <div class="sprite-cell"><%= pokemon_sprite_tag(my_pkmn.species, size: 26) %></div>
+            <% elsif group %>
+              <div class="sprite-cell">?</div>
+            <% else %>
+              <div class="sprite-cell empty" aria-label="empty slot"></div>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </section>
+
+  <%# ── GYMS sub-tab — compact gym list + NEXT BATTLE CTA ── %>
+  <section class="status-panel"
+           role="tabpanel"
+           id="status-panel-gyms"
+           aria-labelledby="status-tab-gyms"
+           tabindex="0"
+           data-status-rail-target="tabPanel"
+           data-status="gyms">
+    <div class="h3-row">
+      <h3>GYM LEADERS</h3>
+      <span class="count"><%= @gyms_defeated %>/8</span>
+    </div>
+
+    <div class="gym-list">
+      <% @gym_info.each do |_key, gym|
+           num = gym["number"]
+           defeated = num <= @gyms_defeated
+           is_next = num == @gyms_defeated + 1
+           row_class =
+             if defeated
+               "gym-row beaten"
+             elsif is_next
+               "gym-row next"
+             else
+               "gym-row upcoming"
+             end
+      %>
+        <div class="<%= row_class %>">
+          <div class="num"><%= num %></div>
+          <span class="name"><%= gym["leader"]&.upcase %></span>
+          <span class="lvl"><%= gym["max_level"] %></span>
+        </div>
+      <% end %>
+    </div>
+
+    <% if @next_gym && !dashboard_read_only?(@run) %>
+      <% loc_data = @locations[@next_gym["location"]] %>
+      <div class="next-battle">
+        <div class="label">&darr; NEXT BATTLE</div>
+        <div class="leader">
+          <%= @next_gym["leader"]&.upcase %>
+          &middot; <%= loc_data&.[]("name") || @next_gym["location"] %>
+          &middot; Lv <%= @next_gym["max_level"] %>
+        </div>
+        <div class="prep"><%= pixeldex_gym_strategy(@next_gym, @type_analysis) %></div>
+        <%= button_to "START GYM DRAFT →", gym_drafts_path,
+                      method: :post,
+                      class: "draft-cta" %>
+      </div>
+    <% elsif dashboard_read_only?(@run) %>
+      <div class="next-battle">
+        <div class="label">&darr; NEXT BATTLE</div>
+        <div class="read-only">RUN ENDED</div>
+      </div>
+    <% end %>
+  </section>
+
+  <%# ── MAP sub-tab — keep today's map-panel body content (ASCII map +
+      CURRENT LOCATION card + BADGE CASE + RECENT ROUTES + Strategy
+      Dialog) but inside the new sub-tab panel. GYM LEADERS section is
+      removed here — it now lives in the GYMS sub-tab (closes audit
+      cross-cutting #6 duplication). ── %>
+  <section class="status-panel hidden"
+           role="tabpanel"
+           id="status-panel-map"
+           aria-labelledby="status-tab-map"
+           tabindex="0"
+           data-status-rail-target="tabPanel"
+           data-status="map">
+    <div class="h3-row">
+      <h3>MAP &amp; ROUTES</h3>
+      <span class="count">SINNOH</span>
+    </div>
+
+    <%# ASCII Map %>
+    <% current_loc = @next_gym ? @locations[@next_gym["location"]]&.[]("name") : "Sunyshore City" %>
+    <div class="map-area"><%= pixeldex_ascii_map(current_loc.to_s) %></div>
+
+    <%# Current Location %>
+    <div class="route-card">
+      <div class="route-label">CURRENT LOCATION</div>
+      <% if @next_gym %>
+        <% loc_data = @locations[@next_gym["location"]] %>
+        <div class="route-name"><%= loc_data&.[]("name")&.upcase || @next_gym["location"].upcase %></div>
+        <div class="route-detail">Preparing for Gym <%= @gyms_defeated + 1 %></div>
+        <div class="route-detail">Next objective: <%= @next_gym["leader"]&.upcase %></div>
+      <% else %>
+        <div class="route-name">POKEMON LEAGUE</div>
+        <div class="route-detail">All gyms defeated!</div>
+        <div class="route-detail">Prepare for the Elite Four</div>
+      <% end %>
+    </div>
+
+    <%# Badge Case %>
+    <div class="route-card">
+      <div class="route-label">BADGE CASE</div>
+      <div class="badge-row">
+        <% (1..8).each do |gym_num| %>
+          <% if gym_num <= @gyms_defeated %>
+            <div class="badge-cell badge-earned">&#9733;</div>
+          <% else %>
+            <div class="badge-cell badge-empty">...</div>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Recent Routes %>
+    <% if @current_segment %>
+      <div class="route-card">
+        <div class="route-label">RECENT ROUTES</div>
+        <div style="font-size: 10px; line-height: 2;">
+          <% (@current_segment["locations"] || []).last(5).each do |loc_key|
+               loc_data = @locations[loc_key]
+               has_catch = @groups_by_location[loc_key]&.any?
+          %>
+            <div>
+              <%= loc_data&.[]("name") || loc_key %> -
+              <%= has_catch ? "&#9733;".html_safe : "uncaught" %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <%# Strategy Dialog %>
+    <div class="dialog" style="font-size: 11px;">
+      <%= pixeldex_gym_strategy(@next_gym, @type_analysis) %>
+    </div>
+  </section>
+</aside>

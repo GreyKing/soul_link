@@ -5,7 +5,14 @@
 <%= turbo_refreshes_with method: :morph, scroll: :preserve %>
 <%= turbo_stream_from @run, :dashboard %>
 
-<div data-controller="dashboard pixeldex"
+<%# Step 24 R1 — wrap in `.dash-r1` namespace + add `run-management`
+    controller at the top so the title-bar `+ START NEW RUN` button
+    can reach `run-management#startRun` without wiring two ActionCable
+    subscriptions. The window-level numeric jump (1-7) is bound here so
+    it works no matter where focus is. %>
+<div class="dash-r1"
+     data-controller="dashboard pixeldex run-management"
+     data-action="keydown@window->pixeldex#numericJump"
      data-dashboard-groups-url-value="<%= pokemon_groups_path %>"
      data-dashboard-csrf-value="<%= form_authenticity_token %>"
      data-dashboard-user-id-value="<%= current_user_id %>"
@@ -16,42 +23,62 @@
      data-pixeldex-pokemon-update-url-value="/pokemon"
      data-pixeldex-group-update-url-value="<%= pokemon_groups_path %>"
      data-pixeldex-update-slots-url-value="<%= update_slots_team_path %>"
-     data-pixeldex-csrf-value="<%= form_authenticity_token %>">
+     data-pixeldex-csrf-value="<%= form_authenticity_token %>"
+     data-run-management-guild-id-value="<%= @guild_id %>"
+     data-run-management-user-id-value="<%= current_user_id %>">
 
   <%= render "title_bar" %>
   <%= render "tab_bar" %>
 
   <div class="pc-layout">
-    <%# Left sidebar: always visible compact party %>
-    <%= render "party_panel" %>
+    <%# Left sidebar: always visible compact party (hidden on tablet/phone) %>
+    <div class="col-party">
+      <%= render "party_panel" %>
+    </div>
 
-    <%# Center: tab-switchable content %>
+    <%# Center: tab-switchable content. Each panel carries the WAI-ARIA
+        contract Tab-bar relies on (`role="tabpanel"` + `aria-labelledby`). %>
     <div class="panel">
-      <div data-pixeldex-target="tabContent" data-tab="party" class="hidden">
+      <div data-pixeldex-target="tabContent" data-tab="party"
+           role="tabpanel" id="panel-party" aria-labelledby="tab-party" tabindex="0"
+           class="hidden">
         <%= render "party_detail" %>
       </div>
-      <div data-pixeldex-target="tabContent" data-tab="pcbox">
+      <div data-pixeldex-target="tabContent" data-tab="pcbox"
+           role="tabpanel" id="panel-pcbox" aria-labelledby="tab-pcbox" tabindex="0">
         <%= render "pc_box_content" %>
       </div>
-      <div data-pixeldex-target="tabContent" data-tab="map" class="hidden">
+      <div data-pixeldex-target="tabContent" data-tab="map"
+           role="tabpanel" id="panel-map" aria-labelledby="tab-map" tabindex="0"
+           class="hidden">
         <%= render "map_content" %>
       </div>
-      <div data-pixeldex-target="tabContent" data-tab="gyms" class="hidden">
+      <div data-pixeldex-target="tabContent" data-tab="gyms"
+           role="tabpanel" id="panel-gyms" aria-labelledby="tab-gyms" tabindex="0"
+           class="hidden">
         <%= render "gyms_content" %>
       </div>
-      <div data-pixeldex-target="tabContent" data-tab="strategy" class="hidden">
+      <div data-pixeldex-target="tabContent" data-tab="strategy"
+           role="tabpanel" id="panel-strategy" aria-labelledby="tab-strategy" tabindex="0"
+           class="hidden">
         <%= render "strategy_panel" %>
       </div>
-      <div data-pixeldex-target="tabContent" data-tab="runs" class="hidden">
+      <div data-pixeldex-target="tabContent" data-tab="runs"
+           role="tabpanel" id="panel-runs" aria-labelledby="tab-runs" tabindex="0"
+           class="hidden">
         <%= render "runs_content" %>
       </div>
-      <div data-pixeldex-target="tabContent" data-tab="calc" class="hidden">
+      <div data-pixeldex-target="tabContent" data-tab="calc"
+           role="tabpanel" id="panel-calc" aria-labelledby="tab-calc" tabindex="0"
+           class="hidden">
         <%= render "calc_content" %>
       </div>
     </div>
 
-    <%# Right sidebar: always visible compact map/gyms %>
-    <%= render "map_panel" %>
+    <%# Right rail: consolidated PARTY / GYMS / MAP sub-tabs (Step 24 R1).
+        Replaces the old `_map_panel.html.erb` which duplicated MAP + GYMS
+        main-tab content. %>
+    <%= render "status_rail" %>
   </div>
 
   <%= render "catch_modal" %>

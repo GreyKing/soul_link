@@ -137,6 +137,41 @@ class ResponsiveGridsTest < ActiveSupport::TestCase
     end
   end
 
+  # ── Step 24 R1 — namespace + responsive contract for dashboard ───────
+
+  test "Step 24 R1 declares the .dash-r1 namespace at least once outside any media block" do
+    css_no_media = @css.gsub(/@media[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/m, "")
+    assert_match(/\.dash-r1\s/, css_no_media,
+      "expected .dash-r1 namespaced selectors declared outside any media block")
+  end
+
+  test "Step 24 R1 hides the left party col + drops to 2-col layout inside the 900px breakpoint" do
+    block = @css[/@media\s*\(max-width:\s*900px\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/m]
+    refute_nil block, "expected an `@media (max-width: 900px)` block"
+
+    assert_match(/\.dash-r1\s+\.pc-layout\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+280px/m, block)
+    assert_match(/\.dash-r1\s+\.col-party\s*\{\s*display:\s*none/m, block)
+  end
+
+  test "Step 24 R1 drops the layout to single column inside the 720px breakpoint" do
+    block = @css[/@media\s*\(max-width:\s*720px\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/m]
+    refute_nil block, "expected an `@media (max-width: 720px)` block"
+
+    assert_match(/\.dash-r1\s+\.pc-layout\s*\{\s*grid-template-columns:\s*1fr\s*[;}]/m, block)
+    assert_match(/\.dash-r1\s+\.tab-bar\s*\{[^}]*overflow-x:\s*auto/m, block)
+  end
+
+  test "Step 24 R1 styles do NOT collapse .dash-r1 .tab or .dash-r1 .status-rail inside any breakpoint" do
+    %w[520px 720px 900px].each do |bp|
+      block = @css[/@media\s*\(max-width:\s*#{bp}\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/m]
+      next if block.nil?
+      assert_no_match(/\.dash-r1\s+\.tab\s*\{[^}]*display:\s*none/m, block,
+        "the #{bp} breakpoint must not hide .dash-r1 .tab")
+      assert_no_match(/\.dash-r1\s+\.status-rail\s*\{[^}]*display:\s*none/m, block,
+        "the #{bp} breakpoint must not hide .dash-r1 .status-rail")
+    end
+  end
+
   test "emulator-grid stays single-column outside any media block AND three-column at 900px" do
     # Single-column default (outside any @media). Strip every @media
     # block before searching so we only match the top-level rule.

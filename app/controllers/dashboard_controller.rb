@@ -33,6 +33,12 @@ class DashboardController < ApplicationController
                        &.order(:position) || []
     @team_groups = @team_slots.map(&:soul_link_pokemon_group).compact
 
+    # Step 24 R1 — all players' teams for the right-rail PARTY sub-tab.
+    # Loaded once + included so the sub-tab renders without per-player N+1.
+    @all_player_teams = run.soul_link_teams
+                          .includes(soul_link_team_slots: { soul_link_pokemon_group: :soul_link_pokemon })
+                          .order(:discord_user_id)
+
     # Extract current player's pokemon from team groups for type analysis
     @team_pokemon = @team_groups.filter_map do |group|
       group.soul_link_pokemon.find { |p| p.discord_user_id == current_user_id }

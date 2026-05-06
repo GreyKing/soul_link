@@ -11,113 +11,157 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 23 — R4 Map redesign (Phase 2 R4 of the 2026-05-04 audit). Locked mockup `handoff/2026-05-04-ui-audit-mockup-map.html`, 4 screens (desktop full timeline · sheet open / new catch · sheet open / existing catches · mobile accordion). Six buckets per Bob's plan + Ava's six question-by-question answers (`handoff/ARCHITECT-BRIEF.md` § Architect endorsement):
-- Wrapping div `.map-r4` namespaces every new selector under `.map-r4 …` so existing timeline/route surfaces (e.g. dashboard MAP tab `_map_content.html.erb`) are untouched. `data-controller="timeline dashboard pixeldex"` triple-attached so the dashboard's `_pokemon_modal` and `_mark_dead_modal` partials work without bespoke wiring.
-- View `app/views/map/show.html.erb` full body rewrite: `.map-head` (h2 + sub + badge strip) + `.status-bar` (NEXT GYM · LEVEL CAP · CURRENT SEG + JUMP TO NOW pill) + `.node-legend` (5 always-visible glyph items) + `.layout` grid (left = `.timeline-frame` desktop / `.accordion-frame` mobile + `.special-bar`; right = sticky `.sheet`). Pulse-ring + `↓ NOW` pin on next-uncaught route. Segment dividers between segments (label = upcoming gym's bare-city name; final divider = "ELITE FOUR"). Endpoint Elite Four node preserved.
-- New section `/* ── R4 Map ── */` in `pixeldex.css` (~545 lines, mockup-verbatim with the `.map-r4` prefix; mockup-document chrome `.page` / `.page-banner` / `.legend` / `.section-anchor` / `.annotation` / `.phone` / `.phone-bezel` stripped). New `@media (max-width: 720px)` block (timeline → accordion swap + sheet drops `position: sticky` + layout collapses to single column). Existing `@media (max-width: 520px)` extended (`.map-r4 .special-grid` reflows to 2 columns). **Zero new design tokens.**
-- `app/helpers/map_helper.rb` extended with five Step 23 helpers: `next_uncaught_route_key`, `current_segment_label`, `segment_divider_label`, `segment_progress`, `segment_open_by_default?`, plus `node_status_class`. `groups_json_for(groups, current_user_id)` extended additively per Ava Q1 (added per-pokemon `id`, `is_mine`, `level`, `ability`, `nature`, `sprite_url`, `types` plus per-group `id`, `species_for_user`, `types_for_user` so the JS-built EDIT button mirrors the dashboard's `pixeldex#selectPokemon` payload without controller surgery).
-- `app/javascript/controllers/timeline_controller.js` extended (not replaced). Targets renamed `panel*` → `sheet*`, `backdrop` removed, new targets `emptyState` / `groupList` / `jumpBtn` / `accordionSegment`. Rewrote `closePanel` for the in-flow sheet (no `translateX`, no body lock, no backdrop; clears `#route=<key>` hash). New actions `jumpToNow` (smooth-scrolls to `.next` node), `showCatchFormForCurrent` (dupes-clause: swaps sheet from group-list to form mode for the same loc_key). New internal `_renderSheetCatchForm` / `_renderSheetGroupList` / `_buildGroupCardHtml` paths; group cards JS-built carry the `pixeldex#selectPokemon` + `dashboard#openMarkDeadModal` data attributes. URL hash `#route=<key>` synced via `connect()` → `applyHashRoute()` and `selectLocation` writes. Existing actions (`submitCatch`, `toggleGym`, `filterSpecies`, `selectSpecies`, `closeAllDropdowns`, `handleKeydown`, `scrollToCurrentProgress`) all preserved verbatim. Read-only mode gate is `hasSheetFormTarget` (single source of truth per Ava Q5/Q6).
-- Modal partials rendered at the bottom: `<%= render "dashboard/pokemon_modal" %>` + `<%= render "dashboard/mark_dead_modal" %>` (explicit dashboard/ prefix, partials live under `app/views/dashboard/`).
+**Active step:** Step 24 — R1 Dashboard restructure (Phase 2 R1 of the 2026-05-04 audit; closes Phase 2). Locked mockup `handoff/2026-05-04-ui-audit-mockup-dashboard.html`, 6 screens (desktop 3-col · right-rail PARTY view · tablet 2-col · phone single col + scrollable tab strip · run-pill open · ARIA spec sheet). Direct build per BUILDER.md Pt. 4 ("brief locked + unambiguous → may build directly without writing a Builder Plan section, unless ambiguity hits"):
+- Wrapping div `.dash-r1` namespaces every new selector under `.dash-r1 …` so existing dashboard surfaces (left party panel, MAP main-tab `_map_content.html.erb`, GYMS main-tab) are untouched. `data-controller="dashboard pixeldex run-management"` is hoisted to the dashboard root so the title-bar's `+ START NEW RUN` button can reach `run-management#startRun` without spawning a second ActionCable subscription. Window-level `keydown@window->pixeldex#numericJump` registers the 1-7 jump action globally.
+- View `app/views/dashboard/_title_bar.html.erb` full rewrite: 36×36 amber title-glyph (player initials, falls back to "PC") + 2-line title block (`<player>'s PC` + `PLATINUM · SOUL LINK`) + run-pill (`<button class="run-pill">RUN #N <span class="badge">ACTIVE</span> <span class="chev">▾</span></button>`) replacing the legacy `<select onchange="window.location.href = …">` per audit annotation C. Right side: single inline stat strip (`CAUGHT N · ALIVE N · DEAD N · BADGES N/8`) with `·` separators. Run-pill dropdown renders all runs as `<a href="/?run_id=N" role="option">` (works without JS); the new `run-picker` Stimulus controller adds toggle + keyboard nav + outside-click close + ESC.
+- View `app/views/dashboard/_tab_bar.html.erb` full rewrite: real WAI-ARIA tablist (`<div role="tablist" aria-label="Dashboard sections">` + per-tab `<button role="tab" id="tab-<key>" aria-controls="panel-<key>" aria-selected aria-tabindex>`). 2-line vertical tab buttons (icon top + label bottom). Active tab `tabindex="0"`, others `-1` per WAI-ARIA. Live-update green dots: PC BOX when `@auto_detected_catches.any?`; GYMS when `@active_draft.present?`. Tab-bar binds `keydown->pixeldex#tablistKeydown` for ←/→/Home/End focus+activate.
+- View `app/views/dashboard/_status_rail.html.erb` (NEW) replaces `_map_panel.html.erb` (DELETED). Three sub-tabs (PARTY/GYMS/MAP); GYMS default-active. PARTY shows one card per `SoulLink::GameState.players` row with name + badges pill + 6 sprite cells, current user's row gets `.you` modifier (amber border + YOU pill, plus 🏆 HOF when `@run.completed? && badges == 8`). GYMS lists all 8 leaders compact (.beaten / .next / .upcoming) + a `↓ NEXT BATTLE` block with leader / location / level / type prep + START GYM DRAFT CTA (read-only mode renders "RUN ENDED" instead). MAP keeps today's body content (ASCII map + CURRENT LOCATION + BADGE CASE + RECENT ROUTES + Strategy Dialog) inside the new sub-tab; GYM LEADERS section removed because it now lives in the GYMS sub-tab (closes audit cross-cutting #6 duplication).
+- View `app/views/dashboard/_runs_content.html.erb` extended with the 3 emulator-ROM affordances (`Generate Emulator ROMs` when `:none`, `Regenerate ROMs` when `:failed`, `ROMs generating…` status span when `:generating`); the `data-controller="run-management"` wrapper is removed from the partial because it's hoisted to the dashboard root.
+- View `app/views/dashboard/show.html.erb` rewritten: top-level wrapped in `.dash-r1`; renders `_title_bar` → `_tab_bar` → `.pc-layout` (`.col-party` + `.panel` + `_status_rail`). Each `tabContent` div now also carries `role="tabpanel"` + `id="panel-<key>"` + `aria-labelledby="tab-<key>"` + `tabindex="0"` so the tablist contract is complete.
+- View `app/views/dashboard/_map_panel.html.erb` deleted (content folded into `_status_rail` MAP sub-tab; `_map_content.html.erb` for the MAP main tab is untouched). `app/views/runs/index.html.erb` deleted; `app/views/runs/` directory removed (now empty).
+- New section `/* ── R1 Dashboard ── */` in `pixeldex.css` (~325 lines, every selector namespaced under `.dash-r1`). Extended `@media (max-width: 900px)` block: `.dash-r1 .pc-layout { grid-template-columns: minmax(0, 1fr) 280px; }` + `.dash-r1 .col-party { display: none; }` + title-bar wraps to column. Extended `@media (max-width: 720px)` block (already exists for `.map-r4`): `.dash-r1 .pc-layout { grid-template-columns: 1fr; }` + `.dash-r1 .tab-bar { overflow-x: auto; flex-wrap: nowrap; }` + stat-strip pulls top border. Extended `@media (max-width: 520px)`: stat-strip font-size shrinks to 7px. **Zero new design tokens** — reused the existing `:root` palette.
+- New `app/javascript/controllers/run_picker_controller.js` (~110 lines): `toggle` + `navigate` (↑/↓/Home/End/Enter/Esc) + outside-click `_closeOnOutside`. RAF-deferred focus on first option after open so screen readers announce the active descendant. Anchors trigger natively; non-anchor "+ START NEW RUN" button uses `target.click()` for Enter activation.
+- New `app/javascript/controllers/status_rail_controller.js` (~60 lines): `switch` (click) + `keydown` (←/→/Home/End focus+activate). Internal `_activate(tab, { focus })` flips `aria-selected` + `tabindex` on every sub-tab button and toggles the matching panel's `.hidden` class.
+- `app/javascript/controllers/pixeldex_controller.js` extended (NOT replaced): new `tablistKeydown` action (←/→/Home/End move focus AND activate per the mockup spec); new `numericJump` window-bound action (1–7 jump tabs; skipped when an `<input>`/`<textarea>`/`<select>`/`[contenteditable]` has focus or any modifier key is held); `switchTab` extended with `aria-selected` + `tabindex` flips on every tab button (legacy `.active` class kept for back-compat) and `history.replaceState(null, "", "#" + tab)` (no back-stack pollution — Step 23 `#route=` precedent). Existing `#applyHashTab` preserved verbatim.
+- Backend: `app/controllers/dashboard_controller.rb` adds **one** new instance variable, `@all_player_teams = run.soul_link_teams.includes(soul_link_team_slots: { soul_link_pokemon_group: :soul_link_pokemon }).order(:discord_user_id)`. `app/controllers/runs_controller.rb` becomes a 2-line `redirect_to root_path(anchor: "runs"), status: :moved_permanently` shim.
 
-**Reviewed by Richard:** **0 Must Fix, 2 Should Fix (both fixed inline), 1 Escalate (resolved by Ava — fixed inline alongside Should Fix #1).** `handoff/REVIEW-FEEDBACK.md` updated with Architect resolution + inline-fix annotations. Awaiting Ava's deploy gate.
+**Test count:** 755 → **777** (+22). 0 failures, 0 errors.
+**Lint:** rubocop clean (202 files, 0 offenses; +2 files: new `run_picker_controller.js` + `status_rail_controller.js`).
+**Brakeman:** Clean (no new warnings; same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess unchanged from Steps 18/19/20/21/22/23).
+**Migrations:** None. **Zero new gem deps. Zero new design tokens. Zero new model/service code; only 1 controller line added (`@all_player_teams`) + 1 controller method body replacement (RunsController#index → redirect).**
 
-**Inline fixes folded in mid-review:**
-- *Should Fix #1 + Escalate (multi-group rendering order)* — fixed inline at `app/javascript/controllers/timeline_controller.js:194` by reverse-iterating: `[...groups].reverse().map(...)` instead of `groups.map(...)`. Resolves Richard's "render most-recent prominently" Should Fix and Ava's product-call escalate (`position: asc` shows oldest-first; reversing puts the latest dupes-clause re-roll at the top of the sheet stack). No primary/secondary CSS decoration — top-of-stack is the prominence.
-- *Should Fix #2 (history bloat)* — fixed inline at `app/javascript/controllers/timeline_controller.js:106` by replacing `window.location.hash = "#route=" + ...` with `history.replaceState(null, "", "#route=" + ...)` in `selectLocation`. Same one-line spirit; no back-stack pollution. The `connect()` hash read via `location.hash.startsWith("#route=")` still works identically (closePanel already used `history.replaceState`).
+**Pre-existing context:** Step 24 is the FOURTH and FINAL Phase 2 redesign per § 5 of `handoff/2026-05-04-ui-audit.md` (locked R3 ✓ → R2 ✓ → R4 ✓ → **R1** ship order). Step 23 (R4 Map) shipped in this same session at `c29f74e` (still on the worktree branch — not yet FF-merged). Phase 2 closes when Step 24 ships.
 
-**Test count:** 712 → **754** (+42). 0 failures, 0 errors.
-**Lint:** rubocop clean (201 files, 0 offenses).
-**Brakeman:** Clean (no new warnings; same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess unchanged from Steps 18/19/20/21/22).
+**Step 24 highlights / decisions:**
+- **Mockup wins on every visual detail.** The 6 mockup screens are the visual contract. The pre-Step-24 title bar showed `@caught_count` next to "CAUGHT" and `@caught_count - @dead_count` next to "ALIVE", which was a labeling inversion (the controller's `@caught_count` is `count(&:caught?)` = currently-alive). Mockup locks the conventional reading: CAUGHT = total ever caught (alive + dead); ALIVE = currently alive; DEAD = currently dead. View math fixed inline (`@caught_count + @dead_count` for CAUGHT, `@caught_count` for ALIVE) without changing controller semantics.
+- **`run-management` controller hoisted to the dashboard root** so the title-bar `+ START NEW RUN` button reaches `run-management#startRun` via DOM bubbling. The previous wiring scoped the controller to `_runs_content.html.erb`, which doesn't enclose the title bar. Hoisting also means there's exactly ONE ActionCable subscription per dashboard (was: one per controller instance — would have spawned two if `_runs_content` kept its `data-controller` attr).
+- **`run-management#startRun` already exists; reused verbatim.** It pops a `confirm("Start a new run? This will end any active run.")` browser dialog before performing the cable action — same affordance the dashboard runs panel offers today, just reachable from the chrome.
+- **Run-pill switching is anchor-based, not JS-driven.** Each menu option is a real `<a href="/?run_id=N" role="option">`. The Stimulus controller only handles the toggle + keyboard nav. Falls back gracefully if JS doesn't load.
+- **`pixeldex#tablistKeydown` activates on focus move (mockup spec).** WAI-ARIA recommends focus-only on ←/→ with Enter/Space to activate, but the mockup explicitly says "←/→ moves between tabs (with wrap), updates `aria-selected` and `tabindex` immediately, **and activates the tab**." Implemented per mockup; if a follow-up wants the WAI-ARIA-strict shape, it's a one-line change (drop `target.click()` from `tablistKeydown`).
+- **`pixeldex#numericJump` window-level binding is gated for input focus** (mockup spec). `event.target.tagName` check covers `<input>` / `<textarea>` / `<select>`; `target.isContentEditable` covers rich-text fields. Modifier keys (meta/ctrl/alt/shift) skip — so users with `Cmd-1` to switch browser tabs aren't intercepted.
+- **`switchTab` URL-hash write uses `replaceState`** (Step 23 `#route=` precedent). No back-stack pollution.
+- **Stimulus controller registration is automatic** via `eagerLoadControllersFrom("controllers", application)` in `app/javascript/controllers/index.js` (no manual edit needed; both new controllers are picked up by `pin_all_from "app/javascript/controllers"` in the importmap config).
+- **Per-player badge counts on PARTY sub-tab share `@gyms_defeated`** (Ava-decided ambiguity in the brief — KG-39 logged for the future variance feature). All 4 players show the run's `gyms_defeated` count for now; the YOU pill identifies the current user, the HOF pill renders only when `@run.completed? && badges == 8`.
+- **ConfirmModalFlowTest split into `/runs` redirect coverage + dashboard RUNS tab modal coverage.** The legacy 3 tests assertting against `get runs_path` got renamed + repointed at `get root_path` (the canonical surface) since `/runs` is now a 301. A new `/runs redirects to root_path with #runs anchor` test covers the redirect itself. Existing `dashboard RUNS tab END RUN trigger uses a distinct modal id from /runs` sanity test preserved.
+
+**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — KG-7 (real-save offset verification for `MAP_ID_OFFSET`) still open. KG-25 (real-SRAM smoke test for `BoxParser` + `PkmDecoder` field reads) still open. UI/UX audit `handoff/2026-05-04-ui-audit.md` Phase 1 shipped in Step 20; Phase 2 R3 in Step 21; R2 in Step 22; R4 in Step 23; **R1 ships in Step 24 → Phase 2 closes**.
+
+**Parked plan:** FactoryBot conversion fully shipped through Step 8.
+
+---
+
+## Step 23 — Status archive
+*Kept here for one-step lookback; will fold into archive at session end.*
+
+**Step 23:** R4 Map redesign (Phase 2 R4 of the 2026-05-04 audit). Locked mockup `handoff/2026-05-04-ui-audit-mockup-map.html`, 4 screens. Six buckets per Bob's plan + Ava's six question-by-question answers:
+- Wrapping div `.map-r4` namespaces every new selector. `data-controller="timeline dashboard pixeldex"` triple-attached so the dashboard's `_pokemon_modal` and `_mark_dead_modal` partials work without bespoke wiring.
+- View `app/views/map/show.html.erb` full body rewrite: `.map-head` + `.status-bar` + `.node-legend` + `.layout` grid (`.timeline-frame` desktop / `.accordion-frame` mobile + `.special-bar`; right = sticky `.sheet`). Pulse-ring + `↓ NOW` pin on next-uncaught route. Segment dividers between segments; final divider = "ELITE FOUR".
+- New section `/* ── R4 Map ── */` in `pixeldex.css` (~545 lines, namespaced). New `@media (max-width: 720px)` block (timeline → accordion swap + sheet de-stickifies + layout collapses). Existing `@media (max-width: 520px)` extended (`.map-r4 .special-grid` reflows to 2 columns). **Zero new design tokens.**
+- `app/helpers/map_helper.rb` extended with five Step 23 helpers: `next_uncaught_route_key`, `current_segment_label`, `segment_divider_label`, `segment_progress`, `segment_open_by_default?`, plus `node_status_class`. `groups_json_for(groups, current_user_id)` extended additively per Ava Q1.
+- `app/javascript/controllers/timeline_controller.js` extended (not replaced). Targets renamed `panel*` → `sheet*`, `backdrop` removed, new targets `emptyState` / `groupList` / `jumpBtn` / `accordionSegment`. New actions `jumpToNow` + `showCatchFormForCurrent`. URL hash `#route=<key>` synced via `connect()` → `applyHashRoute()` and `selectLocation` writes (`history.replaceState`).
+- Modal partials rendered at the bottom: `<%= render "dashboard/pokemon_modal" %>` + `<%= render "dashboard/mark_dead_modal" %>`.
+
+**Reviewed by Richard:** 0 Must Fix, 2 Should Fix (both fixed inline), 1 Escalate (resolved by Ava — fixed inline alongside Should Fix #1). Awaiting Ava's deploy gate.
+
+**Test count:** 712 → 754 (+42). 0 failures, 0 errors.
+**Lint:** rubocop clean (201 files). **Brakeman:** Clean (same 2 pre-existing weak-confidence warnings).
 **Migrations:** None. **Zero new gem deps. Zero new design tokens. Zero controller/model/service changes.**
 
-**Pre-existing context:** Step 23 is the third Phase 2 redesign per § 5 of `handoff/2026-05-04-ui-audit.md` (locked R3 ✓ → R2 ✓ → **R4** → R1 ship order). Step 22 (R2 PC Box) shipped at `1375335` and FF-merged to main at `d442568`. R1 Dashboard gets its own session next.
-
-**Step 23 highlights:**
-- **Mockup wins on every visual detail** (Steps 21 + 22 precedent): the prompt's gist suggested overlay "+" / eye-icon click affordances; the mockup ships hover-lift + amber border + box-shadow + pulse-ring (color-blind safe via motion + caption + amber). Locked to mockup.
-- **No backend changes** — none. No new column, no migration, no new endpoint, no model method. `MapController#show`'s instance variables (`@locations / @progression / @gym_info / @groups_by_location / @players / @gyms_defeated / @pokedex_species`) cover everything the new view needs. Reusing `_pokemon_modal` + `_mark_dead_modal` partials avoids duplicated modal markup; the wrapper picks up `data-controller="timeline dashboard pixeldex"` so the modals' Stimulus targets resolve.
-- **`groups_json_for` extended additively, not replaced** (Ava Q1). Per-pokemon payload now mirrors `pixeldex_group_pokemon_json`'s shape so the JS-built EDIT button can dispatch `pixeldex#selectPokemon` with the correct `data-group-pokemon` JSON without a parallel helper or a controller change. Existing `buildDetailsHtml` callers (legacy `species` / `player` / `sprite` fields) still see what they expect; new fields are pure-additive.
-- **Single read-only gate via `hasSheetFormTarget`** (Ava Q5/Q6). The view conditionally renders the catch form `<form data-timeline-target="sheetForm">` only when `!dashboard_read_only?(@run)`; absent target means read-only mode → JS skips rendering EDIT, MARK DEAD, and `+ ANOTHER ENCOUNTER (DUPES CLAUSE)` in the JS-built group cards. No parallel `readOnlyValue`. One gate.
-- **Mockup-document chrome stripped from CSS** (Ava nudge). The mockup HTML had ~340 lines of CSS including page-styling chrome (`.page`, `.page-banner`, `.legend`, `.section-anchor`, `.annotation`, `.phone`, `.phone-bezel`) that styles the mockup document, not the production component. New CSS keeps only the actual component styles, namespaced under `.map-r4`.
-- **Two breakpoint extensions, one new breakpoint.** Existing `@media (max-width: 900px)` is unchanged for R4 (the layout's already 1-col there because the sheet is 380px wide → 720px is the right swap point). Existing `@media (max-width: 520px)` extended with `.map-r4 .special-grid` 2-col reflow. New `@media (max-width: 720px)` block handles the timeline → accordion swap + sheet de-stickifies + layout collapses. Same pattern as Step 22 (extend existing blocks for shared concerns; add a new block only for R4-specific breakpoints).
-- **Final segment divider label is "ELITE FOUR"** (Ava Q3 override). The mockup's `data-segment="…"` was a truncation artifact (mockup only renders 3 segments). For real implementation, the divider before the null-gym (Victory Road) segment names the destination as "ELITE FOUR".
-- **Existing `<datalist>`-prose in the audit was wrong** (Architect locked already): `filterSpecies` / `selectSpecies` / `speciesPreview` are already a custom Stimulus combobox, not a `<datalist>`. No conversion work needed; the new sheet form re-uses them verbatim.
-
-**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — KG-7 (real-save offset verification for `MAP_ID_OFFSET`) still open. KG-25 (real-SRAM smoke test for `BoxParser` + `PkmDecoder` field reads) still open. UI/UX audit `handoff/2026-05-04-ui-audit.md` Phase 1 shipped in Step 20; Phase 2 R3 shipped in Step 21; Phase 2 R2 shipped in Step 22; Phase 2 R4 shipped in Step 23. Remaining: R1 Dashboard (Step 24).
-
-**Parked plan:** FactoryBot conversion fully shipped through Step 8.
-
----
-
-## Step 22 — Status archive
-*Kept here for one-step lookback; will fold into archive at session end.*
-
-**Step 22:** R2 PC Box redesign (Phase 2 R2 of the 2026-05-04 audit). Locked mockup `handoff/2026-05-04-ui-audit-mockup-pc-box.html`, 4 screens. Single bucket per Bob's plan + Ava's inline endorsement of the catch-modal-target wiring correction:
-- Wrapping div `.pc-box-r2` namespaces every new selector under `.pc-box-r2 …` so the legacy `.box-grid` / `.box-cell` rules used by `_pc_box_panel.html.erb` (sidebar) are untouched.
-- View `_pc_box_content.html.erb` full body rewrite: panel head + REVIEW PARSED CATCHES tray (badge legend + per-row LOG/EDIT/SKIP, recommended-action highlighted) + filter chip bar + free-text search + unified `[on_team, storage, fallen]` grid with corner glyphs + 280px type-coverage rail.
-- New section `/* ── R2 PC Box ── */` in `pixeldex.css` (~265 lines, mockup-verbatim with the `.pc-box-r2` prefix), plus 11 lines extending the existing `@media (max-width: 900px)` and `@media (max-width: 520px)` blocks. **Zero new design tokens.**
-- New `app/javascript/controllers/pc_box_filter_controller.js` (76 lines): chip filter + 150ms-debounced search + URL hash + rail-dim + count target + (Should Fix #1 inline) wrapper-level `.filter-active` toggle so non-active chips dim to opacity 0.55 when a non-ALL filter is active.
-- New `app/javascript/controllers/review_tray_controller.js` (38 lines): `prefillCatch` action looks up the catch-modal Stimulus targets and writes values; `dismiss` toggles `.dismissed` + decrements the count pill.
-- New `recommended_review_action(p)` helper in `pixeldex_helper.rb`: pure-function `:log`/`:skip` decision (event_gift / trade_in → `:skip`; else `:log`).
-
-**Reviewed by Richard:** **0 Must Fix, 1 Should Fix (fixed inline), Step 22 clear.** Should Fix: mockup Screen 2's "non-active chips dim to opacity 0.55" behaviour wasn't implemented. Fixed inline at `pc_box_filter_controller.js:65` + `pixeldex.css:1191`. Two new KGs logged (KG-35 SKIP non-persistence is client-only; KG-36 mockup-locked filter scope = no route/player chips).
-
-**Test count:** 697 → **712** (+15). 0 failures, 0 errors.
-**Lint:** rubocop clean. **Brakeman:** Clean (same 2 pre-existing weak-confidence warnings).
-**Migrations:** None. **Zero new gem deps. Zero new design tokens.**
-
-**Shipped:** Step 22 committed at `1375335` on branch `claude/agitated-lewin-d445ec`, FF-merged to `origin/main` at `d442568` and pushed.
-
----
-
-## Step 21 — Status archive — older
-*Kept here for one-step lookback; will fold into archive at session end.*
-
-**Step 21:** R3 Save Slots redesign (Phase 2 R3 of the 2026-05-04 audit). Locked mockup `handoff/2026-05-04-ui-audit-mockup-save-slots.html`, 5 screens. Five buckets per Bob's plan + Ava's approved answers:
-- B-1 — three new tokens (`--d0`, `--green-glow`, `--crimson`) + `/* ── R3 Save Slots ── */` scoped CSS section in `pixeldex.css` (~245 lines added; mockup CSS verbatim except `.slot.overwriteTarget` → `.slot.overwrite-target` kebab-rename).
-- B-2 — `_save_slots_sidebar.html.erb` rewrite: state pills always render, empty-slot CTA copy, inline DELETE confirm, `.pending-banner` overwrite mode, `.footer-actions` CLEAR ALL with inline confirm. Two `confirm_modal(...)` calls dropped; HOF pill kept on slot card per Ava #4.
-- B-3 — `save_slots_controller.js` overhaul: new targets (`slotPill`/`actionRow`/`confirmRow`/`clearAllAction`/`clearAllConfirm`), new actions (`confirmDelete`/`cancelDelete`/`confirmClearAll`/`cancelClearAll`/`cancelOverwrite`), wrapper-level click target replaces overlay button, `window.confirm` removed from `overwriteSlot`, `_actionButtons()` selector retargeted at `confirmDelete` triggers.
-- B-4 — `_run_sidebar_card.html.erb` rewrite: `.head` row + 3-tile stat strip (BADGES/DEX/PLAY) + TID conflict warning band (with partner names from `tid_conflict_groups` lookup) + `<details>STATS` collapse + click-to-copy seed. Trainer / map / money / TID-SID / DEX-seen move inside `<details>`. Money symbol dropped. "Active … ago" + "Save: bytes" rows dropped (KG-34).
-- B-4b/c — `roster_you_marker_controller.js` updated to emit `.you` class + inject `.you-badge` into `.roster-card-name`. New `roster_seed_controller.js` (~25 lines) — click-to-copy with 1s revert. Both Stimulus controllers eager-loaded via existing `controllers/index.js`.
-- B-5 — new `format_progress_phrase(seconds)` helper in `EmulatorHelper` (locked rule: integer-hour truncation, no zero-pad, singular special-cases for 1 minute / 1 hour). 12 new tests across 4 test files, all green.
-
-**Reviewed by Richard:** **0 Must Fix, 1 Should Fix (fixed inline), Step 21 clear.** Richard's `REVIEW-FEEDBACK.md` cleared the step. Should Fix: `_enterOverwriteMode` did not reconcile a slot whose inline DELETE confirm was already open — slot would show both "confirm delete?" row AND amber TARGET pill, and on exit the pill would restore to SAVED (not in-flight CONFIRM). Fixed inline at `save_slots_controller.js:178-181` by hiding the slot's `confirmRow` before the pill swap, with a 4-line WHY comment. Single-method change, no test changes needed (edge case not covered by markup tests). Two new KGs logged (KG-33 slot-card "saved Xm ago" + bytes dropped; KG-34 roster-card "Active … ago" + "Save: bytes" dropped) per Ava's answer #3.
-
-**Test count:** 676 → **697** (+21). 0 failures, 0 errors.
-**Lint:** rubocop clean (197 files, 0 offenses; +1 file: new `roster_seed_controller.js`).
-**Brakeman:** Clean (no new warnings; same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess unchanged from Steps 18/19/20).
-**Migrations:** None.
-
-**Shipped:** Step 21 committed at `3c001ed` on branch `claude/agitated-matsumoto-d48881`, FF-merged to `origin/main` and pushed. Step 20 (previous step) committed at `fbd51af`.
-**Pending deploy:** Step 21 has zero migrations and zero new gem dependencies. Pure ERB/CSS/JS + 1 new Stimulus controller. Pre-deploy safe.
-
-**Audit FF-merge prelude:** before Step 20, the 2026-05-04 UI/UX audit + 4 redesign mockups (`handoff/2026-05-04-ui-audit*.{md,html}`) plus the OFF-FEED `var(--d3)` inline fix landed on `origin/main` at `028643b` after a rebase off Step 19. Step 20 built on that. Step 21 is the first Phase 2 redesign (R3 Save Slots) per § 5 of the audit (locked R3 → R2 → R4 → R1 ship order).
-
-**Step 21 highlights:**
-- Pill-class repurposing approved by Ava: `saved`/`target`/`confirm` carry the colour vocabulary on BOTH slots and roster cards. `ready` → saved, `pending`/`generating` → target, `failed` → confirm.
-- TID conflict band on the roster card lists partner names via inline lookup against `tid_conflict_groups` (max 3 `find_by` calls per render, fires only on the conflict path — Ava OK'd the N+1 trade).
-- `format_progress_phrase` rule locked in helper docstring + tested at all 5 boundaries (`60 → 1 minute`, `120 → 2 minutes`, `3600 → 1 hour`, `7200 → 2 hours`, `3h59m → 3 hours of progress`).
-- `.emulator-grid` shape test asserts `1fr` outside any media block AND `280px minmax(0, 1fr) 280px` at the existing 900px breakpoint — guards against accidental regression of Step 20's collapse behaviour.
-
-**Richard's verifications (notable, Step 20):**
-- All 7 existing modals + the new shared confirm-modal partial inspected end-to-end for ARIA shape (`role="dialog"`, `aria-modal="true"`, `aria-labelledby` pointing at a real `<span id="...">` matching the title). Coin-flip is intentionally ARIA-only (no close button, auto-dismisses, focus trap on a 1-2s animation would be friction).
-- All six destructive trigger paths walked: trigger fires `confirm-modal#open`, confirm button fires the original action via `confirm_data: { action: "..." }` spread. Distinct ids for END RUN dashboard vs /runs page (`end-run-dashboard-confirm` vs `end-run-page-confirm`) is defensive — survives a future view merge.
-- `_actionButtons()` selector update in `save_slots_controller.js` correctly matches the new `[data-confirm-modal-id-param^='delete-slot-']` triggers — overwrite-pending mode still disables them.
-- Channel authz on `gym_schedule_channel.rb#cancel` enforces `@schedule.proposed_by == current_user_id` server-side (test `non-proposer's cancel is rejected and schedule stays active` covers it). Both `proposed_by` (bigint) and `current_user_id` (Integer from `auth.uid.to_i`) are Ruby Integer → direct equality works.
-- ESC closes dashboard modals after `pixeldex.html.erb:28` got `data-controller="escape-close"` (was missing pre-Step-20 — only the application layout had it).
-- 22 new tests, all FactoryBot. New `:gym_schedule` factory follows existing factory conventions.
-
-**Nice-to-Have items accepted as-is (no code change):**
-- **`window.__confirmModals` registry is dead code.** `confirm_modal_controller.js#connect()` populates it but no callsite reads it; `open()` discriminates by `event.params?.id !== this.idValue` instead. Kept per KG-32 — earns its keep if a future external script wants programmatic access to a modal element by id.
-- **Cancel target fallback in `confirm_modal_controller.js#open()`.** Falls back to `firstFocusable()` if `hasCancelTarget` is false. The partial always renders the cancel button with the right target attribute, so the fallback is unreachable in production. Defense-in-depth comment is fine; cost-zero.
-
-**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — KG-7 (real-save offset verification for `MAP_ID_OFFSET`) still open. KG-25 (real-SRAM smoke test for `BoxParser` + `PkmDecoder` field reads) still open. UI/UX audit `handoff/2026-05-04-ui-audit.md` shipped — Phase 1 cross-cutting fixes land in Step 20; Phase 2 redesigns (R3 Save Slots → R2 PC Box → R4 Map → R1 Dashboard) each get their own future session. New gaps logged below (KG-31, KG-32).
-
-**Parked plan:** FactoryBot conversion fully shipped through Step 8.
+**Shipped:** Step 23 committed at `c29f74e` on branch `claude/sad-haslett-33d407`. Worktree-only — not yet FF-merged to `origin/main` (Phase 2 closes after Step 24 ships).
 
 ---
 
 ## Step History
 *Session-scoped.*
+
+### Step 24 — R1 Dashboard restructure (Phase 2 R1 of the 2026-05-04 audit; closes Phase 2) — 2026-05-05
+**Status:** Shipped on branch `claude/sad-haslett-33d407` — FF-merged to `origin/main` and pushed. **Phase 2 closes.** **No KGs close**, **1 KG opens** (KG-39 — see § Known Gaps).
+
+**Reviewed by Richard:** 0 Must Fix, 4 Should Fix (all fixed inline — see "Should Fixes resolved" appendix in `REVIEW-REQUEST.md`): (1) run-option `tabindex="0"` → `tabindex="-1"` (WAI-ARIA listbox roving-focus contract), (2) `+ START NEW RUN` button gains `role="option"` + matching `tabindex="-1"`, (3) `run_picker_controller.js` ArrowUp/ArrowDown edge case at `currentIndex === -1` (trigger has focus) — explicit guard lands ArrowUp on last option, ArrowDown on first, (4) inline `form: { style: "margin: 0;" }` on the START GYM DRAFT CTA moved to `.dash-r1 .next-battle form { margin: 0; }` in `pixeldex.css` (audit cross-cutting #5 — zero inline styles). Suite still 777/0; rubocop clean (202 files, 0 offenses); brakeman clean (same 2 pre-existing weak-confidence warnings unchanged).
+
+Final Phase 2 redesign per § 5 of `handoff/2026-05-04-ui-audit.md`. Six locked screens in `handoff/2026-05-04-ui-audit-mockup-dashboard.html` (desktop 3-col + slim title + real tablist · right-rail PARTY view · tablet 2-col · phone single column + scrollable tab strip · run-pill open · ARIA spec sheet). Pure frontend ship — 5 view rewrites + 1 CSS section + 1 extended Stimulus controller + 2 new Stimulus controllers + 2 file deletions + 1 controller line addition + 1 controller redirect rewrite. Architect-locked decisions tracked under § Architecture Decisions.
+
+**Architecture decisions (durable — see § Architecture Decisions):**
+- **CSS namespace under `.dash-r1`** (Step 22 `.pc-box-r2`, Step 23 `.map-r4` precedent). Every new CSS selector is prefixed `.dash-r1 …` so existing `.title-bar` / `.tab-bar` / `.pc-layout` rules used elsewhere in the app remain untouched. Within `.dash-r1`, the new rules **override** the legacy `.title-bar` (slim row), `.tab-bar` (tablist), `.pc-layout` (3-col) shapes.
+- **Run-management controller hoisted to dashboard root.** Pre-Step-24 `_runs_content.html.erb` carried `data-controller="run-management"` scoped to the RUNS tab content. Step 24 hoists it to `app/views/dashboard/show.html.erb`'s outer `.dash-r1` div so the title-bar's `+ START NEW RUN` button reaches `run-management#startRun` via DOM bubbling without spawning a second ActionCable subscription. Inside `_runs_content`, the wrapper `<div>` no longer carries the data attributes — targets resolve up the DOM.
+- **Run-pill is anchor-based for switch action; Stimulus only enhances.** Each menu option is a real `<a href="/?run_id=N" role="option">` so switching runs works without JS. `run-picker` Stimulus controller adds toggle (`click->run-picker#toggle`), keyboard nav (↑/↓/Home/End/Enter/Esc via `keydown->run-picker#navigate`), and outside-click close (`document.addEventListener("click", _closeOnOutside)` in `connect()`). `aria-haspopup="listbox"` + dynamic `aria-expanded` ship on the pill button.
+- **Tablist activation on focus move (mockup spec).** WAI-ARIA recommends focus-only on ←/→ with Enter/Space to activate, but the mockup explicitly says "←/→ moves between tabs (with wrap), updates `aria-selected` and `tabindex` immediately, **and activates the tab**." `pixeldex#tablistKeydown` calls `target.focus(); target.click()` to honor mockup. If a follow-up wants the WAI-ARIA-strict shape, drop `target.click()` from `tablistKeydown`.
+- **`pixeldex#numericJump` window-level binding gated for input focus.** `keydown@window->pixeldex#numericJump` registers globally on `app/views/dashboard/show.html.erb`'s `.dash-r1` wrapper. Skip conditions: `event.target.tagName` in `INPUT` / `TEXTAREA` / `SELECT`; `target.isContentEditable`; any modifier key (`metaKey`/`ctrlKey`/`altKey`/`shiftKey`). Mockup spec.
+- **`switchTab` writes URL hash via `history.replaceState`** (Step 23 `#route=` precedent). No back-stack pollution. The existing `#applyHashTab` in `connect()` reads the hash and clicks the matching tab button — round trip preserves tab across reloads.
+- **Right-rail consolidation: 3 sub-tabs replace stacked panels.** Old `_map_panel.html.erb` stacked ASCII map + current location card + badge case + GYM LEADERS + recent routes — duplicating MAP and GYMS main-tab content. New `_status_rail.html.erb` collapses this into one card with PARTY / GYMS / MAP sub-tabs; GYMS is default-active per mockup screen 1. PARTY is NEW data (one row per registered player); GYMS is a compact version of the existing GYMS tab content with a START GYM DRAFT CTA; MAP is the old `_map_panel` body MINUS the GYM LEADERS section (now in GYMS sub-tab — closes audit cross-cutting #6 duplication). Mockup-driven.
+- **`status-rail` Stimulus controller** drives the sub-tabs: `switch` (click) + `keydown` (←/→/Home/End focus+activate) on `[role="tab"]` buttons. `_activate(tab, { focus })` flips `aria-selected` + `tabindex` and toggles the matching panel's `.hidden` class.
+- **`/runs` becomes a 301 redirect to `root_path(anchor: "runs")`.** Cross-cutting #3 from the audit ("Run management exists in two divergent surfaces") resolved here. The dashboard RUNS tab is canonical (it has run/guild context loaded, supports cross-run switching via the chrome run pill, and inherits the dashboard's tablist contract for free). External links / nav links / the emulator page's `GO TO RUNS` button all keep working through the redirect; the 301 is a permanent IA decision so search engines / social previews learn the new URL. `/runs` view file deleted; `app/views/runs/` directory removed.
+- **Emulator-ROM affordances added to the dashboard RUNS tab.** Pre-Step-24 the `Generate Emulator ROMs` / `Regenerate ROMs` / `ROMs generating…` status span only existed on `/runs`. Now also on the dashboard RUNS tab in `_runs_content.html.erb`, wired identically to `run-management#generateEmulatorRoms` / `#regenerateEmulatorRoms`. No JS controller changes — the Stimulus targets already exist (`generateRomsButton` / `regenerateRomsButton` / `generateRomsStatus`) and the controller's `render()` method already sets visibility based on `current_run.emulator_status`.
+- **Stat strip math fixed inline** (no controller change). Pre-Step-24 title bar showed `@caught_count` for "CAUGHT" and `@caught_count - @dead_count` for "ALIVE", which read as a labeling inversion (controller's `@caught_count = @all_groups.count(&:caught?)` is currently-alive-with-status-caught, not total-ever-caught). Mockup locks the conventional reading: CAUGHT = total ever caught; ALIVE = currently alive; DEAD = currently dead. New view computes `@caught_count + @dead_count` for CAUGHT and `@caught_count` for ALIVE without changing controller semantics. Documented in the view with a WHY comment.
+- **`@all_player_teams` is the only new controller variable.** Computed once in `DashboardController#show` with `includes(soul_link_team_slots: { soul_link_pokemon_group: :soul_link_pokemon })` so the PARTY sub-tab renders without per-player N+1. Iterating `SoulLink::GameState.players` and looking up via `index_by(:discord_user_id)` keeps the partial readable.
+- **Per-player badge counts on PARTY sub-tab share `@gyms_defeated`** (KG-39). Per-player badge variance is a future feature; for now all 4 player rows show the run's `gyms_defeated`. The YOU pill identifies the current user; the 🏆 HOF pill renders only when `@run.completed? && badges == 8`. Architect-decided ambiguity per the brief.
+- **Mobile breakpoints**: existing `@media (max-width: 900px)` extended (`.dash-r1 .pc-layout` to 2-col + `.dash-r1 .col-party { display: none; }` + `.dash-r1 .title-bar` flex-direction column) — left party sidebar disappears, content lives in PARTY main tab. Existing `@media (max-width: 720px)` extended (`.dash-r1 .pc-layout` to 1fr + `.dash-r1 .tab-bar { overflow-x: auto; flex-wrap: nowrap; }` + stat strip pulls top border). Existing `@media (max-width: 520px)` extended (`.dash-r1 .stat-strip { font-size: 7px; gap: 8px; }`). All three breakpoint extensions land inside existing blocks; no new media block. **Zero new design tokens.**
+- **Stimulus controller registration is automatic** via `eagerLoadControllersFrom("controllers", application)` in `app/javascript/controllers/index.js`. `pin_all_from "app/javascript/controllers"` in `config/importmap.rb` picks up both new controllers without manual edit.
+
+**Test count:** 755 → 777 (+22). 0 failures, 0 errors.
+
+**Files (new):** 3 —
+- `test/integration/dashboard_redesign_test.rb` (~250 lines, 18 tests).
+- `app/javascript/controllers/run_picker_controller.js` (~110 lines).
+- `app/javascript/controllers/status_rail_controller.js` (~60 lines).
+- `app/views/dashboard/_status_rail.html.erb` (~205 lines).
+
+**Files (modified):** 9 —
+- `app/views/dashboard/show.html.erb` (full rewrite for `.dash-r1` wrapper + status_rail render + ARIA tabpanel attrs on each tabContent div).
+- `app/views/dashboard/_title_bar.html.erb` (full rewrite — slim row + glyph + run-pill + stat strip).
+- `app/views/dashboard/_tab_bar.html.erb` (full rewrite — tablist + ARIA + icons + badge dots).
+- `app/views/dashboard/_runs_content.html.erb` (added 3 emulator-ROM affordances; removed inner `data-controller="run-management"` wrapper now hoisted to dashboard root).
+- `app/controllers/dashboard_controller.rb` (+5 lines — `@all_player_teams` instance variable).
+- `app/controllers/runs_controller.rb` (full rewrite — body is now `redirect_to root_path(anchor: "runs"), status: :moved_permanently`).
+- `app/javascript/controllers/pixeldex_controller.js` (+~70 lines — `tablistKeydown`, `numericJump`, `switchTab` aria/tabindex/replaceState extensions).
+- `app/assets/stylesheets/pixeldex.css` (+~325 lines new R1 section above the RESPONSIVE block; +6 lines extending 900px block; +6 lines extending 720px block; +1 line extending 520px block).
+- `test/integration/responsive_grids_test.rb` (+38 lines — 4 new Step 24 R1 assertions).
+- `test/integration/confirm_modal_flow_test.rb` (3 `get runs_path` calls converted to `get root_path` for the canonical surface; 1 new `/runs redirects` test added).
+
+**Files (deleted):** 2 —
+- `app/views/dashboard/_map_panel.html.erb` (content folded into `_status_rail` MAP sub-tab; `_map_content.html.erb` for the MAP main tab is untouched).
+- `app/views/runs/index.html.erb` (canonical content lives in `_runs_content.html.erb`; `/runs` is now a 301 redirect). `app/views/runs/` directory removed.
+
+**Tests added (22 new):**
+1. `DashboardRedesignTest`: `.dash-r1` wrapper renders with dashboard + pixeldex + run-management controllers attached.
+2. `DashboardRedesignTest`: title-bar renders with the run-pill replacing the legacy `<select>` (no inline `onchange="window.location.href"`; `<button class="run-pill">` + `data-controller="run-picker"` + `aria-haspopup="listbox"` present).
+3. `DashboardRedesignTest`: title-bar stat-strip renders 4 inline items (CAUGHT/ALIVE/DEAD/BADGES) with values from a seeded run (1 alive + 1 dead → CAUGHT 2 / ALIVE 1 / DEAD 1 / BADGES 0/8).
+4. `DashboardRedesignTest`: tab-bar renders with `role="tablist"` + `aria-label="Dashboard sections"` + per-tab `role="tab"` + `id="tab-<key>"` + `aria-controls="panel-<key>"` for all 7 keys.
+5. `DashboardRedesignTest`: active tab has `aria-selected="true"` + `tabindex="0"`; others have `aria-selected="false"` + `tabindex="-1"`. Scoped to the main tab-bar block (right rail also uses `role="tab"`).
+6. `DashboardRedesignTest`: PC BOX tab carries a `<span class="badge-dot">` when `@auto_detected_catches.any?`.
+7. `DashboardRedesignTest`: PC BOX tab does NOT carry a badge-dot when no auto-detected catches exist.
+8. `DashboardRedesignTest`: GYMS tab carries a badge-dot when an active draft exists (`gym_drafts` row with status: "lobby").
+9. `DashboardRedesignTest`: right status rail renders `<aside class="status-rail" data-controller="status-rail">` with 3 sub-tabs (PARTY/GYMS/MAP) carrying `data-status-rail-tab-param`.
+10. `DashboardRedesignTest`: GYMS sub-tab is the default-active (exactly one `aria-selected="true"` under the rail; key is "gyms").
+11. `DashboardRedesignTest`: GYMS sub-tab renders the START GYM DRAFT CTA when `@next_gym && !dashboard_read_only?(@run)`.
+12. `DashboardRedesignTest`: GYMS sub-tab does NOT render the START GYM DRAFT CTA when wiped (read-only); shows "RUN ENDED" state instead.
+13. `DashboardRedesignTest`: PARTY sub-tab renders one `.player-card` per `SoulLink::GameState.players` entry (4 in test settings).
+14. `DashboardRedesignTest`: current user's PARTY sub-tab row has `class="player-card you"` and the YOU pill.
+15. `DashboardRedesignTest`: RUNS tab includes the Generate Emulator ROMs button when `emulator_status == :none` (default with no sessions).
+16. `DashboardRedesignTest`: RUNS tab includes the Regenerate ROMs button when `emulator_status == :failed` (created via `:soul_link_emulator_session, status: "failed"`).
+17. `DashboardRedesignTest`: RUNS tab does NOT include the legacy `/runs` page selector (no `RUN MANAGEMENT` heading; no `class="gb-page-title">RUN MANAGEMENT`).
+18. `DashboardRedesignTest`: `/runs` redirects to `root_path` with `#runs` anchor (status 301 or 302; `redirect_url.end_with?("#runs")`).
+19. `ResponsiveGridsTest`: `.dash-r1` namespace declared outside any media block.
+20. `ResponsiveGridsTest`: 900px breakpoint sets `.dash-r1 .pc-layout { grid-template-columns: minmax(0, 1fr) 280px; }` and `.dash-r1 .col-party { display: none; }`.
+21. `ResponsiveGridsTest`: 720px breakpoint drops `.dash-r1 .pc-layout` to `1fr` and sets `.dash-r1 .tab-bar { overflow-x: auto; }`.
+22. `ResponsiveGridsTest`: 520/720/900px breakpoints do NOT set `display: none` on `.dash-r1 .tab` or `.dash-r1 .status-rail`.
+
+**Backward-compat invariants exercised:**
+- `DashboardController#show` instance variables preserved verbatim; only `@all_player_teams` added (additive).
+- `_party_panel.html.erb` (left-col party panel), `_party_detail.html.erb` (PARTY main-tab), `_pc_box_content.html.erb`, `_map_content.html.erb`, `_gyms_content.html.erb`, `_strategy_panel.html.erb`, `_calc_content.html.erb`, `_catch_modal.html.erb`, `_pokemon_modal.html.erb`, `_mark_dead_modal.html.erb`, `_reset_draft_modal.html.erb` all unchanged. The existing tab content + modals render inside the new shell exactly as before.
+- `pixeldex_controller.js` actions all preserved verbatim (`switchTab`, `selectPokemon`, `searchSpecies`, `savePokemon`, `evolvePokemon`, `updateNatureLabel`, `closePokemonModal`, all `#initSortables` / `#onDragEnd` / `#saveTeamSlots` / `#updateGroupStatus` / `#openModal` / `#applyHashTab` private helpers). Targets all preserved. Only additions: `tablistKeydown`, `numericJump` actions; `switchTab` body extended (still backward-compat — legacy `.active` class still toggled).
+- `run_management_controller.js` action surface unchanged. Targets unchanged. Hoisting the `data-controller` to dashboard root means the same controller instance services both the title-bar's `+ START NEW RUN` button and the RUNS tab's full panel; only one ActionCable subscription per dashboard load.
+- `dashboard_controller.js` action surface unchanged.
+- `confirm_modal_flow_test.rb`'s 3 legacy tests against `get runs_path` re-pointed at `get root_path` (the canonical surface). The `end-run-page-confirm` modal id is gone with the deleted `/runs` view — the dashboard surface uses `end-run-dashboard-confirm` (Step 20 precedent: distinct ids for distinct surfaces).
+- `pc_box_redesign_test`, `map_redesign_test`, `wipe_flow_test`, all gym/team/run/pokemon model tests unaffected.
+
+**Diff scope:** 4 new + 9 modified + 2 deleted files. Inside the brief's stated scope (`Files Bob will touch` table). Zero changes under `app/services/`, `app/jobs/`, `app/channels/`, `db/`, `config/` (except 1 controller body replacement and 1 controller line added per the brief).
+
+**KG closures logged:** none.
+
+**New Known Gaps logged this step:** 1 — KG-39 (per-player badge variance on the PARTY sub-tab). See § Known Gaps.
+
+---
 
 ### Step 23 — R4 Map redesign (Phase 2 R4 of the 2026-05-04 audit) — 2026-05-05
 **Status:** Built; awaiting Richard's review (`REVIEW-REQUEST.md` posted). **No KGs close** (Phase 2 redesigns are surface-level UX work, not backlog items).
@@ -1365,6 +1409,9 @@ ALL FACTORY SMOKE CHECKS PASSED
 - **`window.alert()` for Tier-A error toasts** (Step 9). Smallest user-facing change that closed the silent-failure gap; a styled toast component (matching the `gb-flash gb-flash-alert` palette) would be cleaner. Track if alerts feel intrusive in real use.
 - **Bot-process broadcasts not yet supported.** The async cable adapter is in-process; Discord modal updates (which run in the bot process via `rake soul_link:bot`) don't propagate to web clients in real time. Switching to a redis cable adapter would unlock this.
 - **Pre-existing soft points from `handoff/PROJECT-REVIEW-2026-04-30.md`** — 20 items, ranked by ROI in that document. Top-priority structural cleanups: (1) `discord_bot.rb` god-object decomposition; (2) zero test coverage on services/channels; (3) `SoulLinkRun.current(guild_id)` lacks a hard "one active per guild" invariant; (4) `DashboardController#show` needs presenter extraction; (5) `SoulLinkEmulatorSession::GzipCoder` should move to a concern. None of these are urgent — Tier-1 refactor work, fresh-session candidate.
+
+### New — From Step 24 (2026-05-05)
+- **KG-39: Per-player badge counts on the dashboard PARTY sub-tab share `@gyms_defeated`.** Step 24 R1's PARTY sub-tab in `_status_rail.html.erb` renders `<%= @gyms_defeated %> BADGES` for every player row — there is no per-player badge variance because the run only tracks gyms_defeated as a single integer at the run level. Mockup screen 2 shows "BOB 8 BADGES" while the other 3 sit at 2/3 — that's the future feature. To ship per-player variance: extend `SoulLinkRun` (or `SoulLinkTeam`) with per-player gym progress, add a partial `:player_badges_count(uid)` lookup (or compute from `gym_results` × `team_snapshot`), and replace the shared `@gyms_defeated` reference in the PARTY sub-tab partial. The HOF-pill currently fires on `@run.completed? && badges == 8`; once per-player variance lands, switch the conditional to per-player HoF state. Architect-decided ambiguity in Step 24 brief.
 
 ### New — From Step 22 (2026-05-04)
 - **KG-35: SKIP in the PC BOX REVIEW PARSED CATCHES tray does not persist.** Step 22 R2's per-row SKIP button toggles a `.dismissed` class on the row (opacity 0.4 + count decrement), client-side only. Reload resurfaces the row. Mockup-driven: the mockup shows opacity-dim styling but no backend round-trip; the audit's "small migration" hand-wave for `acquired_via` / `caught_off_feed` round-trip was explicitly out-of-scope per the Step 22 brief (no schema / controller / endpoint changes). Future v2 if SKIP feedback proves persistent: add a `skipped_at:datetime` column on `soul_link_pokemon`, hide SKIPped rows from `@auto_detected_catches`, surface an "UNDO SKIP" affordance somewhere. Adjacent to KG-23.

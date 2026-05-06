@@ -17,35 +17,43 @@ class ConfirmModalFlowTest < ActionDispatch::IntegrationTest
     login_as(GREY)
   end
 
-  test "/runs END RUN button opens the confirm modal instead of firing endRun directly" do
+  # Step 24 R1 — `/runs` is now a 301 redirect to the canonical
+  # dashboard RUNS tab. The legacy `End Current Run` page modal is
+  # gone; the dashboard's `End Run` modal (id `end-run-dashboard-confirm`)
+  # is the canonical surface and the next test covers it.
+  test "/runs redirects to root_path with #runs anchor" do
     get runs_path
-    assert_response :success
-
-    # The trigger button no longer carries the direct end-run action. Note:
-    # the trigger button is hand-written ERB (not via a Rails tag helper), so
-    # `>` is not HTML-escaped — the literal "click->" survives.
-    assert_no_match(/<button[^>]*data-action="click->run-management#endRun"[^>]*>\s*End Current Run/m, response.body)
-
-    # Instead, it opens the confirm modal.
-    assert_match(/data-action="click->confirm-modal#open"[^>]*data-confirm-modal-id-param="end-run-page-confirm"/m, response.body)
+    assert_response :moved_permanently
+    assert_equal "http://www.example.com/#runs", response.redirect_url
   end
 
-  test "/runs renders the END RUN confirm modal with correct ARIA wiring" do
-    get runs_path
+  test "dashboard RUNS tab END RUN button opens the confirm modal instead of firing endRun directly" do
+    get root_path
+    assert_response :success
+
+    # The trigger button no longer carries the direct end-run action.
+    assert_no_match(/<button[^>]*data-action="click->run-management#endRun"[^>]*>\s*END RUN/m, response.body)
+
+    # Instead, it opens the confirm modal.
+    assert_match(/data-action="click->confirm-modal#open"[^>]*data-confirm-modal-id-param="end-run-dashboard-confirm"/m, response.body)
+  end
+
+  test "dashboard RUNS tab renders the END RUN confirm modal with correct ARIA wiring" do
+    get root_path
     assert_response :success
 
     # Modal container with id matching the trigger's id-param.
-    assert_match(/id="end-run-page-confirm"/, response.body)
+    assert_match(/id="end-run-dashboard-confirm"/, response.body)
 
     # role="dialog" + aria-modal + aria-labelledby pointing at the title.
     assert_match(/role="dialog"/, response.body)
     assert_match(/aria-modal="true"/, response.body)
-    assert_match(/aria-labelledby="end-run-page-confirm-title"/, response.body)
-    assert_match(/id="end-run-page-confirm-title">END THIS RUN\?/, response.body)
+    assert_match(/aria-labelledby="end-run-dashboard-confirm-title"/, response.body)
+    assert_match(/id="end-run-dashboard-confirm-title">END THIS RUN\?/, response.body)
   end
 
-  test "/runs confirm button carries the original endRun action" do
-    get runs_path
+  test "dashboard RUNS tab confirm button carries the original endRun action" do
+    get root_path
     assert_response :success
 
     # The confirm button inside the modal is the only place that still

@@ -1,9 +1,48 @@
-<div class="tab-bar">
-  <button class="tab-item" data-action="click->pixeldex#switchTab" data-pixeldex-target="tabButton" data-tab="party">PARTY</button>
-  <button class="tab-item active" data-action="click->pixeldex#switchTab" data-pixeldex-target="tabButton" data-tab="pcbox">PC BOX</button>
-  <button class="tab-item" data-action="click->pixeldex#switchTab" data-pixeldex-target="tabButton" data-tab="map">MAP</button>
-  <button class="tab-item" data-action="click->pixeldex#switchTab" data-pixeldex-target="tabButton" data-tab="gyms">GYMS</button>
-  <button class="tab-item" data-action="click->pixeldex#switchTab" data-pixeldex-target="tabButton" data-tab="strategy">STRATEGY</button>
-  <button class="tab-item" data-action="click->pixeldex#switchTab" data-pixeldex-target="tabButton" data-tab="runs">RUNS</button>
-  <button class="tab-item" data-action="click->pixeldex#switchTab" data-pixeldex-target="tabButton" data-tab="calc">CALC</button>
+<%# Step 24 R1 — real WAI-ARIA tablist.
+    Each tab is a 2-line vertical button (icon top, label bottom).
+    Active tab carries `aria-selected="true" tabindex="0"`; others
+    carry `aria-selected="false" tabindex="-1"` so Tab moves into
+    the active panel rather than walking through the inactive tabs.
+
+    Live-update dot (`<span class="badge-dot">`) renders top-right
+    on tabs that have fresh state worth surfacing. Server-rendered
+    on each request — Turbo's morph refresh keeps it in sync.
+
+    The tab-bar wires `keydown->pixeldex#tablistKeydown` for the
+    arrow / Home / End keyboard contract; the window-level 1-7
+    numeric jump is bound on the dashboard root via `numericJump`.
+%>
+<%
+  tabs = [
+    { key: "party",    label: "PARTY",    icon: "&#9635;".html_safe, active: false, dot: false },
+    { key: "pcbox",    label: "PC BOX",   icon: "&#9638;".html_safe, active: true,  dot: @auto_detected_catches.any? },
+    { key: "map",      label: "MAP",      icon: "&#9968;".html_safe, active: false, dot: false },
+    { key: "gyms",     label: "GYMS",     icon: "&#9733;".html_safe, active: false, dot: @active_draft.present? },
+    { key: "strategy", label: "STRATEGY", icon: "&#9876;".html_safe, active: false, dot: false },
+    { key: "runs",     label: "RUNS",     icon: "&#9881;".html_safe, active: false, dot: false },
+    { key: "calc",     label: "CALC",     icon: "&#8721;".html_safe, active: false, dot: false }
+  ]
+%>
+<div class="tab-bar"
+     role="tablist"
+     aria-label="Dashboard sections"
+     data-action="keydown->pixeldex#tablistKeydown">
+  <% tabs.each do |tab| %>
+    <button type="button"
+            class="tab<%= ' active' if tab[:active] %>"
+            role="tab"
+            id="tab-<%= tab[:key] %>"
+            aria-controls="panel-<%= tab[:key] %>"
+            aria-selected="<%= tab[:active] ? 'true' : 'false' %>"
+            tabindex="<%= tab[:active] ? '0' : '-1' %>"
+            data-action="click->pixeldex#switchTab"
+            data-pixeldex-target="tabButton"
+            data-tab="<%= tab[:key] %>">
+      <span class="icon" aria-hidden="true"><%= tab[:icon] %></span>
+      <%= tab[:label] %>
+      <% if tab[:dot] %>
+        <span class="badge-dot" aria-label="Updates available"></span>
+      <% end %>
+    </button>
+  <% end %>
 </div>

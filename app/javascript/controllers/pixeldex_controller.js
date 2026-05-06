@@ -29,6 +29,68 @@ export default class extends Controller {
     this.#applyHashTab()
   }
 
+  // ── Step 24 R1 — Tablist keyboard support ──
+  //
+  // Bound at the dashboard tab-bar via `keydown->pixeldex#tablistKeydown`.
+  // Implements the WAI-ARIA tablist pattern: ←/→ moves focus AND activates
+  // the tab (mockup spec — unlike the spec's recommendation, the mockup
+  // calls for instant activation rather than focus-only); Home/End jump
+  // to the first/last tab. The 1-7 numeric jump is bound on `window`
+  // (`numericJump`) so it works from anywhere on the page, except when
+  // the user is typing in an input.
+
+  tablistKeydown(event) {
+    const buttons = this.tabButtonTargets
+    if (buttons.length === 0) return
+
+    const currentIndex = buttons.indexOf(document.activeElement)
+    if (currentIndex === -1) return
+
+    let targetIndex = null
+    switch (event.key) {
+      case "ArrowRight":
+        targetIndex = (currentIndex + 1) % buttons.length
+        break
+      case "ArrowLeft":
+        targetIndex = (currentIndex - 1 + buttons.length) % buttons.length
+        break
+      case "Home":
+        targetIndex = 0
+        break
+      case "End":
+        targetIndex = buttons.length - 1
+        break
+      default:
+        return
+    }
+
+    event.preventDefault()
+    const target = buttons[targetIndex]
+    target.focus()
+    target.click()
+  }
+
+  numericJump(event) {
+    if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
+
+    const target = event.target
+    if (target) {
+      const tag = target.tagName
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return
+      if (target.isContentEditable) return
+    }
+
+    const num = parseInt(event.key, 10)
+    if (!Number.isInteger(num) || num < 1 || num > this.tabButtonTargets.length) return
+
+    event.preventDefault()
+    const button = this.tabButtonTargets[num - 1]
+    if (button) {
+      button.focus()
+      button.click()
+    }
+  }
+
   // ── Hash-driven tab restore ──
   //
   // After a server redirect like `redirect_to root_path(anchor: "gyms")`,
@@ -160,9 +222,24 @@ export default class extends Controller {
     const target = this.tabContentTargets.find(el => el.dataset.tab === tab)
     if (target) target.classList.remove("hidden")
 
+    // Step 24 R1 — flip ARIA + tabindex on every tab button. Keep the
+    // legacy `.active` class toggle for any rule that still relies on it.
     this.tabButtonTargets.forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.tab === tab)
+      const isActive = btn.dataset.tab === tab
+      btn.classList.toggle("active", isActive)
+      if (btn.hasAttribute("role") && btn.getAttribute("role") === "tab") {
+        btn.setAttribute("aria-selected", isActive ? "true" : "false")
+        btn.setAttribute("tabindex", isActive ? "0" : "-1")
+      }
     })
+
+    // Step 24 R1 — sync URL hash so a refresh restores the active tab.
+    // `replaceState` matches Step 23's `#route=` precedent — no back-stack
+    // pollution. Browsers without history API (none of our targets) will
+    // simply skip this branch.
+    if (typeof window !== "undefined" && window.history && window.history.replaceState) {
+      window.history.replaceState(null, "", "#" + tab)
+    }
 
     if (this.hasPokemonDetailTarget) {
       this.pokemonDetailTarget.classList.add("hidden")

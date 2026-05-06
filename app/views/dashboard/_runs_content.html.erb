@@ -1,10 +1,13 @@
+<%# Step 24 R1 — `run-management` controller hoisted to the dashboard
+    root (see `dashboard/show.html.erb`), so the title-bar's
+    `+ START NEW RUN` button can reach `run-management#startRun`
+    without wiring two cable subscriptions. The wrapper here is a
+    plain <div> — targets and actions resolve up the DOM. %>
 <%
   active_run = @all_runs.find(&:active?)
   past_runs = @all_runs.reject(&:active?)
 %>
-<div data-controller="run-management"
-     data-run-management-guild-id-value="<%= @guild_id %>"
-     data-run-management-user-id-value="<%= current_user_id %>">
+<div>
 
   <div class="panel-header">
     <span>RUNS</span>
@@ -98,6 +101,25 @@
                   class="gb-btn-primary gb-btn-sm <%= 'hidden' if active_run&.discord_channels_configured? %>">
             SETUP DISCORD
           </button>
+          <%# Step 24 R1 — emulator-ROM affordances moved from the deleted
+              `/runs` page. Same wiring (`run-management#generateEmulatorRoms`
+              / `#regenerateEmulatorRoms`) and the same mutually-exclusive
+              visibility based on `active_run.emulator_status`. %>
+          <button data-action="click->run-management#generateEmulatorRoms"
+                  data-run-management-target="generateRomsButton"
+                  class="gb-btn-primary gb-btn-sm <%= 'hidden' if active_run&.emulator_status != :none %>">
+            Generate Emulator ROMs
+          </button>
+          <button data-action="click->run-management#regenerateEmulatorRoms"
+                  data-run-management-target="regenerateRomsButton"
+                  class="gb-btn-primary gb-btn-sm <%= 'hidden' if active_run&.emulator_status != :failed %>">
+            Regenerate ROMs
+          </button>
+          <span data-run-management-target="generateRomsStatus"
+                class="<%= 'hidden' if active_run&.emulator_status != :generating %>"
+                style="font-size: 11px; color: var(--l1);">
+            ROMs generating&hellip;
+          </span>
         </div>
       </div>
     </div>
