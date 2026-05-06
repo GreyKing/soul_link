@@ -1,34 +1,28 @@
-<%# Step 24 R1 — slim title bar.
-    Left:  36×36 amber title-glyph (initials of player name) +
-           2-line player block + run-pill (Stimulus dropdown that
-           replaces the legacy <select onchange="..."> XSS-adjacent
-           inline JS — see audit annotation C).
-    Right: single inline stat strip with `·` separators. ALIVE
-           coloured green, DEAD crimson, BADGES amber.
+<%# Step 27 — Title bar restyled to gb-page-title + gb-page-subtitle
+    form. Title-glyph removed; the title text already says whose
+    dashboard it is. Run-pill rebased to gb-btn shape; status indicator
+    is inline text inside the button label, not a coloured inner pill.
+    Stat strip drops per-item colour coding — labels do the work.
 
-    The pill toggle + keyboard navigation are JS-only enhancements.
+    The run-picker controller targets + dropdown menu are preserved.
     Each menu option is a real <a href="/?run_id=N"> so switching
     runs works without JS. %>
 <%
   player_label = (@player_name.presence || "Trainer").to_s
-  glyph_initials = player_label.split(/\s+/).map { |w| w[0] }.compact.join.upcase[0, 2]
-  glyph_initials = "PC" if glyph_initials.blank?
 
-  current_status_label, current_status_class =
+  current_status_label =
     if @run.completed?
-      [ "HOF", "badge hof" ]
+      "HOF"
     elsif @run.read_only?
-      [ "ENDED", "badge dim" ]
+      "ENDED"
     elsif @run.active?
-      [ "ACTIVE", "badge" ]
+      "ACTIVE"
     else
-      [ "VIEWING", "badge dim" ]
+      "VIEWING"
     end
 %>
 <header class="title-bar">
   <div class="title-left">
-    <div class="title-glyph" aria-hidden="true"><%= glyph_initials %></div>
-
     <div class="title-block">
       <div class="player"><%= player_label.upcase %>'S PC</div>
       <div class="meta">PLATINUM &middot; SOUL LINK</div>
@@ -44,8 +38,7 @@
               aria-haspopup="listbox"
               aria-expanded="false"
               aria-label="Switch run">
-        RUN #<%= @run.run_number %>
-        <span class="<%= current_status_class %>"><%= current_status_label %></span>
+        RUN #<%= @run.run_number %> &mdash; <%= current_status_label %>
         <span class="chev" aria-hidden="true">&#9662;</span>
       </button>
 
@@ -55,15 +48,15 @@
            aria-label="Available runs">
         <% @all_runs.each do |r| %>
           <%
-            opt_status_label, opt_status_class =
+            opt_status_label =
               if r.completed?
-                [ "🏆 HOF", "pill hof" ]
+                "[🏆 HOF]"
               elsif r.read_only?
-                [ "ENDED", "pill" ]
+                "[ENDED]"
               elsif r.active?
-                [ "ACTIVE", "pill" ]
+                "[ACTIVE]"
               else
-                [ "PAST", "pill" ]
+                "[PAST]"
               end
             opt_dates =
               if r.read_only? || r.completed? || !r.active?
@@ -80,7 +73,7 @@
              data-run-picker-target="option"
              tabindex="-1">
             <span class="label">RUN #<%= r.run_number %>
-              <span class="<%= opt_status_class %>"><%= opt_status_label %></span>
+              <span class="pill"><%= opt_status_label %></span>
             </span>
             <span class="dates"><%= opt_dates %></span>
           </a>
@@ -105,20 +98,17 @@
     </div>
   </div>
 
-  <%# Step 24 R1 — mockup labels:
-        CAUGHT = total ever caught (currently alive + dead)
-        ALIVE  = `@caught_count` (controller defines this as status==caught)
-        DEAD   = `@dead_count`
-      Pre-Step-24 the title bar showed `@caught_count` next to "CAUGHT"
-      and `@caught_count - @dead_count` next to "ALIVE", which read as
-      a labeling inversion. Mockup locks the conventional reading. %>
+  <%# Step 27: stat strip rebased to a single dim line — the per-item
+      colour coding (alive=green, dead=crimson, badges=amber) is dropped
+      per audit § 3.1 / canon § 11.2. Labels read the data; values are
+      plain --white. %>
   <div class="stat-strip" aria-label="Run stats">
     <div class="item"><span>CAUGHT</span> <span class="val"><%= @caught_count + @dead_count %></span></div>
     <span class="sep" aria-hidden="true">&middot;</span>
-    <div class="item alive"><span>ALIVE</span> <span class="val"><%= @caught_count %></span></div>
+    <div class="item"><span>ALIVE</span> <span class="val"><%= @caught_count %></span></div>
     <span class="sep" aria-hidden="true">&middot;</span>
-    <div class="item dead"><span>DEAD</span> <span class="val"><%= @dead_count %></span></div>
+    <div class="item"><span>DEAD</span> <span class="val"><%= @dead_count %></span></div>
     <span class="sep" aria-hidden="true">&middot;</span>
-    <div class="item badges"><span>BADGES</span> <span class="val"><%= @gyms_defeated %>/8</span></div>
+    <div class="item"><span>BADGES</span> <span class="val"><%= @gyms_defeated %>/8</span></div>
   </div>
 </header>

@@ -26,9 +26,10 @@
 
   <%# Pending banner — revealed by save_slots_controller.js when the
       column enters overwrite-pending mode (after a 409 response). The
-      CANCEL button exits the mode without writing anything. %>
+      CANCEL button exits the mode without writing anything.
+      Step 27: dropped the standalone .icon glyph; the message text
+      carries the cue. Banner now reads as gb-flash-alert (danger-family). %>
   <div data-save-slots-target="banner" hidden class="pending-banner">
-    <span class="icon">⚠</span>
     SAVE FULL — PICK A SLOT TO OVERWRITE
     <button type="button" data-action="click->save-slots#cancelOverwrite">CANCEL</button>
   </div>

@@ -31,15 +31,20 @@
      data-pixeldex-update-slots-url-value="<%= update_slots_team_path %>"
      data-pixeldex-csrf-value="<%= form_authenticity_token %>">
 
-  <%# ── Map header bar ── %>
+  <%# ── Map header — Step 27: rebased to gb-page-title + subtitle.
+      Boxed background dropped; the title and subtitle alone carry the
+      surface. Legend is inlined into the subtitle line per audit § 3.4
+      (no separate boxed legend bar). ── %>
   <div class="map-head">
-    <div>
-      <h2>ROUTE PROGRESSION</h2>
-      <div class="sub">Click any node to view catches or add a new one.</div>
-    </div>
+    <h2>ROUTE PROGRESSION</h2>
+    <div class="sub">Click any node to view catches or add a new one. Legend: &#9679; caught &middot; &#9760; dead &middot; &#9675; uncaught &middot; &#9733; special &middot; G gym</div>
+  </div>
 
+  <%# Step 27: badge-strip hoisted into its own gb-section with a
+      gb-section-header — replaces the inline LBL "BADGES" prefix. %>
+  <section class="badge-strip-section">
+    <h3 class="gb-section-header">BADGES</h3>
     <div class="badge-strip">
-      <span class="lbl">BADGES</span>
       <% SoulLink::GameState.gym_info.each do |_key, gym| %>
         <% num = gym["number"] %>
         <% beaten = @gyms_defeated >= num %>
@@ -52,7 +57,7 @@
         </button>
       <% end %>
     </div>
-  </div>
+  </section>
 
   <%# ── Status bar ── %>
   <div class="status-bar">
@@ -83,15 +88,6 @@
             class="jump-btn<%= next_uncaught_key.nil? ? ' hidden' : '' %>"
             data-timeline-target="jumpBtn"
             data-action="click->timeline#jumpToNow">&#x2193; JUMP TO NOW</button>
-  </div>
-
-  <%# ── Always-visible legend ── %>
-  <div class="node-legend">
-    <div class="item"><div class="glyph caught">&#9679;</div> caught</div>
-    <div class="item"><div class="glyph dead">&#9760;</div> dead</div>
-    <div class="item"><div class="glyph uncaught">&#9675;</div> uncaught</div>
-    <div class="item"><div class="glyph special">&#9733;</div> special</div>
-    <div class="item"><div class="glyph gym">G</div> gym</div>
   </div>
 
   <%# ── Layout: timeline + sticky sheet ── %>

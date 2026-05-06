@@ -34,12 +34,16 @@ class PcBoxRedesignTest < ActionDispatch::IntegrationTest
     assert_match(/class="review-tray"/, response.body)
     assert_match(/<h3>REVIEW PARSED CATCHES<\/h3>/, response.body)
 
-    # All four legend rows present.
+    # Step 27: badge-legend collapsed into a single inline strip.
+    # All four labels still render (1ST / TRADE-IN / EVENT / OFF-FEED)
+    # but the per-kind colour modifier classes are dropped — every
+    # badge in the legend gets the same pill--ghost treatment, and
+    # the kind reads from the LABEL TEXT per canon § 5.
     assert_match(/class="badge-legend"/, response.body)
-    assert_match(/<span class="badge first">1ST<\/span>/, response.body)
-    assert_match(/<span class="badge trade">TRADE-IN<\/span>/, response.body)
-    assert_match(/<span class="badge event">EVENT<\/span>/, response.body)
-    assert_match(/<span class="badge offfeed">OFF-FEED<\/span>/, response.body)
+    assert_match(/<span class="badge">1ST<\/span>/, response.body)
+    assert_match(/<span class="badge">TRADE-IN<\/span>/, response.body)
+    assert_match(/<span class="badge">EVENT<\/span>/, response.body)
+    assert_match(/<span class="badge">OFF-FEED<\/span>/, response.body)
 
     # The first-encounter row gets the .first highlight + a primary LOG button.
     assert_match(/class="review-row first"/, response.body)

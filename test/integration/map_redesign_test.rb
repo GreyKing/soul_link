@@ -32,12 +32,18 @@ class MapRedesignTest < ActionDispatch::IntegrationTest
     get map_path
     assert_response :success
 
-    assert_match(/class="node-legend"/, response.body)
-    assert_match(/<div class="glyph caught">[^<]*<\/div>\s*caught/m, response.body)
-    assert_match(/<div class="glyph dead">[^<]*<\/div>\s*dead/m, response.body)
-    assert_match(/<div class="glyph uncaught">[^<]*<\/div>\s*uncaught/m, response.body)
-    assert_match(/<div class="glyph special">[^<]*<\/div>\s*special/m, response.body)
-    assert_match(/<div class="glyph gym">[^<]*G[^<]*<\/div>\s*gym/m, response.body)
+    # Step 27: legend collapsed inline into the .map-head .sub
+    # subtitle line (per audit § 3.4) — no separate boxed legend
+    # bar. The 5 glyphs (●/☠/○/★/G) live as inline text characters
+    # in the subtitle. We assert the subtitle carries each glyph
+    # alongside its label.
+    sub = response.body[%r{<div class="sub">[^<]+</div>}]
+    refute_nil sub, "expected the .map-head .sub subtitle to render"
+    assert_match(/&#9679;\s*caught/, sub)   # ● caught
+    assert_match(/&#9760;\s*dead/, sub)     # ☠ dead
+    assert_match(/&#9675;\s*uncaught/, sub) # ○ uncaught
+    assert_match(/&#9733;\s*special/, sub)  # ★ special
+    assert_match(/G\s*gym/, sub)
   end
 
   # ── Pulse-ring + JUMP TO NOW ──────────────────────────────────────────

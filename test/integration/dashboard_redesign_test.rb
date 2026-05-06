@@ -52,12 +52,16 @@ class DashboardRedesignTest < ActionDispatch::IntegrationTest
     get root_path
     assert_response :success
 
-    # Stat strip exists and carries the four expected items.
+    # Stat strip exists and carries the four expected items. Step 27:
+    # per-item colour modifier classes (.alive / .dead / .badges) are
+    # dropped — every item is now plain `<div class="item">`. The
+    # ordering and the values (CAUGHT 2 / ALIVE 1 / DEAD 1 / BADGES 0/8)
+    # are unchanged.
     assert_match(/class="stat-strip"/, response.body)
     assert_match(/<div class="item">\s*<span>CAUGHT<\/span>\s*<span class="val">2<\/span>/m, response.body)
-    assert_match(/<div class="item alive"><span>ALIVE<\/span>\s*<span class="val">1<\/span>/m, response.body)
-    assert_match(/<div class="item dead"><span>DEAD<\/span>\s*<span class="val">1<\/span>/m, response.body)
-    assert_match(/<div class="item badges"><span>BADGES<\/span>\s*<span class="val">0\/8<\/span>/m, response.body)
+    assert_match(/<div class="item">\s*<span>ALIVE<\/span>\s*<span class="val">1<\/span>/m, response.body)
+    assert_match(/<div class="item">\s*<span>DEAD<\/span>\s*<span class="val">1<\/span>/m, response.body)
+    assert_match(/<div class="item">\s*<span>BADGES<\/span>\s*<span class="val">0\/8<\/span>/m, response.body)
   end
 
   # ── Tab bar — real WAI-ARIA tablist ──────────────────────────────────
@@ -99,36 +103,39 @@ class DashboardRedesignTest < ActionDispatch::IntegrationTest
   end
 
   # ── Live-update badge dots ───────────────────────────────────────────
+  # Step 27: the box-shadow-glow `<span class="badge-dot">` chrome is
+  # replaced by an inline `*` text suffix (with the same aria-label
+  # "Updates available"). Same affordance, no chrome — per audit § 3.1.
 
-  test "the PC BOX tab carries a badge-dot when auto-detected catches exist" do
+  test "the PC BOX tab carries an updates-available marker when auto-detected catches exist" do
     seed_auto_detected_catch
     get root_path
     assert_response :success
 
-    # The badge-dot lives inside the PC BOX tab button.
+    # Updates marker lives inside the PC BOX tab button.
     assert_match(
-      %r{<button[^>]*id="tab-pcbox"[^>]*>.*?<span class="badge-dot"[^>]*></span>.*?</button>}m,
+      %r{<button[^>]*id="tab-pcbox"[^>]*>.*?<span aria-label="Updates available">\*</span>.*?</button>}m,
       response.body
     )
   end
 
-  test "the PC BOX tab does NOT carry a badge-dot when no auto-detected catches exist" do
+  test "the PC BOX tab does NOT carry an updates marker when no auto-detected catches exist" do
     get root_path
     assert_response :success
 
     pcbox_block = response.body[%r{<button[^>]*id="tab-pcbox"[^>]*>.*?</button>}m]
     refute_nil pcbox_block, "expected to find the PC BOX tab markup"
-    refute_match(/<span class="badge-dot"/, pcbox_block,
-      "PC BOX tab should not carry a badge-dot without auto-detected catches")
+    refute_match(/aria-label="Updates available"/, pcbox_block,
+      "PC BOX tab should not carry an updates marker without auto-detected catches")
   end
 
-  test "the GYMS tab carries a badge-dot when an active draft exists" do
+  test "the GYMS tab carries an updates-available marker when an active draft exists" do
     create(:gym_draft, soul_link_run: @run, status: "lobby")
     get root_path
     assert_response :success
 
     assert_match(
-      %r{<button[^>]*id="tab-gyms"[^>]*>.*?<span class="badge-dot"[^>]*></span>.*?</button>}m,
+      %r{<button[^>]*id="tab-gyms"[^>]*>.*?<span aria-label="Updates available">\*</span>.*?</button>}m,
       response.body
     )
   end
@@ -194,7 +201,7 @@ class DashboardRedesignTest < ActionDispatch::IntegrationTest
     assert_equal expected_count, actual_cards
   end
 
-  test "the current user's PARTY sub-tab row has the YOU pill and the amber border" do
+  test "the current user's PARTY sub-tab row carries the .you modifier on the card" do
     get root_path
     assert_response :success
 
@@ -202,10 +209,11 @@ class DashboardRedesignTest < ActionDispatch::IntegrationTest
     refute_nil party_panel
 
     # Exactly one card carries the `you` modifier class (current user).
+    # Step 27: the inline `<span class="you-pill">YOU</span>` chrome is
+    # dropped — the .you class on the card (and its accent border in
+    # CSS) is the entire "this is you" affordance per canon § 11.3.
     you_cards = party_panel.scan(/class="player-card you"/).size
     assert_equal 1, you_cards
-    # And that card carries the YOU pill.
-    assert_match(/class="player-card you">.*?<span class="you-pill">YOU<\/span>/m, party_panel)
   end
 
   # ── Step 24 RUNS-tab consolidation ───────────────────────────────────

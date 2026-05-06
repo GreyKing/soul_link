@@ -78,16 +78,17 @@
          badges_count = @gyms_defeated
          shows_hof = @run.completed? && badges_count == 8
     %>
+      <%# Step 27: dropped the 3-pill stack (you-pill, hof-pill-r1,
+          badges-pill). YOU is conveyed by the .you accent border on
+          the card itself. HOF moves to a 🏆 prefix in the name. The
+          BADGES count becomes plain inline text (no pill bg, no
+          per-state colour). %>
       <div class="player-card<%= ' you' if is_you %>">
         <div class="head">
           <span class="name">
-            <%= display_name.upcase %>
-            <% if is_you %><span class="you-pill">YOU</span><% end %>
-            <% if shows_hof %><span class="hof-pill-r1">&#127942; HOF</span><% end %>
+            <% if shows_hof %>&#127942; <% end %><%= display_name.upcase %>
           </span>
-          <span class="badges-pill<%= ' full' if badges_count >= 8 %>">
-            <%= badges_count %> BADGES
-          </span>
+          <span class="badges-text"><%= badges_count %>/8 BADGES</span>
         </div>
         <div class="sprites">
           <% (0...SoulLinkTeam::MAX_SLOTS).each do |i|

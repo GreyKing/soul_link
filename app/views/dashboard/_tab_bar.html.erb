@@ -1,12 +1,13 @@
-<%# Step 24 R1 — real WAI-ARIA tablist.
-    Each tab is a 2-line vertical button (icon top, label bottom).
-    Active tab carries `aria-selected="true" tabindex="0"`; others
-    carry `aria-selected="false" tabindex="-1"` so Tab moves into
-    the active panel rather than walking through the inactive tabs.
-
-    Live-update dot (`<span class="badge-dot">`) renders top-right
-    on tabs that have fresh state worth surfacing. Server-rendered
-    on each request — Turbo's morph refresh keeps it in sync.
+<%# Step 24 R1 (restyled in Step 27) — real WAI-ARIA tablist.
+    Step 27: tabs rebased to canonical `.tab-item` form (single
+    horizontal strip, single-line label, 13 px font, bg swap on
+    active). The icon renders inline-prefix in the label, not stacked
+    above. Active tab carries `aria-selected="true" tabindex="0"`;
+    others carry `aria-selected="false" tabindex="-1"` so Tab moves
+    into the active panel rather than walking through the inactive
+    tabs. Live-update affordance: `<span class="badge-dot">` chrome
+    is replaced by an inline `*` text suffix on the tab text — same
+    affordance, no glow chrome.
 
     The tab-bar wires `keydown->pixeldex#tablistKeydown` for the
     arrow / Home / End keyboard contract; the window-level 1-7
@@ -39,10 +40,7 @@
             data-pixeldex-target="tabButton"
             data-tab="<%= tab[:key] %>">
       <span class="icon" aria-hidden="true"><%= tab[:icon] %></span>
-      <%= tab[:label] %>
-      <% if tab[:dot] %>
-        <span class="badge-dot" aria-label="Updates available"></span>
-      <% end %>
+      <%= tab[:label] %><% if tab[:dot] %><span aria-label="Updates available">*</span><% end %>
     </button>
   <% end %>
 </div>

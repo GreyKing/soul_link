@@ -1101,99 +1101,80 @@ body::after {
 
 .map-r4 { display: block; }
 
-/* ── Map header bar ── */
+/* ── Map header — Step 27 rebases to gb-page-title + gb-page-subtitle
+   form. No boxed background; the title and subtitle alone carry the
+   surface. The badge-strip is hoisted into its own gb-section below. ── */
 .map-r4 .map-head {
-  background: var(--d1);
-  border: var(--border);
-  padding: 12px 18px;
-  margin-bottom: 14px;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap;
+  margin-bottom: var(--s-6);
 }
 .map-r4 .map-head h2 {
   font-family: 'Press Start 2P', monospace;
-  font-size: 13px; color: var(--white);
-  margin: 0; letter-spacing: 1px;
+  font-size: 18px; color: var(--white);
+  margin: 0 0 var(--s-1); letter-spacing: 0.1em;
 }
-.map-r4 .map-head .sub { color: var(--l1); font-size: 14px; margin-top: 4px; }
+.map-r4 .map-head .sub {
+  color: var(--l1);
+  font-size: 11px;
+  margin-bottom: 0;
+}
 
-.map-r4 .badge-strip { display: flex; gap: 4px; align-items: center; }
-.map-r4 .badge-strip .lbl {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 8px; color: var(--l1);
-  margin-right: 6px; letter-spacing: 1px;
+/* Badge strip — Step 27: keep 28×28 dimensions (badges literally need
+   to be visible badges). Drop hover translate, drop earned-state glow.
+   Active = bg swap to --accent only. */
+.map-r4 .badge-strip-section {
+  margin-bottom: var(--s-6);
+}
+.map-r4 .badge-strip-section .gb-section-header {
+  margin-bottom: var(--s-3);
+}
+.map-r4 .badge-strip {
+  display: flex; gap: var(--s-1); align-items: center;
+  flex-wrap: wrap;
 }
 .map-r4 .badge-strip .badge {
   width: 28px; height: 28px;
-  border: 2px solid var(--d0);
+  border: var(--border-thin);
   display: flex; align-items: center; justify-content: center;
   font-family: 'Press Start 2P', monospace; font-size: 10px;
   cursor: pointer;
-  background: var(--l2); color: var(--d0);
-  transition: transform 0.1s, box-shadow 0.1s;
+  background: var(--l2); color: var(--d1);
+  transition: background 0.05s, color 0.05s, border-color 0.05s;
 }
 .map-r4 .badge-strip .badge.earned {
   background: var(--accent); color: var(--d0); border-color: var(--accent);
-  box-shadow: 0 0 6px rgba(95, 212, 95, 0.4);
 }
-.map-r4 .badge-strip .badge:hover { transform: translateY(-1px); }
+.map-r4 .badge-strip .badge:hover { background: var(--d2); color: var(--l2); }
 
-/* ── Status bar ── */
+/* ── Status bar — Step 27: rebased to a single gb-card-dark-shape row.
+   JUMP TO NOW button is gb-btn-primary form, static (no subtleBlink). ── */
 .map-r4 .status-bar {
   background: var(--d2);
-  border: var(--border-thin);
-  padding: 8px 14px;
-  margin-bottom: 14px;
-  display: flex; align-items: center; gap: 14px;
+  border: var(--border);
+  padding: var(--s-3) var(--s-6);
+  margin-bottom: var(--s-6);
+  display: flex; align-items: center; gap: var(--s-6);
   flex-wrap: wrap;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--l2);
 }
 .map-r4 .status-bar .item .lbl {
   font-family: 'Press Start 2P', monospace;
   font-size: 8px; color: var(--l1);
-  letter-spacing: 1px; margin-right: 6px;
+  letter-spacing: 1px; margin-right: var(--s-2);
 }
 .map-r4 .status-bar .item .val { color: var(--white); }
 .map-r4 .status-bar .jump-btn {
   margin-left: auto;
-  background: var(--accent); color: var(--d0);
-  border: 2px solid var(--d0);
-  padding: var(--s-3) var(--s-5); cursor: pointer;
+  background: var(--d1); color: var(--l2);
+  border: var(--border-thin);
+  padding: var(--s-3) var(--s-6); cursor: pointer;
   font-family: 'Press Start 2P', monospace;
-  font-size: 9px; letter-spacing: 1px;
-  animation: subtleBlink 2.4s ease-in-out infinite;
+  font-size: 11px; letter-spacing: var(--ls-tight);
+  line-height: 1.4;
+  transition: all 0.05s;
 }
+.map-r4 .status-bar .jump-btn:hover { background: var(--d2); color: var(--l2); }
 .map-r4 .status-bar .jump-btn.hidden { display: none; }
-@keyframes subtleBlink {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(95, 212, 95, 0.45); }
-  50% { box-shadow: 0 0 0 6px rgba(95, 212, 95, 0); }
-}
-
-/* ── Node legend (always visible) ── */
-.map-r4 .node-legend {
-  display: flex; align-items: center; gap: 14px;
-  padding: 8px 12px;
-  background: var(--d1);
-  border: 1px dashed var(--d2);
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-  font-size: 13px;
-  color: var(--l1);
-}
-.map-r4 .node-legend .item { display: flex; align-items: center; gap: 6px; }
-.map-r4 .node-legend .glyph {
-  width: 22px; height: 22px;
-  display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--d2);
-  font-family: 'Press Start 2P', monospace;
-  font-size: 9px;
-}
-.map-r4 .node-legend .glyph.caught { background: var(--d2); color: var(--green-glow); border-color: var(--green-glow); }
-.map-r4 .node-legend .glyph.dead { background: #4a1c1c; color: var(--white); border-color: var(--crimson); }
-.map-r4 .node-legend .glyph.uncaught { background: var(--l2); color: var(--d2); }
-.map-r4 .node-legend .glyph.special { background: var(--d1); color: var(--accent); border-color: var(--accent); }
-.map-r4 .node-legend .glyph.gym { background: var(--accent); color: var(--d0); border-color: var(--d0); font-size: 11px; }
 
 /* ── Layout grid: timeline + sticky sheet ── */
 .map-r4 .layout {
@@ -1212,18 +1193,8 @@ body::after {
   position: relative;
   overflow: hidden;
 }
-.map-r4 .timeline-frame::after {
-  content: ''; position: absolute;
-  top: 0; right: 0; bottom: 0; width: 64px;
-  background: linear-gradient(to right, transparent, var(--d1) 80%);
-  pointer-events: none; z-index: 5;
-}
-.map-r4 .timeline-frame::before {
-  content: ''; position: absolute;
-  top: 0; left: 0; bottom: 0; width: 36px;
-  background: linear-gradient(to left, transparent, var(--d1) 80%);
-  pointer-events: none; z-index: 5;
-}
+/* Step 27: dropped left/right gradient-fade overlays — the horizontal
+   scroll already implies more content per canon § 11.2. */
 
 .map-r4 .timeline-scroll {
   overflow-x: auto;
@@ -1278,13 +1249,13 @@ body::after {
   width: 56px; height: 56px;
   border: 2px solid var(--d0);
   display: flex; align-items: center; justify-content: center;
-  transition: transform 0.1s, border-color 0.1s, box-shadow 0.1s;
+  transition: border-color 0.05s;
   position: relative;
 }
+/* Step 27: dropped translateY hover lift + box-shadow drop. Border
+   colour swap is the entire affordance per canon § 11.2. */
 .map-r4 .node:hover .glyph {
-  transform: translateY(-2px);
   border-color: var(--accent);
-  box-shadow: 0 4px 0 rgba(95, 212, 95, 0.3);
 }
 .map-r4 .node:focus-visible .glyph {
   outline: 3px solid var(--accent);
@@ -1295,18 +1266,15 @@ body::after {
 .map-r4 .node.dead .glyph { background: #4a1c1c; border-color: var(--crimson); color: var(--white); }
 .map-r4 .node.uncaught .glyph { background: var(--l2); border-color: var(--d2); color: var(--d2); opacity: 0.85; }
 .map-r4 .node.special .glyph { background: var(--d1); border-color: var(--accent); color: var(--accent); }
+/* Step 27: NEXT marker keeps the 3 px accent inner border (the single
+   canonical "next" cue). Outer 5 px ring + glow + pulseNext animation
+   dropped per canon § 11.2. */
 .map-r4 .node.next .glyph {
   border-color: var(--accent); border-width: 3px;
-  box-shadow: 0 0 0 2px var(--d0), 0 0 0 5px var(--accent), 0 0 16px rgba(95, 212, 95, 0.4);
-  animation: pulseNext 2s ease-in-out infinite;
 }
 .map-r4 .node.selected .glyph {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
-}
-@keyframes pulseNext {
-  0%, 100% { box-shadow: 0 0 0 2px var(--d0), 0 0 0 5px var(--accent), 0 0 16px rgba(95, 212, 95, 0.4); }
-  50% { box-shadow: 0 0 0 2px var(--d0), 0 0 0 5px var(--accent), 0 0 28px rgba(95, 212, 95, 0.7); }
 }
 
 .map-r4 .node.gym .glyph {
@@ -1339,6 +1307,8 @@ body::after {
 }
 .map-r4 .node.dead .nick { color: var(--crimson); text-decoration: line-through; }
 
+/* Step 27: static "↓ NOW" pin — dropped the box-shadow glow per
+   canon § 11.2. Position + colour treatment unchanged. */
 .map-r4 .node-now-pin {
   position: absolute; top: -16px; left: 50%;
   transform: translateX(-50%);
@@ -1347,7 +1317,6 @@ body::after {
   font-size: 7px; padding: 2px 6px;
   letter-spacing: 1px;
   white-space: nowrap;
-  box-shadow: 0 0 8px rgba(95, 212, 95, 0.4);
   z-index: 6;
 }
 .map-r4 .node-now-pin::after {
@@ -1381,11 +1350,13 @@ body::after {
   border: var(--border-thin);
   padding: 10px 12px;
   cursor: pointer;
-  transition: border-color 0.1s, transform 0.1s;
+  transition: border-color 0.05s;
   font-family: 'VT323', monospace;
   text-align: left;
 }
-.map-r4 .special-cell:hover { border-color: var(--accent); transform: translateY(-2px); }
+/* Step 27: dropped translateY hover lift; one-frame border-colour
+   swap is the entire affordance per canon § 11.2. */
+.map-r4 .special-cell:hover { border-color: var(--accent); }
 .map-r4 .special-cell .head {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 4px;
@@ -1407,26 +1378,32 @@ body::after {
   padding: 0;
   position: sticky; top: 16px;
 }
+/* Step 27: sheet-head restyled to gb-section-header form
+   (--d1 bg, --l2 text, 8 × 12 padding, 13 px caps). Close button
+   rebased to gb-btn-sm-style (10 px font, 4 × 8 padding, 2 px border). */
 .map-r4 .sheet-head {
-  background: var(--d0);
-  padding: 12px 16px;
+  background: var(--d1);
+  padding: var(--s-3) var(--s-5);
   display: flex; align-items: center; justify-content: space-between;
   border-bottom: var(--border-thin);
 }
 .map-r4 .sheet-head h3 {
   font-family: 'Press Start 2P', monospace;
-  font-size: 11px; color: var(--white);
-  margin: 0; letter-spacing: 1px;
+  font-size: 13px; color: var(--l2);
+  margin: 0; letter-spacing: 0.1em;
 }
 .map-r4 .sheet-head .close {
-  background: none; color: var(--l2);
-  border: 1px solid var(--d2);
+  background: var(--l1); color: var(--d1);
+  border: var(--border-thin);
   padding: 4px 8px; cursor: pointer;
   font-family: 'Press Start 2P', monospace;
-  font-size: 8px; letter-spacing: 1px;
+  font-size: 10px; letter-spacing: var(--ls-tight);
+  line-height: 1.4;
+  transition: all 0.05s;
 }
 .map-r4 .sheet-head .close:hover {
-  background: var(--crimson); color: var(--white); border-color: var(--crimson);
+  background: var(--danger-bg); color: var(--danger-fg);
+  border-color: var(--danger-border);
 }
 
 .map-r4 .sheet-body { padding: 16px; }
@@ -1507,18 +1484,26 @@ body::after {
   background: var(--accent); color: var(--d0);
 }
 
+/* Step 27: submit-btn rebased to gb-btn-primary form. Dropped the
+   filter-brightness hover in favour of a 1-frame bg/colour swap. */
 .map-r4 .submit-btn {
   width: 100%;
-  background: var(--green-glow); color: var(--d0);
-  border: 2px solid var(--d0);
-  padding: 10px;
+  background: var(--d1); color: var(--l2);
+  border: var(--border-thin);
+  padding: var(--s-3) var(--s-6);
   font-family: 'Press Start 2P', monospace;
-  font-size: 10px; letter-spacing: 1px;
+  font-size: 11px; letter-spacing: var(--ls-tight);
+  line-height: 1.4;
   cursor: pointer;
-  margin-top: 8px;
+  margin-top: var(--s-3);
+  transition: all 0.05s;
 }
-.map-r4 .submit-btn:hover { filter: brightness(1.1); }
-.map-r4 .submit-btn.danger { background: var(--crimson); color: var(--white); }
+.map-r4 .submit-btn:hover { background: var(--d2); color: var(--l2); }
+.map-r4 .submit-btn.danger {
+  background: var(--danger-bg); color: var(--danger-fg);
+  border: 2px solid var(--danger-border);
+}
+.map-r4 .submit-btn.danger:hover { background: var(--danger-border); color: #f0c0c0; }
 .map-r4 .submit-btn.muted { background: var(--d2); color: var(--l2); }
 
 .map-r4 .form-status {
@@ -1621,7 +1606,9 @@ body::after {
 .map-r4 .acc-row .glyph.dead { background: #4a1c1c; border-color: var(--crimson); color: var(--white); }
 .map-r4 .acc-row .glyph.uncaught { background: var(--l2); border-color: var(--d2); color: var(--d2); }
 .map-r4 .acc-row .glyph.special { background: var(--d1); border-color: var(--accent); color: var(--accent); }
-.map-r4 .acc-row .glyph.next { border-color: var(--accent); animation: pulseNext 2s ease-in-out infinite; }
+/* Step 27: dropped pulseNext animation. Border-color swap is the
+   static "next" affordance per canon § 11.2. */
+.map-r4 .acc-row .glyph.next { border-color: var(--accent); }
 .map-r4 .acc-row .meta .loc {
   font-family: 'Press Start 2P', monospace;
   font-size: 9px; color: var(--white);
@@ -1643,66 +1630,70 @@ body::after {
 
 .pc-box-r2 { display: block; }
 
-/* Review tray for auto-detected catches */
+/* Review tray for auto-detected catches.
+   Step 27: rebased to gb-card-dark form (3 px ink border, 12 px padding).
+   The tray is a card, not a special accented zone. */
 .pc-box-r2 .review-tray {
-  background: var(--d0);
-  border: 2px solid var(--accent);
-  padding: 14px 16px;
-  margin-bottom: 22px;
+  background: var(--d2); color: var(--l2);
+  border: var(--border);
+  padding: var(--s-5);
+  margin-bottom: var(--s-8);
 }
 .pc-box-r2 .review-tray-head {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 10px;
-  flex-wrap: wrap; gap: 8px;
+  margin-bottom: var(--s-4);
+  flex-wrap: wrap; gap: var(--s-3);
 }
 .pc-box-r2 .review-tray-head h3 {
   font-family: 'Press Start 2P', monospace;
-  font-size: 11px; color: var(--accent);
+  font-size: 11px; color: var(--white);
   margin: 0; letter-spacing: 1px;
 }
+/* Step 27: count chip becomes plain text, no accent bg. */
 .pc-box-r2 .review-tray-head .count {
-  background: var(--accent); color: var(--d0);
   font-family: 'Press Start 2P', monospace;
-  font-size: 8px; padding: 3px 6px; letter-spacing: 1px;
+  font-size: 8px; color: var(--l1);
+  letter-spacing: 1px;
 }
 
+/* Step 27: badge-legend collapsed into a single inline strip — plain
+   --l1 text, no boxed border, no per-badge color coding. The kind
+   (1ST / TRADE-IN / EVENT / OFF-FEED) reads from the label text. */
 .pc-box-r2 .badge-legend {
-  background: var(--d1);
-  border: 1px dashed var(--d2);
-  padding: 10px 12px;
-  margin-bottom: 12px;
-  font-size: 14px;
+  padding: 0;
+  margin-bottom: var(--s-5);
+  font-size: 13px;
   color: var(--l1);
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px 16px;
+  line-height: 1.6;
 }
-.pc-box-r2 .badge-legend .row { display: flex; align-items: center; gap: 8px; }
-.pc-box-r2 .badge-legend .badge {
+.pc-box-r2 .badge-legend .row { display: inline; margin-right: var(--s-5); }
+
+/* Step 27: all 4 inline badges (1ST / TRADE / EVENT / OFFFEED) get the
+   same pill--ghost-style treatment: 1 px --l1 border, transparent bg,
+   --l1 text. Information lives in the LABEL, not the colour. */
+.pc-box-r2 .badge {
+  display: inline-block;
   font-family: 'Press Start 2P', monospace;
   font-size: 8px;
   padding: var(--s-1) var(--s-2);
   letter-spacing: 1px;
-  border: 1px solid;
-  flex-shrink: 0;
-  min-width: 56px; text-align: center;
+  border: 1px solid var(--l1);
+  background: transparent;
+  color: var(--l1);
 }
-.pc-box-r2 .badge.first   { color: var(--green-glow); border-color: var(--green-glow); }
-.pc-box-r2 .badge.trade   { color: var(--accent); border-color: var(--accent); }
-.pc-box-r2 .badge.event   { color: var(--d2); border-color: var(--d2); background: var(--l1); }
-.pc-box-r2 .badge.offfeed { color: var(--l1); border-color: var(--l1); }
 
-/* A single review row */
+/* A single review row.
+   Step 27: padding/margin snapped to canon (10 → s-3, 14 → s-6). */
 .pc-box-r2 .review-row {
   display: grid;
   grid-template-columns: 56px 1fr auto;
-  gap: 14px; align-items: center;
+  gap: var(--s-6); align-items: center;
   background: var(--d1);
   border: var(--border-thin);
-  padding: 10px 14px;
-  margin-bottom: 8px;
+  padding: var(--s-3) var(--s-6);
+  margin-bottom: var(--s-3);
 }
-.pc-box-r2 .review-row.first { border-color: var(--green-glow); border-width: 3px; padding: 8px 12px; }
+.pc-box-r2 .review-row.first { border-color: var(--green-glow); border-width: 3px; padding: var(--s-3) var(--s-5); }
 .pc-box-r2 .review-row.dismissed { opacity: 0.4; }
 
 .pc-box-r2 .review-row .sprite {
@@ -1727,57 +1718,61 @@ body::after {
 .pc-box-r2 .review-row .meta .stats span { color: var(--l1); }
 
 .pc-box-r2 .review-row .actions {
-  display: flex; flex-direction: column; gap: 6px;
+  display: flex; flex-direction: column; gap: var(--s-2);
 }
+/* Step 27: rebased to gb-btn-sm form (10 px font, 4 × 8 padding, 2 px
+   border-thin). Single accent — primary uses --d1 bg / --l2 text
+   (gb-btn-primary), other actions stay neutral gb-btn light-bg. */
 .pc-box-r2 .review-row .actions button {
-  background: var(--d2); color: var(--l2);
-  border: 1px solid var(--d0);
-  padding: 6px 14px;
+  background: var(--l1); color: var(--d1);
+  border: var(--border-thin);
+  padding: 4px 8px;
   cursor: pointer;
   font-family: 'Press Start 2P', monospace;
-  font-size: 8px; letter-spacing: 1px;
+  font-size: 10px; letter-spacing: var(--ls-tight);
+  line-height: 1.4;
   min-width: 92px;
+  transition: all 0.05s;
 }
-.pc-box-r2 .review-row .actions button.primary { background: var(--green-glow); color: var(--d0); }
-.pc-box-r2 .review-row .actions button:hover   { filter: brightness(1.15); }
+.pc-box-r2 .review-row .actions button:hover { background: var(--d2); color: var(--l2); }
+.pc-box-r2 .review-row .actions button.primary { background: var(--d1); color: var(--l2); }
+.pc-box-r2 .review-row .actions button.primary:hover { background: var(--d2); color: var(--l2); }
 
-/* Empty review-tray bar (Screen 3) */
+/* Empty review-tray bar (Screen 3).
+   Step 27: rebased to gb-flash-notice form (--d2 bg, --l2 text). The
+   .check glyph becomes inline (✓) in the message text. */
 .pc-box-r2 .empty-tray-bar {
-  background: var(--d0);
-  border: 1px dashed var(--d2);
-  padding: 10px 14px;
-  margin-bottom: 18px;
-  color: var(--l1);
-  font-size: 14px;
-  display: flex; align-items: center; gap: 10px;
-}
-.pc-box-r2 .empty-tray-bar .check {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 10px; color: var(--green-glow); letter-spacing: 1px;
+  background: var(--d2); color: var(--l2);
+  border: var(--border-thin);
+  padding: var(--s-3) var(--s-6);
+  margin-bottom: var(--s-7);
+  font-size: 13px;
 }
 
-/* Filter chip bar */
+/* Filter chip bar.
+   Step 27: chips rebased to gb-btn-sm form. Active = bg swap to --d1 +
+   --l2 text (matches .tab-item.active). No accent green bg. The
+   dim-on-non-active opacity behavior is dropped — bg swap is enough. */
 .pc-box-r2 .filter-bar {
-  display: flex; align-items: center; gap: 8px;
-  margin-bottom: 14px;
+  display: flex; align-items: center; gap: var(--s-3);
+  margin-bottom: var(--s-6);
   flex-wrap: wrap;
 }
 .pc-box-r2 .filter-chip {
-  background: var(--d1); color: var(--l1);
-  border: 1px solid var(--d2);
-  padding: 6px 12px;
+  background: var(--l1); color: var(--d1);
+  border: var(--border-thin);
+  padding: 4px 8px;
   cursor: pointer;
   font-family: 'Press Start 2P', monospace;
-  font-size: 9px; letter-spacing: 1px;
+  font-size: 10px; letter-spacing: var(--ls-tight);
+  line-height: 1.4;
+  transition: all 0.05s;
 }
+.pc-box-r2 .filter-chip:hover:not(.active) { background: var(--d2); color: var(--l2); }
 .pc-box-r2 .filter-chip.active {
-  background: var(--accent); color: var(--d0);
-  border-color: var(--accent);
+  background: var(--d1); color: var(--l2);
+  border-color: var(--d1);
 }
-.pc-box-r2 .filter-chip:hover:not(.active) { color: var(--white); }
-/* Mockup Screen 2: dim inactive chips when a non-ALL filter is active.
-   `.filter-active` is toggled on the wrapper by pc_box_filter_controller. */
-.pc-box-r2.filter-active .filter-chip:not(.active) { opacity: 0.55; }
 .pc-box-r2 .filter-search {
   margin-left: auto;
   flex: 1; min-width: 200px;
@@ -1812,9 +1807,11 @@ body::after {
   text-align: center;
   cursor: pointer;
   position: relative;
-  transition: border-color 0.1s, transform 0.1s;
+  transition: border-color 0.05s;
 }
-.pc-box-r2 .box-cell:hover { border-color: var(--accent); transform: translateY(-2px); }
+/* Step 27: dropped translateY hover lift; one-frame border colour swap
+   is the entire affordance per canon § 11.2. */
+.pc-box-r2 .box-cell:hover { border-color: var(--accent); }
 .pc-box-r2 .box-cell.team { background: var(--d1); border-color: var(--green-glow); }
 .pc-box-r2 .box-cell.dead { background: #2a1a1a; border-color: #4a1c1c; opacity: 0.7; }
 .pc-box-r2 .box-cell .nick {
@@ -1895,36 +1892,38 @@ body::after {
    `.slot.overwrite-target` (kebab-case, project convention).
    ═══════════════════════════════════════════════════════════ */
 
-/* Banner that announces overwrite-pending mode. */
+/* Banner that announces overwrite-pending mode. Step 27: rebased to
+   gb-flash-alert-style notice (danger-family palette). The icon-glyph
+   was dropped from the markup; the message text carries the full cue. */
 .pending-banner {
-  background: var(--accent); color: var(--d0);
-  border: 2px solid var(--d0);
-  padding: 8px 10px; margin-bottom: 10px;
+  background: var(--danger-bg); color: var(--danger-fg);
+  border: var(--border-thin); border-color: var(--danger-border);
+  padding: var(--s-3) var(--s-4); margin-bottom: var(--s-4);
   font-family: 'Press Start 2P', monospace;
   font-size: 9px; line-height: 1.5;
-  display: flex; align-items: center; gap: 8px;
-}
-.pending-banner .icon {
-  font-size: 14px; line-height: 1;
+  display: flex; align-items: center; gap: var(--s-3);
 }
 .pending-banner button {
   margin-left: auto;
-  background: var(--d0); color: var(--accent);
-  border: 1px solid var(--d0);
-  padding: 3px 6px; cursor: pointer;
+  background: var(--l1); color: var(--d1);
+  border: var(--border-thin);
+  padding: 4px 8px; cursor: pointer;
   font-family: 'Press Start 2P', monospace;
   font-size: 8px; letter-spacing: 1px;
 }
+.pending-banner button:hover { background: var(--d2); color: var(--l2); }
 
-/* A single slot card. */
+/* A single slot card. Step 27: rebased to gb-card-dark form (3 px ink
+   border, 12 px padding). The .slot.active 4 px green-glow border is
+   the canonical "active save target" affordance — kept (canon § 11.3). */
 .slot {
-  background: var(--d1);
-  border: var(--border-thin);
-  padding: 10px 12px;
-  margin-bottom: 8px;
+  background: var(--d2); color: var(--l2);
+  border: var(--border);
+  padding: var(--s-5);
+  margin-bottom: var(--s-4);
   position: relative;
 }
-.slot.active { border: 4px solid var(--green-glow); padding: 8px 10px; }
+.slot.active { border: 4px solid var(--green-glow); padding: 11px; }
 .slot.overwrite-target { border-color: var(--accent); cursor: pointer; }
 .slot.empty .slot-meta { color: var(--d2); }
 
@@ -1959,74 +1958,102 @@ body::after {
 .slot-meta strong { color: var(--white); font-size: 16px; }
 
 .slot-actions {
-  display: flex; gap: 6px;
-  margin-top: 10px;
-  padding-top: 8px;
+  display: flex; gap: var(--s-2);
+  margin-top: var(--s-4);
+  padding-top: var(--s-3);
   border-top: 1px dashed var(--d2);
 }
+/* Step 27: rebased to gb-btn-sm form (10 px font, 4 × 8 padding, 2 px
+   border-thin). Per canon § 4 directive: at most ONE accent-bg button
+   per cluster; primary/danger/confirm now use `gb-btn` light-bg with
+   meaningful colour ON THE TEXT, not a full-bg flood. */
 .slot-actions button,
 .slot-actions a {
   flex: 1;
-  background: var(--d2); color: var(--l2);
-  border: 1px solid var(--d0);
-  padding: 6px 8px; cursor: pointer;
+  background: var(--l1); color: var(--d1);
+  border: var(--border-thin);
+  padding: 4px 8px; cursor: pointer;
   font-family: 'Press Start 2P', monospace;
-  font-size: 8px; letter-spacing: 1px;
+  font-size: 10px; letter-spacing: var(--ls-tight);
+  line-height: 1.4;
   text-decoration: none; text-align: center;
   display: inline-block;
+  transition: all 0.05s;
 }
 .slot-actions button:hover,
-.slot-actions a:hover { background: var(--d0); color: var(--white); }
-.slot-actions button.primary { background: var(--green-glow); color: var(--d0); }
-.slot-actions button.danger { color: var(--crimson); }
-.slot-actions button.danger:hover { background: var(--crimson); color: var(--white); }
-.slot-actions button.confirm { background: var(--crimson); color: var(--white); }
+.slot-actions a:hover { background: var(--d2); color: var(--l2); }
+/* Single accent-bg primary action (MAKE ACTIVE — promotes a slot). */
+.slot-actions button.primary { background: var(--d1); color: var(--l2); }
+.slot-actions button.primary:hover { background: var(--d2); color: var(--l2); }
+/* DELETE = colour on text only, neutral bg per canon directive. */
+.slot-actions button.danger { color: var(--danger); }
+.slot-actions button.danger:hover {
+  background: var(--danger-bg); color: var(--danger-fg);
+  border-color: var(--danger-border);
+}
+/* DELETE FOREVER (the actual destructive confirm) keeps gb-btn-danger fill. */
+.slot-actions button.confirm {
+  background: var(--danger-bg); color: var(--danger-fg);
+  border: 2px solid var(--danger-border);
+}
 
 /* Inline confirmation row (DELETE / CLEAR ALL SLOTS). Rendered hidden
-   by default; revealed by save_slots_controller.js. */
+   by default; revealed by save_slots_controller.js. Step 27: rebased
+   to a quieter dark-card form — the buttons inside carry the danger
+   colour, not the container. The .q heading is restyled to match
+   gb-section-header. */
 .confirm-inline {
-  background: var(--d0); color: var(--white);
-  border: 2px solid var(--crimson);
-  padding: 10px;
-  margin-top: 10px;
+  background: var(--d2); color: var(--l2);
+  border: var(--border-thin);
+  padding: var(--s-4);
+  margin-top: var(--s-4);
 }
 .confirm-inline .q {
+  background: var(--d1); color: var(--l2);
+  padding: var(--s-3) var(--s-5);
+  margin: calc(var(--s-4) * -1) calc(var(--s-4) * -1) var(--s-3);
   font-family: 'Press Start 2P', monospace;
-  font-size: 10px; color: var(--crimson);
-  margin-bottom: 6px;
-  letter-spacing: 1px;
+  font-size: 13px;
+  letter-spacing: 0.1em;
 }
 .confirm-inline .body {
   font-size: 14px; color: var(--l1);
-  margin-bottom: 8px;
+  margin-bottom: var(--s-3);
 }
-.confirm-inline .actions { display: flex; gap: 6px; }
+.confirm-inline .actions { display: flex; gap: var(--s-2); }
 .confirm-inline .actions button {
   flex: 1;
-  background: var(--d2); color: var(--l2);
-  border: 1px solid var(--d0);
-  padding: 6px 8px; cursor: pointer;
+  background: var(--l1); color: var(--d1);
+  border: var(--border-thin);
+  padding: 4px 8px; cursor: pointer;
   font-family: 'Press Start 2P', monospace;
-  font-size: 8px; letter-spacing: 1px;
+  font-size: 10px; letter-spacing: var(--ls-tight);
+  line-height: 1.4;
+  transition: all 0.05s;
 }
+.confirm-inline .actions button:hover { background: var(--d2); color: var(--l2); }
 .confirm-inline .actions button.confirm {
-  background: var(--crimson); color: var(--white);
+  background: var(--danger-bg); color: var(--danger-fg);
+  border: 2px solid var(--danger-border);
 }
 
 .footer-actions {
-  margin-top: 14px;
-  padding-top: 12px;
+  margin-top: var(--s-6);
+  padding-top: var(--s-5);
   border-top: 1px dashed var(--d2);
 }
 .footer-actions button {
   width: 100%;
-  background: transparent; color: var(--crimson);
-  border: 1px dashed var(--crimson);
-  padding: 8px 10px; cursor: pointer;
+  background: transparent; color: var(--danger);
+  border: 1px dashed var(--danger);
+  padding: var(--s-3) var(--s-4); cursor: pointer;
   font-family: 'Press Start 2P', monospace;
   font-size: 9px; letter-spacing: 1px;
 }
-.footer-actions button:hover { background: var(--crimson); color: var(--white); border-style: solid; }
+.footer-actions button:hover {
+  background: var(--danger-bg); color: var(--danger-fg);
+  border: 2px solid var(--danger-border);
+}
 
 /* Roster card redesign. */
 .roster-card {
@@ -2134,56 +2161,48 @@ body::after {
    ═══════════════════════════════════════════════════════════ */
 
 /* ── Title bar ── */
+/* Step 27: title-bar rebased to a 2-line gb-page-title + gb-page-subtitle
+   form (no boxed --d1 background, no border). The title-glyph (amber
+   square with initials) is dropped — the title text already says
+   whose dashboard it is. Run-pill + stat-strip flow inline below. */
 .dash-r1 .title-bar {
-  background: var(--d1);
-  border: var(--border);
-  padding: 10px 16px;
-  display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 12px;
+  margin-bottom: var(--s-6);
 }
 .dash-r1 .title-left {
-  display: flex; align-items: center; gap: 12px; min-width: 0;
-}
-.dash-r1 .title-glyph {
-  width: 36px; height: 36px;
-  background: var(--accent); color: var(--d0);
-  border: 2px solid var(--d0);
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'Press Start 2P', monospace; font-size: 14px;
-  flex-shrink: 0;
+  display: flex; align-items: baseline; gap: var(--s-5);
+  flex-wrap: wrap;
+  margin-bottom: var(--s-1);
 }
 .dash-r1 .title-block .player {
   font-family: 'Press Start 2P', monospace;
-  font-size: 13px; color: var(--white);
-  letter-spacing: 1px;
+  font-size: 18px; color: var(--white);
+  letter-spacing: 0.1em;
 }
 .dash-r1 .title-block .meta {
-  color: var(--l1); font-size: 13px; margin-top: 2px;
+  color: var(--l1); font-size: 11px; margin-top: 0;
 }
 
-/* ── Run pill (replaces the legacy <select onchange>) ── */
+/* ── Run pill — Step 27: rebased to gb-btn shape (2 px ink border,
+   --l1 light bg, --d1 text, single-line label). Status indicator
+   becomes inline text inside the button label rather than a coloured
+   inner pill. Dropdown menu still works via run-picker controller. ── */
 .dash-r1 .run-pill-wrap {
   position: relative;
 }
 .dash-r1 .run-pill {
-  background: var(--d2);
-  border: 2px solid var(--accent);
-  padding: 5px 10px;
-  display: flex; align-items: center; gap: 8px;
+  background: var(--l1);
+  border: var(--border-thin);
+  padding: 4px 8px;
+  display: inline-flex; align-items: center; gap: var(--s-2);
   font-family: 'Press Start 2P', monospace;
-  font-size: 9px; letter-spacing: 1px;
-  color: var(--white);
+  font-size: 10px; letter-spacing: var(--ls-tight);
+  line-height: 1.4;
+  color: var(--d1);
   cursor: pointer;
+  transition: all 0.05s;
 }
-.dash-r1 .run-pill:hover { background: var(--d0); }
-.dash-r1 .run-pill .badge {
-  background: var(--green-glow); color: var(--d0);
-  padding: 2px 4px; font-size: 7px;
-  font-family: 'Press Start 2P', monospace; letter-spacing: 1px;
-}
-.dash-r1 .run-pill .badge.hof { background: var(--accent); }
-.dash-r1 .run-pill .badge.dim { background: var(--d2); color: var(--l1); }
-.dash-r1 .run-pill .chev { color: var(--accent); margin-left: 4px; }
+.dash-r1 .run-pill:hover { background: var(--d2); color: var(--l2); }
+.dash-r1 .run-pill .chev { margin-left: var(--s-1); }
 .dash-r1 .run-pill[aria-expanded="true"] .chev { transform: rotate(180deg); display: inline-block; }
 
 .dash-r1 .run-pill-menu {
@@ -2223,13 +2242,15 @@ body::after {
   outline: none;
   background: var(--d2);
 }
+/* Step 27: run-option status indicator becomes inline plain text in
+   the .label span ([ACTIVE] / [HOF] / [PAST]) — no coloured bg pill. */
 .dash-r1 .run-pill-menu .run-option .pill {
   font-family: 'Press Start 2P', monospace;
-  font-size: 7px; padding: 1px 4px; margin-left: 6px;
+  font-size: 7px; padding: 0; margin-left: var(--s-2);
   letter-spacing: 1px;
-  background: var(--green-glow); color: var(--d0);
+  background: transparent; color: var(--l1);
+  border: none;
 }
-.dash-r1 .run-pill-menu .run-option .pill.hof { background: var(--accent); color: var(--d0); }
 .dash-r1 .run-pill-menu .start-row {
   margin-top: 6px; padding-top: 6px;
   border-top: 1px dashed var(--d2);
@@ -2245,64 +2266,58 @@ body::after {
 }
 .dash-r1 .run-pill-menu .start-row .start-btn:hover { background: var(--d0); color: var(--white); }
 
-/* ── Stat strip (single inline row) ── */
+/* ── Stat strip — Step 27: rebased to gb-page-subtitle styling.
+   Per-item colour coding (alive=green, dead=crimson, badges=amber)
+   dropped — the labels do the work per canon § 11.2. ── */
 .dash-r1 .stat-strip {
-  display: flex; align-items: center; gap: 14px;
+  display: flex; align-items: baseline; gap: var(--s-3);
   flex-wrap: wrap;
-}
-.dash-r1 .stat-strip .item {
-  display: flex; align-items: baseline; gap: 6px;
   font-family: 'Press Start 2P', monospace;
   font-size: 9px; letter-spacing: 1px;
   color: var(--l1);
 }
-.dash-r1 .stat-strip .item .val { color: var(--white); font-size: 14px; }
-.dash-r1 .stat-strip .item.alive .val { color: var(--green-glow); }
-.dash-r1 .stat-strip .item.dead .val { color: var(--crimson); }
-.dash-r1 .stat-strip .item.badges .val { color: var(--accent); }
-.dash-r1 .stat-strip .sep { color: var(--d2); font-size: 14px; }
+.dash-r1 .stat-strip .item {
+  display: inline-flex; align-items: baseline; gap: var(--s-2);
+}
+.dash-r1 .stat-strip .item .val { color: var(--white); font-size: 11px; }
+.dash-r1 .stat-strip .sep { color: var(--d2); font-size: 11px; }
 
-/* ── Tab bar — real tablist ── */
+/* ── Tab bar — Step 27: rebased to the canonical .tab-bar / .tab-item
+   form (single horizontal strip, single-line label, 13 px font, bg
+   swap on active, no underline). The icon renders inline-prefix in
+   the label, not stacked above it (canon § 4 single-line-label rule).
+   The `.badge-dot` chrome is replaced by an unstyled `*` text suffix
+   on tab text — same affordance, no glow chrome (per audit § 3.1
+   architect call). ── */
 .dash-r1 .tab-bar {
   display: flex;
-  background: var(--d2);
-  border: var(--border);
-  border-top: none;
-  padding: 0;
-  flex-wrap: wrap;
+  background: var(--d1);
+  border-bottom: var(--border);
+  flex-shrink: 0;
 }
 .dash-r1 .tab {
   flex: 1; min-width: 90px;
-  background: transparent;
+  background: var(--d2);
   border: none;
-  border-right: 1px solid var(--d0);
+  border-right: 2px solid var(--d2);
   padding: 10px 8px;
   cursor: pointer;
   color: var(--l1);
   font-family: 'Press Start 2P', monospace;
-  font-size: 9px; letter-spacing: 1px;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  transition: background 0.1s, color 0.1s;
-  position: relative;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  text-align: center;
+  transition: background 0.05s, color 0.05s;
 }
 .dash-r1 .tab:last-child { border-right: none; }
 .dash-r1 .tab .icon {
   font-family: 'Press Start 2P', monospace;
-  font-size: 14px; color: inherit;
+  font-size: inherit; color: inherit;
+  margin-right: var(--s-1);
 }
 .dash-r1 .tab:hover { background: var(--d1); color: var(--l2); }
 .dash-r1 .tab[aria-selected="true"] {
-  background: var(--d1); color: var(--accent);
-}
-.dash-r1 .tab[aria-selected="true"]::after {
-  content: ''; position: absolute; bottom: -3px; left: 0; right: 0;
-  height: 3px; background: var(--accent);
-}
-.dash-r1 .tab .badge-dot {
-  position: absolute; top: 6px; right: 8px;
-  width: 6px; height: 6px;
-  background: var(--green-glow); border-radius: 50%;
-  box-shadow: 0 0 4px var(--green-glow);
+  background: var(--d1); color: var(--l2);
 }
 
 /* ── Three-col layout (overrides the legacy .pc-layout shape) ── */
@@ -2324,36 +2339,49 @@ body::after {
   border: var(--border);
   padding: 14px;
 }
+/* Step 27: side-tab buttons restyled to gb-section-header form
+   (--d1 bg, --l2 text, 13 px caps, full-width caps bar). The
+   sub-tablist STRUCTURE stays — controller targets are preserved —
+   but the visual hierarchy reads as section-headers stacked, not
+   as a coloured-active mini-tablist. Active state = bg swap to
+   --d2 (one shade brighter), keeping it within neutral surface
+   colours rather than accent-flooding. */
 .dash-r1 .side-tabs {
-  display: flex;
-  border: 1px solid var(--d0);
-  margin-bottom: 12px;
+  display: flex; flex-direction: column;
+  margin-bottom: var(--s-3);
+  gap: 0;
 }
 .dash-r1 .side-tab {
-  flex: 1;
-  background: var(--d2);
+  background: var(--d1);
+  color: var(--l2);
   border: none;
-  border-right: 1px solid var(--d0);
-  padding: 6px 4px;
+  border-bottom: 1px solid var(--d2);
+  padding: var(--s-3) var(--s-5);
   cursor: pointer;
-  color: var(--l1);
   font-family: 'Press Start 2P', monospace;
-  font-size: 8px; letter-spacing: 1px;
+  font-size: 13px; letter-spacing: 0.1em;
+  text-align: left;
+  transition: background 0.05s, color 0.05s;
 }
-.dash-r1 .side-tab:last-child { border-right: none; }
-.dash-r1 .side-tab[aria-selected="true"] { background: var(--accent); color: var(--d0); }
-.dash-r1 .side-tab:hover:not([aria-selected="true"]) { background: var(--d1); color: var(--white); }
+.dash-r1 .side-tab:last-child { border-bottom: none; }
+.dash-r1 .side-tab[aria-selected="true"] {
+  background: var(--d2); color: var(--l2);
+}
+.dash-r1 .side-tab:hover:not([aria-selected="true"]) {
+  background: var(--d2); color: var(--l2);
+}
 
 .dash-r1 .status-panel.hidden { display: none; }
 .dash-r1 .status-panel .h3-row {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 10px;
-  border-bottom: 1px dashed var(--d2);
-  padding-bottom: 8px;
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: var(--s-3);
+  padding-bottom: 0;
 }
+/* Step 27: count chip becomes inline plain text in the header — no
+   separate caps-pill chrome per canon § 11.1. */
 .dash-r1 .status-panel h3 {
   font-family: 'Press Start 2P', monospace;
-  font-size: 10px; color: var(--white);
+  font-size: 11px; color: var(--white);
   margin: 0; letter-spacing: 1px;
 }
 .dash-r1 .status-panel .count {
@@ -2361,41 +2389,41 @@ body::after {
   font-size: 8px; color: var(--l1); letter-spacing: 1px;
 }
 
-/* PARTY sub-tab — one card per registered player */
+/* PARTY sub-tab — one card per registered player.
+   Step 27: rebased to gb-card-dark form (3 px ink border, 12 px
+   padding). The .you accent border is kept as the canonical "this
+   is you" affordance per canon § 11.3. The 3-pill stack
+   (you-pill / hof-pill-r1 / badges-pill) is dropped — the YOU border
+   already says "you", HOF moves to a 🏆 prefix in the name span,
+   and BADGES becomes plain inline text in the head row. */
 .dash-r1 .player-card {
-  margin-bottom: 10px; padding: 8px;
-  background: var(--d2);
-  border: 1px solid var(--d0);
+  margin-bottom: var(--s-4); padding: var(--s-5);
+  background: var(--d2); color: var(--l2);
+  border: var(--border);
 }
 .dash-r1 .player-card:last-child { margin-bottom: 0; }
 .dash-r1 .player-card.you {
-  background: var(--d0);
-  border: 2px solid var(--accent);
+  border-color: var(--accent);
 }
 .dash-r1 .player-card .head {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: var(--s-2);
+  gap: var(--s-3);
 }
 .dash-r1 .player-card .name {
   font-family: 'Press Start 2P', monospace;
   font-size: 9px; color: var(--white);
   letter-spacing: 0.5px;
 }
-.dash-r1 .player-card .you-pill,
-.dash-r1 .player-card .hof-pill-r1 {
-  background: var(--accent); color: var(--d0);
-  padding: 1px 4px; font-size: 6px;
-  font-family: 'Press Start 2P', monospace; letter-spacing: 1px;
-  margin-left: 4px;
-}
-.dash-r1 .player-card .badges-pill {
+/* Step 27: badges count becomes plain inline text — no pill bg,
+   no per-state colour. */
+.dash-r1 .player-card .badges-text {
   font-family: 'Press Start 2P', monospace;
-  font-size: 7px; color: var(--green-glow);
+  font-size: 8px; color: var(--l1);
   letter-spacing: 1px;
 }
-.dash-r1 .player-card .badges-pill.full { color: var(--accent); }
 .dash-r1 .player-card .sprites {
-  display: flex; gap: 4px;
+  display: flex; gap: var(--s-1);
 }
 .dash-r1 .player-card .sprite-cell {
   width: 28px; height: 28px;
@@ -2429,9 +2457,10 @@ body::after {
 .dash-r1 .gym-list .gym-row.beaten .num {
   background: var(--accent); color: var(--d0); border-color: var(--accent);
 }
+/* Step 27: pulseNext animation dropped — the static 2 px accent
+   border is the affordance per canon § 11.3. */
 .dash-r1 .gym-list .gym-row.next .num {
   border-color: var(--accent); border-width: 2px;
-  animation: pulseNext 2s ease-in-out infinite;
 }
 .dash-r1 .gym-list .gym-row .name {
   font-family: 'Press Start 2P', monospace;
@@ -2445,40 +2474,49 @@ body::after {
   font-size: 8px; color: var(--l1);
 }
 
+/* Step 27: pulseNext keyframes retained as a no-op for any rule that
+   may still reference it from external partials — the rules above are
+   migrated to static-only. Map and dashboard both no longer animate. */
 @keyframes pulseNext {
   0%, 100% { box-shadow: 0 0 0 0 rgba(95, 212, 95, 0.4); }
   50%      { box-shadow: 0 0 0 4px rgba(95, 212, 95, 0); }
 }
 
 .dash-r1 .next-battle {
-  margin-top: 12px; padding-top: 10px;
+  margin-top: var(--s-5); padding-top: var(--s-4);
   border-top: 1px dashed var(--d2);
 }
 .dash-r1 .next-battle form { margin: 0; }
 .dash-r1 .next-battle .label {
   font-family: 'Press Start 2P', monospace;
-  font-size: 8px; color: var(--accent);
-  letter-spacing: 1px; margin-bottom: 6px;
+  font-size: 8px; color: var(--l1);
+  letter-spacing: 1px; margin-bottom: var(--s-2);
 }
 .dash-r1 .next-battle .leader {
-  color: var(--white); font-size: 14px;
+  color: var(--white); font-size: 13px;
 }
 .dash-r1 .next-battle .prep {
   color: var(--l1); font-size: 12px; margin-top: 2px;
 }
+/* Step 27: draft-cta rebased to gb-btn-primary form (--d1 bg, --l2
+   text, 2 px ink border). Primary in the old canon = bg-swap to dark,
+   not accent-green flood per canon § 4. */
 .dash-r1 .next-battle .draft-cta {
-  margin-top: 10px; width: 100%;
-  background: var(--accent); color: var(--d0);
-  border: 2px solid var(--d0);
-  padding: var(--s-3) var(--s-5);
+  margin-top: var(--s-4); width: 100%;
+  background: var(--d1); color: var(--l2);
+  border: var(--border-thin);
+  padding: 8px 14px;
   font-family: 'Press Start 2P', monospace;
-  font-size: 9px; letter-spacing: 1px;
+  font-size: 11px; letter-spacing: var(--ls-tight);
+  line-height: 1.4;
   cursor: pointer;
+  transition: all 0.05s;
 }
+.dash-r1 .next-battle .draft-cta:hover { background: var(--d2); color: var(--l2); }
 .dash-r1 .next-battle .read-only {
-  margin-top: 10px;
+  margin-top: var(--s-4);
   background: var(--d2); color: var(--l1);
-  padding: 8px; text-align: center;
+  padding: var(--s-3); text-align: center;
   font-family: 'Press Start 2P', monospace;
   font-size: 9px; letter-spacing: 1px;
 }

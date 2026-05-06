@@ -61,6 +61,10 @@
   <div class="panel-body">
 
     <% if auto_catches.any? %>
+      <%# Step 27: collapsed multi-row badge-legend into a single inline
+          strip. Count is now plain text (no chip background) — the
+          span itself is the review-tray#count target so the dismiss
+          rewrite (`${remaining} NEW`) keeps working. %>
       <div class="review-tray">
         <div class="review-tray-head">
           <h3>REVIEW PARSED CATCHES</h3>
@@ -68,10 +72,11 @@
         </div>
 
         <div class="badge-legend" aria-label="Badge legend">
-          <div class="row"><span class="badge first">1ST</span> first encounter on a route — log it</div>
-          <div class="row"><span class="badge trade">TRADE-IN</span> obtained via trade — usually skip</div>
-          <div class="row"><span class="badge event">EVENT</span> mystery gift / event — not a real encounter</div>
-          <div class="row"><span class="badge offfeed">OFF-FEED</span> from PC box, not active party</div>
+          LEGEND:
+          <span class="row"><span class="badge">1ST</span> first encounter</span>
+          <span class="row"><span class="badge">TRADE-IN</span> traded</span>
+          <span class="row"><span class="badge">EVENT</span> mystery gift</span>
+          <span class="row"><span class="badge">OFF-FEED</span> from PC box</span>
         </div>
 
         <% auto_catches.each do |p| %>
@@ -151,9 +156,10 @@
         <% end %>
       </div>
     <% else %>
+      <%# Step 27: standalone .check glyph dropped in favour of an
+          inline (✓) text prefix. Container restyled to gb-flash-notice. %>
       <div class="empty-tray-bar" role="status">
-        <span class="check" aria-hidden="true">✓</span>
-        No new parsed catches to review. New saves will land here for confirmation.
+        (✓) No new parsed catches to review. New saves will land here for confirmation.
       </div>
     <% end %>
 
