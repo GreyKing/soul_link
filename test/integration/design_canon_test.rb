@@ -6,8 +6,8 @@ class DesignCanonTest < ActionDispatch::IntegrationTest
 
   test "pixeldex.css declares the canonical accent token" do
     css = CSS_PATH.read
-    assert_match(/--accent:\s*var\(--amber\)/, css,
-                 "Step 25 canon: --accent must alias --amber in :root")
+    assert_match(/--accent:\s*var\(--green-glow\)/, css,
+                 "Step 26: --accent rebased to --green-glow")
   end
 
   test "pixeldex.css declares the danger-family tokens" do

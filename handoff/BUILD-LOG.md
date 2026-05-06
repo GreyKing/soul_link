@@ -11,7 +11,32 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 25 — Site-wide design canon adoption. Mechanical CSS normalization only — single file edit (`app/assets/stylesheets/pixeldex.css`) plus one new test file. No view / controller / model / service / config / migration touched. Six self-contained slices per `handoff/ARCHITECT-BRIEF.md`:
+**Active step:** Step 26 — Rebase the design canon's main accent color (`--accent`) from `--amber` (`#d4b14a`) to `--green-glow` (`#5fd45f`) per user feedback ("use the lighter green from the gym draft view as the main color"). Mechanical token-alias swap + propagation: 1 line in `:root`, 60 of 62 `var(--amber)` references in `pixeldex.css` swept to `var(--accent)` (the 2 `.conflict-warning` references stay amber per canon § 9 out-of-canon list), 10 `rgba(212, 177, 74, …)` glow decompositions migrated to `rgba(95, 212, 95, …)` to match the new color, 4 inline `var(--amber)` usages in views (HoF "🏆 COMPLETE" pill, NEXT pill, map "↓ NOW" caption, gym-draft coin-flip result text) swept to `var(--accent)`, 4 inline-style writes in `gym_draft_controller.js` (lines 157, 262, 263, 572) swept to `var(--accent)`, `design_canon.md` § 1 + § 8 prose + opening sentence updated for the rebase, `design_canon_test.rb` first assertion updated from `/--accent:\s*var\(--amber\)/` to `/--accent:\s*var\(--green-glow\)/`. The `--amber: #d4b14a` token remains defined in `:root` as a positional Game Boy palette token (no live references but kept for palette completeness).
+
+**Architect-prep doc:** `handoff/2026-05-06-accent-rebase-audit.md` (locked rationale + grep + scope + exception list).
+
+**Test count:** 782 → **782** (no change — same total; the `design_canon_test.rb` first assertion regex updated to match the new alias). 0 failures, 0 errors.
+**Lint:** rubocop clean (203 files, 0 offenses).
+**Brakeman:** Clean (same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess; zero delta on Step-26-touched files — Step 26 only edited CSS, ERB inline-style attrs, JS string literals, Markdown prose, and an integration test).
+**Migrations:** None. **Zero new gem deps. Zero controller / model / service / config / migration code.** Pure presentation-layer rebase.
+
+**Pre-existing context:** Step 26 follows Step 25 (Site-wide design canon adoption) at `1a5024d` and the Step 25 SESSION-CHECKPOINT update at `a1e6bbe` on `origin/main`. Step 25 had introduced `--accent` as a semantic alias but never propagated it (`grep -c "var(--accent)" pixeldex.css` was `0` pre-Step-26). Step 26 does both — swaps the alias *and* does the propagation Step 25 deferred.
+
+**Step 26 highlights / decisions:**
+- **`--green-glow` is the right "lighter green" target.** The other Game Boy greens (`--d2` `#3a5a3a`, `--l1` `#8a9e6a`, `--l2` `#9aae7a`) are positional surface/text colors (chrome / page bg / muted text), not main-color candidates. `--green-glow` is the only "vibrant / fresh / lighter" green in the palette and it's the dominant green on the gym-draft view (slot.active border, state-pill.active bg, alive-count text, etc.).
+- **`--accent` and `--success` now resolve to the same hex.** Both alias `var(--green-glow)`. Semantic distinction preserved in `design_canon.md` prose (success = positive-state markers; accent = primary attention CTA / focus / earned). The Game Boy palette only has one bright-green slot — aliasing two roles to it keeps the canon honest.
+- **`--amber: #d4b14a` token kept defined.** No live references after Step 26; preserved as a positional palette token for palette completeness and to allow a future opt-in "true gold" surface without re-adding the hex. Does *not* count against the canon's "no dead code" rule because it's a palette source-of-truth, not a code import.
+- **`.conflict-warning` exception is per the canon's own out-of-canon list (§ 9).** Single-use save-slot warning, deliberate gold/yellow alarm — not part of the unified accent. Lines 2111-2112 of `pixeldex.css` retain `var(--amber)`. This is the only legitimate `var(--amber)` site post-Step-26.
+- **rgba decompositions of the amber hex (10 sites in `pixeldex.css`) had to migrate together.** When border/bg becomes green-glow, the matching glow-shadow's rgb must also flip from `rgba(212, 177, 74, …)` to `rgba(95, 212, 95, …)` (i.e. green-glow's rgb decomposition) — same alpha stops preserved (0.3 / 0.4 / 0.45 / 0.7 / 0). Mechanical bulk replace.
+- **Bob caught one trap on the JS sweep.** `gym_draft_controller.js:263` had the literal string `"0 0 0 2px var(--amber)"` (amber embedded in a longer `box-shadow` literal), which the bare-token replace_all initially missed. Caught by the post-edit `grep -rn "var(--amber)" app/views/ app/javascript/` audit and fixed before review submission. Documented in REVIEW-REQUEST.md.
+- **`bin/rails` shim broken on this worktree** (mis-shimmed to ruby 3.0.6) — Bob fell back to `PATH="…/ruby/3.4.5/bin:$PATH" bundle exec rails test` per the project memory's documented fallback. Not a Step 26 concern; flagged for future infra cleanup if it persists.
+
+---
+
+## Step 25 — Status archive
+*Kept here for one-step lookback; will fold into archive at session end.*
+
+**Step 25:** Site-wide design canon adoption (first step after Phase 2 closed at Step 24). Mechanical CSS-only normalization: single file edit (`app/assets/stylesheets/pixeldex.css`) + one new test (`test/integration/design_canon_test.rb`) + two new docs (`handoff/2026-05-06-design-canon-audit.md` + `app/assets/stylesheets/design_canon.md` — Architect-locked source of truth). Six self-contained slices per `handoff/ARCHITECT-BRIEF.md`:
 - **Slice 1 — Tokens:** Replaced the `:root` block (lines 5-21) with the canon-aligned version. Added 30+ new tokens (semantic aliases `--shadow/--ink/--shade/--moss/--canvas/--paper/--accent/--success/--danger`, danger family `--danger-bg/--danger-border/--danger-fg`, spacing scale `--s-1` through `--s-8`, type scale `--t-micro` through `--t-xl`, letter-spacing scale `--ls-tight/--ls-default/--ls-wide`, line-height scale `--lh-tight/--lh-snug/--lh-body`). Kept every existing token (`--d0/--d1/--d2/--l1/--l2/--white/--amber/--green-glow/--crimson`); semantic aliases point at them. `--border` / `--border-thin` / `--border-double` rewritten to use `var(--ink)` (still resolves to `--d1` — value-stable).
 - **Slice 2 — Danger tokens:** Three sites swapped from hardcoded hex (`#4a1c1c` / `#6b2c2c` / `#e8a0a0`) to `var(--danger-*)`: `.gb-flash-alert` (lines ~178-181), `.gb-btn-danger` block + only the `:hover` `background: #6b2c2c` (lines ~792-803; the `#f0c0c0` hover `color` stays inline as documented in audit Section 1), `.gb-status-dead` (lines ~921-924). Out-of-scope sites untouched: `.team-builder-status--error #e8a0a0` (single-use error text), `.map-r4` namespaced redesign blocks (`.node.dead .glyph` / `.acc-row .glyph.dead` / `.node-legend .glyph.dead`), `.pc-box-r2 .box-cell.dead #2a1a1a/#4a1c1c` (extra-dark variant).
 - **Slice 3 — Pill paddings:** Snapped 4 sites of `padding: 2px 5px` → `padding: var(--s-1) var(--s-2)` (= `2px 6px`): `.state-pill` (~line 1900), `.hof-pill` (~line 2079), `.map-r4 .group-card .head .pill` (~line 1503), `.pc-box-r2 .badge-legend .badge` (~line 1639). Post-edit grep confirms 0 remaining `padding: 2px 5px` lines in the file.
@@ -34,53 +59,43 @@ reset until the gap is addressed or the decision is replaced.
 
 ---
 
-## Step 24 — Status archive
-*Kept here for one-step lookback; will fold into archive at session end.*
-
-**Step 24:** R1 Dashboard restructure (Phase 2 R1 of the 2026-05-04 audit; closes Phase 2). Locked mockup `handoff/2026-05-04-ui-audit-mockup-dashboard.html`, 6 screens (desktop 3-col · right-rail PARTY view · tablet 2-col · phone single col + scrollable tab strip · run-pill open · ARIA spec sheet). Direct build per BUILDER.md Pt. 4 ("brief locked + unambiguous → may build directly without writing a Builder Plan section, unless ambiguity hits"):
-- Wrapping div `.dash-r1` namespaces every new selector under `.dash-r1 …` so existing dashboard surfaces (left party panel, MAP main-tab `_map_content.html.erb`, GYMS main-tab) are untouched. `data-controller="dashboard pixeldex run-management"` is hoisted to the dashboard root so the title-bar's `+ START NEW RUN` button can reach `run-management#startRun` without spawning a second ActionCable subscription. Window-level `keydown@window->pixeldex#numericJump` registers the 1-7 jump action globally.
-- View `app/views/dashboard/_title_bar.html.erb` full rewrite: 36×36 amber title-glyph (player initials, falls back to "PC") + 2-line title block (`<player>'s PC` + `PLATINUM · SOUL LINK`) + run-pill (`<button class="run-pill">RUN #N <span class="badge">ACTIVE</span> <span class="chev">▾</span></button>`) replacing the legacy `<select onchange="window.location.href = …">` per audit annotation C. Right side: single inline stat strip (`CAUGHT N · ALIVE N · DEAD N · BADGES N/8`) with `·` separators. Run-pill dropdown renders all runs as `<a href="/?run_id=N" role="option">` (works without JS); the new `run-picker` Stimulus controller adds toggle + keyboard nav + outside-click close + ESC.
-- View `app/views/dashboard/_tab_bar.html.erb` full rewrite: real WAI-ARIA tablist (`<div role="tablist" aria-label="Dashboard sections">` + per-tab `<button role="tab" id="tab-<key>" aria-controls="panel-<key>" aria-selected aria-tabindex>`). 2-line vertical tab buttons (icon top + label bottom). Active tab `tabindex="0"`, others `-1` per WAI-ARIA. Live-update green dots: PC BOX when `@auto_detected_catches.any?`; GYMS when `@active_draft.present?`. Tab-bar binds `keydown->pixeldex#tablistKeydown` for ←/→/Home/End focus+activate.
-- View `app/views/dashboard/_status_rail.html.erb` (NEW) replaces `_map_panel.html.erb` (DELETED). Three sub-tabs (PARTY/GYMS/MAP); GYMS default-active. PARTY shows one card per `SoulLink::GameState.players` row with name + badges pill + 6 sprite cells, current user's row gets `.you` modifier (amber border + YOU pill, plus 🏆 HOF when `@run.completed? && badges == 8`). GYMS lists all 8 leaders compact (.beaten / .next / .upcoming) + a `↓ NEXT BATTLE` block with leader / location / level / type prep + START GYM DRAFT CTA (read-only mode renders "RUN ENDED" instead). MAP keeps today's body content (ASCII map + CURRENT LOCATION + BADGE CASE + RECENT ROUTES + Strategy Dialog) inside the new sub-tab; GYM LEADERS section removed because it now lives in the GYMS sub-tab (closes audit cross-cutting #6 duplication).
-- View `app/views/dashboard/_runs_content.html.erb` extended with the 3 emulator-ROM affordances (`Generate Emulator ROMs` when `:none`, `Regenerate ROMs` when `:failed`, `ROMs generating…` status span when `:generating`); the `data-controller="run-management"` wrapper is removed from the partial because it's hoisted to the dashboard root.
-- View `app/views/dashboard/show.html.erb` rewritten: top-level wrapped in `.dash-r1`; renders `_title_bar` → `_tab_bar` → `.pc-layout` (`.col-party` + `.panel` + `_status_rail`). Each `tabContent` div now also carries `role="tabpanel"` + `id="panel-<key>"` + `aria-labelledby="tab-<key>"` + `tabindex="0"` so the tablist contract is complete.
-- View `app/views/dashboard/_map_panel.html.erb` deleted (content folded into `_status_rail` MAP sub-tab; `_map_content.html.erb` for the MAP main tab is untouched). `app/views/runs/index.html.erb` deleted; `app/views/runs/` directory removed (now empty).
-- New section `/* ── R1 Dashboard ── */` in `pixeldex.css` (~325 lines, every selector namespaced under `.dash-r1`). Extended `@media (max-width: 900px)` block: `.dash-r1 .pc-layout { grid-template-columns: minmax(0, 1fr) 280px; }` + `.dash-r1 .col-party { display: none; }` + title-bar wraps to column. Extended `@media (max-width: 720px)` block (already exists for `.map-r4`): `.dash-r1 .pc-layout { grid-template-columns: 1fr; }` + `.dash-r1 .tab-bar { overflow-x: auto; flex-wrap: nowrap; }` + stat-strip pulls top border. Extended `@media (max-width: 520px)`: stat-strip font-size shrinks to 7px. **Zero new design tokens** — reused the existing `:root` palette.
-- New `app/javascript/controllers/run_picker_controller.js` (~110 lines): `toggle` + `navigate` (↑/↓/Home/End/Enter/Esc) + outside-click `_closeOnOutside`. RAF-deferred focus on first option after open so screen readers announce the active descendant. Anchors trigger natively; non-anchor "+ START NEW RUN" button uses `target.click()` for Enter activation.
-- New `app/javascript/controllers/status_rail_controller.js` (~60 lines): `switch` (click) + `keydown` (←/→/Home/End focus+activate). Internal `_activate(tab, { focus })` flips `aria-selected` + `tabindex` on every sub-tab button and toggles the matching panel's `.hidden` class.
-- `app/javascript/controllers/pixeldex_controller.js` extended (NOT replaced): new `tablistKeydown` action (←/→/Home/End move focus AND activate per the mockup spec); new `numericJump` window-bound action (1–7 jump tabs; skipped when an `<input>`/`<textarea>`/`<select>`/`[contenteditable]` has focus or any modifier key is held); `switchTab` extended with `aria-selected` + `tabindex` flips on every tab button (legacy `.active` class kept for back-compat) and `history.replaceState(null, "", "#" + tab)` (no back-stack pollution — Step 23 `#route=` precedent). Existing `#applyHashTab` preserved verbatim.
-- Backend: `app/controllers/dashboard_controller.rb` adds **one** new instance variable, `@all_player_teams = run.soul_link_teams.includes(soul_link_team_slots: { soul_link_pokemon_group: :soul_link_pokemon }).order(:discord_user_id)`. `app/controllers/runs_controller.rb` becomes a 2-line `redirect_to root_path(anchor: "runs"), status: :moved_permanently` shim.
-
-**Test count:** 755 → **777** (+22). 0 failures, 0 errors.
-**Lint:** rubocop clean (202 files, 0 offenses; +2 files: new `run_picker_controller.js` + `status_rail_controller.js`).
-**Brakeman:** Clean (no new warnings; same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess unchanged from Steps 18/19/20/21/22/23).
-**Migrations:** None. **Zero new gem deps. Zero new design tokens. Zero new model/service code; only 1 controller line added (`@all_player_teams`) + 1 controller method body replacement (RunsController#index → redirect).**
-
-**Pre-existing context:** Step 24 is the FOURTH and FINAL Phase 2 redesign per § 5 of `handoff/2026-05-04-ui-audit.md` (locked R3 ✓ → R2 ✓ → R4 ✓ → **R1** ship order). Step 23 (R4 Map) shipped in this same session at `c29f74e` (still on the worktree branch — not yet FF-merged). Phase 2 closes when Step 24 ships.
-
-**Step 24 highlights / decisions:**
-- **Mockup wins on every visual detail.** The 6 mockup screens are the visual contract. The pre-Step-24 title bar showed `@caught_count` next to "CAUGHT" and `@caught_count - @dead_count` next to "ALIVE", which was a labeling inversion (the controller's `@caught_count` is `count(&:caught?)` = currently-alive). Mockup locks the conventional reading: CAUGHT = total ever caught (alive + dead); ALIVE = currently alive; DEAD = currently dead. View math fixed inline (`@caught_count + @dead_count` for CAUGHT, `@caught_count` for ALIVE) without changing controller semantics.
-- **`run-management` controller hoisted to the dashboard root** so the title-bar `+ START NEW RUN` button reaches `run-management#startRun` via DOM bubbling. The previous wiring scoped the controller to `_runs_content.html.erb`, which doesn't enclose the title bar. Hoisting also means there's exactly ONE ActionCable subscription per dashboard (was: one per controller instance — would have spawned two if `_runs_content` kept its `data-controller` attr).
-- **`run-management#startRun` already exists; reused verbatim.** It pops a `confirm("Start a new run? This will end any active run.")` browser dialog before performing the cable action — same affordance the dashboard runs panel offers today, just reachable from the chrome.
-- **Run-pill switching is anchor-based, not JS-driven.** Each menu option is a real `<a href="/?run_id=N" role="option">`. The Stimulus controller only handles the toggle + keyboard nav. Falls back gracefully if JS doesn't load.
-- **`pixeldex#tablistKeydown` activates on focus move (mockup spec).** WAI-ARIA recommends focus-only on ←/→ with Enter/Space to activate, but the mockup explicitly says "←/→ moves between tabs (with wrap), updates `aria-selected` and `tabindex` immediately, **and activates the tab**." Implemented per mockup; if a follow-up wants the WAI-ARIA-strict shape, it's a one-line change (drop `target.click()` from `tablistKeydown`).
-- **`pixeldex#numericJump` window-level binding is gated for input focus** (mockup spec). `event.target.tagName` check covers `<input>` / `<textarea>` / `<select>`; `target.isContentEditable` covers rich-text fields. Modifier keys (meta/ctrl/alt/shift) skip — so users with `Cmd-1` to switch browser tabs aren't intercepted.
-- **`switchTab` URL-hash write uses `replaceState`** (Step 23 `#route=` precedent). No back-stack pollution.
-- **Stimulus controller registration is automatic** via `eagerLoadControllersFrom("controllers", application)` in `app/javascript/controllers/index.js` (no manual edit needed; both new controllers are picked up by `pin_all_from "app/javascript/controllers"` in the importmap config).
-- **Per-player badge counts on PARTY sub-tab share `@gyms_defeated`** (Ava-decided ambiguity in the brief — KG-39 logged for the future variance feature). All 4 players show the run's `gyms_defeated` count for now; the YOU pill identifies the current user, the HOF pill renders only when `@run.completed? && badges == 8`.
-- **ConfirmModalFlowTest split into `/runs` redirect coverage + dashboard RUNS tab modal coverage.** The legacy 3 tests assertting against `get runs_path` got renamed + repointed at `get root_path` (the canonical surface) since `/runs` is now a 301. A new `/runs redirects to root_path with #runs anchor` test covers the redirect itself. Existing `dashboard RUNS tab END RUN trigger uses a distinct modal id from /runs` sanity test preserved.
-
-**Project review:** `handoff/PROJECT-REVIEW-2026-04-30.md` — KG-7 (real-save offset verification for `MAP_ID_OFFSET`) still open. KG-25 (real-SRAM smoke test for `BoxParser` + `PkmDecoder` field reads) still open. UI/UX audit `handoff/2026-05-04-ui-audit.md` Phase 1 shipped in Step 20; Phase 2 R3 in Step 21; R2 in Step 22; R4 in Step 23; **R1 ships in Step 24 → Phase 2 closes**.
-
-**Parked plan:** FactoryBot conversion fully shipped through Step 8.
-
----
-
 ## Step History
 *Session-scoped.*
 
+### Step 26 — Rebase design canon `--accent` from `--amber` to `--green-glow` — 2026-05-06
+**Status:** Shipped on branch `claude/hungry-cray-ff4938`; FF-merged to `origin/main` and pushed. **No KGs close**, **0 KGs open**.
+
+User feedback driver: "I think the new design is a downgrade from the old styling, can you look at the gym draft view page for the lighter green color and use that as the main color? I like the unified styling but I'm focused on the colors." Step 25 introduced `--accent` as a semantic alias but never propagated it (`grep -c "var(--accent)" pixeldex.css` was `0` pre-Step-26); Step 26 swaps the alias *and* does the propagation.
+
+**Slice A — Token alias:** `pixeldex.css` line 24, `--accent: var(--amber)` → `--accent: var(--green-glow)`. `--success: var(--green-glow)` left intact (semantic distinction preserved in prose; both aliases now resolve to the same Game Boy palette slot). `--amber: #d4b14a` token kept defined as a positional palette token (no live references but available for future opt-in gold surface).
+
+**Slice B — `pixeldex.css` `var(--amber)` sweep:** 60 of 62 references swept to `var(--accent)`. The 2 surviving references are inside `.conflict-warning` (lines 2111-2112) — explicitly out-of-canon per `design_canon.md` § 9 (single-use save-slot warning, intentional gold/yellow alarm). Post-edit grep: `grep -c "var(--amber)" pixeldex.css` → `2`; `grep -c "var(--accent)" pixeldex.css` → `59`.
+
+**Slice C — rgba glow decompositions:** 10 sites of `rgba(212, 177, 74, …)` (`#d4b14a` decomposed) → `rgba(95, 212, 95, …)` (`#5fd45f` decomposed) at lines 1137, 1169, 1170, 1287, 1300, 1308, 1309, 1350, 2449, 2450. Same alpha stops preserved (0.3 / 0.4 / 0.45 / 0.7 / 0). Mechanical bulk replace.
+
+**Slice D — view files:** 4 inline `var(--amber)` → `var(--accent)` swaps:
+- `app/views/dashboard/_runs_content.html.erb:33` — HoF "🏆 COMPLETE" pill (border-color + background; color: var(--d1) untouched).
+- `app/views/dashboard/_gyms_content.html.erb:52` — NEXT pill (border-color + color).
+- `app/views/map/show.html.erb:251` — "↓ NOW · log first encounter" caption (color).
+- `app/views/gym_drafts/show.html.erb:194` — coin-flip result text on tiebreak reveal (color).
+
+**Slice E — JS file:** 4 inline-style writes in `app/javascript/controllers/gym_draft_controller.js` (lines 157, 262, 263, 572) updated. Line 263 was `"0 0 0 2px var(--amber)"` (amber embedded in a longer `box-shadow` literal) — bare-token `replace_all` initially missed it; caught by post-edit `grep -rn "var(--amber)" app/views/ app/javascript/` audit and fixed before review submission.
+
+**Slice F — `design_canon.md`:** § 1 Accents table row updated (`--accent (= --green-glow)` `#5fd45f`); new Step 26 note added at top of § 1 documenting the rebase + `--success`/`--accent` shared hex; § 8 Borders parenthetical updated from "4px amber = warn-emphasis" to "4px accent-green = active-emphasis"; opening sentence updated from "dimmed amber accent" to "dimmed green accent".
+
+**Slice G — Test:** `test/integration/design_canon_test.rb` first assertion regex updated from `/--accent:\s*var\(--amber\)/` to `/--accent:\s*var\(--green-glow\)/` plus message updated to "Step 26: --accent rebased to --green-glow". Other 4 design-canon tests unchanged.
+
+**Test count:** 782 → **782** (no count change; the regex on the first assertion changed). 0 failures, 0 errors.
+**Lint:** rubocop clean (203 files, 0 offenses).
+**Brakeman:** Clean (same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess; zero delta on Step-26-touched files).
+**Migrations:** None. **Zero new gem deps. Zero controller / model / service / config / migration code.** Pure presentation-layer rebase: 1 CSS file modified, 4 view files modified, 1 JS file modified, 1 Markdown doc modified, 1 test file modified.
+
+**Review:** Richard cleared 0 / 0 / 0 / 0 (Must Fix / Should Fix / Escalate / Nits). All grep + test + visual checks passed.
+
+---
+
 ### Step 25 — Site-wide design canon adoption — 2026-05-06
-**Status:** Bob shipped to Reviewer; awaiting Richard's review. **No KGs close**, **0 KGs open**.
+**Status:** Shipped on branch `claude/stupefied-burnell-62b48d`; FF-merged to `origin/main` at `1a5024d` and pushed. **No KGs close**, **0 KGs open**.
 
 Mechanical CSS-only normalization step. One file edit (`app/assets/stylesheets/pixeldex.css`) + one new test file (`test/integration/design_canon_test.rb`). Architect-locked source of truth: `handoff/2026-05-06-design-canon-audit.md` (audit + rationale) + `app/assets/stylesheets/design_canon.md` (locked canon). Six tight slices per the brief:
 

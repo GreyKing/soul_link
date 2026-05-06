@@ -1,101 +1,126 @@
-# Review Request — Step 25: Site-wide design canon adoption
+# Review Request — Step 26: Rebase `--accent` from `--amber` to `--green-glow`
 
+**Branch:** `claude/hungry-cray-ff4938`
 **Builder:** Bob
-**Branch:** `claude/stupefied-burnell-62b48d` (worktree)
-**Ready for Review: YES**
-**Scope:** Step 25 — site-wide design canon adoption per `handoff/ARCHITECT-BRIEF.md` and the locked Architect references `handoff/2026-05-06-design-canon-audit.md` + `app/assets/stylesheets/design_canon.md`. Mechanical CSS-only normalization — single CSS file edit + one new test file. No view / controller / model / service / config / migration touched.
+**Status:** Ready for Review: YES
+**Date:** 2026-05-06
 
 ---
 
 ## Summary
 
-Six self-contained slices, all shipped per the brief:
+Rebases the design canon's main accent token from amber/gold (`#d4b14a`) to vibrant green (`#5fd45f`) per user feedback ("use the lighter green from the gym draft view as the main color"). Mechanical sweep of `var(--amber)` → `var(--accent)` site-wide, plus matching rgba glow decompositions, plus canon-doc + test updates. The `.conflict-warning` block keeps `var(--amber)` per the canon's out-of-canon list.
 
-1. **Slice 1 — Tokens added to `:root`**: 30+ new tokens (semantic aliases `--shadow/--ink/--shade/--moss/--canvas/--paper/--accent/--success/--danger`, danger family `--danger-bg/--danger-border/--danger-fg`, spacing scale `--s-1..--s-8`, type scale `--t-micro..--t-xl`, letter-spacing scale `--ls-tight/--ls-default/--ls-wide`, line-height scale `--lh-tight/--lh-snug/--lh-body`). Existing tokens preserved verbatim; semantic aliases point at them. `--border`/`--border-thin`/`--border-double` rewritten to use `var(--ink)` (value-stable — still resolves to `--d1`).
-2. **Slice 2 — Danger family adopted on 3 shared surfaces**: `.gb-flash-alert`, `.gb-btn-danger` (+ `:hover` `background` only), `.gb-status-dead` swap from hardcoded `#4a1c1c/#6b2c2c/#e8a0a0` → `var(--danger-bg/--danger-border/--danger-fg)`. The `#f0c0c0` `.gb-btn-danger:hover` color stays inline per audit Section 1.
-3. **Slice 3 — Pill paddings snapped**: 4 sites of `padding: 2px 5px` → `var(--s-1) var(--s-2)` (= `2px 6px`). Post-edit grep: 0 remaining matches.
-4. **Slice 4 — Amber CTA paddings unified**: `.dash-r1 .next-battle .draft-cta` (`8px` → `var(--s-3) var(--s-5)`) + `.map-r4 .status-bar .jump-btn` (`6px 12px` → same). Both small CTAs now share `8px 12px`.
-5. **Slice 5 — `0.03em` letter-spacing → `var(--ls-tight)`** on 3 `.gb-btn*` sites (`.gb-btn`, `.gb-btn-primary`, `.gb-btn-danger`). The `.gb-btn-danger` letter-spacing was folded into the Slice 2 edit (same selector block — one combined Edit operation, value-equivalent).
-6. **Slice 6 — Smoke test**: New `test/integration/design_canon_test.rb` (5 assertions, all passing): asserts `--accent` aliases `--amber`, danger family declared, spacing scale declared, danger-family blocks reference `var(--danger-*)`, and `design_canon.md` references the locked tokens.
+Slice-by-slice execution per ARCHITECT-BRIEF.md. No scope expansion.
 
 ---
 
-## File manifest
+## Files changed
 
-| File | Status | Notes |
-|------|--------|-------|
-| `app/assets/stylesheets/pixeldex.css` | Modified | `:root` block extended (lines ~5-72); 13 selector-block edits |
-| `test/integration/design_canon_test.rb` | Added (Bob) | 5 assertions covering canon tokens + danger-surface adoption |
-| `app/assets/stylesheets/design_canon.md` | Pre-existing (Architect) | Confirmed present — locked source of truth, untouched |
-| `handoff/2026-05-06-design-canon-audit.md` | Pre-existing (Architect) | Confirmed present — audit + rationale, untouched |
-| `handoff/BUILD-LOG.md` | Modified | Step 25 entry added; Step 24 moved into Status archive |
-| `handoff/REVIEW-REQUEST.md` | Modified | This file |
+| # | File | Change |
+|---|---|---|
+| 1 | `app/assets/stylesheets/pixeldex.css` | Slice A: line 24 alias `--accent: var(--amber)` → `--accent: var(--green-glow)`. Slice B: 60 of 62 `var(--amber)` swept to `var(--accent)` (2 `.conflict-warning` references at lines 2111-2112 preserved). Slice C: 10 rgba decompositions `rgba(212, 177, 74, …)` → `rgba(95, 212, 95, …)`. |
+| 2 | `app/views/dashboard/_runs_content.html.erb` | Line 33: HoF "🏆 COMPLETE" pill — `border-color` + `background` now `var(--accent)` (`color: var(--d1)` untouched). |
+| 3 | `app/views/dashboard/_gyms_content.html.erb` | Line 52: NEXT pill `border-color` + `color` → `var(--accent)`. |
+| 4 | `app/views/map/show.html.erb` | Line 251: "↓ NOW · log first encounter" caption `color` → `var(--accent)`. |
+| 5 | `app/views/gym_drafts/show.html.erb` | Line 194: coin-flip result `color` → `var(--accent)`. |
+| 6 | `app/javascript/controllers/gym_draft_controller.js` | Lines 157, 262, 263, 572: 4 inline-style writes `"var(--amber)"` → `"var(--accent)"`. |
+| 7 | `app/assets/stylesheets/design_canon.md` | § 1 Accents row: `--accent (= --amber)` `#d4b14a` → `--accent (= --green-glow)` `#5fd45f`. New Step 26 note added under `## 1. Color tokens`. § 8 Borders parenthetical: "4px amber = warn-emphasis" → "4px accent-green = active-emphasis". Opening sentence: "dimmed amber accent" → "dimmed green accent". |
+| 8 | `test/integration/design_canon_test.rb` | First test assertion + message updated from amber-aliased expectation to green-glow-aliased expectation (Step 26 wording). |
 
-**Confirmed: 0 view files touched, 0 controller files touched, 0 model files touched, 0 service files touched, 0 config files touched, 0 migrations.**
-
----
-
-## Per-line summary of CSS edits
-
-| Slice | Selector | Before → After | Note |
-|-------|----------|----------------|------|
-| 1 | `:root { … }` (lines 5-21) | Whole block replaced with canon-aligned version (lines ~5-72) | Adds tokens; preserves all existing |
-| 2 | `.gb-flash-alert` (~178-181) | `#4a1c1c / #e8a0a0 / #6b2c2c` → `var(--danger-bg / --danger-fg / --danger-border)` | |
-| 2+5 | `.gb-btn-danger` (~788-799) | `border: 2px solid #6b2c2c` → `var(--danger-border)`; `background: #4a1c1c` → `var(--danger-bg)`; `color: #e8a0a0` → `var(--danger-fg)`; `letter-spacing: 0.03em` → `var(--ls-tight)` | Slice 2 + Slice 5 combined in one Edit |
-| 2 | `.gb-btn-danger:hover` (~801-804) | `background: #6b2c2c` → `var(--danger-border)`; `color: #f0c0c0` LEFT INLINE | Per brief — `#f0c0c0` is a hover-only one-off |
-| 2 | `.gb-status-dead` (~920-924) | `#4a1c1c / #6b2c2c / #e8a0a0` → `var(--danger-bg / --danger-border / --danger-fg)` | |
-| 3 | `.map-r4 .group-card .head .pill` (~line 1503) | `padding: 2px 5px` → `padding: var(--s-1) var(--s-2)` | |
-| 3 | `.pc-box-r2 .badge-legend .badge` (~line 1639) | `padding: 2px 5px` → `padding: var(--s-1) var(--s-2)` | |
-| 3 | `.state-pill` (~line 1900) | `padding: 2px 5px` → `padding: var(--s-1) var(--s-2)` | |
-| 3 | `.hof-pill` (~line 2079) | `padding: 2px 5px` → `padding: var(--s-1) var(--s-2)` | |
-| 4 | `.dash-r1 .next-battle .draft-cta` (~line 2428) | `padding: 8px` → `padding: var(--s-3) var(--s-5)` | Gains 4px horizontal |
-| 4 | `.map-r4 .status-bar .jump-btn` (~line 1117) | `padding: 6px 12px` → `padding: var(--s-3) var(--s-5)` | Gains 2px vertical |
-| 5 | `.gb-btn` (~line 761) | `letter-spacing: 0.03em` → `var(--ls-tight)` | |
-| 5 | `.gb-btn-primary` (~line 779) | `letter-spacing: 0.03em` → `var(--ls-tight)` | |
+`--amber: #d4b14a` token in `:root` left intact (positional palette token). `--success: var(--green-glow)` left intact. `.conflict-warning` block intentionally retains `var(--amber)`.
 
 ---
 
-## Out-of-scope sites left untouched (per brief)
+## Acceptance grep counts (all match the brief)
 
-Verified by post-edit grep:
+```
+$ grep -c "var(--amber)" app/assets/stylesheets/pixeldex.css
+2                 # the .conflict-warning declaration only (lines 2111-2112) — expected 2 ✓
 
-- `.team-builder-status--error { color: #e8a0a0 }` (line ~73) — single-use error text, brief Slice 2 explicit out-of-scope.
-- `.map-r4 .node-legend .glyph.dead` (~line 1193), `.map-r4 .node.dead .glyph` (~line 1295), `.map-r4 .acc-row .glyph.dead` (~line 1621) — namespaced redesign blocks; brief Slice 2 explicitly defers them ("namespaced redesigns can adopt tokens at their next iteration").
-- `.pc-box-r2 .box-cell.dead { background: #2a1a1a; border-color: #4a1c1c }` (~line 1819) — extra-dark variant per audit Section 8.
-- `.gb-btn-danger:hover { color: #f0c0c0 }` (~line 803) — bright-fg-on-hover one-off; brief explicitly leaves inline.
-- `.team-name { letter-spacing: 0.03em }` (~line 428), `.box-cell-name { letter-spacing: 0.03em }` (~line 522) — NOT `.gb-btn*`. Definition of Done says "0.03em → var(--ls-tight) **on `.gb-btn*`**" — these 2 text-label sites are out of scope and stayed unchanged.
-- All other decorative one-offs in audit Section 8 (`.tcg-coin*`, `.gb-avatar--c0..c3`, `.conflict-warning`, `.pending-banner`, `.dialog`, `.gb-flash`).
-- `body { line-height: 1.8 }` and `.dialog { line-height: 1.8 }` — Hard Constraints DO-NOT.
+$ grep -c "rgba(212, 177, 74" app/assets/stylesheets/pixeldex.css
+0                 # expected 0 ✓
 
----
+$ grep -rn "var(--amber)" app/views/ app/javascript/
+                  # no hits — expected no hits ✓
 
-## Verification gates
+$ grep -c "var(--accent)" app/assets/stylesheets/pixeldex.css
+59                # was 0 pre-Step-26; now 59 (62 baseline amber − 2 conflict-warning kept − 1 line-24 alias source). Brief said "~45+" ✓
 
-| Gate | Result | Note |
-|------|--------|------|
-| `bin/rails test` | **782 runs, 0 failures, 0 errors** | Was 777 (Step 24); +5 from new `design_canon_test.rb` (matches DoD's "+5 tests" expectation) |
-| `bin/rails test test/integration/design_canon_test.rb` | **5 runs, 5 passes** | Direct run of the new file |
-| `bundle exec rubocop` | **Clean (203 files, 0 offenses)** | |
-| `bundle exec brakeman -q` | **2 weak-confidence warnings — unchanged** | Same `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess as Steps 18-24 |
-| `grep -E 'padding: 2px 5px' pixeldex.css` | **0 matches** | Was 4 |
-| `grep -E 'letter-spacing: 0\.03em' pixeldex.css` | **2 matches** (`.team-name`, `.box-cell-name`) | Both intentionally out of scope per DoD |
-| `grep -E '#4a1c1c\|#6b2c2c\|#e8a0a0' pixeldex.css` | **9 matches**: 3 in `:root` token defs (correct) + 6 in explicitly out-of-scope sites | All shared-surface adoptions complete |
+$ grep -rn "var(--amber)" app/
+app/assets/stylesheets/pixeldex.css:2111:  background: #4a3a1c; color: var(--amber);
+app/assets/stylesheets/pixeldex.css:2112:  border: 1px solid var(--amber);
+                  # only the two intentional .conflict-warning references ✓
 
----
+$ grep -c "rgba(95, 212, 95" app/assets/stylesheets/pixeldex.css
+10                # all 10 rgba decompositions migrated ✓
+```
 
-## Open questions / deviations
-
-None. The brief was self-contained and decisive. No deviations were forced; no questions need to escalate.
+`var(--accent)` references in views/JS after Step 26: 4 view occurrences + 4 JS occurrences = 8 — matches the brief's Slice D (4) + Slice E (4) targets exactly.
 
 ---
 
-## Hard constraints — confirmed honored
+## Test output
 
-- [x] Did not rename `--d0`, `--d1`, `--d2`, `--l1`, `--l2`, `--white`, `--amber`, `--green-glow`, `--crimson`.
-- [x] Did not rebase any existing button class.
-- [x] Did not edit any view file (`app/views/**`).
-- [x] Did not edit any controller / model / service / config.
-- [x] Did not add a new migration.
-- [x] Did not rewrite namespaced `.dash-r1` / `.pc-box-r2` / `.map-r4` / `.slot` / `.roster-card` rules — only the 4 specific pill paddings (Slice 3) and the 2 specific amber CTA paddings (Slice 4) called out by the brief.
-- [x] Did not touch `.tcg-coin*`, `.gb-avatar--c0..c3`, `.conflict-warning`, `.pc-box-r2 .box-cell.dead`, `.team-builder-status--error`, the `0.05em` / `0.08em` letter-spacings, or any decorative one-offs from audit Section 8.
-- [x] Did not change `body { line-height: 1.8 }` or `.dialog { line-height: 1.8 }`.
+Ran the full test suite via `PATH="…/ruby/3.4.5/bin:$PATH" bundle exec rails test` (`bin/rails` is mis-shimmed to ruby 3.0.6 on this worktree — used the standing rule's documented fallback path with the correct ruby pinned).
+
+**Before Step 26:**
+```
+ok rake test: 782 runs, 0 failures
+```
+
+**After Step 26:**
+```
+ok rake test: 782 runs, 0 failures
+```
+
+The `design_canon_test.rb` first assertion now passes against the new alias regex `/--accent:\s*var\(--green-glow\)/`. Other 4 design-canon tests unchanged and still passing. Same total run count, same zero failures — no regressions across the redesign / responsive-grids / pc-box / map / dashboard / wipe-flow / confirm-modal integration tests.
+
+---
+
+## Rubocop output
+
+```
+$ bundle exec rubocop
+ok ✓ rubocop (203 files)
+```
+
+Clean.
+
+---
+
+## Brakeman delta
+
+```
+$ bundle exec brakeman --quiet --no-pager
+File Access: 2
+
+== Warnings ==
+Confidence: Weak — Check: SendFile — emulator_controller.rb:79
+Confidence: Weak — Check: FileAccess — gym_schedule_discord_update_job.rb:14
+```
+
+Both warnings are pre-existing on Step-26-untouched files (an emulator ROM controller and a Discord update job). **Zero delta on Step-26-touched files** — Step 26 only edited CSS, ERB inline-style attributes, JS string literals, Markdown prose, and an integration test assertion.
+
+---
+
+## Notes & exceptions confirmed
+
+- `--amber: #d4b14a` token in `:root` **kept defined** (positional palette token, no live references). Per brief's explicit "do not delete" instruction.
+- `.conflict-warning` block (lines 2110-2118) **keeps** `var(--amber)` border + amber-tinted bg. Per brief's exception + canon § 9.
+- `--success: var(--green-glow)` line **kept**. Both `--accent` and `--success` now resolve to the same hex; semantic distinction documented in § 1's new Step 26 note + § 5 pill modifiers.
+- Coin-flip modal `#c0392b` red border in `gym_drafts/show.html.erb:179, 183` **untouched** — out of scope per audit doc.
+- `#4a3a1c` deep-amber bg on `.conflict-warning` **untouched** — out of canon per § 9.
+- One trap successfully avoided: `gym_draft_controller.js:263` had `"0 0 0 2px var(--amber)"` (amber embedded inside a longer string), so the bare-literal `replace_all` did not catch it on the first pass. Caught by the post-edit `grep -rn "var(--amber)" app/views/ app/javascript/` audit and fixed before this review.
+
+---
+
+## Open questions
+
+None. Brief was unambiguous; all acceptance gates green.
+
+## Visual smoke (described, not rendered)
+
+Across the dashboard runs/gyms tabs, save-slot strip, PC box review tray, map "NOW" caption + next-pulse, HoF COMPLETE pill, run-pill, gym-draft coin-flip text + ready-status + turn-indicator chip — every previously-amber surface should now render in green-glow `#5fd45f`. The four documented exceptions remain unchanged: `.conflict-warning` (amber bg+border), `--amber` token still defined in `:root`, coin-flip modal red `#c0392b` border, `--success` markers (already green-glow).
+
+Ready for Review: YES

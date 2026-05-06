@@ -2,13 +2,15 @@
 
 *Locked 2026-05-06 (Step 25). Source of truth for tokens, spacing, type, buttons, pills, cards, modals.*
 
-The site has a deliberate **Game Boy / Pokémon Platinum CRT** aesthetic — `Press Start 2P` display + `VT323` body, dimmed amber accent, 2-3 px solid borders, no rounded corners except for circles, scanline overlay. This canon does not change that aesthetic — it tightens the *language* used inside it so future surfaces speak the same dialect as the existing four (legacy `gb-*`, `.slot/.roster-card`, `.pc-box-r2`, `.map-r4`, `.dash-r1`).
+The site has a deliberate **Game Boy / Pokémon Platinum CRT** aesthetic — `Press Start 2P` display + `VT323` body, dimmed green accent, 2-3 px solid borders, no rounded corners except for circles, scanline overlay. This canon does not change that aesthetic — it tightens the *language* used inside it so future surfaces speak the same dialect as the existing four (legacy `gb-*`, `.slot/.roster-card`, `.pc-box-r2`, `.map-r4`, `.dash-r1`).
 
 When in doubt, use semantic names. Existing positional names (`--d0`, `--l1`, etc.) remain as the source of truth — semantic names alias them.
 
 ---
 
 ## 1. Color tokens
+
+> *Step 26 (2026-05-06): `--accent` rebased from `--amber` to `--green-glow` per user feedback — the site's main accent is now vibrant green. `--amber` stays defined as a positional palette token but is unreferenced. `--success` and `--accent` now resolve to the same hex; the semantic distinction is preserved in prose (success = state markers; accent = primary attention).*
 
 ### Palette (positional — the Game Boy values)
 
@@ -25,7 +27,7 @@ When in doubt, use semantic names. Existing positional names (`--d0`, `--l1`, et
 
 | Token | Hex | Use |
 |---|---|---|
-| `--accent` (= `--amber`) | `#d4b14a` | CTA button bg, earned badge, focus ring, "next" pulse, run-pill border |
+| `--accent` (= `--green-glow`) | `#5fd45f` | CTA button bg, earned badge, focus ring, "next" pulse, run-pill border |
 | `--success` (= `--green-glow`) | `#5fd45f` | Alive count, save-slot active, group-card alive border, sheet-status pill |
 | `--danger` (= `--crimson`) | `#c75a5a` | Destructive button fg, dead state border, delete-confirm bg |
 | `--danger-bg` | `#4a1c1c` | Danger filled-surface bg (gb-flash-alert, gb-btn-danger, dead-glyph) |
@@ -234,7 +236,7 @@ The three "almost-modal" surfaces (`.confirm-inline`, `.map-r4 .sheet`, `.dash-r
 --border-double = 4px double var(--ink)
 ```
 
-Plus ad-hoc treatments: `1px solid var(--shade)`, `1px dashed var(--shade)`, `2px solid var(--shadow)`, `4px solid var(--accent)`, `4px solid var(--success)`. All remain — they encode meaning ("4px amber = warn-emphasis", etc.).
+Plus ad-hoc treatments: `1px solid var(--shade)`, `1px dashed var(--shade)`, `2px solid var(--shadow)`, `4px solid var(--accent)`, `4px solid var(--success)`. All remain — they encode meaning ("4px accent-green = active-emphasis", etc.).
 
 ---
 

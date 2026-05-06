@@ -49,7 +49,7 @@
           <span>
             &#9654; <%= gym["leader"]&.upcase %>
             <span class="type-text" style="border-color: var(--l1);"><%= PixeldexHelper::TYPE_ABBREVIATIONS[gym["type"]] || gym["type"] %></span>
-            <span class="type-text" style="border-color: var(--amber); color: var(--amber); margin-left: 4px;">NEXT</span>
+            <span class="type-text" style="border-color: var(--accent); color: var(--accent); margin-left: 4px;">NEXT</span>
           </span>
           <%# Step 19 — hide MARK BEATEN in read-only mode. %>
           <% unless dashboard_read_only?(@run) %>

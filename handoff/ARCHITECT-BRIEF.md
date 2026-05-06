@@ -4,4 +4,4 @@
 
 ---
 
-*Awaiting next brief from the Project Owner. Step 25 (Site-wide design canon adoption — first step after Phase 2 closed) shipped, FF-merged to `origin/main`, and pushed. See `handoff/SESSION-CHECKPOINT.md` for state.*
+*Awaiting next brief from the Project Owner. Step 26 (rebase the design canon's main `--accent` token from `--amber` to `--green-glow`, plus propagation across `pixeldex.css` + 4 views + 1 JS controller + canon doc + test) shipped, FF-merged to `origin/main`, and pushed. See `handoff/SESSION-CHECKPOINT.md` for state.*

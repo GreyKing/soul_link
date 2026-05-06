@@ -154,7 +154,7 @@ export default class extends Controller {
       const statusEl = card.querySelector(".ready-status")
       if (statusEl) {
         statusEl.textContent = isReady ? "Ready!" : "Not ready"
-        statusEl.style.color = isReady ? "var(--amber)" : "var(--l1)"
+        statusEl.style.color = isReady ? "var(--accent)" : "var(--l1)"
       }
     })
 
@@ -259,8 +259,8 @@ export default class extends Controller {
       chip.style.color = hasPicked ? "var(--l2)" : "var(--d1)"
       chip.style.fontFamily = "'Press Start 2P', monospace"
       if (isCurrent) {
-        chip.style.borderColor = "var(--amber)"
-        chip.style.boxShadow = "0 0 0 2px var(--amber)"
+        chip.style.borderColor = "var(--accent)"
+        chip.style.boxShadow = "0 0 0 2px var(--accent)"
       }
       const prefix = hasPicked ? "✓ " : (isCurrent ? "▶ " : "")
       chip.textContent = `${prefix}${player?.display_name || pid}`
@@ -569,7 +569,7 @@ export default class extends Controller {
         if (opts.labelForGroup) {
           const tag = document.createElement("div")
           tag.className = "text-[10px]"
-          tag.style.color = "var(--amber)"
+          tag.style.color = "var(--accent)"
           tag.style.marginTop = "4px"
           tag.textContent = opts.labelForGroup(group)
           card.appendChild(tag)
