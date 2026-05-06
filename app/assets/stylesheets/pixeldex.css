@@ -3,21 +3,66 @@
    ═══════════════════════════════════════════════════════════ */
 
 :root {
+  /* ── Game Boy palette (positional — the source of truth) ── */
+  --d0: #0a1a0a;
   --d1: #1a2e1a;
   --d2: #3a5a3a;
   --l1: #8a9e6a;
   --l2: #9aae7a;
   --white: #c0d0a0;
   --amber: #d4b14a;
-  /* Step 21 R3 — slot inner bezel / action-button bg / seed monospace bg. */
-  --d0: #0a1a0a;
-  /* Step 21 R3 — ACTIVE state pill bg + active-slot 4px border. */
   --green-glow: #5fd45f;
-  /* Step 21 R3 — CONFIRM state pill + DELETE FOREVER bg + inline-confirm border. */
   --crimson: #c75a5a;
-  --border: 3px solid var(--d1);
-  --border-thin: 2px solid var(--d1);
-  --border-double: 4px double var(--d1);
+
+  /* ── Semantic aliases (Step 25 canon — preferred for new work) ── */
+  --shadow: var(--d0);    /* deepest bg */
+  --ink: var(--d1);       /* primary border, dark text */
+  --shade: var(--d2);     /* mid-dark bg, dim text */
+  --moss: var(--l1);      /* mid-light bg */
+  --canvas: var(--l2);    /* light page bg */
+  --paper: var(--white);  /* hi-contrast text on dark */
+  --accent: var(--amber);
+  --success: var(--green-glow);
+  --danger: var(--crimson);
+
+  /* ── Danger family (Step 25 — replaces 3 hardcoded hexes) ── */
+  --danger-bg: #4a1c1c;
+  --danger-border: #6b2c2c;
+  --danger-fg: #e8a0a0;
+
+  /* ── Borders ── */
+  --border: 3px solid var(--ink);
+  --border-thin: 2px solid var(--ink);
+  --border-double: 4px double var(--ink);
+
+  /* ── Spacing scale (Step 25 — 8 steps, 2-px grid) ── */
+  --s-1: 4px;
+  --s-2: 6px;
+  --s-3: 8px;
+  --s-4: 10px;
+  --s-5: 12px;
+  --s-6: 14px;
+  --s-7: 16px;
+  --s-8: 22px;
+
+  /* ── Type scale (Step 25 — 7 steps) ── */
+  --t-micro: 7px;
+  --t-xs: 8px;
+  --t-sm: 9px;
+  --t-md: 10px;
+  --t-body: 11px;
+  --t-lg: 13px;
+  --t-xl: 16px;
+
+  /* ── Letter-spacing scale ── */
+  --ls-tight: 0.5px;
+  --ls-default: 1px;
+  --ls-wide: 0.1em;
+
+  /* ── Line-height scale ── */
+  --lh-tight: 1;
+  --lh-snug: 1.4;
+  --lh-body: 1.6;
 }
 
 /* Team-builder save-status colors. Class set by team_builder_controller.js
@@ -175,9 +220,9 @@ body::after {
 }
 
 .gb-flash-alert {
-  background: #4a1c1c;
-  color: #e8a0a0;
-  border-color: #6b2c2c;
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+  border-color: var(--danger-border);
 }
 
 .gb-flash-notice {
@@ -758,7 +803,7 @@ body::after {
   transition: all 0.05s;
   background: var(--l1);
   color: var(--d1);
-  letter-spacing: 0.03em;
+  letter-spacing: var(--ls-tight);
   line-height: 1.4;
 }
 
@@ -776,7 +821,7 @@ body::after {
   transition: all 0.05s;
   background: var(--d1);
   color: var(--l2);
-  letter-spacing: 0.03em;
+  letter-spacing: var(--ls-tight);
   line-height: 1.4;
 }
 
@@ -789,17 +834,17 @@ body::after {
   font-family: 'Press Start 2P', monospace;
   font-size: 11px;
   padding: 8px 14px;
-  border: 2px solid #6b2c2c;
+  border: 2px solid var(--danger-border);
   cursor: pointer;
   transition: all 0.05s;
-  background: #4a1c1c;
-  color: #e8a0a0;
-  letter-spacing: 0.03em;
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+  letter-spacing: var(--ls-tight);
   line-height: 1.4;
 }
 
 .gb-btn-danger:hover {
-  background: #6b2c2c;
+  background: var(--danger-border);
   color: #f0c0c0;
 }
 
@@ -918,9 +963,9 @@ body::after {
 
 /* ── Status indicators ── */
 .gb-status-dead {
-  background: #4a1c1c;
-  border-color: #6b2c2c;
-  color: #e8a0a0;
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger-fg);
 }
 
 .gb-status-caught {
@@ -1114,7 +1159,7 @@ body::after {
   margin-left: auto;
   background: var(--amber); color: var(--d0);
   border: 2px solid var(--d0);
-  padding: 6px 12px; cursor: pointer;
+  padding: var(--s-3) var(--s-5); cursor: pointer;
   font-family: 'Press Start 2P', monospace;
   font-size: 9px; letter-spacing: 1px;
   animation: subtleBlink 2.4s ease-in-out infinite;
@@ -1500,7 +1545,7 @@ body::after {
   font-family: 'Press Start 2P', monospace;
   font-size: 8px; color: var(--green-glow);
   border: 1px solid var(--green-glow);
-  padding: 2px 5px; letter-spacing: 1px;
+  padding: var(--s-1) var(--s-2); letter-spacing: 1px;
 }
 .map-r4 .group-card.dead .head .pill {
   color: var(--crimson); border-color: var(--crimson);
@@ -1636,7 +1681,7 @@ body::after {
 .pc-box-r2 .badge-legend .badge {
   font-family: 'Press Start 2P', monospace;
   font-size: 8px;
-  padding: 2px 5px;
+  padding: var(--s-1) var(--s-2);
   letter-spacing: 1px;
   border: 1px solid;
   flex-shrink: 0;
@@ -1897,7 +1942,7 @@ body::after {
 .state-pill {
   font-family: 'Press Start 2P', monospace;
   font-size: 7px;
-  padding: 2px 5px;
+  padding: var(--s-1) var(--s-2);
   letter-spacing: 1px;
   border: 1px solid;
 }
@@ -2076,7 +2121,7 @@ body::after {
   display: inline-block;
   background: var(--amber); color: var(--d0);
   font-family: 'Press Start 2P', monospace; font-size: 7px;
-  padding: 2px 5px; letter-spacing: 1px;
+  padding: var(--s-1) var(--s-2); letter-spacing: 1px;
   margin-left: 4px;
 }
 
@@ -2425,7 +2470,7 @@ body::after {
   margin-top: 10px; width: 100%;
   background: var(--amber); color: var(--d0);
   border: 2px solid var(--d0);
-  padding: 8px;
+  padding: var(--s-3) var(--s-5);
   font-family: 'Press Start 2P', monospace;
   font-size: 9px; letter-spacing: 1px;
   cursor: pointer;

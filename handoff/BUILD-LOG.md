@@ -11,7 +11,33 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Active step:** Step 24 — R1 Dashboard restructure (Phase 2 R1 of the 2026-05-04 audit; closes Phase 2). Locked mockup `handoff/2026-05-04-ui-audit-mockup-dashboard.html`, 6 screens (desktop 3-col · right-rail PARTY view · tablet 2-col · phone single col + scrollable tab strip · run-pill open · ARIA spec sheet). Direct build per BUILDER.md Pt. 4 ("brief locked + unambiguous → may build directly without writing a Builder Plan section, unless ambiguity hits"):
+**Active step:** Step 25 — Site-wide design canon adoption. Mechanical CSS normalization only — single file edit (`app/assets/stylesheets/pixeldex.css`) plus one new test file. No view / controller / model / service / config / migration touched. Six self-contained slices per `handoff/ARCHITECT-BRIEF.md`:
+- **Slice 1 — Tokens:** Replaced the `:root` block (lines 5-21) with the canon-aligned version. Added 30+ new tokens (semantic aliases `--shadow/--ink/--shade/--moss/--canvas/--paper/--accent/--success/--danger`, danger family `--danger-bg/--danger-border/--danger-fg`, spacing scale `--s-1` through `--s-8`, type scale `--t-micro` through `--t-xl`, letter-spacing scale `--ls-tight/--ls-default/--ls-wide`, line-height scale `--lh-tight/--lh-snug/--lh-body`). Kept every existing token (`--d0/--d1/--d2/--l1/--l2/--white/--amber/--green-glow/--crimson`); semantic aliases point at them. `--border` / `--border-thin` / `--border-double` rewritten to use `var(--ink)` (still resolves to `--d1` — value-stable).
+- **Slice 2 — Danger tokens:** Three sites swapped from hardcoded hex (`#4a1c1c` / `#6b2c2c` / `#e8a0a0`) to `var(--danger-*)`: `.gb-flash-alert` (lines ~178-181), `.gb-btn-danger` block + only the `:hover` `background: #6b2c2c` (lines ~792-803; the `#f0c0c0` hover `color` stays inline as documented in audit Section 1), `.gb-status-dead` (lines ~921-924). Out-of-scope sites untouched: `.team-builder-status--error #e8a0a0` (single-use error text), `.map-r4` namespaced redesign blocks (`.node.dead .glyph` / `.acc-row .glyph.dead` / `.node-legend .glyph.dead`), `.pc-box-r2 .box-cell.dead #2a1a1a/#4a1c1c` (extra-dark variant).
+- **Slice 3 — Pill paddings:** Snapped 4 sites of `padding: 2px 5px` → `padding: var(--s-1) var(--s-2)` (= `2px 6px`): `.state-pill` (~line 1900), `.hof-pill` (~line 2079), `.map-r4 .group-card .head .pill` (~line 1503), `.pc-box-r2 .badge-legend .badge` (~line 1639). Post-edit grep confirms 0 remaining `padding: 2px 5px` lines in the file.
+- **Slice 4 — Amber CTA paddings:** Unified two amber-CTA paddings to `padding: var(--s-3) var(--s-5)` (= `8px 12px`). `.dash-r1 .next-battle .draft-cta` (was `8px`, gains 4px horizontal) and `.map-r4 .status-bar .jump-btn` (was `6px 12px`, gains 2px vertical). The visual delta is minor; both are "small CTAs in a narrow strip".
+- **Slice 5 — Letter-spacing tokens:** Converted `letter-spacing: 0.03em` → `var(--ls-tight)` on the 3 `.gb-btn*` sites enumerated in the brief: `.gb-btn` (line 761), `.gb-btn-primary` (line 779), `.gb-btn-danger` (line 797 — done in the same edit as Slice 2). Per brief Definition of Done ("`0.03em` → `var(--ls-tight)` on `.gb-btn*`"), the 2 non-button uses (`.team-name` line ~383, `.box-cell-name` line ~477) are explicitly out of scope and remain unchanged. Audit's "all on `.gb-btn*` classes" gloss + DoD scope match.
+- **Slice 6 — Smoke test:** New `test/integration/design_canon_test.rb` (5 assertions, 5 passes): asserts `--accent: var(--amber)` aliased in `:root`, asserts `--danger-bg/--danger-border/--danger-fg` declared, asserts spacing scale `--s-1`..`--s-8` declared, asserts `.gb-flash-alert/.gb-btn-danger/.gb-status-dead` blocks reference `var(--danger-*)`, asserts `design_canon.md` exists and references the locked semantic aliases.
+
+**Test count:** 777 → **782** (+5). 0 failures, 0 errors.
+**Lint:** rubocop clean (203 files, 0 offenses).
+**Brakeman:** Clean (same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess unchanged from Steps 18/19/20/21/22/23/24).
+**Migrations:** None. **Zero new gem deps. Zero new model / service / controller / view / config code.** This is a pure-CSS normalization step.
+
+**Pre-existing context:** Step 25 follows the design canon audit shipped pre-step by Architect (`handoff/2026-05-06-design-canon-audit.md` + `app/assets/stylesheets/design_canon.md`, both locked). Step 24 (R1 Dashboard) shipped at `4923876` on `main` (Phase 2 closed). Step 25 is the first step after Phase 2 — it normalizes shared surfaces against the locked canon without rewriting any redesign.
+
+**Step 25 highlights / decisions:**
+- **Brief is the source of truth on letter-spacing scope.** The brief enumerates 3 `.gb-btn*` sites and parenthetically allows for a 4th `.gb-btn*` site. The audit's "0.03em (~5 uses, all on buttons)" was slightly off — there are 5 total `0.03em` sites but only 3 are on `.gb-btn*` (the other 2 are `.team-name` and `.box-cell-name`, which are text labels not buttons). Definition of Done says "0.03em → var(--ls-tight) on .gb-btn*" — converted only the 3 button sites. Per "Do not improvise. Do not expand scope" rule, the 2 non-button sites are left for a future canon iteration.
+- **`.gb-btn-danger` letter-spacing was folded into the Slice 2 edit** because the same selector block changes both the danger hexes (Slice 2) and the letter-spacing (Slice 5). One edit instead of two — value-equivalent.
+- **Post-edit grep verification:** `padding: 2px 5px` → 0 matches (was 4); `letter-spacing: 0.03em` → 2 matches remaining (`.team-name`, `.box-cell-name` — out of scope per DoD); `#4a1c1c/#6b2c2c/#e8a0a0` remain only in the token definitions (`:root`) and on the explicitly out-of-scope sites (`.team-builder-status--error`, `.map-r4` namespaced blocks, `.pc-box-r2 .box-cell.dead`).
+- **Reference docs unchanged.** `handoff/2026-05-06-design-canon-audit.md` and `app/assets/stylesheets/design_canon.md` are Architect-locked source of truth — Bob did not edit them.
+
+---
+
+## Step 24 — Status archive
+*Kept here for one-step lookback; will fold into archive at session end.*
+
+**Step 24:** R1 Dashboard restructure (Phase 2 R1 of the 2026-05-04 audit; closes Phase 2). Locked mockup `handoff/2026-05-04-ui-audit-mockup-dashboard.html`, 6 screens (desktop 3-col · right-rail PARTY view · tablet 2-col · phone single col + scrollable tab strip · run-pill open · ARIA spec sheet). Direct build per BUILDER.md Pt. 4 ("brief locked + unambiguous → may build directly without writing a Builder Plan section, unless ambiguity hits"):
 - Wrapping div `.dash-r1` namespaces every new selector under `.dash-r1 …` so existing dashboard surfaces (left party panel, MAP main-tab `_map_content.html.erb`, GYMS main-tab) are untouched. `data-controller="dashboard pixeldex run-management"` is hoisted to the dashboard root so the title-bar's `+ START NEW RUN` button can reach `run-management#startRun` without spawning a second ActionCable subscription. Window-level `keydown@window->pixeldex#numericJump` registers the 1-7 jump action globally.
 - View `app/views/dashboard/_title_bar.html.erb` full rewrite: 36×36 amber title-glyph (player initials, falls back to "PC") + 2-line title block (`<player>'s PC` + `PLATINUM · SOUL LINK`) + run-pill (`<button class="run-pill">RUN #N <span class="badge">ACTIVE</span> <span class="chev">▾</span></button>`) replacing the legacy `<select onchange="window.location.href = …">` per audit annotation C. Right side: single inline stat strip (`CAUGHT N · ALIVE N · DEAD N · BADGES N/8`) with `·` separators. Run-pill dropdown renders all runs as `<a href="/?run_id=N" role="option">` (works without JS); the new `run-picker` Stimulus controller adds toggle + keyboard nav + outside-click close + ESC.
 - View `app/views/dashboard/_tab_bar.html.erb` full rewrite: real WAI-ARIA tablist (`<div role="tablist" aria-label="Dashboard sections">` + per-tab `<button role="tab" id="tab-<key>" aria-controls="panel-<key>" aria-selected aria-tabindex>`). 2-line vertical tab buttons (icon top + label bottom). Active tab `tabindex="0"`, others `-1` per WAI-ARIA. Live-update green dots: PC BOX when `@auto_detected_catches.any?`; GYMS when `@active_draft.present?`. Tab-bar binds `keydown->pixeldex#tablistKeydown` for ←/→/Home/End focus+activate.
@@ -50,29 +76,32 @@ reset until the gap is addressed or the decision is replaced.
 
 ---
 
-## Step 23 — Status archive
-*Kept here for one-step lookback; will fold into archive at session end.*
-
-**Step 23:** R4 Map redesign (Phase 2 R4 of the 2026-05-04 audit). Locked mockup `handoff/2026-05-04-ui-audit-mockup-map.html`, 4 screens. Six buckets per Bob's plan + Ava's six question-by-question answers:
-- Wrapping div `.map-r4` namespaces every new selector. `data-controller="timeline dashboard pixeldex"` triple-attached so the dashboard's `_pokemon_modal` and `_mark_dead_modal` partials work without bespoke wiring.
-- View `app/views/map/show.html.erb` full body rewrite: `.map-head` + `.status-bar` + `.node-legend` + `.layout` grid (`.timeline-frame` desktop / `.accordion-frame` mobile + `.special-bar`; right = sticky `.sheet`). Pulse-ring + `↓ NOW` pin on next-uncaught route. Segment dividers between segments; final divider = "ELITE FOUR".
-- New section `/* ── R4 Map ── */` in `pixeldex.css` (~545 lines, namespaced). New `@media (max-width: 720px)` block (timeline → accordion swap + sheet de-stickifies + layout collapses). Existing `@media (max-width: 520px)` extended (`.map-r4 .special-grid` reflows to 2 columns). **Zero new design tokens.**
-- `app/helpers/map_helper.rb` extended with five Step 23 helpers: `next_uncaught_route_key`, `current_segment_label`, `segment_divider_label`, `segment_progress`, `segment_open_by_default?`, plus `node_status_class`. `groups_json_for(groups, current_user_id)` extended additively per Ava Q1.
-- `app/javascript/controllers/timeline_controller.js` extended (not replaced). Targets renamed `panel*` → `sheet*`, `backdrop` removed, new targets `emptyState` / `groupList` / `jumpBtn` / `accordionSegment`. New actions `jumpToNow` + `showCatchFormForCurrent`. URL hash `#route=<key>` synced via `connect()` → `applyHashRoute()` and `selectLocation` writes (`history.replaceState`).
-- Modal partials rendered at the bottom: `<%= render "dashboard/pokemon_modal" %>` + `<%= render "dashboard/mark_dead_modal" %>`.
-
-**Reviewed by Richard:** 0 Must Fix, 2 Should Fix (both fixed inline), 1 Escalate (resolved by Ava — fixed inline alongside Should Fix #1). Awaiting Ava's deploy gate.
-
-**Test count:** 712 → 754 (+42). 0 failures, 0 errors.
-**Lint:** rubocop clean (201 files). **Brakeman:** Clean (same 2 pre-existing weak-confidence warnings).
-**Migrations:** None. **Zero new gem deps. Zero new design tokens. Zero controller/model/service changes.**
-
-**Shipped:** Step 23 committed at `c29f74e` on branch `claude/sad-haslett-33d407`. Worktree-only — not yet FF-merged to `origin/main` (Phase 2 closes after Step 24 ships).
-
----
-
 ## Step History
 *Session-scoped.*
+
+### Step 25 — Site-wide design canon adoption — 2026-05-06
+**Status:** Bob shipped to Reviewer; awaiting Richard's review. **No KGs close**, **0 KGs open**.
+
+Mechanical CSS-only normalization step. One file edit (`app/assets/stylesheets/pixeldex.css`) + one new test file (`test/integration/design_canon_test.rb`). Architect-locked source of truth: `handoff/2026-05-06-design-canon-audit.md` (audit + rationale) + `app/assets/stylesheets/design_canon.md` (locked canon). Six tight slices per the brief:
+
+**Slice 1 — `:root` block extended (lines 5-21 → lines 5-72):** Added 30+ semantic-alias / scale tokens (`--shadow/--ink/--shade/--moss/--canvas/--paper/--accent/--success/--danger`, `--danger-bg/--danger-border/--danger-fg`, `--s-1`..`--s-8`, `--t-micro`..`--t-xl`, `--ls-tight/--ls-default/--ls-wide`, `--lh-tight/--lh-snug/--lh-body`). Existing tokens `--d0/--d1/--d2/--l1/--l2/--white/--amber/--green-glow/--crimson` preserved verbatim — they remain the source of truth; semantic aliases point at them. `--border` family rewritten to use `var(--ink)` (still resolves to `--d1` — value-stable).
+
+**Slice 2 — Danger tokens replace 9 hex values:** `.gb-flash-alert` (3 swaps), `.gb-btn-danger` block (3 swaps + 1 `:hover` background, the `#f0c0c0` hover color stays inline), `.gb-status-dead` (3 swaps).
+
+**Slice 3 — Pill paddings snapped:** 4 sites of `padding: 2px 5px` → `padding: var(--s-1) var(--s-2)` (= `2px 6px`). Sites: `.state-pill`, `.hof-pill`, `.map-r4 .group-card .head .pill`, `.pc-box-r2 .badge-legend .badge`. Post-edit grep confirms 0 remaining matches.
+
+**Slice 4 — Amber CTA paddings unified:** `.dash-r1 .next-battle .draft-cta` (`8px` → `var(--s-3) var(--s-5)` = `8px 12px`) + `.map-r4 .status-bar .jump-btn` (`6px 12px` → same token). Visual delta minor; both share the "small CTA in a narrow strip" role.
+
+**Slice 5 — Letter-spacing tokens:** Converted `letter-spacing: 0.03em` → `var(--ls-tight)` on the 3 `.gb-btn*` sites (`.gb-btn` line 761, `.gb-btn-primary` line 779, `.gb-btn-danger` line 797 — that one folded into the Slice 2 edit). Per Definition of Done ("on `.gb-btn*`"), the 2 non-button uses (`.team-name`, `.box-cell-name`) stayed unchanged.
+
+**Slice 6 — Smoke test:** New `test/integration/design_canon_test.rb` (5 assertions, 5 passes): `--accent` aliased, danger family declared, spacing scale declared, danger-family blocks reference `var(--danger-*)`, `design_canon.md` references the locked tokens.
+
+**Test count:** 777 → **782** (+5 from new `design_canon_test.rb`). 0 failures, 0 errors.
+**Lint:** rubocop clean (203 files, 0 offenses).
+**Brakeman:** Clean (same 2 pre-existing weak-confidence warnings unchanged).
+**Migrations:** None. **Zero view files touched. Zero controller files touched. Zero model files touched. Zero config files touched. Zero migrations.** Only `pixeldex.css` (modified) + `design_canon_test.rb` (added).
+
+---
 
 ### Step 24 — R1 Dashboard restructure (Phase 2 R1 of the 2026-05-04 audit; closes Phase 2) — 2026-05-05
 **Status:** Shipped on branch `claude/sad-haslett-33d407` — FF-merged to `origin/main` and pushed. **Phase 2 closes.** **No KGs close**, **1 KG opens** (KG-39 — see § Known Gaps).
