@@ -11,7 +11,7 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Step 28 review cleared (0 Must Fix / 0 Should Fix / 0 Escalate). Architect committing ship now.** Visual rebuild of the dashboard against `designs/04-pixeldex.html` on branch `claude/confident-kare-0d3dab`; ready to FF-merge to `origin/main` and push. Test count 782 → 783 (+1 new Step 28 assertion). Rubocop clean; Brakeman zero delta on touched files.
+**Step 28 shipped on branch `claude/confident-kare-0d3dab` at `afb39f4`, FF-merged to `origin/main`, and pushed.** Visual rebuild of the dashboard against `designs/04-pixeldex.html` (the canonical source). Functional behavior preserved verbatim from Steps 20–27. Test count 782 → 783. Rubocop clean; Brakeman zero delta on touched files. Awaiting next brief from the Project Owner.
 
 ---
 
@@ -76,7 +76,7 @@ reset until the gap is addressed or the decision is replaced.
 *Session-scoped.*
 
 ### Step 28 — Rebuild the dashboard against `designs/04-pixeldex.html` — 2026-05-06
-**Status:** Built on branch `claude/confident-kare-0d3dab`; Richard cleared 0 / 0 / 0 (Must Fix / Should Fix / Escalate); ready to ship pending Architect commit + FF-merge + push. **No KGs close, 0 KGs open.**
+**Status:** Shipped on branch `claude/confident-kare-0d3dab` at `afb39f4`; FF-merged to `origin/main` and pushed. Richard cleared 0 / 0 / 0 (Must Fix / Should Fix / Escalate). **No KGs close, 0 KGs open.**
 
 Visual rebuild of the dashboard surface against the canonical PixelDex source spec (`designs/04-pixeldex.html`) — the source-of-truth file from which the project's `:root` palette was originally derived. Functional behaviour preserved verbatim from Steps 20–27; backend / controllers / models / Stimulus targets untouched. Out-of-scope partials (`_pc_box_content`, `_map_content`, `_save_slots_sidebar`) untouched. All work happens inside the existing `.dash-r1` namespace block in `pixeldex.css` plus mechanical class-rename / wrapper-restructure edits in 4 ERB views.
 
