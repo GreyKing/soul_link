@@ -4,4 +4,4 @@
 
 ---
 
-*Awaiting next brief from the Project Owner. Step 28 (Rebuild the dashboard against `designs/04-pixeldex.html` as the canonical reference) shipped, FF-merged to `origin/main` at `afb39f4`, and pushed. See `handoff/SESSION-CHECKPOINT.md` for state.*
+*Architect-only documentation task in progress. No Bob, no Richard. Producing `docs/save_file_encoding.md` — a comprehensive reference consolidating SRAM-parsing knowledge from Steps 11-19 (KG-6, KG-11, KG-12, KG-13, KG-14, KG-21, KG-24). Commits direct to main, no FF-merge needed.*
