@@ -79,6 +79,15 @@ class DashboardRedesignTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "each dashboard tab cell uses the canonical .tab-item class (Step 28 PixelDex source spec)" do
+    get root_path
+    assert_response :success
+    %w[party pcbox map gyms strategy runs calc].each do |key|
+      assert_match(/<button[^>]*class="tab-item(?: active)?"[^>]*id="tab-#{key}"/m, response.body,
+        "expected tab cell #{key} to use .tab-item class")
+    end
+  end
+
   test "the active tab has aria-selected=true and tabindex=0; others have aria-selected=false and tabindex=-1" do
     get root_path
     assert_response :success

@@ -1,4 +1,4 @@
-# Review Feedback — Step 27
+# Review Feedback — Step 28
 Date: 2026-05-06
 Ready for Builder: YES
 
@@ -6,65 +6,88 @@ Ready for Builder: YES
 None.
 
 ## Should Fix
-None blocking. Two cleanup items Bob already flagged in REVIEW-REQUEST § Notes — both are acceptable as conservative-build "leave-it" calls for this step. Logging here so they don't get lost:
-
-- `app/assets/stylesheets/pixeldex.css:2477-2483` — `@keyframes pulseNext` is retained as a defensive no-op. I grepped `app/` and `test/` for any `animation: pulseNext` consumer and found zero (only doc-prose mentions in `design_canon.md`, which list it as a banned animation). Since the keyframes block is genuinely orphaned, a future cleanup pass can safely delete it. Not a blocker for Step 27 — leaving it shipping as-is is the cheaper call.
-- `app/views/dashboard/_pc_box_content.html.erb:114-124` — Per-row badge modifier classes (`first` / `trade` / `event` / `offfeed`) remain in the markup with no CSS targeting them. Inert; no visual difference. Acceptable as harmless markup hooks; a future cleanup can remove them when nothing else needs the affordance.
+None.
 
 ## Escalate to Architect
 None.
 
 ## Cleared
 
-Reviewed Step 27 — pure visual restyle of the four Phase-2 redesigned surfaces (R3 Save Slots, R2 PC Box review tray, R4 Map timeline, R1 Dashboard) to the legacy `gb-*` idiom that `/species` and `/teams` still speak.
+Step 28 — dashboard visual rebuild against `designs/04-pixeldex.html` — is clear.
 
-**Aesthetic consistency** — the four surfaces now use the canon primitives uniformly:
+Spot-checked all seven directives against the diff:
 
-- `gb-card-dark` shape (3 px ink border, 12 px padding, `--d2` bg) on `.review-tray` (`pixeldex.css:1636-1641`), `.slot` (`1919-1925`), `.player-card` (`2399-2403`).
-- `gb-btn` family (light bg, 2 px ink border, 10 px font, 4×8 padding) on `.filter-chip` (`1761-1770`), `.review-row .actions button` (`1726-1736`), `.slot-actions button` (`1970-1982`), `.run-pill` (`2192-2203`), `.sheet-head .close` (`1395-1403`).
-- `gb-btn-primary` (`--d1` bg, `--l2` text, 2 px ink border) on `.next-battle .draft-cta` (`2504-2514`), `.map-r4 .submit-btn` (`1489-1500`), `.map-r4 .status-bar .jump-btn` (`1166-1175`). All static, no `subtleBlink`, no filter-brightness hover.
-- `gb-page-title` + `gb-page-subtitle` form on `.map-head` (`1107-1119`) and `.dash-r1 .title-bar` (`2168-2183`). No boxed background; no title-glyph.
-- `.tab-bar` rebased to canonical horizontal-strip shape (`2292-2321`): single-line label, 13 px font, `--d2` → `--d1` bg-swap on active, no underline.
-- Accent color is now reserved for functional state markers only — `.state-pill.target/.active`, `.player-card.you` border, `.node.next .glyph` 3 px border, `.review-row.first` 3 px border, `.box-cell.team` border, `.gym-list .gym-row.next .num` border, `.badge-strip .badge.earned`. Decorative accent appearances all removed.
-- All animations dropped: `pulseNext` (3 consumer rules removed), `subtleBlink` (consumer + keyframes removed), gradient-fade overlays on `.timeline-frame`, hover `translateY` on nodes / cells / chips, box-shadow glows on now-pin and badge-dots.
+- **D1 title-bar / stat-strip / run-pill** — `.title-bar` rebuilt as `--d2` band
+  with flex space-between, ink border-bottom, 10/20 padding, `flex-shrink: 0`,
+  no `margin-bottom` (pixeldex.css L2170–2179). `.title-right` flex group added
+  (L2184–2186). `.stat-strip` rebuilt with `display: flex; gap: 16px;` plus
+  `flex-direction: column-reverse` per `.item` to render value-on-top
+  label-below without DOM change (L2291–2306). Run-pill rebased to
+  transparent / `--l2` text / 2 px `--l1` underline (L2204–2222), hover wash
+  rgba(155, 188, 15, 0.15) per spec.
+- **D2 tab-bar rename** — `.tab` → `.tab-item` and `.icon` → `.tab-icon` in
+  `_tab_bar.html.erb` L31 / L40. CSS rules renamed in `.dash-r1` block
+  (L2319–2343); `.tab-icon` is `display: block; font-size: 20px;
+  margin-bottom: 4px; line-height: 1;` for the block-above stack form.
+- **D3 pc-layout shared-frame** — `gap: 0`, `margin-top: 0`,
+  `background: var(--l2)`, ink border-right per child, `:last-child` drops it
+  (L2352–2367). Inset overlay correctly skipped — verified `body::after` at
+  L113–126 is `position: fixed; inset: 0` covering the full viewport.
+- **D4 status-rail flatten + horizontal sub-tabs** — `.status-rail` now
+  `background: transparent; border: none; padding: 0;` (L2374–2378).
+  `.side-tabs` rebuilt as horizontal mini tab-bar with `--d1` bg + ink
+  border-bottom (L2379–2385). `.side-tab` rebuilt as `.tab-item`-sibling cell,
+  active state swaps to `--d1` bg + `--l2` text (L2386–2403). Legacy
+  `.h3-row` / `h3` / `.count` rules deleted, replaced by canonical `:root`
+  level `.panel-header` (L349–366).
+- **D5 right-rail cards** — `.player-card` light-card form
+  (`--l1` bg + 2 px ink border + `--d1` text, sprite-cell on `--l2` bg with
+  2 px ink border) per L2413–2449. `.gym-row` rebased to single-line flex
+  with solid `--d2` divider, glyph slot in `.num` (L2456–2495).
+  `.gym-row.next` filled-bar with -6px horizontal margin (L2488–2495).
+  `.gym-row.upcoming` uses `opacity: 0.35`. `.next-battle` rebased to
+  `.route-card` light-card skin (L2509–2546); `.draft-cta` keeps the
+  `gb-btn-primary` form per spec.
+- **D6 `_status_rail.html.erb` markup** — three `.h3-row` blocks rewritten
+  to `.panel-header` / `.panel-header-sub` (L64–67, L119–122, L193–196).
+  Three `.panel-body` wrappers added (L69, L124, L198). All ARIA targets
+  intact. Gym glyph emitted in ERB per D5: ★ / ▶ / · (L141–148, L151).
+- **D7 `show.html.erb`** — `.col-party` wrapper dropped; `_party_panel`
+  rendered directly inside `.pc-layout` (L39). Verified `_party_panel`
+  provides its own `<div class="panel">` shell so the partial participates
+  in the 3-col grid. Responsive 900 px rule rewritten to target
+  `> .panel:first-child` (L2585).
 
-The dialect now reads as the same family as `/species` + `/teams`. Subjective check passes.
+WAI-ARIA preservation verified end-to-end: every `role="tab"`,
+`aria-selected`, `aria-controls`, `tabindex`, `keydown->pixeldex#tablistKeydown`,
+`keydown->status-rail#keydown`, `data-pixeldex-target="tabButton"`,
+`data-status-rail-target="tabButton"`, `data-action`, `data-tab` /
+`data-status-rail-tab-param` is present in `_tab_bar.html.erb` and
+`_status_rail.html.erb`. Window-level `numericJump` binding intact on
+`show.html.erb` L15.
 
-**Functional preservation** — verified by grep against the cited line ranges:
+Step 25 token canon and Step 26 accent rebase preserved — `--accent` rule on
+`.dash-r1 .player-card.you` (L2419–2421) and `.dash-r1 .gym-row.beaten .name`
+(L2480) both retained.
 
-- Save Slots — `data-save-slots-target="banner"` (`_save_slots_sidebar.html.erb:32`), `slot` (`:50`), `slotPill` (`:56`), `cancelOverwrite` action (`:34`). TARGET / DELETE / CLEAR-ALL flows unbroken.
-- PC Box — `data-controller="pc-box-filter review-tray"` chain preserved. `data-pc-box-filter-target="chip"` on each filter-chip; `data-review-tray-target="count"` on the review-tray count span (`_pc_box_content.html.erb:71`); `data-review-tray-target="row"` per row (`:101`); `click->dashboard#openCatchModal click->review-tray#prefillCatch` action chain order preserved (`:137`); `click->review-tray#dismiss` on every SKIP (`:151`). The dismiss handler's `${remaining} NEW` write into the count span still works because Bob kept the count span containing both number and " NEW" text (Bob caught this trap in his § Notes; my own grep confirms the structure matches).
-- Map — every `data-timeline-target=*` cited in REVIEW-REQUEST present in `map/show.html.erb`: `jumpBtn` (:89), `track` / `scrollContainer` / `locationNode` (:98-99, 122, 226, 273), `accordionSegment` (:209), `sheet` / `sheetTitle` / `sheetBody` / `emptyState` / `groupList` / `sheetForm` / `formLocationKey` / `speciesPreview` / `speciesHidden` / `speciesDropdown` / `nicknameInput` / `formStatus` / `speciesSearchWrapper` (:296-…). 720 px breakpoint accordion swap unchanged. `node-now-pin` is now static but still rendered.
-- Dashboard — full WAI-ARIA tablist preserved on the main tab-bar (`_tab_bar.html.erb:34-41` carries `role="tab"`, `aria-controls`, `aria-selected`, `tabindex` on every tab; `data-action="keydown->pixeldex#tablistKeydown"` on the wrapper at :30). `data-pixeldex-target="tabButton"` per tab. Status-rail sub-tabs: 3 `data-status-rail-target="tabButton"` + 3 `data-status-rail-target="tabPanel"` (`_status_rail.html.erb:22, 34, 46, 62, 117, 178`). `data-controller="run-picker"` + `trigger` / `menu` / `option` targets on the rebased run-pill (`_title_bar.html.erb:32-40, 45-48, 73, 91`).
+CSS scope-locked: every diff hunk falls inside lines 2160–2606 of
+`pixeldex.css`, all within the `.dash-r1` namespace block. The `:root`
+palette, canonical primitives (1–520), `.pc-box-r2`, `.map-r4`, and `.gb-*`
+namespaces untouched.
 
-**Drift check** — Bob's 6 confirmed exceptions in REVIEW-REQUEST § Notes evaluated:
+Step 28 assertion (L82–89 in `dashboard_redesign_test.rb`) correctly targets
+the main dashboard tab cells via `id="tab-#{key}"` selector — the regex won't
+collide with the status-rail's `status-tab-` ids. The seven keys cover every
+tab in the bar.
 
-1. `@keyframes pulseNext` kept as no-op — defensive, harmless. Acceptable.
-2. `@keyframes subtleBlink` deleted — only consumer (`.jump-btn`) had its `animation:` directive removed in this step, so deletion is correct. Helpful.
-3. Per-row badge modifier classes left in markup — inert (CSS rules under `.pc-box-r2 .badge.first/.trade/.event/.offfeed` confirmed gone via grep). Harmless.
-4. `.run-pill .chev` color now inherits from button — consistent with the pill text color. Helpful.
-5. `.next-battle .label` accent → `--l1` — within audit § 3.1 dim-label idiom; consistent with the rest of the rebased status-rail. Helpful.
-6. `.map-r4 .submit-btn.danger` migrated from raw `--crimson`/`--white` to danger-family tokens (`--danger-bg` / `--danger-border` / `--danger-fg`) — aligns with canon § 4 danger-button shape. Helpful.
+`responsive_grids_test.rb` updates (L153 col-party → first-child, L164–172
+tab → tab-item) are necessary stale-assertion follow-ups to D7 / D2 — same
+intent, new selector form. Same pattern as Step 27's test updates.
 
-None expand scope.
+Test status verified locally: `bin/rails test` reports 783 runs, 2644
+assertions, 0 failures, 0 errors, 0 skips. Rubocop: 203 files, 0 offenses.
+Brakeman: 2 weak-confidence warnings on Step-28-untouched files
+(`emulator_controller.rb:79`, `gym_schedule_discord_update_job.rb:14`) — zero
+delta.
 
-**Test changes** — 5 markup-shape assertion updates, all shape-only:
-
-- `dashboard_redesign_test.rb:60-64` — drops `.alive` / `.dead` / `.badges` modifier classes from regex; values still asserted. Behavior contract unchanged.
-- `dashboard_redesign_test.rb:117, 138` — replaces `<span class="badge-dot">` with `<span aria-label="Updates available">*</span>`. Same a11y contract; only the chrome shape changed.
-- `dashboard_redesign_test.rb:128` — refute case for the no-marker scenario; semantic equivalent of the old refutation.
-- `dashboard_redesign_test.rb:215` — drops the `<span class="you-pill">YOU</span>` text assertion; keeps the `.player-card you` count check (the load-bearing affordance per canon § 11.3).
-- `pc_box_redesign_test.rb:43-46` — drops per-kind modifier classes from legend-badge regex; asserts `<span class="badge">LABEL</span>` instead. Information now lives in the label per canon § 5 ghost-pill rule.
-- `map_redesign_test.rb:40-46` — replaces boxed `.node-legend` div assertions with checks that all 5 glyphs (●/☠/○/★/G) appear in the `.map-head .sub` subtitle line. Same coverage; new container.
-
-None weaken behavior. Step 25 `design_canon_test.rb` confirmed unmodified since Step 26 (`git log 3b05a80..HEAD -- test/integration/design_canon_test.rb` returns no commits).
-
-**Standards** — Bob reports rubocop clean (`203 files inspected, no offenses detected`). Brakeman delta = 0 on Step-27-touched files; the same 2 weak warnings on `emulator_controller.rb:79` and `gym_schedule_discord_update_job.rb:14` are pre-existing on out-of-scope files.
-
-**Test suite** — 782 runs, 2629 assertions, 0 failures, 0 errors, 0 skips. The +20 assertion delta is the mechanical regex-shape change in the stat-strip test (4× `<div class="item">` regex instead of 3 distinct modifier-class regexes). No behavioral test was weakened.
-
-**Scope discipline** — `git diff --stat HEAD` shows 14 files changed, matching REVIEW-REQUEST exactly (1 CSS, 5 ERB views, 3 test files, 1 architect-authored canon doc, 4 handoff docs). No off-scope code touched.
-
-**Manual visual smoke** — deferred to interactive run by the user. Bob can't render the browser; this is a CSS-first restyle so all behavior tests pass, but the subjective "does it read as the same dialect as `/species` + `/teams`" call belongs to the user looking at the rendered surfaces.
-
-Step 27 is clear. 0 Must Fix / 0 Should Fix-blocking / 0 Escalate.
+Step 28 is clear.

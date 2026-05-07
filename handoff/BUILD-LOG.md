@@ -11,7 +11,7 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Awaiting next brief.** Step 27 (Restyle the four Phase-2 redesigns to the old `gb-*` idiom) shipped on branch `claude/quirky-franklin-ab7a54` at `9c83c8f`, FF-merged to `origin/main`, and pushed.
+**Step 28 review cleared (0 Must Fix / 0 Should Fix / 0 Escalate). Architect committing ship now.** Visual rebuild of the dashboard against `designs/04-pixeldex.html` on branch `claude/confident-kare-0d3dab`; ready to FF-merge to `origin/main` and push. Test count 782 → 783 (+1 new Step 28 assertion). Rubocop clean; Brakeman zero delta on touched files.
 
 ---
 
@@ -74,6 +74,45 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 28 — Rebuild the dashboard against `designs/04-pixeldex.html` — 2026-05-06
+**Status:** Built on branch `claude/confident-kare-0d3dab`; Richard cleared 0 / 0 / 0 (Must Fix / Should Fix / Escalate); ready to ship pending Architect commit + FF-merge + push. **No KGs close, 0 KGs open.**
+
+Visual rebuild of the dashboard surface against the canonical PixelDex source spec (`designs/04-pixeldex.html`) — the source-of-truth file from which the project's `:root` palette was originally derived. Functional behaviour preserved verbatim from Steps 20–27; backend / controllers / models / Stimulus targets untouched. Out-of-scope partials (`_pc_box_content`, `_map_content`, `_save_slots_sidebar`) untouched. All work happens inside the existing `.dash-r1` namespace block in `pixeldex.css` plus mechanical class-rename / wrapper-restructure edits in 4 ERB views.
+
+**Architect-prep doc:** `handoff/2026-05-06-pixeldex-source-extraction.md` (Halves 1 + 2 — locked source spec extracted from `designs/04-pixeldex.html` and live-vs-source diff). Half 3 (the rebuild itself) is this step.
+
+**Highlights / decisions:**
+- **Title bar gets the PixelDex `--d2` band.** Single horizontal `--d2` row with `--l2` text + 3 px ink border-bottom. `.title-left` (title-block + run-pill) flex-aligned against new `.title-right` (stat-strip). Player caption recoloured from `--white` to `--l2` to read on the dark band; letter-spacing 0.08em.
+- **Stat-strip rebuilt to PixelDex `.title-stat` block grid form via CSS-only flex `column-reverse`.** ERB DOM stays — the existing test assertion `<div class="item"><span>LABEL</span><span class="val">N</span></div>` continues to match. The label `<span>` is first in DOM but renders below the `.val` `<span>` because of `flex-direction: column-reverse`. The `·` separators are kept in DOM but hidden via CSS — gap does the spacing.
+- **Run-pill restyled to a label-on-d2-band form.** Transparent bg, `--l2` text, 2 px `--l1` underline as the affordance. Hover is a subtle 15%-opacity green wash, not a full bg flip — reads as part of the title bar, not a stamped-on button.
+- **Tab-bar cells stack icon-above-label (PixelDex 2-line form).** Renamed `.tab` → `.tab-item` and `.icon` → `.tab-icon` (both ERB and CSS) to match source. `.tab-icon` is `display: block; font-size: 20px; margin-bottom: 4px; line-height: 1;` so the 20 px glyph sits above the 13 px label.
+- **3-col layout adopts shared-frame form.** `gap: 0` (was 14 px), `margin-top: 0` (was 14 px), `background: var(--l2)`. Per-panel `border-right: var(--border)` shares a single 3 px ink frame across columns; `:last-child` drops the right border.
+- **`.pc-layout::after` scanline overlay skipped.** `body::after` (lines 113–126) is `position: fixed; inset: 0;` covering the full viewport already — adding a per-pc-layout overlay would be a double-overlay per D3's "Skip if the body-level scanline already covers this".
+- **`.col-party` wrapper dropped (Architect option (a)).** `_party_panel` already provides its own `<div class="panel">` shell, so it now participates directly in `.pc-layout`. The 900 px-breakpoint hide-rule rewrites from `.dash-r1 .col-party` to `.dash-r1 .pc-layout > .panel:first-child`.
+- **Right rail flattened.** `.dash-r1 .status-rail` drops the boxed wrapper (transparent bg, no border, no padding); the rail participates in the shared 3-col frame as a plain panel. `.side-tabs` rebuilt as a horizontal mini `.tab-bar` (--d1 bg + ink border-bottom) with `.side-tab` cells styled like `.tab-item` siblings (--d2 bg, --l1 text, hover/active swap to --d1 + --l2). The vertical caps-bar stack form from Step 27 is gone.
+- **Right-rail card aesthetic flips dark → light.** `.player-card` rebases to PixelDex light-card form (--l1 bg + 2 px ink border + --d1 text). `.gym-list .gym-row` rebases to PixelDex `.gym-list-item` form (single-line flex, 11 px font, solid `--d2` divider, glyph-prefix `.num` cell). `.gym-row.next` becomes a `.gym-next-highlight` filled bar (--d2 bg + --l2 text, with `margin: 4px -6px` so it bleeds into the panel-body's negative space). `.next-battle` rebases to a `.route-card` light-card skin so the CTA block harmonises with the rest of the rail.
+- **`.h3-row` → `.panel-header` (3 occurrences).** Each `<div class="h3-row"><h3>…</h3><span class="count">…</span></div>` rewritten to `<div class="panel-header"><span>…</span><span class="panel-header-sub">…</span></div>` — same content, canonical primitive class names so the canonical `:root`-level rules apply. The `.dash-r1`-scoped `.h3-row` / `h3` / `.count` rules deleted.
+- **Each panel body wrapped in `.panel-body` (3 occurrences).** Padding lines up with the rest of the dashboard's panels.
+- **Gym list glyphs emitted from ERB, not CSS `::before`.** Chose D5's "OR rewrite the ERB to emit the right glyph" path — `★` for beaten, `▶` for next, `·` for upcoming. Avoids per-row CSS `::before` content rules; keeps the ERB self-explanatory.
+- **WAI-ARIA tablist contract preserved.** Every `role="tab"`, `aria-selected`, `aria-controls`, `tabindex`, plus `pixeldex#tablistKeydown`, `pixeldex#numericJump`, `status-rail#keydown`, all controller targets and `data-*` attributes intact across the rebuild.
+- **Stale assertions in `responsive_grids_test.rb` updated in lockstep.** Two assertions hard-coded the old `.dash-r1 .col-party` and `.dash-r1 .tab` selector forms; both updated to match the new DOM (`.pc-layout > .panel:first-child`) and class name (`.tab-item`). Same intent; same coverage; matches the Step 27 pattern of updating visual-chrome assertions when the chrome is restyled.
+
+**Files touched:**
+- `app/views/dashboard/_tab_bar.html.erb` (class rename + comment header)
+- `app/views/dashboard/_title_bar.html.erb` (`.title-right` wrap + comment header)
+- `app/views/dashboard/_status_rail.html.erb` (3× `.h3-row` → `.panel-header`, 3× `.panel-body` wrap, gym-row glyph rewrite)
+- `app/views/dashboard/show.html.erb` (drop `.col-party` wrapper)
+- `app/assets/stylesheets/pixeldex.css` (`.dash-r1` namespace block ~lines 2155–2615 rebuilt)
+- `test/integration/dashboard_redesign_test.rb` (+1 new test for `.tab-item` class)
+- `test/integration/responsive_grids_test.rb` (2 stale assertions updated)
+
+**Test count:** 782 → **783** (+1). 0 failures, 0 errors, 0 skips.
+**Lint:** rubocop clean (203 files, 0 offenses).
+**Brakeman:** Clean (same 2 pre-existing weak-confidence warnings on `emulator_controller.rb:79` SendFile + `gym_schedule_discord_update_job.rb:14` FileAccess; zero delta on Step-28-touched files).
+**Migrations:** None. **Zero new gem deps. Zero controller / model / service / config / job / channel code touched. Zero canon token changes. Zero JS changes.** Pure presentation-layer rebuild: 1 CSS file modified, 4 view files modified, 2 test files modified.
+
+---
 
 ### Step 26 — Rebase design canon `--accent` from `--amber` to `--green-glow` — 2026-05-06
 **Status:** Shipped on branch `claude/hungry-cray-ff4938`; FF-merged to `origin/main` and pushed. **No KGs close**, **0 KGs open**.

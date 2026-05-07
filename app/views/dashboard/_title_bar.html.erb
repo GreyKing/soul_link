@@ -1,8 +1,10 @@
-<%# Step 27 — Title bar restyled to gb-page-title + gb-page-subtitle
-    form. Title-glyph removed; the title text already says whose
-    dashboard it is. Run-pill rebased to gb-btn shape; status indicator
-    is inline text inside the button label, not a coloured inner pill.
-    Stat strip drops per-item colour coding — labels do the work.
+<%# Step 28 — Title bar rebuilt against the PixelDex source spec
+    (designs/04-pixeldex.html). Single horizontal `--d2` band:
+    `.title-left` (title-block + run-pill) flex-aligned against
+    `.title-right` (stat-strip). Stat values render num-on-top
+    label-below via column-reverse on each `.item`. The `·`
+    separators are kept in DOM but hidden in CSS so the gap does
+    the spacing visually.
 
     The run-picker controller targets + dropdown menu are preserved.
     Each menu option is a real <a href="/?run_id=N"> so switching
@@ -98,17 +100,22 @@
     </div>
   </div>
 
-  <%# Step 27: stat strip rebased to a single dim line — the per-item
-      colour coding (alive=green, dead=crimson, badges=amber) is dropped
-      per audit § 3.1 / canon § 11.2. Labels read the data; values are
-      plain --white. %>
-  <div class="stat-strip" aria-label="Run stats">
-    <div class="item"><span>CAUGHT</span> <span class="val"><%= @caught_count + @dead_count %></span></div>
-    <span class="sep" aria-hidden="true">&middot;</span>
-    <div class="item"><span>ALIVE</span> <span class="val"><%= @caught_count %></span></div>
-    <span class="sep" aria-hidden="true">&middot;</span>
-    <div class="item"><span>DEAD</span> <span class="val"><%= @dead_count %></span></div>
-    <span class="sep" aria-hidden="true">&middot;</span>
-    <div class="item"><span>BADGES</span> <span class="val"><%= @gyms_defeated %>/8</span></div>
+  <%# Step 28: stat strip wrapped in `.title-right` flex group so it
+      docks to the right edge of the `--d2` title band. DOM markup
+      preserved (test asserts `<div class="item"><span>LABEL</span>
+      <span class="val">N</span>` exact form). Visual num-on-top
+      label-below comes from `flex-direction: column-reverse` in
+      pixeldex.css. The `·` separators are kept for accessibility
+      semantics but hidden via CSS — gap does the visual spacing. %>
+  <div class="title-right">
+    <div class="stat-strip" aria-label="Run stats">
+      <div class="item"><span>CAUGHT</span> <span class="val"><%= @caught_count + @dead_count %></span></div>
+      <span class="sep" aria-hidden="true">&middot;</span>
+      <div class="item"><span>ALIVE</span> <span class="val"><%= @caught_count %></span></div>
+      <span class="sep" aria-hidden="true">&middot;</span>
+      <div class="item"><span>DEAD</span> <span class="val"><%= @dead_count %></span></div>
+      <span class="sep" aria-hidden="true">&middot;</span>
+      <div class="item"><span>BADGES</span> <span class="val"><%= @gyms_defeated %>/8</span></div>
+    </div>
   </div>
 </header>

@@ -61,51 +61,51 @@
            tabindex="0"
            data-status-rail-target="tabPanel"
            data-status="party">
-    <div class="h3-row">
-      <h3>LIVE PARTIES</h3>
-      <span class="count"><%= SoulLink::GameState.players.size %> PLAYERS</span>
+    <div class="panel-header">
+      <span>LIVE PARTIES</span>
+      <span class="panel-header-sub"><%= SoulLink::GameState.players.size %> PLAYERS</span>
     </div>
 
-    <% SoulLink::GameState.players.each do |player|
-         uid = player["discord_user_id"]
-         display_name = player["display_name"].to_s
-         is_you = uid == current_user_id
-         team = teams_by_user[uid]
-         slot_groups = team ? team.soul_link_team_slots.sort_by(&:position).map(&:soul_link_pokemon_group).compact : []
+    <div class="panel-body">
+      <% SoulLink::GameState.players.each do |player|
+           uid = player["discord_user_id"]
+           display_name = player["display_name"].to_s
+           is_you = uid == current_user_id
+           team = teams_by_user[uid]
+           slot_groups = team ? team.soul_link_team_slots.sort_by(&:position).map(&:soul_link_pokemon_group).compact : []
 
-         # Per-player badge variance is out of scope (KG-39); all rows show
-         # the run's `gyms_defeated` for now.
-         badges_count = @gyms_defeated
-         shows_hof = @run.completed? && badges_count == 8
-    %>
-      <%# Step 27: dropped the 3-pill stack (you-pill, hof-pill-r1,
-          badges-pill). YOU is conveyed by the .you accent border on
-          the card itself. HOF moves to a 🏆 prefix in the name. The
-          BADGES count becomes plain inline text (no pill bg, no
-          per-state colour). %>
-      <div class="player-card<%= ' you' if is_you %>">
-        <div class="head">
-          <span class="name">
-            <% if shows_hof %>&#127942; <% end %><%= display_name.upcase %>
-          </span>
-          <span class="badges-text"><%= badges_count %>/8 BADGES</span>
-        </div>
-        <div class="sprites">
-          <% (0...SoulLinkTeam::MAX_SLOTS).each do |i|
-               group = slot_groups[i]
-               my_pkmn = group&.soul_link_pokemon&.find { |p| p.discord_user_id == uid }
-          %>
-            <% if group && my_pkmn&.species.present? %>
-              <div class="sprite-cell"><%= pokemon_sprite_tag(my_pkmn.species, size: 26) %></div>
-            <% elsif group %>
-              <div class="sprite-cell">?</div>
-            <% else %>
-              <div class="sprite-cell empty" aria-label="empty slot"></div>
+           # Per-player badge variance is out of scope (KG-39); all rows show
+           # the run's `gyms_defeated` for now.
+           badges_count = @gyms_defeated
+           shows_hof = @run.completed? && badges_count == 8
+      %>
+        <%# Step 28: rebased to PixelDex light-card form (--l1 bg + 2 px ink
+            border). Keeps the .you accent border affordance (canon § 11.3)
+            on the lighter base. HOF stays as a 🏆 prefix in the name. %>
+        <div class="player-card<%= ' you' if is_you %>">
+          <div class="head">
+            <span class="name">
+              <% if shows_hof %>&#127942; <% end %><%= display_name.upcase %>
+            </span>
+            <span class="badges-text"><%= badges_count %>/8 BADGES</span>
+          </div>
+          <div class="sprites">
+            <% (0...SoulLinkTeam::MAX_SLOTS).each do |i|
+                 group = slot_groups[i]
+                 my_pkmn = group&.soul_link_pokemon&.find { |p| p.discord_user_id == uid }
+            %>
+              <% if group && my_pkmn&.species.present? %>
+                <div class="sprite-cell"><%= pokemon_sprite_tag(my_pkmn.species, size: 26) %></div>
+              <% elsif group %>
+                <div class="sprite-cell">?</div>
+              <% else %>
+                <div class="sprite-cell empty" aria-label="empty slot"></div>
+              <% end %>
             <% end %>
-          <% end %>
+          </div>
         </div>
-      </div>
-    <% end %>
+      <% end %>
+    </div>
   </section>
 
   <%# ── GYMS sub-tab — compact gym list + NEXT BATTLE CTA ── %>
@@ -116,53 +116,66 @@
            tabindex="0"
            data-status-rail-target="tabPanel"
            data-status="gyms">
-    <div class="h3-row">
-      <h3>GYM LEADERS</h3>
-      <span class="count"><%= @gyms_defeated %>/8</span>
+    <div class="panel-header">
+      <span>GYM LEADERS</span>
+      <span class="panel-header-sub"><%= @gyms_defeated %>/8</span>
     </div>
 
-    <div class="gym-list">
-      <% @gym_info.each do |_key, gym|
-           num = gym["number"]
-           defeated = num <= @gyms_defeated
-           is_next = num == @gyms_defeated + 1
-           row_class =
-             if defeated
-               "gym-row beaten"
-             elsif is_next
-               "gym-row next"
-             else
-               "gym-row upcoming"
-             end
-      %>
-        <div class="<%= row_class %>">
-          <div class="num"><%= num %></div>
-          <span class="name"><%= gym["leader"]&.upcase %></span>
-          <span class="lvl"><%= gym["max_level"] %></span>
+    <div class="panel-body">
+      <div class="gym-list">
+        <% @gym_info.each do |_key, gym|
+             num = gym["number"]
+             defeated = num <= @gyms_defeated
+             is_next = num == @gyms_defeated + 1
+             row_class =
+               if defeated
+                 "gym-row beaten"
+               elsif is_next
+                 "gym-row next"
+               else
+                 "gym-row upcoming"
+               end
+             # Step 28: gym-row glyph slot mirrors PixelDex `.gym-check`. ★ for
+             # beaten, ▶ for next, · for upcoming. The numeric position is
+             # implicit in the row order; the glyph carries the state.
+             glyph =
+               if defeated
+                 "★".html_safe
+               elsif is_next
+                 "▶".html_safe
+               else
+                 "·".html_safe
+               end
+        %>
+          <div class="<%= row_class %>">
+            <div class="num"><%= glyph %></div>
+            <span class="name"><%= gym["leader"]&.upcase %></span>
+            <span class="lvl"><%= gym["max_level"] %></span>
+          </div>
+        <% end %>
+      </div>
+
+      <% if @next_gym && !dashboard_read_only?(@run) %>
+        <% loc_data = @locations[@next_gym["location"]] %>
+        <div class="next-battle">
+          <div class="label">&darr; NEXT BATTLE</div>
+          <div class="leader">
+            <%= @next_gym["leader"]&.upcase %>
+            &middot; <%= loc_data&.[]("name") || @next_gym["location"] %>
+            &middot; Lv <%= @next_gym["max_level"] %>
+          </div>
+          <div class="prep"><%= pixeldex_gym_strategy(@next_gym, @type_analysis) %></div>
+          <%= button_to "START GYM DRAFT →", gym_drafts_path,
+                        method: :post,
+                        class: "draft-cta" %>
+        </div>
+      <% elsif dashboard_read_only?(@run) %>
+        <div class="next-battle">
+          <div class="label">&darr; NEXT BATTLE</div>
+          <div class="read-only">RUN ENDED</div>
         </div>
       <% end %>
     </div>
-
-    <% if @next_gym && !dashboard_read_only?(@run) %>
-      <% loc_data = @locations[@next_gym["location"]] %>
-      <div class="next-battle">
-        <div class="label">&darr; NEXT BATTLE</div>
-        <div class="leader">
-          <%= @next_gym["leader"]&.upcase %>
-          &middot; <%= loc_data&.[]("name") || @next_gym["location"] %>
-          &middot; Lv <%= @next_gym["max_level"] %>
-        </div>
-        <div class="prep"><%= pixeldex_gym_strategy(@next_gym, @type_analysis) %></div>
-        <%= button_to "START GYM DRAFT →", gym_drafts_path,
-                      method: :post,
-                      class: "draft-cta" %>
-      </div>
-    <% elsif dashboard_read_only?(@run) %>
-      <div class="next-battle">
-        <div class="label">&darr; NEXT BATTLE</div>
-        <div class="read-only">RUN ENDED</div>
-      </div>
-    <% end %>
   </section>
 
   <%# ── MAP sub-tab — keep today's map-panel body content (ASCII map +
@@ -177,65 +190,67 @@
            tabindex="0"
            data-status-rail-target="tabPanel"
            data-status="map">
-    <div class="h3-row">
-      <h3>MAP &amp; ROUTES</h3>
-      <span class="count">SINNOH</span>
+    <div class="panel-header">
+      <span>MAP &amp; ROUTES</span>
+      <span class="panel-header-sub">SINNOH</span>
     </div>
 
-    <%# ASCII Map %>
-    <% current_loc = @next_gym ? @locations[@next_gym["location"]]&.[]("name") : "Sunyshore City" %>
-    <div class="map-area"><%= pixeldex_ascii_map(current_loc.to_s) %></div>
+    <div class="panel-body">
+      <%# ASCII Map %>
+      <% current_loc = @next_gym ? @locations[@next_gym["location"]]&.[]("name") : "Sunyshore City" %>
+      <div class="map-area"><%= pixeldex_ascii_map(current_loc.to_s) %></div>
 
-    <%# Current Location %>
-    <div class="route-card">
-      <div class="route-label">CURRENT LOCATION</div>
-      <% if @next_gym %>
-        <% loc_data = @locations[@next_gym["location"]] %>
-        <div class="route-name"><%= loc_data&.[]("name")&.upcase || @next_gym["location"].upcase %></div>
-        <div class="route-detail">Preparing for Gym <%= @gyms_defeated + 1 %></div>
-        <div class="route-detail">Next objective: <%= @next_gym["leader"]&.upcase %></div>
-      <% else %>
-        <div class="route-name">POKEMON LEAGUE</div>
-        <div class="route-detail">All gyms defeated!</div>
-        <div class="route-detail">Prepare for the Elite Four</div>
-      <% end %>
-    </div>
-
-    <%# Badge Case %>
-    <div class="route-card">
-      <div class="route-label">BADGE CASE</div>
-      <div class="badge-row">
-        <% (1..8).each do |gym_num| %>
-          <% if gym_num <= @gyms_defeated %>
-            <div class="badge-cell badge-earned">&#9733;</div>
-          <% else %>
-            <div class="badge-cell badge-empty">...</div>
-          <% end %>
+      <%# Current Location %>
+      <div class="route-card">
+        <div class="route-label">CURRENT LOCATION</div>
+        <% if @next_gym %>
+          <% loc_data = @locations[@next_gym["location"]] %>
+          <div class="route-name"><%= loc_data&.[]("name")&.upcase || @next_gym["location"].upcase %></div>
+          <div class="route-detail">Preparing for Gym <%= @gyms_defeated + 1 %></div>
+          <div class="route-detail">Next objective: <%= @next_gym["leader"]&.upcase %></div>
+        <% else %>
+          <div class="route-name">POKEMON LEAGUE</div>
+          <div class="route-detail">All gyms defeated!</div>
+          <div class="route-detail">Prepare for the Elite Four</div>
         <% end %>
       </div>
-    </div>
 
-    <%# Recent Routes %>
-    <% if @current_segment %>
+      <%# Badge Case %>
       <div class="route-card">
-        <div class="route-label">RECENT ROUTES</div>
-        <div style="font-size: 10px; line-height: 2;">
-          <% (@current_segment["locations"] || []).last(5).each do |loc_key|
-               loc_data = @locations[loc_key]
-               has_catch = @groups_by_location[loc_key]&.any?
-          %>
-            <div>
-              <%= loc_data&.[]("name") || loc_key %> -
-              <%= has_catch ? "&#9733;".html_safe : "uncaught" %>
-            </div>
+        <div class="route-label">BADGE CASE</div>
+        <div class="badge-row">
+          <% (1..8).each do |gym_num| %>
+            <% if gym_num <= @gyms_defeated %>
+              <div class="badge-cell badge-earned">&#9733;</div>
+            <% else %>
+              <div class="badge-cell badge-empty">...</div>
+            <% end %>
           <% end %>
         </div>
       </div>
-    <% end %>
 
-    <%# Strategy Dialog %>
-    <div class="dialog" style="font-size: 11px;">
-      <%= pixeldex_gym_strategy(@next_gym, @type_analysis) %>
+      <%# Recent Routes %>
+      <% if @current_segment %>
+        <div class="route-card">
+          <div class="route-label">RECENT ROUTES</div>
+          <div style="font-size: 10px; line-height: 2;">
+            <% (@current_segment["locations"] || []).last(5).each do |loc_key|
+                 loc_data = @locations[loc_key]
+                 has_catch = @groups_by_location[loc_key]&.any?
+            %>
+              <div>
+                <%= loc_data&.[]("name") || loc_key %> -
+                <%= has_catch ? "&#9733;".html_safe : "uncaught" %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <%# Strategy Dialog %>
+      <div class="dialog" style="font-size: 11px;">
+        <%= pixeldex_gym_strategy(@next_gym, @type_analysis) %>
+      </div>
     </div>
   </section>
 </aside>

@@ -31,10 +31,12 @@
   <%= render "tab_bar" %>
 
   <div class="pc-layout">
-    <%# Left sidebar: always visible compact party (hidden on tablet/phone) %>
-    <div class="col-party">
-      <%= render "party_panel" %>
-    </div>
+    <%# Step 28 — left sidebar: always visible compact party. Renders
+        `_party_panel` directly; the partial provides its own
+        `<div class="panel">` shell so we don't double-wrap. The
+        responsive collapse-on-tablet rule targets the first child of
+        `.pc-layout` directly. %>
+    <%= render "party_panel" %>
 
     <%# Center: tab-switchable content. Each panel carries the WAI-ARIA
         contract Tab-bar relies on (`role="tabpanel"` + `aria-labelledby`). %>

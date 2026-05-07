@@ -150,7 +150,9 @@ class ResponsiveGridsTest < ActiveSupport::TestCase
     refute_nil block, "expected an `@media (max-width: 900px)` block"
 
     assert_match(/\.dash-r1\s+\.pc-layout\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+280px/m, block)
-    assert_match(/\.dash-r1\s+\.col-party\s*\{\s*display:\s*none/m, block)
+    # Step 28 — `.col-party` wrapper dropped; the party panel is now the
+    # first `.panel` child of `.pc-layout`, hidden via `:first-child`.
+    assert_match(/\.dash-r1\s+\.pc-layout\s*>\s*\.panel:first-child\s*\{\s*display:\s*none/m, block)
   end
 
   test "Step 24 R1 drops the layout to single column inside the 720px breakpoint" do
@@ -161,12 +163,13 @@ class ResponsiveGridsTest < ActiveSupport::TestCase
     assert_match(/\.dash-r1\s+\.tab-bar\s*\{[^}]*overflow-x:\s*auto/m, block)
   end
 
-  test "Step 24 R1 styles do NOT collapse .dash-r1 .tab or .dash-r1 .status-rail inside any breakpoint" do
+  test "Step 24 R1 styles do NOT collapse .dash-r1 .tab-item or .dash-r1 .status-rail inside any breakpoint" do
+    # Step 28 — `.tab` renamed to `.tab-item` (PixelDex source spec).
     %w[520px 720px 900px].each do |bp|
       block = @css[/@media\s*\(max-width:\s*#{bp}\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/m]
       next if block.nil?
-      assert_no_match(/\.dash-r1\s+\.tab\s*\{[^}]*display:\s*none/m, block,
-        "the #{bp} breakpoint must not hide .dash-r1 .tab")
+      assert_no_match(/\.dash-r1\s+\.tab-item\s*\{[^}]*display:\s*none/m, block,
+        "the #{bp} breakpoint must not hide .dash-r1 .tab-item")
       assert_no_match(/\.dash-r1\s+\.status-rail\s*\{[^}]*display:\s*none/m, block,
         "the #{bp} breakpoint must not hide .dash-r1 .status-rail")
     end

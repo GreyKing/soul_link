@@ -1,13 +1,11 @@
-<%# Step 24 R1 (restyled in Step 27) — real WAI-ARIA tablist.
-    Step 27: tabs rebased to canonical `.tab-item` form (single
-    horizontal strip, single-line label, 13 px font, bg swap on
-    active). The icon renders inline-prefix in the label, not stacked
-    above. Active tab carries `aria-selected="true" tabindex="0"`;
-    others carry `aria-selected="false" tabindex="-1"` so Tab moves
-    into the active panel rather than walking through the inactive
-    tabs. Live-update affordance: `<span class="badge-dot">` chrome
-    is replaced by an inline `*` text suffix on the tab text — same
-    affordance, no glow chrome.
+<%# Step 24 R1 / Step 28 — real WAI-ARIA tablist with PixelDex source
+    structure (designs/04-pixeldex.html). Each cell is a `.tab-item`
+    with a block-above `.tab-icon` (20 px glyph) stacked on top of the
+    label (13 px caps). Active tab carries `aria-selected="true"
+    tabindex="0"`; others carry `aria-selected="false" tabindex="-1"`
+    so Tab moves into the active panel rather than walking through the
+    inactive tabs. Live-update affordance: an inline `*` text suffix
+    after the label, no glow chrome (Step 27).
 
     The tab-bar wires `keydown->pixeldex#tablistKeydown` for the
     arrow / Home / End keyboard contract; the window-level 1-7
@@ -30,7 +28,7 @@
      data-action="keydown->pixeldex#tablistKeydown">
   <% tabs.each do |tab| %>
     <button type="button"
-            class="tab<%= ' active' if tab[:active] %>"
+            class="tab-item<%= ' active' if tab[:active] %>"
             role="tab"
             id="tab-<%= tab[:key] %>"
             aria-controls="panel-<%= tab[:key] %>"
@@ -39,7 +37,7 @@
             data-action="click->pixeldex#switchTab"
             data-pixeldex-target="tabButton"
             data-tab="<%= tab[:key] %>">
-      <span class="icon" aria-hidden="true"><%= tab[:icon] %></span>
+      <span class="tab-icon" aria-hidden="true"><%= tab[:icon] %></span>
       <%= tab[:label] %><% if tab[:dot] %><span aria-label="Updates available">*</span><% end %>
     </button>
   <% end %>
