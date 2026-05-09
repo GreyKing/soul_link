@@ -11,14 +11,14 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Step 29 shipped on branch `claude/funny-payne-4df13d` at `d18b966`, FF-merged to `origin/main`, and pushed.** Replace the Rails-default red-dot favicon with a chunky pokeball icon at the canon palette (`--crimson` top, `--white` bottom, `--d1` ink ring + equator + button). Three files: `public/icon.svg` rewritten as a 16×16 viewBox pokeball; `public/icon.png` regenerated at 512×512 from the new SVG via `magick`; `app/views/pwa/manifest.json.erb` `theme_color` / `background_color` swapped from `"red"` (Rails default leftovers) to `"#1a2e1a"` / `"#c0d0a0"` (canon `--d1` / `--white`). No layout-file changes; no new tests (no existing favicon tests, brief says don't add any). Test count holds at **783**. Rubocop clean. Richard cleared 0 / 0 / 0 — rendered the SVG at 16×16 and 32×32 with `magick` nearest-neighbour zoom; equator and button stay distinguishable at favicon size, neither pre-approved D5 simplification needed.
+**Step 30 shipped on branch `claude/brave-rhodes-9da4ba` at `625c83e`, FF-merged to `origin/main`, and pushed.** Pivot gym strategy to roster-only (Option C of the 2026-05-09 strategy rethink). Delete `pixeldex_gym_strategy/2` and its six render sites — the canonical Platinum gym-type assertions ("Crasher Wake uses Water — bring Grass/Electric") that were wrong roughly half the time in randomized Nuzlocke runs. NEXT BATTLE prep div now calls `pixeldex_team_dialog(@type_analysis, @team_groups.size)` — roster-derived TYPE READINESS prose, universally valid. Per-gym TYPE chips removed from `_gyms_content.html.erb` (L51/70/124), `map/show.html.erb` (L55/67/163, including the tooltip), and the canonical Type label dropped from `gym_ready/show.html.erb:19` (no replacement; COVERAGE pills already below). Test count 783 → **787** (+4 helper specs covering the four `pixeldex_team_dialog` branches). Rubocop clean. Richard cleared `STEP 30 IS CLEAR` — 0 / 0 / 0 / 2 Nit. Both Major findings rolled in from the prior proposal review (gym_ready Type line + empty-dialog shell regression risk) verified resolved; only two `class="dialog"` hits survive in the codebase, both wrapping real PARTY-surface content. Live `bin/dev` boot deferred (no MySQL/OAuth in worktree); all grep gates pass.
 
 ---
 
-## Step 28 — Status archive
+## Step 29 — Status archive
 *Kept here for one-step lookback; will fold into archive at session end.*
 
-**Step 28 shipped on branch `claude/confident-kare-0d3dab` at `afb39f4`, FF-merged to `origin/main`, and pushed.** Visual rebuild of the dashboard against `designs/04-pixeldex.html` (the canonical source). Functional behavior preserved verbatim from Steps 20–27. Test count 782 → 783. Rubocop clean; Brakeman zero delta on touched files.
+**Step 29 shipped on branch `claude/funny-payne-4df13d` at `d18b966`, FF-merged to `origin/main`, and pushed.** Replace the Rails-default red-dot favicon with a chunky pokeball icon at the canon palette (`--crimson` top, `--white` bottom, `--d1` ink ring + equator + button). Three files: `public/icon.svg` rewritten as a 16×16 viewBox pokeball; `public/icon.png` regenerated at 512×512 via `magick`; `app/views/pwa/manifest.json.erb` `theme_color` / `background_color` swapped from `"red"` to `"#1a2e1a"` / `"#c0d0a0"`. Test count holds at **783**. Rubocop clean. Richard cleared 0 / 0 / 0; neither pre-approved D5 simplification needed.
 
 ---
 
@@ -81,6 +81,43 @@ reset until the gap is addressed or the decision is replaced.
 
 ## Step History
 *Session-scoped.*
+
+### Step 30 — Pivot gym strategy to roster-only (Option C of 2026-05-09 rethink) — 2026-05-09
+**Status:** Shipped on branch `claude/brave-rhodes-9da4ba` at `625c83e`; FF-merged to `origin/main` and pushed. Richard cleared `STEP 30 IS CLEAR` (0 Blocker / 0 Major / 0 Minor / 2 Nit). **No KGs close, +1 KG opened (KG-40, dedup proposal §6).**
+
+The dashboard's gym strategy was asserting canonical Platinum gym types ("Crasher Wake uses Water — bring Grass/Electric") wrapped in a dialog footer across six render sites. In the user's randomized Nuzlocke runs gym leader rosters are shuffled, so those canonical claims are wrong roughly half the time. Step 30 replaces leader-typed advice with roster-derived TYPE READINESS prose computed purely from the user's caught Pokemon via `TypeChart.analyze_team` — universally valid in any randomizer. Driven by the 2026-05-09 Architect-authored proposal `handoff/2026-05-09-strategy-recommendations-rethink.md` (5 options brainstormed, Option C picked) plus its accompanying options-only PDF for the Project Owner.
+
+**Architect-prep docs:** `handoff/2026-05-09-strategy-recommendations-rethink.md` (proposal — inventory + duplication map + 5-option spectrum + recommendation + dedup pass + open questions); `handoff/2026-05-09-strategy-options-brainstorm.pdf` (options-only printable for Project Owner). Richard's pressure-test of the proposal landed at the same path as a `READY WITH NOTES` verdict with 2 Major findings folded into Step 30 scope (`gym_ready/show.html.erb:19` Type label; empty-`.dialog` shell regression risk).
+
+**Highlights / decisions:**
+- **Option C over Option A.** PO's literal "maybe just get rid of it?" leaned A (pure deletion). Ava picked C because the NEXT BATTLE panel is exactly where the user is staring before pushing START GYM DRAFT, and answering "you have ICE and FGT gaps" is a true useful answer in a randomizer run that A would have lost. Marginal cost over A is rounding error since `pixeldex_team_dialog` already exists and is already wired into PARTY surfaces.
+- **`pixeldex_team_dialog` reused verbatim** — no rename, no prose rewrite. Richard's Finding-5 (existing helper output is "defensive") considered and rejected: the warning framing fits gym-prep *better* than idle PARTY-tab.
+- **`gym_ready/show.html.erb:19` Type line deleted, no replacement.** Richard's Major finding from the proposal review. Ava's call: COVERAGE pills already below, replacing with a roster-derived line would just duplicate them.
+- **Empty-`.dialog` shells deleted with their wrappers** at every former `pixeldex_gym_strategy` call site — no separate CSS hunt needed because `.dialog` legitimately stays in use on PARTY surfaces. Richard's Major-finding-2 risk verified post-build: only two `class="dialog"` hits survive in the codebase, both wrap real content.
+- **Per-gym TYPE chips removed alongside the helper** — `_gyms_content.html.erb` (L51/70/124), `map/show.html.erb` (L55/67/163 incl. tooltip). Same canonical-Platinum claim wearing a different costume. `_status_rail.html.erb:152` was already absent — verified clean, no-op.
+- **Test work was additive, not subtractive.** Both proposal and prior review estimated `pixeldex_helper_test.rb` had specs covering `gym_strategy` to delete. Bob verified by reading: it only covered `recommended_review_action`. So 4 new specs added (one per `pixeldex_team_dialog` output branch), test count went up not down (783 → 787, +4).
+- **Live `bin/dev` boot deferred** — worktree has no MySQL / OAuth. All grep gates pass (zero hits for `pixeldex_gym_strategy` anywhere; zero hits for `gym["type"]` in scoped files; zero hits for `next_gym["type"]` in `gym_ready/`; zero stale test references). Live browser verification is a Project Owner / next-session task if desired.
+- **§6 dedup pass deferred to a future step** as KG-40. The proposal also identified four coverage / weakness surfaces (PARTY sidebar, center PARTY tab, PC BOX rail, STRATEGY tab) plus a fifth in dead code, with subtle drift between them. Independent of the gym question. Worth its own focused step rather than bundled into Step 30.
+
+**Files touched:**
+- `app/helpers/pixeldex_helper.rb` (deleted `pixeldex_gym_strategy/2`, ~18 lines)
+- `app/views/dashboard/_strategy_panel.html.erb` (removed dialog shell + helper call)
+- `app/views/dashboard/_gyms_content.html.erb` (removed dialog shell + helper call; 3 TYPE chips removed)
+- `app/views/dashboard/_map_content.html.erb` (removed dialog shell + helper call)
+- `app/views/dashboard/_status_rail.html.erb` (NEXT BATTLE prep div: swap `pixeldex_gym_strategy` → `pixeldex_team_dialog`)
+- `app/views/map/show.html.erb` (3 TYPE chip + tooltip removals)
+- `app/views/gym_ready/show.html.erb` (delete `Type:` line at L19)
+- `test/helpers/pixeldex_helper_test.rb` (+4 helper specs for `pixeldex_team_dialog` branches)
+- `test/integration/dashboard_redesign_test.rb` (broaden NEXT BATTLE assertion regex to match `TypeChart#analyze_team` output shape)
+
+**Test count:** 783 → **787** (+4). 0 failures, 0 errors, 0 skips.
+**Lint:** rubocop clean (203 files, 0 offenses).
+**Brakeman:** Not re-run — pure helper / view edit, no SQL or query construction touched.
+**Migrations:** None. **Zero new gem deps. Zero controller / model / service / config / job / channel / Stimulus code touched.** Pure helper + view + test edit: 1 helper file, 6 view files, 2 test files.
+
+**Review:** Richard cleared `STEP 30 IS CLEAR` — 0 Blocker / 0 Major / 0 Minor / 2 Nit. Verification: rubocop passed (203 files clean), `bin/rails test` 787 / 0 / 0, all D7 grep gates passed, both prior-review Major findings (canonical Type at `gym_ready/show.html.erb:19` + empty-`.dialog` shell risk) fully resolved.
+
+---
 
 ### Step 28 — Rebuild the dashboard against `designs/04-pixeldex.html` — 2026-05-06
 **Status:** Shipped on branch `claude/confident-kare-0d3dab` at `afb39f4`; FF-merged to `origin/main` and pushed. Richard cleared 0 / 0 / 0 (Must Fix / Should Fix / Escalate). **No KGs close, 0 KGs open.**
@@ -1512,6 +1549,9 @@ ALL FACTORY SMOKE CHECKS PASSED
 - **`window.alert()` for Tier-A error toasts** (Step 9). Smallest user-facing change that closed the silent-failure gap; a styled toast component (matching the `gb-flash gb-flash-alert` palette) would be cleaner. Track if alerts feel intrusive in real use.
 - **Bot-process broadcasts not yet supported.** The async cable adapter is in-process; Discord modal updates (which run in the bot process via `rake soul_link:bot`) don't propagate to web clients in real time. Switching to a redis cable adapter would unlock this.
 - **Pre-existing soft points from `handoff/PROJECT-REVIEW-2026-04-30.md`** — 20 items, ranked by ROI in that document. Top-priority structural cleanups: (1) `discord_bot.rb` god-object decomposition; (2) zero test coverage on services/channels; (3) `SoulLinkRun.current(guild_id)` lacks a hard "one active per guild" invariant; (4) `DashboardController#show` needs presenter extraction; (5) `SoulLinkEmulatorSession::GzipCoder` should move to a concern. None of these are urgent — Tier-1 refactor work, fresh-session candidate.
+
+### New — From Step 30 (2026-05-09)
+- **KG-40: Coverage / weakness surfaces are duplicated across four panels with subtle drift.** Independent of the gym strategy question (closed in Step 30), the 2026-05-09 rethink doc's §6 dedup pass identified four live coverage / weakness surfaces — PARTY sidebar (mini stat), center PARTY tab (full readout), PC BOX rail (status callout), STRATEGY tab (canonical home) — plus a fifth dead copy in `_pc_box_panel.html.erb`. Each renders the same underlying `TypeChart.analyze_team` output but with subtle copy / pill-design / phrasing drift. Proposal §6 recommends picking STRATEGY tab as canonical home, keeping the PARTY sidebar's `40% / 9/17` stat as a glance affordance, and trimming the rest. Out of scope for Step 30 — that step only addressed the gym-roster-dependent strategy. Future step (likely 1–1.5 days; mostly view / partial dedup, no schema). See `handoff/2026-05-09-strategy-recommendations-rethink.md` § 6 for the full canonical-vs-redundant inventory and `handoff/REVIEW-FEEDBACK.md` (the older proposal review, not the Step 30 build review) for Richard's pressure-test of the dedup proposal.
 
 ### New — From Step 24 (2026-05-05)
 - **KG-39: Per-player badge counts on the dashboard PARTY sub-tab share `@gyms_defeated`.** Step 24 R1's PARTY sub-tab in `_status_rail.html.erb` renders `<%= @gyms_defeated %> BADGES` for every player row — there is no per-player badge variance because the run only tracks gyms_defeated as a single integer at the run level. Mockup screen 2 shows "BOB 8 BADGES" while the other 3 sit at 2/3 — that's the future feature. To ship per-player variance: extend `SoulLinkRun` (or `SoulLinkTeam`) with per-player gym progress, add a partial `:player_badges_count(uid)` lookup (or compute from `gym_results` × `team_snapshot`), and replace the shared `@gyms_defeated` reference in the PARTY sub-tab partial. The HOF-pill currently fires on `@run.completed? && badges == 8`; once per-player variance lands, switch the conditional to per-player HoF state. Architect-decided ambiguity in Step 24 brief.
