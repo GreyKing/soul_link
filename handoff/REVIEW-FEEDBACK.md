@@ -1,5 +1,5 @@
-# Review Feedback — Step 28
-Date: 2026-05-06
+# Review Feedback — Step 29
+Date: 2026-05-09
 Ready for Builder: YES
 
 ## Must Fix
@@ -13,81 +13,84 @@ None.
 
 ## Cleared
 
-Step 28 — dashboard visual rebuild against `designs/04-pixeldex.html` — is clear.
+Step 29 — red-dot favicon → pokeball — is clear.
 
-Spot-checked all seven directives against the diff:
+### D1 — `public/icon.svg` (L1–15)
 
-- **D1 title-bar / stat-strip / run-pill** — `.title-bar` rebuilt as `--d2` band
-  with flex space-between, ink border-bottom, 10/20 padding, `flex-shrink: 0`,
-  no `margin-bottom` (pixeldex.css L2170–2179). `.title-right` flex group added
-  (L2184–2186). `.stat-strip` rebuilt with `display: flex; gap: 16px;` plus
-  `flex-direction: column-reverse` per `.item` to render value-on-top
-  label-below without DOM change (L2291–2306). Run-pill rebased to
-  transparent / `--l2` text / 2 px `--l1` underline (L2204–2222), hover wash
-  rgba(155, 188, 15, 0.15) per spec.
-- **D2 tab-bar rename** — `.tab` → `.tab-item` and `.icon` → `.tab-icon` in
-  `_tab_bar.html.erb` L31 / L40. CSS rules renamed in `.dash-r1` block
-  (L2319–2343); `.tab-icon` is `display: block; font-size: 20px;
-  margin-bottom: 4px; line-height: 1;` for the block-above stack form.
-- **D3 pc-layout shared-frame** — `gap: 0`, `margin-top: 0`,
-  `background: var(--l2)`, ink border-right per child, `:last-child` drops it
-  (L2352–2367). Inset overlay correctly skipped — verified `body::after` at
-  L113–126 is `position: fixed; inset: 0` covering the full viewport.
-- **D4 status-rail flatten + horizontal sub-tabs** — `.status-rail` now
-  `background: transparent; border: none; padding: 0;` (L2374–2378).
-  `.side-tabs` rebuilt as horizontal mini tab-bar with `--d1` bg + ink
-  border-bottom (L2379–2385). `.side-tab` rebuilt as `.tab-item`-sibling cell,
-  active state swaps to `--d1` bg + `--l2` text (L2386–2403). Legacy
-  `.h3-row` / `h3` / `.count` rules deleted, replaced by canonical `:root`
-  level `.panel-header` (L349–366).
-- **D5 right-rail cards** — `.player-card` light-card form
-  (`--l1` bg + 2 px ink border + `--d1` text, sprite-cell on `--l2` bg with
-  2 px ink border) per L2413–2449. `.gym-row` rebased to single-line flex
-  with solid `--d2` divider, glyph slot in `.num` (L2456–2495).
-  `.gym-row.next` filled-bar with -6px horizontal margin (L2488–2495).
-  `.gym-row.upcoming` uses `opacity: 0.35`. `.next-battle` rebased to
-  `.route-card` light-card skin (L2509–2546); `.draft-cta` keeps the
-  `gb-btn-primary` form per spec.
-- **D6 `_status_rail.html.erb` markup** — three `.h3-row` blocks rewritten
-  to `.panel-header` / `.panel-header-sub` (L64–67, L119–122, L193–196).
-  Three `.panel-body` wrappers added (L69, L124, L198). All ARIA targets
-  intact. Gym glyph emitted in ERB per D5: ★ / ▶ / · (L141–148, L151).
-- **D7 `show.html.erb`** — `.col-party` wrapper dropped; `_party_panel`
-  rendered directly inside `.pc-layout` (L39). Verified `_party_panel`
-  provides its own `<div class="panel">` shell so the partial participates
-  in the 3-col grid. Responsive 900 px rule rewritten to target
-  `> .panel:first-child` (L2585).
+Matches the brief's canonical SVG verbatim. 16×16 viewBox preserved. Six
+fill/stroke literals all resolve to canon hex:
 
-WAI-ARIA preservation verified end-to-end: every `role="tab"`,
-`aria-selected`, `aria-controls`, `tabindex`, `keydown->pixeldex#tablistKeydown`,
-`keydown->status-rail#keydown`, `data-pixeldex-target="tabButton"`,
-`data-status-rail-target="tabButton"`, `data-action`, `data-tab` /
-`data-status-rail-tab-param` is present in `_tab_bar.html.erb` and
-`_status_rail.html.erb`. Window-level `numericJump` binding intact on
-`show.html.erb` L15.
+- `#c75a5a` (`--crimson`) — top half rect (L8)
+- `#c0d0a0` (`--white`) — bottom half rect (L9), button inner (L14)
+- `#1a2e1a` (`--d1`) — equator band (L10), outer ring stroke (L12),
+  button outer (L13)
 
-Step 25 token canon and Step 26 accent rebase preserved — `--accent` rule on
-`.dash-r1 .player-card.you` (L2419–2421) and `.dash-r1 .gym-row.beaten .name`
-(L2480) both retained.
+`grep` for forbidden literals (`#fff`, `#000`, `#FFF`, `red`, `#FF0000`)
+returns zero matches. Geometry per brief: equator at y=7–9 (2px), outer
+ring r=7.5 stroke=1, button r=2.5 / r=1.25.
 
-CSS scope-locked: every diff hunk falls inside lines 2160–2606 of
-`pixeldex.css`, all within the `.dash-r1` namespace block. The `:root`
-palette, canonical primitives (1–520), `.pc-box-r2`, `.map-r4`, and `.gb-*`
-namespaces untouched.
+### D2 — `public/icon.png`
 
-Step 28 assertion (L82–89 in `dashboard_redesign_test.rb`) correctly targets
-the main dashboard tab cells via `id="tab-#{key}"` selector — the regex won't
-collide with the status-rail's `status-tab-` ids. The seven keys cover every
-tab in the bar.
+`file public/icon.png` reports `PNG image data, 512 x 512, 16-bit/color
+RGBA, non-interlaced`. Size 86.3 KB (was 4.1 KB stale red-dot — the new
+file has three colours plus anti-aliased edges, so the size jump is
+expected). Visual inspection of the rendered PNG at native 512×512
+confirms it is the new pokeball, not a stale leftover: top crimson half,
+bottom parchment half, dark equator with centred button containing a
+parchment dot — matches the new SVG one-for-one.
 
-`responsive_grids_test.rb` updates (L153 col-party → first-child, L164–172
-tab → tab-item) are necessary stale-assertion follow-ups to D7 / D2 — same
-intent, new selector form. Same pattern as Step 27's test updates.
+### D3 — `app/views/pwa/manifest.json.erb` (L20–21)
 
-Test status verified locally: `bin/rails test` reports 783 runs, 2644
-assertions, 0 failures, 0 errors, 0 skips. Rubocop: 203 files, 0 offenses.
-Brakeman: 2 weak-confidence warnings on Step-28-untouched files
-(`emulator_controller.rb:79`, `gym_schedule_discord_update_job.rb:14`) — zero
-delta.
+- L20 `theme_color` is `"#1a2e1a"` (canon `--d1`) — matches brief exactly.
+- L21 `background_color` is `"#c0d0a0"` (canon `--white`) — matches brief
+  exactly.
+- Nothing else in the file changed; icon entries (L4–14) still point at
+  `/icon.png`.
 
-Step 28 is clear.
+### D4 — Layout files untouched
+
+`git status` shows three working-tree changes outside handoff docs:
+`public/icon.svg`, `public/icon.png`, `app/views/pwa/manifest.json.erb`
+— exactly the three the brief enumerates. `app/views/layouts/
+application.html.erb` and `app/views/layouts/pixeldex.html.erb` both
+still reference `/icon.svg` + `/icon.png` at L14–16 and were not
+modified.
+
+### D5 — Readability at favicon size (Reviewer's owned check)
+
+I rendered the SVG at 16×16 and 32×32 directly from `public/icon.svg`
+via `magick -background none public/icon.svg -resize 16x16 …` (and
+32×32), then nearest-neighbour zoomed each to 512×512 for inspection.
+
+- **At 32×32:** clean and unambiguous — top crimson, dark equator,
+  centred ink button with a clearly visible parchment-tinted core,
+  bottom parchment. Reads as a pokeball at a glance.
+- **At 16×16:** the four cardinal regions are all distinguishable —
+  top red half, dark equator band running edge-to-edge, bottom
+  parchment half, centred button. The button's parchment inner core
+  is rendered as 4 mixed-green pixels (the r=1.25 sub-pixel circle
+  smears under nearest-pixel coverage) but it still reads as a
+  hollow ring rather than a solid blob. The equator and button do
+  not mush together.
+
+The two pre-approved D5 simplifications (3px equator OR solid ink
+button without the white center) are **not needed** — neither failure
+mode triggered. Shipping as-is.
+
+### Other checks
+
+- **Test count:** Bob reports 783 runs / 0 failures / 0 errors / 0
+  skips, unchanged from Step 28 (brief required this — no favicon
+  tests added).
+- **Rubocop:** Bob reports 203 files / 0 offenses.
+- **Brakeman:** Bob did not re-run because no Ruby/ERB-logic changes
+  were made — the manifest edit is two literal-string swaps inside a
+  static JSON template. I concur; the two pre-existing weak-confidence
+  warnings carry over from Step 28 with zero delta. Re-running on a
+  pure-asset change would be ceremony.
+- **Bundler-under-mise note:** Bob's PATH-sanitization workaround for
+  Ruby 3.0.6 / Bundler 2.4.11 colliding with Rails 8.1's gemset is a
+  Bob-environment issue only; nothing in CI or the project shell
+  changed.
+
+Step 29 is clear.

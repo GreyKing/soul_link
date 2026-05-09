@@ -11,12 +11,19 @@ reset until the gap is addressed or the decision is replaced.
 ## Current Status
 *Session-scoped.*
 
-**Step 28 shipped on branch `claude/confident-kare-0d3dab` at `afb39f4`, FF-merged to `origin/main`, and pushed.** Visual rebuild of the dashboard against `designs/04-pixeldex.html` (the canonical source). Functional behavior preserved verbatim from Steps 20–27. Test count 782 → 783. Rubocop clean; Brakeman zero delta on touched files. Awaiting next brief from the Project Owner.
+**Step 29 built on branch `claude/funny-payne-4df13d`; awaiting Richard's review.** Replace the Rails-default red-dot favicon with a chunky pokeball icon at the canon palette (`--crimson` top, `--white` bottom, `--d1` ink ring + equator + button). Three files: `public/icon.svg` rewritten as a 16×16 viewBox pokeball; `public/icon.png` regenerated at 512×512 from the new SVG via `magick`; `app/views/pwa/manifest.json.erb` `theme_color` / `background_color` swapped from `"red"` (Rails default leftovers) to `"#1a2e1a"` / `"#c0d0a0"` (canon `--d1` / `--white`). No layout-file changes; no new tests (no existing favicon tests, brief says don't add any). Test count holds at **783**. Rubocop clean. Visual sanity-check at favicon size deferred to Richard per the brief.
+
+---
+
+## Step 28 — Status archive
+*Kept here for one-step lookback; will fold into archive at session end.*
+
+**Step 28 shipped on branch `claude/confident-kare-0d3dab` at `afb39f4`, FF-merged to `origin/main`, and pushed.** Visual rebuild of the dashboard against `designs/04-pixeldex.html` (the canonical source). Functional behavior preserved verbatim from Steps 20–27. Test count 782 → 783. Rubocop clean; Brakeman zero delta on touched files.
 
 ---
 
 ## Step 27 — Status archive
-*Kept here for one-step lookback; will fold into archive at session end.*
+*Kept here for deeper lookback this session.*
 
 **Step 27:** Restyle the four Phase-2 redesigns (R3 Save Slots, R2 PC Box review tray, R4 Map timeline, R1 Dashboard) to the legacy `gb-*` idiom. Pure CSS-first / minor-ERB visual restyle — functional behavior unchanged. Mechanical application of the audit's per-surface directive tables (`handoff/2026-05-06-old-style-canon-audit.md` § 3.1 / 3.2 / 3.3 / 3.4). The four surfaces' chrome rebased to `gb-card-dark`, `gb-btn` / `gb-btn-primary` / `gb-btn-sm`, `gb-section-header`, `gb-flash-alert` / `gb-flash-notice`, `gb-page-title` / `gb-page-subtitle`. The `.dash-r1`, `.pc-box-r2`, `.map-r4` namespaces stay (forward-path bound from Step 25); only the rules under them change.
 

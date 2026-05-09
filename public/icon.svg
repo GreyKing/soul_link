@@ -1,3 +1,15 @@
-<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="256" cy="256" r="256" fill="red"/>
+<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="ball">
+      <circle cx="8" cy="8" r="8"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#ball)">
+    <rect x="0" y="0" width="16" height="8" fill="#c75a5a"/>
+    <rect x="0" y="8" width="16" height="8" fill="#c0d0a0"/>
+    <rect x="0" y="7" width="16" height="2" fill="#1a2e1a"/>
+  </g>
+  <circle cx="8" cy="8" r="7.5" fill="none" stroke="#1a2e1a" stroke-width="1"/>
+  <circle cx="8" cy="8" r="2.5" fill="#1a2e1a"/>
+  <circle cx="8" cy="8" r="1.25" fill="#c0d0a0"/>
 </svg>
