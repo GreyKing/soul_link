@@ -184,6 +184,13 @@ class DashboardRedesignTest < ActionDispatch::IntegrationTest
     refute_nil rail_block
     assert_match(/class="next-battle"/, rail_block)
     assert_match(/START GYM DRAFT/, rail_block)
+
+    # Step 30 — NEXT BATTLE prep line is now roster-derived
+    # (pixeldex_team_dialog) instead of the canonical-roster strategy.
+    # Positive-match one of the team-dialog output forms; negative-match
+    # the deleted "<leader> uses <type> types" canonical phrasing.
+    assert_match(/Team is solid|Team is at full strength|No team built|coverage against/, rail_block)
+    assert_no_match(/uses .{3} types/, rail_block)
   end
 
   test "the GYMS sub-tab does NOT render the START GYM DRAFT CTA in read-only mode (wiped run)" do

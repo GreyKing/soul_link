@@ -71,24 +71,6 @@ module PixeldexHelper
     safe_join(types.map { |t| pixeldex_type_badge(t) }, " ")
   end
 
-  # Strategy dialog text for the map panel
-  def pixeldex_gym_strategy(next_gym, type_analysis)
-    return "All gym leaders defeated! Prepare for the ELITE FOUR!" unless next_gym
-
-    leader = next_gym["leader"]&.upcase || "???"
-    gym_type = next_gym["type"] || "Unknown"
-    abbr = TYPE_ABBREVIATIONS[gym_type] || gym_type[0..2].upcase
-
-    coverage = type_analysis[:offensive_coverage] || []
-    has_coverage = coverage.include?(gym_type)
-
-    if has_coverage
-      "#{leader} uses #{abbr} types. Your team has good coverage. You're prepared, trainer!"
-    else
-      "#{leader} uses #{abbr} types. Consider adjusting your team for better matchups."
-    end
-  end
-
   # Team status dialog text for the party panel
   def pixeldex_team_dialog(type_analysis, team_size)
     return "No team built yet. Visit the Team page!" if team_size == 0

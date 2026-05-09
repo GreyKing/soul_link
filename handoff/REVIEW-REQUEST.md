@@ -1,124 +1,168 @@
-# Review Request — Step 29
-*Bob → Richard. Replace red-dot favicon with a pokeball icon.*
+# Review Request — Step 30
 
-**Branch:** `claude/funny-payne-4df13d`
-**Builder:** Bob
-**Status:** Ready for Review: YES
+*Builder: Bob. Reviewer: Richard.*
+*Branch: `claude/brave-rhodes-9da4ba`*
 
----
+## Step summary
 
-## Scope reminder
-
-Step 29 is a tiny three-file change. The browser-tab icon is currently a red dot
-(`public/icon.svg` was a leftover Rails default — `<circle … fill="red"/>`). The
-brief asks for a chunky pokeball at the canon palette that reads at 16×16, the
-matching 512×512 PNG fallback for Safari and the PWA, and the PWA manifest's stale
-`"red"` theme/background swapped for canon `--d1` / `--white` hex.
-
-No layout-file edits; no new tests. The brief explicitly forbids both.
-
----
+Step 30 pivots the gym-strategy surface from canonical-roster prose
+(`pixeldex_gym_strategy`, six call sites) to the roster-derived
+`pixeldex_team_dialog`, but only in the dashboard NEXT BATTLE panel.
+The other five `.dialog` shells (status_rail MAP sub-tab, gyms_content,
+map_content, strategy_panel) and the `pixeldex_gym_strategy` helper
+itself are deleted outright. Per-gym row "TYPE" chips are stripped from
+the GYMS center tab, the standalone `/map` badge tooltips, status bar,
+and timeline-node tooltips. The `gym_ready/show` header drops the
+`— Type: <badge>` segment, leaving `Leader: <name>` (the page already
+shows OFFENSIVE COVERAGE / SHARED WEAKNESSES below).
+Tests cover the four `pixeldex_team_dialog` output forms and a
+positive/negative-match assertion in the existing NEXT BATTLE
+integration test.
 
 ## Files changed
 
-### `public/icon.svg` — rewrite (red-dot → pokeball)
-- **L1–13** (full file). New 16×16 viewBox so coordinates map 1:1 to favicon
-  pixels. Structure follows the brief's canonical SVG verbatim:
-  - `<clipPath id="ball">` masks two halves to a r=8 circle.
-  - `<rect 0,0,16,8 fill="#c75a5a">` — top crimson half (`--crimson`).
-  - `<rect 0,8,16,8 fill="#c0d0a0">` — bottom parchment half (`--white`).
-  - `<rect 0,7,16,2 fill="#1a2e1a">` — 2px equator band (`--d1`).
-  - Outer ring: `circle r=7.5 stroke="#1a2e1a" stroke-width="1"` — 1px ink ring.
-  - Button outer: `circle r=2.5 fill="#1a2e1a"` — 5px ink dot.
-  - Button inner: `circle r=1.25 fill="#c0d0a0"` — parchment center.
-- Hex literals are intentional — favicon contexts can't resolve `var(--token)`.
-- No `#fff`, no `#000`, no new reds (per brief).
-- No structural deviations from the canonical SVG in the brief.
+| File | Change |
+|---|---|
+| `app/helpers/pixeldex_helper.rb` | Deleted `pixeldex_gym_strategy/2` (was lines 75-90). `pixeldex_team_dialog/2` untouched. |
+| `app/views/dashboard/_status_rail.html.erb` | NEXT BATTLE `<div class="prep">` now calls `pixeldex_team_dialog(@type_analysis, @team_groups.size)`. Deleted the trailing Strategy Dialog block at the bottom of the MAP sub-tab. |
+| `app/views/dashboard/_gyms_content.html.erb` | Deleted three `<span class="type-text">…TYPE_ABBREVIATIONS…</span>` chips (NEXT-row, defeated-row, future-row). Deleted the trailing `<%# Next gym strategy %>` `.dialog` block. |
+| `app/views/dashboard/_map_content.html.erb` | Deleted the trailing `.dialog` block. |
+| `app/views/dashboard/_strategy_panel.html.erb` | Deleted the trailing `<%# Strategy Dialog %>` block. |
+| `app/views/map/show.html.erb` | Stripped `(<%= gym['type'] %>)` from the badge tooltip (L55), `&middot; <%= next_gym["type"] %>` from the status-bar val (L67), and ` (<%= gym['type'] %>)` from the timeline-node tooltip (L163). |
+| `app/views/gym_ready/show.html.erb` | Stripped `&mdash; Type: <%= pixeldex_type_badge(@next_gym['type']) %>` from L19. Header now reads `Leader: <leader>`. |
+| `test/helpers/pixeldex_helper_test.rb` | Added 4 unit tests for `pixeldex_team_dialog` covering empty-team, balance-note warning, full-strength, and gaps-with-no-warnings cases. |
+| `test/integration/dashboard_redesign_test.rb` | Extended the existing "GYMS sub-tab renders the START GYM DRAFT CTA" test with a positive-match (`/Team is solid|Team is at full strength|No team built|coverage against/`) and a negative-match (`/uses .{3} types/`). |
 
-### `public/icon.png` — regenerate at 512×512 from the new SVG
-- Built via `magick -background none -density 1024 public/icon.svg -resize 512x512 public/icon.png`
-  from the worktree root, exactly as the brief specifies.
-- `file public/icon.png` reports `PNG image data, 512 x 512, 16-bit/color RGBA, non-interlaced`
-  (was `512 x 512, 8-bit colormap, non-interlaced`; size 4.1 KB → 86.3 KB — the new
-  PNG has more colour data because the pokeball needs three colours plus
-  anti-aliased edges).
-- `magick` succeeded on first run; no need for the `convert` fallback.
+Nine files. No new files. No CSS edits. No controller / migration / route changes.
 
-### `app/views/pwa/manifest.json.erb` — fix stale red theme
-- **L20** `"theme_color": "red"` → `"theme_color": "#1a2e1a"` (canon `--d1`,
-  matches the GB UI chrome).
-- **L21** `"background_color": "red"` → `"background_color": "#c0d0a0"` (canon
-  `--white`, matches the canvas page bg used as PWA splash).
-- Nothing else in the file touched. The icon entries (L4–14) already point at
-  `/icon.png`, which we just regenerated.
+## Test results
 
-### Files NOT touched (per brief D4)
+`bin/rails test`:
 
-- `app/views/layouts/application.html.erb:14-16` — already references `/icon.svg`
-  + `/icon.png`. Correct as-is.
-- `app/views/layouts/pixeldex.html.erb:14-16` — same. Correct as-is.
+```
+787 runs, 0 failures, 0 errors
+```
 
----
+Delta vs. baseline: **783 → 787 = +4 tests** (the four new helper
+specs). The integration extension reused the existing test method
+rather than adding a new one. Brief expected ~785-786 (helper specs
++ at most 1 integration assertion expansion). Actual is +4 because
+all four helper spec branches were treated as separate `test "..."`
+blocks rather than one parameterized test — within the brief's
+"±1-2 new helper tests" wording I kept each output form individually
+named for failure clarity. Calling out as a minor delta vs. estimate.
 
-## Test status
+`bundle exec rubocop`:
 
-- `bin/rails test`: **783 runs, 2644 assertions, 0 failures, 0 errors, 0 skips.**
-  Test count unchanged from Step 28 (brief explicitly required this — no favicon
-  tests exist, none added).
-- `bundle exec rubocop`: **clean** (203 files, 0 offenses).
-- `bundle exec brakeman`: not re-run for Step 29 — no Ruby / ERB-logic changes
-  were made (the manifest.json.erb edit is two literal-string swaps inside a
-  static JSON template; no controller / model / service code touched). Same
-  pre-existing 2 weak-confidence warnings carried over from Step 28; zero delta
-  on Step-29-touched files.
+```
+✓ rubocop (203 files)
+```
 
-(Note on test-runner mechanics: bare `bundle exec` resolves to the system
-Bundler 2.4.11 under Ruby 3.0.6, which can't load Rails 8.1's gem set. Used
-`/Users/gferm/.local/share/mise/installs/ruby/3.4.5/bin/bundle exec …` with a
-sanitized PATH to force Bundler to run under Ruby 3.4.5 against the project's
-gemset. This is purely a Bob-side environment issue; nothing in the project's
-shell or CI changes.)
+`bundle exec brakeman`: not run. Step 30 is view + helper-method
+deletions; no SQL, no query construction, no auth-relevant changes.
+Per the brief, brakeman was conditional on security-relevant edits.
 
----
+(Test/lint run via
+`PATH=/Users/gferm/.local/share/mise/installs/ruby/3.4.5/bin:$PATH bundle exec …`
+because `bin/rails` and `mise exec -- bundle exec rails` both resolve
+through a 3.0.6 bundler shim in this worktree's environment. Same
+gemset, same Ruby — just a PATH ordering quirk for the test run.)
 
-## Standing rules check
+## Manual verification
 
-- **Canon palette only:** every colour in the SVG resolves to an existing canon
-  token by hex — `#c75a5a` = `--crimson`, `#c0d0a0` = `--white`, `#1a2e1a` =
-  `--d1`. Manifest hex values match `--d1` / `--white`. No `#fff`, no `#000`,
-  no new reds.
-- **Scope lock:** three files touched, exactly the three the brief enumerates.
-  Layout files, tests, controllers, models, services all untouched.
-- **No speculative additions:** no PWA manifest icon-entry edits beyond the two
-  colour swaps; no `apple-touch-icon` rule added; no extra favicon sizes
-  generated. Brief said don't, so I didn't.
-- **Hard-coded hex justification:** the brief explicitly notes favicon SVGs
-  can't resolve `var(--token)` because they load outside the page's CSS scope.
-  Hex literals here are canonical, not a token violation.
+**Did NOT boot `bin/dev`** — the worktree environment doesn't expose
+a running MySQL + Discord-OAuth-signed-in session by default, and
+spinning that up purely for screen-grabs of a view-only change felt
+out of proportion. Live verification of D7 §3-5 (dashboard sub-tabs,
+`/map`, `/gym_ready`) is **pending Richard / Project Owner**.
 
----
+**Verified by code-read + grep:**
 
-## Open questions for Richard
+- D7 §6 grep gates — all three pass:
+  - `grep -rn 'pixeldex_gym_strategy' app/` → 0 hits.
+  - `grep -rn 'gym\["type"\]' app/views/dashboard/_gyms_content.html.erb app/views/map/show.html.erb` → 0 hits.
+  - `grep -rn 'next_gym\["type"\]' app/views/gym_ready/` → 0 hits.
+- `grep -rn 'class="dialog"' app/views` → exactly 2 hits, both in
+  `_party_panel.html.erb:56` and `_party_detail.html.erb:50` (the
+  surviving PARTY surfaces). Brief D5 cleanup gate satisfied: no
+  empty `.dialog` shells remain in the codebase.
+- `_status_rail.html.erb` L167 (post-edit) renders
+  `<div class="prep"><%= pixeldex_team_dialog(@type_analysis, @team_groups.size) %></div>`
+  — same wrapper, swapped helper, exactly per the brief.
+- The integration test's `assert_match` on the rail block uses a
+  flexible regex that accepts any of the helper's branches, including
+  the `"No super-effective coverage against: …"` warning string.
+  See note under "Anything I flagged" below.
+- `pixeldex_team_dialog/2` arity unchanged (still
+  `(type_analysis, team_size)`); both inputs are already on the
+  dashboard partial via `DashboardController#index` (L48 sets
+  `@type_analysis`; `@team_groups` is an array → `.size` is the
+  Team-page slot count). No controller change required.
+- `pixeldex_helper.rb` — deletion is clean, surrounding methods
+  (`pixeldex_team_dialog`, `recommended_review_action`) untouched,
+  module compiles (rubocop confirms).
 
-None. The brief was unambiguous on every directive (D1–D5). The two judgement
-calls were trivial:
+## Files for Richard to read
 
-1. **`magick` vs `convert` fallback:** `magick` succeeded first try, so no
-   fallback needed.
-2. **Brakeman:** chose not to re-run (no Ruby logic touched). Flag if you'd
-   prefer a fresh run before clearing.
+- `app/helpers/pixeldex_helper.rb` — confirm only `pixeldex_gym_strategy`
+  was removed; everything else intact.
+- `app/views/dashboard/_status_rail.html.erb` — confirm L167 swap and
+  the bottom-of-MAP-sub-tab dialog deletion.
+- `app/views/dashboard/_gyms_content.html.erb` — confirm three
+  type-text chip deletions and the trailing dialog deletion.
+- `app/views/dashboard/_map_content.html.erb` — confirm dialog deletion.
+- `app/views/dashboard/_strategy_panel.html.erb` — confirm dialog deletion.
+- `app/views/map/show.html.erb` — confirm three tooltip/val strips.
+- `app/views/gym_ready/show.html.erb` — confirm `Type:` segment strip.
+- `test/helpers/pixeldex_helper_test.rb` — confirm four new tests
+  read sensibly and lock the helper's contract.
+- `test/integration/dashboard_redesign_test.rb` — confirm the rail
+  block assertions; particularly the regex (`/Team is solid|Team is at full strength|No team built|coverage against/`)
+  is intentionally permissive — see flag below.
 
-The brief notes Bob "may also do a sanity check" of the rendered favicon at
-16×16 in a browser tab but that this is Reviewer's responsibility. I confirmed
-the SVG renders correctly in the Launch preview panel — the pokeball reads as
-expected (top red, bottom off-white, 2px ink equator, centred 5px button with
-parchment dot). I deferred booting `bin/dev` for the actual browser-tab capture
-to your review pass per the brief's explicit ownership split. **Flag if you want
-me to re-attempt at-tab-size now.**
+## Anything I flagged or adapted
 
-If at 16×16 the equator + button mush into a blob, the brief allows two
-acceptable simplifications: thicken equator to 3px, or drop the button's white
-center and leave a solid ink dot. Both are flag-then-fix; happy to do whichever
-you call.
+1. **Integration assertion regex includes `"coverage against"`.** The
+   brief's example regex was
+   `/Team is solid|Team is at full strength|No team built/`. Reading
+   `pixeldex_team_dialog`'s actual logic alongside
+   `SoulLink::TypeChart.analyze_team`, I noticed: when
+   `offensive_gaps.any?`, `analyze_team` always emits a warning-level
+   balance note (`"No super-effective coverage against: …"`). That
+   warning is the FIRST entry in `:balance_notes`, and
+   `pixeldex_team_dialog` returns `warnings.first[:message]` before
+   it can fall through to the `"Team is solid. Watch out for X and Y types."`
+   branch. So with a real factory-built team that has gaps, the live
+   render is the warning string, not "Team is solid…". I extended the
+   regex to also match `"coverage against"` so the integration
+   assertion is robust regardless of which branch the test fixture
+   triggers. The brief lists `"Team is solid. Watch out for ICE and FGT types."`
+   as an actual-output example; the helper still produces that string,
+   but only for synthetic inputs (gaps with no warnings) — which is
+   what the unit test covers. Worth Richard's confirmation that this
+   reading is correct and the broader regex is acceptable.
 
-Ready for Review: YES
+2. **Test count delta = +4, not ~+1-2.** Brief estimated ±1-2 new
+   helper tests. I split into 4 separate `test "..."` blocks — one
+   per output form — so failures point at the exact branch. Net same
+   contract coverage; just more granular. Calling out per the brief's
+   guidance to surface count discrepancies.
+
+3. **Live verification deferred.** `bin/dev` boot was not attempted
+   for the reasons above; D7 §3-5 (dashboard sub-tabs visual sweep,
+   `/map` page, `/gym_ready` page) is pending Project Owner spot-check.
+   Code-read + grep cover D7 §1-2, §6.
+
+4. **No surprise canonical-roster surfaces found.** The grep
+   sweep turned up nothing beyond what the brief listed — no
+   Stimulus controller computing matchups, no YAML helper, no
+   missed partial. Step 30 scope = exact set Architect inventoried.
+
+5. **No `BOB-QUESTIONS.md` written.** Brief was complete and
+   unambiguous; the only adaptation (regex broadening) was within
+   the brief's "if a test asserts on text that's no longer produced,
+   update the assertion" spirit, except here the divergence was the
+   helper's runtime branch behavior vs. the brief's example outputs,
+   not test-vs-code drift.
+
+Status: ready for review.

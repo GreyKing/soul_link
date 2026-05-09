@@ -164,7 +164,7 @@
             &middot; <%= loc_data&.[]("name") || @next_gym["location"] %>
             &middot; Lv <%= @next_gym["max_level"] %>
           </div>
-          <div class="prep"><%= pixeldex_gym_strategy(@next_gym, @type_analysis) %></div>
+          <div class="prep"><%= pixeldex_team_dialog(@type_analysis, @team_groups.size) %></div>
           <%= button_to "START GYM DRAFT →", gym_drafts_path,
                         method: :post,
                         class: "draft-cta" %>
@@ -247,10 +247,6 @@
         </div>
       <% end %>
 
-      <%# Strategy Dialog %>
-      <div class="dialog" style="font-size: 11px;">
-        <%= pixeldex_gym_strategy(@next_gym, @type_analysis) %>
-      </div>
     </div>
   </section>
 </aside>

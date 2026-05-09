@@ -52,7 +52,7 @@
                 class="badge<%= beaten ? ' earned' : '' %>"
                 data-action="click->timeline#toggleGym"
                 data-gym-number="<%= num %>"
-                title="<%= gym['name'] %> &mdash; <%= gym['leader'] %> (<%= gym['type'] %>) &mdash; Lv. <%= gym['max_level'] %>">
+                title="<%= gym['name'] %> &mdash; <%= gym['leader'] %> &mdash; Lv. <%= gym['max_level'] %>">
           <%= num %>
         </button>
       <% end %>
@@ -64,7 +64,7 @@
     <% if next_gym %>
       <div class="item">
         <span class="lbl">NEXT GYM</span>
-        <span class="val"><%= next_gym["leader"] %> &middot; <%= next_gym["type"] %></span>
+        <span class="val"><%= next_gym["leader"] %></span>
       </div>
       <div class="item">
         <span class="lbl">LEVEL CAP</span>
@@ -160,7 +160,7 @@
                           class="node gym<%= beaten ? ' beaten' : '' %>"
                           data-action="click->timeline#toggleGym"
                           data-gym-number="<%= gym['number'] %>"
-                          title="<%= gym['name'] %> &mdash; <%= gym['leader'] %> (<%= gym['type'] %>)">
+                          title="<%= gym['name'] %> &mdash; <%= gym['leader'] %>">
                     <div class="glyph"><%= gym["number"] %></div>
                     <div class="label"><%= gym["leader"].to_s.upcase %><br>Lv <%= gym["max_level"] %></div>
                   </button>
