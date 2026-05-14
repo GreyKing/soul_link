@@ -293,6 +293,16 @@ module SoulLink
       bot.modal_submit(custom_id: 'soul_link:uncaught_death_modal') do |event|
         handle_uncaught_death_submission(event)
       end
+
+      # Button: Gym poll vote
+      bot.button(custom_id: /^soul_link:gym_poll_vote:/) do |event|
+        handle_gym_poll_vote(event)
+      end
+
+      # Button: Gym poll reset
+      bot.button(custom_id: /^soul_link:gym_poll_reset:/) do |event|
+        handle_gym_poll_reset(event)
+      end
     end
 
     # ------------------------
@@ -1073,6 +1083,44 @@ module SoulLink
       Rails.logger.error "Event class: #{event.class}"
       Rails.logger.error "Event methods: #{event.methods.grep(/component|value|data/).join(', ')}"
       {}
+    end
+
+    def handle_gym_poll_vote(event)
+      _, _, poll_id, slot_index, response = event.interaction.data["custom_id"].split(":")
+      poll = GymPoll.find_by(id: poll_id)
+      return respond_ephemeral(event, "❌ Poll not found.") unless poll
+
+      discord_user_id = event.user.id
+      unless SoulLink::GameState.registered_player?(discord_user_id)
+        respond_ephemeral(event, "❌ You aren't a player in this run.")
+        return
+      end
+
+      begin
+        poll.vote!(discord_user_id, slot_index.to_i, response)
+        at = Time.iso8601(poll.slots[slot_index.to_i]["scheduled_at"]).in_time_zone(poll.soul_link_run.timezone)
+        confirmation = "Got it — #{at.strftime('%a %-l%P').sub(':00', '')} #{response_emoji(response)}"
+        respond_ephemeral(event, confirmation)
+      rescue GymPoll::LockedError, GymPoll::InvalidSlotError, GymPoll::PastSlotError, GymPoll::InvalidResponseError => e
+        respond_ephemeral(event, "❌ #{e.message}")
+      end
+    end
+
+    def handle_gym_poll_reset(event)
+      _, _, poll_id = event.interaction.data["custom_id"].split(":")
+      poll = GymPoll.find_by(id: poll_id)
+      return respond_ephemeral(event, "❌ Poll not found.") unless poll
+
+      poll.destroy
+      respond_ephemeral(event, "✅ Poll reset.")
+    end
+
+    def response_emoji(response)
+      case response
+      when "yes"   then "✅"
+      when "maybe" then "❓"
+      when "no"    then "❌"
+      end
     end
 
     def respond_ephemeral(event, content)
