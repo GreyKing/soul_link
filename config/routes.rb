@@ -37,8 +37,6 @@ Rails.application.routes.draw do
     member { post :mark_beaten }
   end
   resources :gym_results, only: [ :update ]
-  resources :gym_schedules, only: [ :index, :create, :show ]
-
   # Run management
   resources :runs, only: [ :index ]
 
