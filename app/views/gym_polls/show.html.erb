@@ -1,7 +1,34 @@
 <% if @poll %>
-  <div data-poll-id="<%= @poll.id %>" data-controller="gym-poll">
-    Poll #<%= @poll.id %> — <%= @poll.status %>
+  <%= turbo_stream_from "gym_poll_#{@poll.id}" %>
+
+  <div data-controller="gym-poll"
+       data-gym-poll-id-value="<%= @poll.id %>"
+       data-gym-poll-state-value="<%= @poll.broadcast_state.to_json %>"
+       data-gym-poll-user-id-value="<%= current_user_id %>">
+
+    <h1>Gym Poll — <%= @poll.status.upcase %></h1>
+
+    <% if @poll.locked? %>
+      <div class="banner banner-locked" data-gym-poll-target="bannerLocked">
+        🔒 Locked on slot <%= @poll.locked_slot_index %>
+      </div>
+    <% end %>
+
+    <% if @poll.slots.all? { |s| Time.iso8601(s["scheduled_at"]) < Time.current } %>
+      <div class="banner banner-all-past" data-gym-poll-target="bannerAllPast">
+        All slots have passed. Reset to start next week's poll.
+      </div>
+    <% end %>
+
+    <div data-gym-poll-target="slotList">
+      <% @poll.broadcast_state[:slots].each do |slot| %>
+        <%= render "slot_card", slot: slot, poll: @poll %>
+      <% end %>
+    </div>
+
+    <%= button_to "🔄 Reset", gym_poll_path, method: :delete,
+                  data: { turbo_confirm: "Reset the current poll?" } %>
   </div>
 <% else %>
-  <div data-empty-state>No active poll. <%= button_to "Start poll", gym_poll_path, method: :post %></div>
+  <%= render "empty" %>
 <% end %>

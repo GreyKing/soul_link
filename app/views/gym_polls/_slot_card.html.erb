@@ -1,0 +1,37 @@
+<%
+  tz = ActiveSupport::TimeZone[@poll.soul_link_run.timezone]
+  at = Time.iso8601(slot[:scheduled_at]).in_time_zone(tz)
+  label = at.strftime("%a %-l:%M %p")
+  is_past = slot[:past]
+%>
+<div class="slot-card<%= ' past' if is_past %><%= ' locked-winner' if @poll.locked? && @poll.locked_slot_index == slot[:index] %>"
+     data-gym-poll-target="slotCard"
+     data-slot-index="<%= slot[:index] %>">
+
+  <header><%= label %></header>
+
+  <ul class="player-chips">
+    <% @poll.broadcast_state[:players].each do |player| %>
+      <% uid = player["discord_user_id"] %>
+      <% response = @poll.votes.dig(uid, slot[:index].to_s) %>
+      <li class="chip chip-<%= response || 'pending' %>"><%= player["display_name"] %></li>
+    <% end %>
+  </ul>
+
+  <p class="tally">
+    <%= slot[:yes_count] %> yes / <%= slot[:maybe_count] %> maybe /
+    <%= slot[:no_count] %> no / <%= slot[:pending_count] %> pending
+  </p>
+
+  <% unless is_past || @poll.locked? %>
+    <div class="vote-buttons">
+      <% %w[yes maybe no].each do |r| %>
+        <button type="button"
+                data-action="click->gym-poll#vote"
+                data-slot-index="<%= slot[:index] %>"
+                data-response="<%= r %>"
+                data-gym-poll-target="voteButton"><%= r.capitalize %></button>
+      <% end %>
+    </div>
+  <% end %>
+</div>
