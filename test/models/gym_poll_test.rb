@@ -207,6 +207,52 @@ class GymPollVoteTest < ActiveSupport::TestCase
   end
 end
 
+class GymPollCallbackTest < ActiveSupport::TestCase
+  PLAYERS = [
+    { "discord_user_id" => 111, "display_name" => "A" },
+    { "discord_user_id" => 222, "display_name" => "B" },
+    { "discord_user_id" => 333, "display_name" => "C" },
+    { "discord_user_id" => 444, "display_name" => "D" }
+  ].freeze
+  PLAYER_IDS = PLAYERS.map { |p| p["discord_user_id"] }.freeze
+
+  def with_player_data(&block)
+    SoulLink::GameState.stub(:players, PLAYERS) do
+      SoulLink::GameState.stub(:player_ids, PLAYER_IDS, &block)
+    end
+  end
+
+  test "after_commit enqueues sync job when discord_message_id present" do
+    poll = create(:gym_poll, discord_message_id: 123, discord_channel_id: 999)
+    with_player_data do
+      assert_enqueued_with(job: GymPollDiscordSyncJob, args: [poll.id]) do
+        poll.vote!(111, 0, "yes")
+      end
+    end
+  end
+
+  test "after_commit does not enqueue sync when discord_message_id is nil" do
+    poll = create(:gym_poll, discord_message_id: nil)
+    with_player_data do
+      assert_no_enqueued_jobs(only: GymPollDiscordSyncJob) do
+        poll.vote!(111, 0, "yes")
+      end
+    end
+  end
+
+  test "lock transition enqueues GymPollLockJob exactly once" do
+    poll = create(:gym_poll, discord_message_id: 123, discord_channel_id: 999)
+    with_player_data do
+      poll.vote!(111, 0, "yes")
+      poll.vote!(222, 0, "yes")
+      poll.vote!(333, 0, "yes")
+      assert_enqueued_with(job: GymPollLockJob, args: [poll.id]) do
+        poll.vote!(444, 0, "yes")
+      end
+    end
+  end
+end
+
 class GymPollBroadcastStateTest < ActiveSupport::TestCase
   PLAYERS = [
     { "discord_user_id" => 111, "display_name" => "A" },

@@ -7,6 +7,9 @@ class GymPoll < ApplicationRecord
 
   validates :status, inclusion: { in: STATUSES }
 
+  after_update_commit :enqueue_discord_sync, if: :discord_message_id?
+  after_update_commit :enqueue_lock_job,     if: :saved_change_to_status_to_locked?
+
   class EmptyTemplateError  < StandardError; end
   class LockedError          < StandardError; end
   class InvalidSlotError     < StandardError; end
@@ -113,6 +116,22 @@ class GymPoll < ApplicationRecord
   def set_defaults
     self.state_data ||= { "slots" => [], "votes" => {} }
     self.status     ||= "open"
+  end
+
+  def discord_message_id?
+    discord_message_id.present?
+  end
+
+  def saved_change_to_status_to_locked?
+    saved_change_to_status? && status == "locked"
+  end
+
+  def enqueue_discord_sync
+    GymPollDiscordSyncJob.perform_later(id)
+  end
+
+  def enqueue_lock_job
+    GymPollLockJob.perform_later(id)
   end
 
   def all_yes_on_slot?(state, slot_index)
