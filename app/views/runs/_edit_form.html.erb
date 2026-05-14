@@ -1,0 +1,29 @@
+<%= form_with model: run, url: run_path(run), method: :patch, local: true do |f| %>
+  <% if flash[:alert] %>
+    <div class="alert"><%= flash[:alert] %></div>
+  <% end %>
+
+  <fieldset>
+    <legend>Timezone</legend>
+    <%= f.select :timezone,
+        [["Phoenix (Arizona)", "America/Phoenix"],
+         ["Pacific", "America/Los_Angeles"],
+         ["Mountain", "America/Denver"],
+         ["Central", "America/Chicago"],
+         ["Eastern", "America/New_York"]],
+        {}, {} %>
+  </fieldset>
+
+  <fieldset data-controller="schedule-template">
+    <legend>Weekly Slots (max 5)</legend>
+    <div data-schedule-template-target="slotList">
+      <% (run.schedule_template&.dig("slots") || []).each_with_index do |slot, idx| %>
+        <%= render "slot_row", index: idx, slot: slot %>
+      <% end %>
+    </div>
+    <%= f.hidden_field :schedule_template, value: run.schedule_template&.to_json, data: { schedule_template_target: "hiddenInput" } %>
+    <button type="button" data-action="click->schedule-template#addSlot">Add slot</button>
+  </fieldset>
+
+  <%= f.submit "Save" %>
+<% end %>

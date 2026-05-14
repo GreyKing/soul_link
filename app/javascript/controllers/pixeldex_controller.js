@@ -35,7 +35,7 @@ export default class extends Controller {
   // Implements the WAI-ARIA tablist pattern: ←/→ moves focus AND activates
   // the tab (mockup spec — unlike the spec's recommendation, the mockup
   // calls for instant activation rather than focus-only); Home/End jump
-  // to the first/last tab. The 1-7 numeric jump is bound on `window`
+  // to the first/last tab. The 1-8 numeric jump is bound on `window`
   // (`numericJump`) so it works from anywhere on the page, except when
   // the user is typing in an input.
 

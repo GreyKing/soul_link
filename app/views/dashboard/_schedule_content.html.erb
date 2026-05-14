@@ -1,0 +1,35 @@
+<div class="schedule-content">
+  <header>
+    <h2>Schedule</h2>
+    <% if @open_gym_poll %>
+      <%= link_to "View full poll →", gym_poll_path, class: "btn-link" %>
+    <% end %>
+  </header>
+
+  <section class="poll-summary">
+    <% if @open_gym_poll %>
+      <p>Status: <strong><%= @open_gym_poll.status.upcase %></strong></p>
+      <ul>
+        <% @open_gym_poll.broadcast_state[:slots].each do |slot| %>
+          <% at = Time.iso8601(slot[:scheduled_at]).in_time_zone(@run.timezone) %>
+          <li>
+            <%= at.strftime("%a %-l:%M %p") %> —
+            <%= slot[:yes_count] %>✅ / <%= slot[:maybe_count] %>❓ /
+            <%= slot[:no_count] %>❌ / <%= slot[:pending_count] %>⏳
+          </li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p>No active poll.</p>
+      <% if @run.schedule_template.blank? %>
+        <p>Configure your weekly slots below to enable poll creation.</p>
+      <% else %>
+        <%= button_to "Start poll", gym_poll_path, method: :post, class: "btn btn-primary" %>
+      <% end %>
+    <% end %>
+  </section>
+
+  <section class="template-editor">
+    <%= render "runs/edit_form", run: @run %>
+  </section>
+</div>
