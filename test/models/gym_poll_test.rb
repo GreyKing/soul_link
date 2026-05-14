@@ -206,3 +206,52 @@ class GymPollVoteTest < ActiveSupport::TestCase
     with_player_ids { assert_raises(GymPoll::InvalidResponseError) { poll.vote!(111, 0, "potato") } }
   end
 end
+
+class GymPollBroadcastStateTest < ActiveSupport::TestCase
+  PLAYERS = [
+    { "discord_user_id" => 111, "display_name" => "A" },
+    { "discord_user_id" => 222, "display_name" => "B" },
+    { "discord_user_id" => 333, "display_name" => "C" },
+    { "discord_user_id" => 444, "display_name" => "D" }
+  ].freeze
+  PLAYER_IDS = PLAYERS.map { |p| p["discord_user_id"] }.freeze
+
+  def with_player_data(&block)
+    SoulLink::GameState.stub(:players, PLAYERS) do
+      SoulLink::GameState.stub(:player_ids, PLAYER_IDS, &block)
+    end
+  end
+
+  test "broadcast_state has the expected top-level keys" do
+    poll  = create(:gym_poll)
+    state = with_player_data { poll.broadcast_state }
+    %i[id status locked_slot_index locked_at timezone slots votes players discord_message_id].each do |key|
+      assert state.key?(key), "missing key: #{key}"
+    end
+  end
+
+  test "slots include per-slot tally counts and past flag" do
+    poll = create(:gym_poll)
+    with_player_data do
+      poll.vote!(111, 0, "yes")
+      poll.vote!(222, 0, "yes")
+      poll.vote!(333, 0, "maybe")
+    end
+    state = with_player_data { poll.reload.broadcast_state }
+    first_slot = state[:slots].first
+    assert_equal 2, first_slot[:yes_count]
+    assert_equal 1, first_slot[:maybe_count]
+    assert_equal 0, first_slot[:no_count]
+    assert_equal 1, first_slot[:pending_count]
+    assert_equal false, first_slot[:past]
+  end
+
+  test "past slots are marked past: true" do
+    poll = create(:gym_poll, state_data: {
+      "slots" => [ { "index" => 0, "scheduled_at" => 1.hour.ago.utc.iso8601 } ],
+      "votes" => {}
+    })
+    state = with_player_data { poll.broadcast_state }
+    assert_equal true, state[:slots].first[:past]
+  end
+end

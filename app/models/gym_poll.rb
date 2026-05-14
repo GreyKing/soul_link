@@ -53,6 +53,34 @@ class GymPoll < ApplicationRecord
     data["votes"] || {}
   end
 
+  def broadcast_state
+    player_ids = SoulLink::GameState.player_ids.map(&:to_s)
+    now        = Time.current
+    {
+      id:                 id,
+      status:             status,
+      locked_slot_index:  locked_slot_index,
+      locked_at:          locked_at&.iso8601,
+      timezone:           soul_link_run.timezone,
+      discord_message_id: discord_message_id&.to_s,
+      slots: slots.map do |s|
+        slot_idx = s["index"].to_i
+        responses = player_ids.map { |uid| votes.dig(uid, slot_idx.to_s) }
+        {
+          index:         slot_idx,
+          scheduled_at:  s["scheduled_at"],
+          past:          Time.iso8601(s["scheduled_at"]) < now,
+          yes_count:     responses.count("yes"),
+          maybe_count:   responses.count("maybe"),
+          no_count:      responses.count("no"),
+          pending_count: responses.count(nil)
+        }
+      end,
+      votes:   votes.transform_keys(&:to_s),
+      players: SoulLink::GameState.players.map { |p| p.merge("discord_user_id" => p["discord_user_id"].to_s) }
+    }
+  end
+
   def vote!(user_id, slot_index, response)
     raise LockedError, "Poll is locked — reset to vote again" if locked?
     raise InvalidResponseError, "Response must be yes, maybe, or no" unless VALID_RESPONSES.include?(response)
