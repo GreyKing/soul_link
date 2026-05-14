@@ -1,0 +1,7 @@
+<% if @poll %>
+  <div data-poll-id="<%= @poll.id %>" data-controller="gym-poll">
+    Poll #<%= @poll.id %> — <%= @poll.status %>
+  </div>
+<% else %>
+  <div data-empty-state>No active poll. <%= button_to "Start poll", gym_poll_path, method: :post %></div>
+<% end %>

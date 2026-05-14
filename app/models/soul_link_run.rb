@@ -3,6 +3,7 @@ class SoulLinkRun < ApplicationRecord
   has_many :soul_link_pokemon, dependent: :destroy
   has_many :soul_link_teams, dependent: :destroy
   has_many :gym_drafts, dependent: :destroy
+  has_many :gym_polls,  dependent: :destroy
   has_many :gym_results, dependent: :destroy
   has_many :gym_auto_mark_suppressions, dependent: :destroy
   has_many :soul_link_emulator_sessions, dependent: :destroy
