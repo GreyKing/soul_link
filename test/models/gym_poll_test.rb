@@ -107,3 +107,102 @@ class GymPollMaterializationTest < ActiveSupport::TestCase
     assert_equal [2026, 11, 2, 7, 0], [mon.year, mon.month, mon.day, mon.hour, mon.min]
   end
 end
+
+class GymPollVoteTest < ActiveSupport::TestCase
+  PLAYER_IDS = [111, 222, 333, 444].freeze
+
+  def with_player_ids(&block)
+    SoulLink::GameState.stub(:player_ids, PLAYER_IDS, &block)
+  end
+
+  def open_poll
+    create(:gym_poll, state_data: {
+      "slots" => [
+        { "index" => 0, "scheduled_at" => 2.days.from_now.utc.iso8601 },
+        { "index" => 1, "scheduled_at" => 4.days.from_now.utc.iso8601 }
+      ],
+      "votes" => {}
+    })
+  end
+
+  test "vote! records the response in state_data" do
+    poll = open_poll
+    with_player_ids { poll.vote!(111, 0, "yes") }
+    poll.reload
+    assert_equal "yes", poll.votes["111"]["0"]
+  end
+
+  test "vote! is idempotent — re-voting same value is fine" do
+    poll = open_poll
+    with_player_ids do
+      poll.vote!(111, 0, "yes")
+      poll.vote!(111, 0, "yes")
+    end
+    assert_equal "yes", poll.reload.votes["111"]["0"]
+  end
+
+  test "vote! flips an existing vote" do
+    poll = open_poll
+    with_player_ids do
+      poll.vote!(111, 0, "yes")
+      poll.vote!(111, 0, "no")
+    end
+    assert_equal "no", poll.reload.votes["111"]["0"]
+  end
+
+  test "vote! locks the poll when all 4 players say yes on a slot" do
+    poll = open_poll
+    with_player_ids { PLAYER_IDS.each { |uid| poll.vote!(uid, 0, "yes") } }
+    poll.reload
+    assert poll.locked?
+    assert_equal 0, poll.locked_slot_index
+    assert_not_nil poll.locked_at
+  end
+
+  test "vote! does not lock when 3 yes and 1 maybe" do
+    poll = open_poll
+    with_player_ids do
+      poll.vote!(PLAYER_IDS[0], 0, "yes")
+      poll.vote!(PLAYER_IDS[1], 0, "yes")
+      poll.vote!(PLAYER_IDS[2], 0, "yes")
+      poll.vote!(PLAYER_IDS[3], 0, "maybe")
+    end
+    assert poll.reload.open?
+  end
+
+  test "vote! does not lock when 3 yes only (one player hasn't voted)" do
+    poll = open_poll
+    with_player_ids do
+      poll.vote!(PLAYER_IDS[0], 0, "yes")
+      poll.vote!(PLAYER_IDS[1], 0, "yes")
+      poll.vote!(PLAYER_IDS[2], 0, "yes")
+    end
+    assert poll.reload.open?
+  end
+
+  test "vote! raises when poll is locked" do
+    poll = create(:gym_poll, :locked)
+    with_player_ids do
+      error = assert_raises(GymPoll::LockedError) { poll.vote!(111, 0, "yes") }
+      assert_match(/locked/i, error.message)
+    end
+  end
+
+  test "vote! raises when slot index is out of range" do
+    poll = open_poll
+    with_player_ids { assert_raises(GymPoll::InvalidSlotError) { poll.vote!(111, 99, "yes") } }
+  end
+
+  test "vote! raises when slot is in the past" do
+    poll = create(:gym_poll, state_data: {
+      "slots" => [ { "index" => 0, "scheduled_at" => 1.hour.ago.utc.iso8601 } ],
+      "votes" => {}
+    })
+    with_player_ids { assert_raises(GymPoll::PastSlotError) { poll.vote!(111, 0, "yes") } }
+  end
+
+  test "vote! raises on invalid response" do
+    poll = open_poll
+    with_player_ids { assert_raises(GymPoll::InvalidResponseError) { poll.vote!(111, 0, "potato") } }
+  end
+end
