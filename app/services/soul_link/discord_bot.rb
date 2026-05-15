@@ -166,11 +166,17 @@ module SoulLink
           next
         end
 
+        channel = run.general_channel_id && bot.channel(run.general_channel_id)
+        unless channel
+          event.edit_response(content: "❌ Could not find the general channel for this run. " \
+            "Set it via `/start_new_run` or verify the channel ID in the dashboard.")
+          next
+        end
+
         begin
           slots = GymPoll.materialize_slots(run)
           poll = run.gym_polls.create!(state_data: { "slots" => slots, "votes" => {} })
 
-          channel = bot.channel(run.general_channel_id)
           message = post_initial_poll_message(channel, poll)
           poll.update!(
             discord_channel_id: run.general_channel_id,
