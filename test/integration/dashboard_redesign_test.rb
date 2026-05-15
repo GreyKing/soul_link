@@ -282,6 +282,30 @@ class DashboardRedesignTest < ActionDispatch::IntegrationTest
       "expected redirect to end with #runs, got #{response.redirect_url.inspect}"
   end
 
+  # ── Schedule tab ─────────────────────────────────────────────────────
+  # Regression: when a run has a populated `schedule_template`, the
+  # dashboard's `_schedule_content` partial renders `runs/_edit_form`,
+  # which loops over the slots and renders the `slot_row` partial. With
+  # an unqualified `render "slot_row"`, Rails resolves the lookup
+  # relative to the DashboardController (→ `dashboard/_slot_row`) and
+  # raises `ActionView::MissingTemplate`, blowing up the whole page.
+
+  test "dashboard renders the SCHEDULE tab when run has a populated schedule_template" do
+    @run.update!(schedule_template: {
+      "slots" => [
+        { "day_of_week" => 1, "time_of_day" => "19:00" },
+        { "day_of_week" => 3, "time_of_day" => "20:00" }
+      ]
+    })
+
+    get root_path
+    assert_response :success
+    # The slot_row partial renders a <input type="time"> per slot —
+    # asserting both inputs prove the partial resolved correctly.
+    assert_select "input[type=time][value=?]", "19:00"
+    assert_select "input[type=time][value=?]", "20:00"
+  end
+
   # ── Helpers ──────────────────────────────────────────────────────────
 
   private

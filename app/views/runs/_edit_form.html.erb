@@ -18,7 +18,7 @@
     <legend>Weekly Slots (max 5)</legend>
     <div data-schedule-template-target="slotList">
       <% (run.schedule_template&.dig("slots") || []).each_with_index do |slot, idx| %>
-        <%= render "slot_row", index: idx, slot: slot %>
+        <%= render "runs/slot_row", index: idx, slot: slot %>
       <% end %>
     </div>
     <%= f.hidden_field :schedule_template, value: run.schedule_template&.to_json, data: { schedule_template_target: "hiddenInput" } %>
