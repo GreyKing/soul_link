@@ -22,28 +22,32 @@ class GymPollFlowTest < ActionDispatch::IntegrationTest
 
   test "happy path: create -> vote -> lock -> reset" do
     with_player_data do
-      # Create
-      assert_difference -> { GymPoll.count }, 1 do
-        post gym_poll_path
-      end
-      poll = GymPoll.last
-      poll.update!(discord_channel_id: 999, discord_message_id: 555)
+      # Freeze time to Monday 6am Phoenix — before the Mon 7pm slot materializes,
+      # so votes on slot 0 never raise PastSlotError regardless of wall-clock day.
+      travel_to Time.find_zone("America/Phoenix").local(2026, 5, 11, 6, 0) do
+        # Create
+        assert_difference -> { GymPoll.count }, 1 do
+          post gym_poll_path
+        end
+        poll = GymPoll.last
+        poll.update!(discord_channel_id: 999, discord_message_id: 555)
 
-      # Vote (model-level — channel test covers the channel path)
-      poll.vote!(111, 0, "yes")
-      poll.vote!(222, 0, "yes")
-      poll.vote!(333, 0, "yes")
-      assert_enqueued_with(job: GymPollLockJob, args: [poll.id]) do
-        poll.vote!(444, 0, "yes")
-      end
-      assert poll.reload.locked?
+        # Vote (model-level — channel test covers the channel path)
+        poll.vote!(111, 0, "yes")
+        poll.vote!(222, 0, "yes")
+        poll.vote!(333, 0, "yes")
+        assert_enqueued_with(job: GymPollLockJob, args: [poll.id]) do
+          poll.vote!(444, 0, "yes")
+        end
+        assert poll.reload.locked?
 
-      # Verify additional votes are rejected on locked poll
-      assert_raises(GymPoll::LockedError) { poll.vote!(111, 1, "yes") }
+        # Verify additional votes are rejected on locked poll
+        assert_raises(GymPoll::LockedError) { poll.vote!(111, 1, "yes") }
 
-      # Reset
-      assert_difference -> { GymPoll.count }, -1 do
-        delete gym_poll_path
+        # Reset
+        assert_difference -> { GymPoll.count }, -1 do
+          delete gym_poll_path
+        end
       end
     end
   end
