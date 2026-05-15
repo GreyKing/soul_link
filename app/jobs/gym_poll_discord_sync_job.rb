@@ -54,7 +54,7 @@ class GymPollDiscordSyncJob < ApplicationJob
       state[:slots].each do |slot|
         next if slot[:past]
         at = Time.iso8601(slot[:scheduled_at]).in_time_zone(tz)
-        label_base = at.strftime("%-l%P").sub(":00", "")
+        label_base = at.strftime("%a %-l%P").sub(":00", "")
         rows << {
           type: 1, components: [
             { type: 2, style: 3, label: "#{label_base} ✅", custom_id: "soul_link:gym_poll_vote:#{poll.id}:#{slot[:index]}:yes"   },
