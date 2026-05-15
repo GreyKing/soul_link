@@ -11,13 +11,18 @@ module EmulatorJSInstaller
   # only contains the unbuilt source tree (data/src/...), which forces the
   # loader into its FAILSAFE path with known runtime bugs (setImmediates.shift).
   # Self-hosting requires the 7z asset; that requires `7z` (p7zip) on PATH.
-  REPO = "EmulatorJS/EmulatorJS".freeze
-  USER_AGENT = "soul_link-emulatorjs-installer".freeze
-  MAX_REDIRECTS = 5
+  #
+  # `unless defined?` guards: Rake loads task files more than once during
+  # `bin/rails test` (the tailwindcss-rails `test:prepare` hook triggers
+  # `Rails.application.load_tasks`, then the test command re-loads them),
+  # which otherwise prints "already initialized constant" warnings.
+  REPO = "EmulatorJS/EmulatorJS".freeze unless defined?(REPO)
+  USER_AGENT = "soul_link-emulatorjs-installer".freeze unless defined?(USER_AGENT)
+  MAX_REDIRECTS = 5 unless defined?(MAX_REDIRECTS)
 
   # File whose presence we treat as proof of a complete install. Only present
   # when the built bundle was extracted (not in the source-only tarball).
-  INSTALL_MARKER = "data/emulator.min.js".freeze
+  INSTALL_MARKER = "data/emulator.min.js".freeze unless defined?(INSTALL_MARKER)
 
   module_function
 

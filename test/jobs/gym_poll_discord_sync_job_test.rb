@@ -22,8 +22,12 @@ class GymPollDiscordSyncJobTest < ActiveJob::TestCase
 
   test "noop when discord_message_id is nil" do
     @poll.update!(discord_message_id: nil)
-    with_credentials_and_players { GymPollDiscordSyncJob.perform_now(@poll.id) }
-    # No WebMock stub set; if a request fires, the test fails.
+    # No WebMock stubs: an outbound request would raise (WebMock blocks net traffic),
+    # which `assert_nothing_raised` would catch. Doubles as the assertion that silences
+    # minitest's "Test is missing assertions" warning.
+    with_credentials_and_players do
+      assert_nothing_raised { GymPollDiscordSyncJob.perform_now(@poll.id) }
+    end
   end
 
   test "PATCHes the message embed" do

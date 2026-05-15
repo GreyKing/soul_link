@@ -208,6 +208,10 @@ class GymPollVoteTest < ActiveSupport::TestCase
 end
 
 class GymPollCallbackTest < ActiveSupport::TestCase
+  # `assert_enqueued_with` / `assert_no_enqueued_jobs` live in ActiveJob::TestHelper.
+  # ActiveJob::TestCase mixes this in automatically; ActiveSupport::TestCase does not.
+  include ActiveJob::TestHelper
+
   PLAYERS = [
     { "discord_user_id" => 111, "display_name" => "A" },
     { "discord_user_id" => 222, "display_name" => "B" },

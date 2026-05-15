@@ -4,7 +4,11 @@ require "yaml"
 require "fileutils"
 
 module PokemonDataFetcher
-  POKEAPI_BASE = "https://pokeapi.co/api/v2"
+  # `unless defined?` guards: Rake task files load more than once during
+  # `bin/rails test` (the tailwindcss-rails `test:prepare` hook triggers
+  # `Rails.application.load_tasks`, then the test command re-loads them),
+  # which otherwise prints "already initialized constant" warnings.
+  POKEAPI_BASE = "https://pokeapi.co/api/v2" unless defined?(POKEAPI_BASE)
 
   POKEAPI_NAME_MAP = {
     "nidoran-f" => "Nidoran\u2640",
@@ -14,7 +18,7 @@ module PokemonDataFetcher
     "mime-jr"   => "Mime Jr.",
     "porygon-z" => "Porygon-Z",
     "ho-oh"     => "Ho-Oh"
-  }.freeze
+  }.freeze unless defined?(POKEAPI_NAME_MAP)
 
   STAT_NAME_MAP = {
     "hp"              => :hp,
@@ -23,7 +27,7 @@ module PokemonDataFetcher
     "special-attack"  => :spa,
     "special-defense" => :spd,
     "speed"           => :spe
-  }.freeze
+  }.freeze unless defined?(STAT_NAME_MAP)
 
   def self.normalize_species_name(api_name)
     POKEAPI_NAME_MAP[api_name] || api_name.split("-").map(&:capitalize).join(" ")

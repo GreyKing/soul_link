@@ -7,7 +7,7 @@ class GymPollChannel < ApplicationCable::Channel
 
   def vote(data)
     unless SoulLink::GameState.registered_player?(current_user_id)
-      transmit(type: "error", message: "You aren't a player in this run.")
+      transmit({ type: "error", message: "You aren't a player in this run." })
       return
     end
 
@@ -15,7 +15,7 @@ class GymPollChannel < ApplicationCable::Channel
     @poll.vote!(current_user_id, data["slot_index"].to_i, data["response"])
     broadcast_state
   rescue => e
-    transmit(type: "error", message: e.message)
+    transmit({ type: "error", message: e.message })
   end
 
   def reset(_data = {})
@@ -23,7 +23,7 @@ class GymPollChannel < ApplicationCable::Channel
     GymPollChannel.broadcast_to(@poll, type: "poll_reset")
     @poll.destroy
   rescue => e
-    transmit(type: "error", message: e.message)
+    transmit({ type: "error", message: e.message })
   end
 
   private

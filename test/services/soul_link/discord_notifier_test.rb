@@ -226,12 +226,21 @@ module SoulLink
 
     # ── token resolution fallback ────────────────────────────────────────
 
-    test "when discord credentials are absent, send_message short-circuits without calling create_message" do
+    test "when resolve_token returns blank, send_message short-circuits without calling create_message" do
       called = false
       stub = ->(*) { called = true }
+      # Stub resolve_token to return nil explicitly. We previously relied on
+      # the real path (no `RAILS_MASTER_KEY` in test env -> credentials.discord
+      # is nil -> resolve_token is nil), but other parallel tests that stub
+      # `Rails.application.credentials.discord` can leave behind a
+      # singleton-class method on the shared credentials object — making this
+      # test flaky depending on parallel-worker scheduling. Stubbing
+      # `resolve_token` directly removes that environmental dependency while
+      # preserving the contract under test: blank token -> no API call.
       Discordrb::API::Channel.stub(:create_message, stub) do
-        # No resolve_token stub → real path resolves nil in test env.
-        SoulLink::DiscordNotifier.notify_run_complete(@run)
+        SoulLink::DiscordNotifier.stub(:resolve_token, nil) do
+          SoulLink::DiscordNotifier.notify_run_complete(@run)
+        end
       end
       assert_not called, "create_message should not be invoked when token is blank"
     end

@@ -31,10 +31,13 @@ class GymPollLockJobTest < ActiveJob::TestCase
       .to_return(status: 200, body: "{}")
     with_creds_and_players { GymPollLockJob.perform_now(@poll.id) }
     assert_requested post_stub
-    assert_includes body_captured, "<@111>"
-    assert_includes body_captured, "<@222>"
-    assert_includes body_captured, "<@333>"
-    assert_includes body_captured, "<@444>"
+    # Ruby's `to_json` escapes `<` and `>` as `<`/`>` (HTML-safe default),
+    # so parse the body and assert on the decoded `content` field rather than the raw bytes.
+    content = JSON.parse(body_captured).fetch("content")
+    assert_includes content, "<@111>"
+    assert_includes content, "<@222>"
+    assert_includes content, "<@333>"
+    assert_includes content, "<@444>"
   end
 
   test "PATCHes the poll embed to a locked state" do
@@ -64,7 +67,11 @@ class GymPollLockJobTest < ActiveJob::TestCase
 
   test "noop when poll is not locked" do
     @poll.update!(status: "open", locked_slot_index: nil, locked_at: nil)
-    with_creds_and_players { GymPollLockJob.perform_now(@poll.id) }
-    # No stubs; an outbound request would raise.
+    # No WebMock stubs: an outbound request would raise (WebMock blocks net traffic),
+    # which `assert_nothing_raised` would catch. Doubles as the assertion that silences
+    # minitest's "Test is missing assertions" warning.
+    with_creds_and_players do
+      assert_nothing_raised { GymPollLockJob.perform_now(@poll.id) }
+    end
   end
 end
