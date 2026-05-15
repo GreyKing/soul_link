@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_04_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_14_120002) do
   create_table "gym_auto_mark_suppressions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "gym_number", null: false
@@ -33,6 +33,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_000001) do
     t.index ["soul_link_run_id"], name: "index_gym_drafts_on_soul_link_run_id"
   end
 
+  create_table "gym_polls", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "discord_channel_id"
+    t.bigint "discord_message_id"
+    t.bigint "gym_draft_id"
+    t.datetime "locked_at"
+    t.integer "locked_slot_index"
+    t.datetime "pinged_at"
+    t.bigint "soul_link_run_id", null: false
+    t.json "state_data", null: false
+    t.string "status", default: "open", null: false
+    t.datetime "updated_at", null: false
+    t.index ["gym_draft_id"], name: "index_gym_polls_on_gym_draft_id"
+    t.index ["soul_link_run_id", "status"], name: "index_gym_polls_on_soul_link_run_id_and_status"
+    t.index ["soul_link_run_id"], name: "index_gym_polls_on_soul_link_run_id"
+  end
+
   create_table "gym_results", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "beaten_at", null: false
     t.datetime "created_at", null: false
@@ -44,22 +61,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_000001) do
     t.index ["gym_draft_id"], name: "index_gym_results_on_gym_draft_id"
     t.index ["soul_link_run_id", "gym_number"], name: "index_gym_results_on_soul_link_run_id_and_gym_number", unique: true
     t.index ["soul_link_run_id"], name: "index_gym_results_on_soul_link_run_id"
-  end
-
-  create_table "gym_schedules", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.bigint "discord_channel_id"
-    t.bigint "discord_message_id"
-    t.bigint "gym_draft_id"
-    t.bigint "proposed_by", null: false
-    t.datetime "scheduled_at", null: false
-    t.bigint "soul_link_run_id", null: false
-    t.json "state_data"
-    t.string "status", default: "proposed", null: false
-    t.datetime "updated_at", null: false
-    t.index ["gym_draft_id"], name: "index_gym_schedules_on_gym_draft_id"
-    t.index ["soul_link_run_id", "status"], name: "index_gym_schedules_on_soul_link_run_id_and_status"
-    t.index ["soul_link_run_id"], name: "index_gym_schedules_on_soul_link_run_id"
   end
 
   create_table "pokemon_base_stats", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -231,6 +232,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_000001) do
     t.integer "gyms_defeated", default: 0, null: false
     t.json "player_avatars"
     t.integer "run_number", null: false
+    t.json "schedule_template"
+    t.string "timezone", default: "America/Phoenix", null: false
     t.datetime "updated_at", null: false
     t.datetime "wiped_at"
     t.index ["active"], name: "index_soul_link_runs_on_active"
@@ -264,10 +267,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_000001) do
 
   add_foreign_key "gym_auto_mark_suppressions", "soul_link_runs"
   add_foreign_key "gym_drafts", "soul_link_runs"
+  add_foreign_key "gym_polls", "gym_drafts"
+  add_foreign_key "gym_polls", "soul_link_runs"
   add_foreign_key "gym_results", "gym_drafts"
   add_foreign_key "gym_results", "soul_link_runs"
-  add_foreign_key "gym_schedules", "gym_drafts"
-  add_foreign_key "gym_schedules", "soul_link_runs"
   add_foreign_key "pokemon_learnsets", "pokemon_base_stats"
   add_foreign_key "pokemon_learnsets", "pokemon_moves"
   add_foreign_key "soul_link_emulator_save_slots", "soul_link_emulator_sessions"

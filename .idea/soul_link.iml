@@ -66,6 +66,8 @@
     <orderEntry type="library" scope="PROVIDED" name="erb (v6.0.0, ruby-3.4.5-p51) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="erubi (v1.13.1, ruby-3.4.5-p51) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="event_emitter (v0.2.6, ruby-3.4.5-p51) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="factory_bot (v6.5.6, ruby-3.4.5-p51) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="factory_bot_rails (v6.5.1, ruby-3.4.5-p51) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="faraday (v2.14.1, ruby-3.4.5-p51) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="faraday-net_http (v3.4.2, ruby-3.4.5-p51) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="ffi (v1.17.3, ruby-3.4.5-p51) [gem]" level="application" />
@@ -93,7 +95,6 @@
     <orderEntry type="library" scope="PROVIDED" name="mime-types-data (v3.2026.0127, ruby-3.4.5-p51) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="mini_magick (v5.3.1, ruby-3.4.5-p51) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="mini_mime (v1.1.5, ruby-3.4.5-p51) [gem]" level="application" />
-    <orderEntry type="library" scope="PROVIDED" name="mini_portile2 (v2.8.9, ruby-3.4.5-p51) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="minitest (v5.26.1, ruby-3.4.5-p51) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="msgpack (v1.8.0, ruby-3.4.5-p51) [gem]" level="application" />
     <orderEntry type="library" scope="PROVIDED" name="multi_xml (v0.8.1, ruby-3.4.5-p51) [gem]" level="application" />
