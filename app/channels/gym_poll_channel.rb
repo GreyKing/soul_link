@@ -6,6 +6,11 @@ class GymPollChannel < ApplicationCable::Channel
   end
 
   def vote(data)
+    unless SoulLink::GameState.registered_player?(current_user_id)
+      transmit(type: "error", message: "You aren't a player in this run.")
+      return
+    end
+
     @poll.reload
     @poll.vote!(current_user_id, data["slot_index"].to_i, data["response"])
     broadcast_state

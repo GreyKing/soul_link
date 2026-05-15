@@ -57,4 +57,15 @@ class GymPollChannelTest < ActionCable::Channel::TestCase
       end
     end
   end
+
+  test "vote action rejects unregistered users" do
+    with_player_data do
+      stub_connection current_user_id: 99999  # not in PLAYER_IDS
+      subscribe(id: @poll.id)
+      perform :vote, { "slot_index" => 0, "response" => "yes" }
+    end
+    err = transmissions.find { |t| t["type"] == "error" }
+    assert err
+    assert_match(/aren't a player/i, err["message"])
+  end
 end
