@@ -7,8 +7,9 @@ class GymPoll < ApplicationRecord
 
   validates :status, inclusion: { in: STATUSES }
 
-  after_update_commit :enqueue_discord_sync, if: :discord_message_id?
-  after_update_commit :enqueue_lock_job,     if: :saved_change_to_status_to_locked?
+  after_update_commit :enqueue_discord_sync,
+                      if: -> { discord_message_id? && !saved_change_to_status_to_locked? }
+  after_update_commit :enqueue_lock_job, if: :saved_change_to_status_to_locked?
 
   class EmptyTemplateError  < StandardError; end
   class LockedError          < StandardError; end
