@@ -65,6 +65,8 @@ group :test do
   gem "selenium-webdriver"
   # Test data factories — used by new test code; legacy tests stay on fixtures.
   gem "factory_bot_rails"
+  # HTTP request stubbing for job tests that call external APIs.
+  gem "webmock"
 end
 
 gem 'discordrb', github: 'shardlab/discordrb', branch: 'main'

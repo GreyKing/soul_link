@@ -37,10 +37,11 @@ Rails.application.routes.draw do
     member { post :mark_beaten }
   end
   resources :gym_results, only: [ :update ]
-  resources :gym_schedules, only: [ :index, :create, :show ]
-
   # Run management
-  resources :runs, only: [ :index ]
+  resources :runs, only: %i[index edit update]
+
+  # Singleton poll: one open/locked poll per run at a time
+  resource :gym_poll, only: %i[show create destroy], controller: "gym_polls"
 
   # Player-facing emulator (auto-claims one of the run's randomized ROMs)
   resource :emulator, only: [ :show ], controller: "emulator" do

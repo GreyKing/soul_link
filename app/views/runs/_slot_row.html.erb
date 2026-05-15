@@ -1,0 +1,9 @@
+<div class="slot-row" data-schedule-template-target="slotRow" data-index="<%= index %>">
+  <select name="slot_day_<%= index %>" data-action="change->schedule-template#sync">
+    <% [["Mon",1],["Tue",2],["Wed",3],["Thu",4],["Fri",5],["Sat",6],["Sun",7]].each do |(label, val)| %>
+      <option value="<%= val %>" <%= "selected" if slot["day_of_week"] == val %>><%= label %></option>
+    <% end %>
+  </select>
+  <input type="time" name="slot_time_<%= index %>" value="<%= slot["time_of_day"] %>" data-action="change->schedule-template#sync">
+  <button type="button" data-action="click->schedule-template#removeSlot">Remove</button>
+</div>

@@ -8,6 +8,28 @@
        data-controller="status-rail"
        aria-label="Live status">
 
+  <% if @open_gym_poll %>
+    <div class="rail-tile rail-tile-poll">
+      <h4>GYM POLL</h4>
+      <% if @open_gym_poll.locked? %>
+        <p>&#128274; Locked</p>
+        <% slot = @open_gym_poll.slots.find { |s| s["index"].to_i == @open_gym_poll.locked_slot_index } %>
+        <% if slot %>
+          <% at = Time.iso8601(slot["scheduled_at"]).in_time_zone(@run.timezone) %>
+          <p><%= at.strftime("%a %-l:%M %p") %></p>
+        <% end %>
+      <% else %>
+        <% top = @open_gym_poll.broadcast_state[:slots].max_by { |s| s[:yes_count] } %>
+        <p><%= @open_gym_poll.broadcast_state[:slots].sum { |s| s[:yes_count] } %> votes</p>
+        <% if top %>
+          <% at = Time.iso8601(top[:scheduled_at]).in_time_zone(@run.timezone) %>
+          <p>Top: <%= at.strftime("%a %-l%P").sub(":00","") %></p>
+        <% end %>
+      <% end %>
+      <%= link_to "Open poll →", gym_poll_path %>
+    </div>
+  <% end %>
+
   <div class="side-tabs"
        role="tablist"
        aria-label="Status panels"

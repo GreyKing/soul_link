@@ -34,7 +34,7 @@ For detailed documentation, see `.claude/documents/`:
 | [discord-bot.md](.claude/documents/discord-bot.md) | Bot setup, slash commands, button/modal interactions, panel management, rake tasks |
 | [discord-auth.md](.claude/documents/discord-auth.md) | OAuth flow, session keys, guild validation, DiscordAuthentication concern |
 | [gym-draft.md](.claude/documents/gym-draft.md) | 5-phase draft state machine, ActionCable channel, Stimulus controller |
-| [gym-schedule.md](.claude/documents/gym-schedule.md) | RSVP scheduling, auto-confirm, Discord message sync |
+| [gym-poll.md](.claude/documents/gym-poll.md) | Weekly multi-slot poll, lock-on-all-yes, manual reset |
 | [frontend.md](.claude/documents/frontend.md) | Stimulus controllers, SortableJS drag-and-drop, Importmap, Tailwind theme |
 | [services.md](.claude/documents/services.md) | GameState config loader, TypeChart analysis, YAML file reference |
 | [controllers-routes.md](.claude/documents/controllers-routes.md) | Full route map, controller actions, common patterns |
@@ -44,7 +44,7 @@ For detailed documentation, see `.claude/documents/`:
 
 - **Domain model:** `SoulLinkRun` → `PokemonGroup` → `Pokemon` (one per player per group). Teams have max 6 slots referencing groups.
 - **Auth:** Discord OAuth, session-based, no User model. Guild ID scopes all data.
-- **Real-time:** ActionCable channels for GymDraft and GymSchedule. Pattern: `stream_for @record`, broadcast full state, client re-renders.
+- **Real-time:** ActionCable channels for GymDraft and GymPoll. Pattern: `stream_for @record`, broadcast full state, client re-renders.
 - **Dev gotcha:** Async cable adapter only works within same process — `rails console` broadcasts won't reach browser.
 - **Config:** YAML files in `config/soul_link/`, loaded via `SoulLink::GameState`.
 - **Bot:** Separate process (`rake soul_link:bot`), shares Rails models. Custom ID format: `soul_link:action:context:value`.

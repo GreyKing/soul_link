@@ -141,6 +141,75 @@ module SoulLink
         end
       end
 
+      # /new_gym_poll - Create a new weekly gym poll from the template
+      bot.register_application_command(
+        :new_gym_poll,
+        'Start a new weekly gym poll from your schedule template'
+      )
+
+      bot.application_command(:new_gym_poll) do |event|
+        event.defer(ephemeral: true)
+
+        run = current_run(event)
+        unless run
+          event.edit_response(content: "❌ No active run found! Use `/start_new_run` first.")
+          next
+        end
+
+        if run.schedule_template.blank?
+          event.edit_response(content: "❌ No schedule template set. Configure it on the dashboard Schedule tab first.")
+          next
+        end
+
+        if run.gym_polls.where(status: %w[open locked]).exists?
+          event.edit_response(content: "❌ An open poll already exists. Click the Reset button on it (or run `/reset_gym_poll`) first.")
+          next
+        end
+
+        begin
+          slots = GymPoll.materialize_slots(run)
+          poll = run.gym_polls.create!(state_data: { "slots" => slots, "votes" => {} })
+
+          channel = bot.channel(run.general_channel_id)
+          message = post_initial_poll_message(channel, poll)
+          poll.update!(
+            discord_channel_id: run.general_channel_id,
+            discord_message_id: message.id
+          )
+
+          event.edit_response(content: "✅ Posted gym poll to ##{channel.name}!")
+        rescue GymPoll::EmptyTemplateError => e
+          event.edit_response(content: "❌ #{e.message}")
+        rescue => e
+          Rails.logger.error "Failed to create gym poll: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+          event.edit_response(content: "❌ Failed to create gym poll: #{e.message}")
+        end
+      end
+
+      # /reset_gym_poll - Destroy the current poll
+      bot.register_application_command(
+        :reset_gym_poll,
+        'Reset the current gym poll'
+      )
+
+      bot.application_command(:reset_gym_poll) do |event|
+        event.defer(ephemeral: true)
+        run = current_run(event)
+        unless run
+          event.edit_response(content: "❌ No active run found!")
+          next
+        end
+
+        poll = run.gym_polls.where(status: %w[open locked]).first
+        unless poll
+          event.edit_response(content: "❌ No active poll to reset.")
+          next
+        end
+
+        poll.destroy
+        event.edit_response(content: "✅ Poll reset. Run `/new_gym_poll` to start the next one.")
+      end
+
       # Text command for !next_gym
       bot.message(content: '!next_gym') do |event|
         next unless event.channel.id == current_run(event)&.general_channel_id
@@ -223,6 +292,16 @@ module SoulLink
       # Modal: Uncaught death submission
       bot.modal_submit(custom_id: 'soul_link:uncaught_death_modal') do |event|
         handle_uncaught_death_submission(event)
+      end
+
+      # Button: Gym poll vote
+      bot.button(custom_id: /^soul_link:gym_poll_vote:/) do |event|
+        handle_gym_poll_vote(event)
+      end
+
+      # Button: Gym poll reset
+      bot.button(custom_id: /^soul_link:gym_poll_reset:/) do |event|
+        handle_gym_poll_reset(event)
       end
     end
 
@@ -919,6 +998,59 @@ module SoulLink
     end
 
     # ------------------------
+    # Gym Poll Helpers
+    # ------------------------
+    def post_initial_poll_message(channel, poll)
+      state = poll.broadcast_state
+      tz = ActiveSupport::TimeZone[state[:timezone]]
+      week_label = state[:slots].first ? Time.iso8601(state[:slots].first[:scheduled_at]).in_time_zone(tz).strftime("Week of %b %-d") : ""
+
+      slot_lines = state[:slots].map do |slot|
+        at = Time.iso8601(slot[:scheduled_at]).in_time_zone(tz)
+        label = at.strftime("%a %-l:%M %p")
+        "**#{label}** — 0✅ / 0❓ / 0❌ / 4⏳"
+      end
+
+      embed = Discordrb::Webhooks::Embed.new(
+        title: "🗓️ Gym Poll — #{week_label}",
+        description: slot_lines.join("\n"),
+        color: 0x5865F2,
+        timestamp: Time.now
+      )
+
+      channel.send_message('', false, embed, nil, nil, nil, build_poll_components(poll))
+    end
+
+    def build_poll_components(poll)
+      state = poll.broadcast_state
+      tz = ActiveSupport::TimeZone[state[:timezone]]
+      rows = []
+
+      state[:slots].each do |slot|
+        next if slot[:past]
+        at = Time.iso8601(slot[:scheduled_at]).in_time_zone(tz)
+        label_base = at.strftime("%a %-l%P").sub(":00", "")
+        rows << {
+          type: 1, # Action Row
+          components: [
+            { type: 2, style: 3, label: "#{label_base} ✅", custom_id: "soul_link:gym_poll_vote:#{poll.id}:#{slot[:index]}:yes" },
+            { type: 2, style: 2, label: "#{label_base} ❓", custom_id: "soul_link:gym_poll_vote:#{poll.id}:#{slot[:index]}:maybe" },
+            { type: 2, style: 4, label: "#{label_base} ❌", custom_id: "soul_link:gym_poll_vote:#{poll.id}:#{slot[:index]}:no" }
+          ]
+        }
+      end
+
+      rows << {
+        type: 1,
+        components: [
+          { type: 2, style: 4, label: "🔄 Reset", custom_id: "soul_link:gym_poll_reset:#{poll.id}" }
+        ]
+      }
+
+      rows
+    end
+
+    # ------------------------
     # Helpers
     # ------------------------
     def extract_modal_values(event)
@@ -951,6 +1083,44 @@ module SoulLink
       Rails.logger.error "Event class: #{event.class}"
       Rails.logger.error "Event methods: #{event.methods.grep(/component|value|data/).join(', ')}"
       {}
+    end
+
+    def handle_gym_poll_vote(event)
+      _, _, poll_id, slot_index, response = event.interaction.data["custom_id"].split(":")
+      poll = GymPoll.find_by(id: poll_id)
+      return respond_ephemeral(event, "❌ Poll not found.") unless poll
+
+      discord_user_id = event.user.id
+      unless SoulLink::GameState.registered_player?(discord_user_id)
+        respond_ephemeral(event, "❌ You aren't a player in this run.")
+        return
+      end
+
+      begin
+        poll.vote!(discord_user_id, slot_index.to_i, response)
+        at = Time.iso8601(poll.slots[slot_index.to_i]["scheduled_at"]).in_time_zone(poll.soul_link_run.timezone)
+        confirmation = "Got it — #{at.strftime('%a %-l%P').sub(':00', '')} #{response_emoji(response)}"
+        respond_ephemeral(event, confirmation)
+      rescue GymPoll::LockedError, GymPoll::InvalidSlotError, GymPoll::PastSlotError, GymPoll::InvalidResponseError => e
+        respond_ephemeral(event, "❌ #{e.message}")
+      end
+    end
+
+    def handle_gym_poll_reset(event)
+      _, _, poll_id = event.interaction.data["custom_id"].split(":")
+      poll = GymPoll.find_by(id: poll_id)
+      return respond_ephemeral(event, "❌ Poll not found.") unless poll
+
+      poll.destroy
+      respond_ephemeral(event, "✅ Poll reset.")
+    end
+
+    def response_emoji(response)
+      case response
+      when "yes"   then "✅"
+      when "maybe" then "❓"
+      when "no"    then "❌"
+      end
     end
 
     def respond_ephemeral(event, content)

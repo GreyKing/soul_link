@@ -3,7 +3,7 @@ class SoulLinkRun < ApplicationRecord
   has_many :soul_link_pokemon, dependent: :destroy
   has_many :soul_link_teams, dependent: :destroy
   has_many :gym_drafts, dependent: :destroy
-  has_many :gym_schedules, dependent: :destroy
+  has_many :gym_polls,  dependent: :destroy
   has_many :gym_results, dependent: :destroy
   has_many :gym_auto_mark_suppressions, dependent: :destroy
   has_many :soul_link_emulator_sessions, dependent: :destroy
@@ -11,6 +11,10 @@ class SoulLinkRun < ApplicationRecord
   validates :run_number, presence: true, uniqueness: { scope: :guild_id }
   validates :guild_id, presence: true
   validate :no_other_active_run_for_guild, if: -> { active? }
+  validate :timezone_is_recognized
+  validate :schedule_template_is_well_formed
+
+  TIME_OF_DAY_FORMAT = /\A([01]\d|2[0-3]):[0-5]\d\z/.freeze
 
   # Step 16 — broadcast a Turbo refresh on every run change so that when
   # `HallOfFameCoordinator` updates `completed_at`, the dashboard
@@ -189,5 +193,34 @@ class SoulLinkRun < ApplicationRecord
     scope = scope.where.not(id: id) if persisted?
     return unless scope.exists?
     errors.add(:active, "another run is already active for this guild")
+  end
+
+  def timezone_is_recognized
+    return if timezone.blank?
+    errors.add(:timezone, "is not a recognized time zone") if ActiveSupport::TimeZone[timezone].nil?
+  end
+
+  def schedule_template_is_well_formed
+    return if schedule_template.blank?
+
+    slots = schedule_template["slots"]
+    unless slots.is_a?(Array)
+      errors.add(:schedule_template, "must contain a 'slots' array")
+      return
+    end
+
+    if slots.length > 5
+      errors.add(:schedule_template, "may contain a max 5 slots")
+      return
+    end
+
+    slots.each_with_index do |slot, idx|
+      unless slot.is_a?(Hash) && slot["day_of_week"].is_a?(Integer) && (1..7).cover?(slot["day_of_week"])
+        errors.add(:schedule_template, "slot #{idx}: day_of_week must be an integer 1..7")
+      end
+      unless slot.is_a?(Hash) && slot["time_of_day"].is_a?(String) && slot["time_of_day"].match?(TIME_OF_DAY_FORMAT)
+        errors.add(:schedule_template, "slot #{idx}: time_of_day must be HH:MM 24-hour format")
+      end
+    end
   end
 end

@@ -8,7 +8,7 @@
 <%# Step 24 R1 — wrap in `.dash-r1` namespace + add `run-management`
     controller at the top so the title-bar `+ START NEW RUN` button
     can reach `run-management#startRun` without wiring two ActionCable
-    subscriptions. The window-level numeric jump (1-7) is bound here so
+    subscriptions. The window-level numeric jump (1-8) is bound here so
     it works no matter where focus is. %>
 <div class="dash-r1"
      data-controller="dashboard pixeldex run-management"
@@ -74,6 +74,11 @@
            role="tabpanel" id="panel-calc" aria-labelledby="tab-calc" tabindex="0"
            class="hidden">
         <%= render "calc_content" %>
+      </div>
+      <div data-pixeldex-target="tabContent" data-tab="schedule"
+           role="tabpanel" id="panel-schedule" aria-labelledby="tab-schedule" tabindex="0"
+           class="hidden">
+        <%= render "schedule_content" %>
       </div>
     </div>
 

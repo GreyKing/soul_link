@@ -1,0 +1,9 @@
+<div data-empty-state>
+  <h1>No active gym poll</h1>
+  <% if @run&.schedule_template.blank? %>
+    <p>Set up your weekly slots first.</p>
+    <%= link_to "Configure Schedule", edit_run_path(@run), class: "btn" %>
+  <% else %>
+    <%= button_to "Start a new poll", gym_poll_path, method: :post, class: "btn btn-primary" %>
+  <% end %>
+</div>

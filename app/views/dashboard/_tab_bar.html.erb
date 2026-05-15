@@ -8,7 +8,7 @@
     after the label, no glow chrome (Step 27).
 
     The tab-bar wires `keydown->pixeldex#tablistKeydown` for the
-    arrow / Home / End keyboard contract; the window-level 1-7
+    arrow / Home / End keyboard contract; the window-level 1-8
     numeric jump is bound on the dashboard root via `numericJump`.
 %>
 <%
@@ -19,7 +19,8 @@
     { key: "gyms",     label: "GYMS",     icon: "&#9733;".html_safe, active: false, dot: @active_draft.present? },
     { key: "strategy", label: "STRATEGY", icon: "&#9876;".html_safe, active: false, dot: false },
     { key: "runs",     label: "RUNS",     icon: "&#9881;".html_safe, active: false, dot: false },
-    { key: "calc",     label: "CALC",     icon: "&#8721;".html_safe, active: false, dot: false }
+    { key: "calc",     label: "CALC",     icon: "&#8721;".html_safe, active: false, dot: false },
+    { key: "schedule", label: "SCHEDULE", icon: "&#9200;".html_safe, active: false, dot: @open_gym_poll.present? }
   ]
 %>
 <div class="tab-bar"
