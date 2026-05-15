@@ -1,6 +1,4 @@
 <% if @poll %>
-  <%= turbo_stream_from "gym_poll_#{@poll.id}" %>
-
   <div data-controller="gym-poll"
        data-gym-poll-id-value="<%= @poll.id %>"
        data-gym-poll-state-value="<%= @poll.broadcast_state.to_json %>"
