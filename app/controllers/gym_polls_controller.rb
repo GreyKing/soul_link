@@ -31,17 +31,6 @@ class GymPollsController < ApplicationController
     redirect_to gym_poll_path
   end
 
-  def vote
-    poll = @run.gym_polls.where(status: %w[open locked]).first
-    return redirect_to(gym_poll_path, alert: "No active poll.") unless poll
-
-    poll.vote!(current_user_id, params[:slot_index].to_i, params[:response])
-    redirect_to gym_poll_path
-  rescue GymPoll::LockedError, GymPoll::InvalidSlotError,
-         GymPoll::PastSlotError, GymPoll::InvalidResponseError => e
-    redirect_to gym_poll_path, alert: e.message
-  end
-
   private
 
   def load_run
