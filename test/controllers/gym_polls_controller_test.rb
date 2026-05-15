@@ -29,7 +29,7 @@ class GymPollsControllerTest < ActionDispatch::IntegrationTest
       post gym_poll_path
     end
     assert_response :unprocessable_entity
-    assert_match(/template/i, response.body)
+    assert_match(/schedule/i, response.body)
   end
 
   test "POST /gym_poll refuses when an open poll already exists" do
