@@ -166,10 +166,16 @@ module SoulLink
           next
         end
 
-        channel = run.general_channel_id && bot.channel(run.general_channel_id)
+        unless run.discord_channels_configured?
+          event.edit_response(content: "❌ This run has no Discord channels yet. " \
+            "Click **SETUP DISCORD** on the dashboard, then try again.")
+          next
+        end
+
+        channel = bot.channel(run.general_channel_id)
         unless channel
-          event.edit_response(content: "❌ Could not find the general channel for this run. " \
-            "Set it via `/start_new_run` or verify the channel ID in the dashboard.")
+          event.edit_response(content: "❌ Couldn't reach the run's general channel (#{run.general_channel_id}). " \
+            "It may have been deleted, or the bot may have lost access.")
           next
         end
 
