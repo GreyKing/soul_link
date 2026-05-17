@@ -75,7 +75,7 @@
     </aside>
 
     <main style="min-width: 0; display: flex;">
-      <div class="gb-card" style="padding: 12px; flex: 1; display: flex; align-items: center; justify-content: center;"
+      <div class="gb-card" style="padding: 12px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;"
            data-controller="emulator"
            data-emulator-rom-url-value="<%= rom_emulator_path %>"
            data-emulator-save-data-url-value="<%= save_data_emulator_path %>"
@@ -85,6 +85,15 @@
            data-emulator-core-value="<%= EmulatorController::EMULATOR_CORE %>"
            data-emulator-pathtodata-value="/emulatorjs/data/"
            data-emulator-cheats-value="<%= @cheats.to_json %>">
+        <%# Error banner — hidden by default; the controller toggles `hidden`
+            and writes the message. Two failure modes share one element:
+            save-load failure (blocks boot) and save-upload failure (warns the
+            player their last save didn't reach the server). %>
+        <div data-emulator-target="errorBanner"
+             role="alert"
+             hidden
+             style="width: 100%; padding: 10px 14px; border: 1px solid var(--danger, #b3261e); background: rgba(179, 38, 30, 0.08); color: var(--danger, #b3261e); font-size: 12px; font-family: var(--font-mono, monospace);"></div>
+
         <%# DS native is 256×384 stacked (top + bottom). Lock the container to that
             2:3 aspect ratio, cap at 90vh so it fills the visible viewport without
             scrolling, center horizontally. EmulatorJS scales the canvas to fill

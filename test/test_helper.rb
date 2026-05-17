@@ -4,6 +4,9 @@ require "rails/test_help"
 require "minitest/mock"
 require "webmock/minitest"
 
+# Auto-load shared test helpers from test/support/.
+Dir[File.expand_path("support/**/*.rb", __dir__)].each { |f| require f }
+
 # OmniAuth test mode — prevents real OAuth calls
 OmniAuth.config.test_mode = true
 

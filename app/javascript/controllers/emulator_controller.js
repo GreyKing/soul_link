@@ -29,13 +29,27 @@ export default class extends Controller {
     cheats: { type: Array, default: [] }
   }
 
-  static targets = ["game"]
+  static targets = ["game", "errorBanner"]
 
   async connect() {
     // Server is the source of truth on load. IDBFS is a local convenience
     // cache; if both have data, we inject the server copy into MEMFS inside
     // EJS_ready so melonDS reloads from it.
-    const existingSave = await this._fetchSave()
+    //
+    // _fetchSave returns one of three states:
+    //   { status: "ok", bytes: Uint8Array }  → existing save loaded
+    //   { status: "empty" }                  → 204, first-time player
+    //   { status: "error", message }         → network / server failure
+    // On `error` we surface a banner and DO NOT boot the emulator —
+    // booting from a half-loaded state would render a fresh game over the
+    // player's saved progress and the next manual save would overwrite the
+    // server-side bytes. Player can refresh once the issue clears.
+    const fetched = await this._fetchSave()
+    if (fetched.status === "error") {
+      this._showError(`Could not load your save (${fetched.message}). The emulator was not started to protect your progress. Refresh once the network / server recovers.`)
+      return
+    }
+    const existingSave = fetched.status === "ok" ? fetched.bytes : null
 
     // Set core / save defaults BEFORE loader.js boots. loader.js reads
     // window.EJS_defaultOptions synchronously and feeds it through
@@ -161,16 +175,19 @@ export default class extends Controller {
         headers: { "Accept": "application/octet-stream" },
         credentials: "same-origin"
       })
-      if (res.status === 204) return null
+      if (res.status === 204) return { status: "empty" }
       if (!res.ok) {
         console.error("Emulator: failed to load existing save:", res.status)
-        return null
+        return { status: "error", message: `HTTP ${res.status}` }
       }
       const buf = await res.arrayBuffer()
-      return buf.byteLength > 0 ? new Uint8Array(buf) : null
+      // 200 with 0 bytes shouldn't happen (server uses 204 for empty),
+      // but treat it like "empty" rather than booting fresh-over-existing.
+      if (buf.byteLength === 0) return { status: "empty" }
+      return { status: "ok", bytes: new Uint8Array(buf) }
     } catch (e) {
       console.error("Emulator: error fetching save:", e)
-      return null
+      return { status: "error", message: e?.message || "network error" }
     }
   }
 
@@ -242,14 +259,37 @@ export default class extends Controller {
         window.dispatchEvent(new CustomEvent("save-slots:overwrite-needed", { detail: payload }))
         return
       }
-      if (!res.ok) {
-        console.error("Emulator: save_slots POST failed:", res.status)
+      if (res.status === 422) {
+        // Server rejected the bytes — CRC failed or wrong size. Tell the
+        // player loud and clear: the cartridge bytes didn't reach the
+        // server, the emulator is still running, but their next save needs
+        // to be a clean in-game save (not, say, a mid-frame snapshot).
+        this._showError("Save rejected by the server — the bytes failed validation (corrupt or not a Pokemon Platinum save). Save again in-game, then click Save File. Your previous server-side slots are unchanged.")
         return
       }
-      // 201 Created — refresh the slot column.
+      if (!res.ok) {
+        console.error("Emulator: save_slots POST failed:", res.status)
+        this._showError(`Save failed (HTTP ${res.status}). Your in-emulator progress is fine; click Save File again to retry uploading to the server.`)
+        return
+      }
+      // 201 Created — clear any prior error banner and refresh the slot column.
+      this._hideError()
       window.dispatchEvent(new CustomEvent("save-slots:saved"))
     } catch (e) {
       console.error("Emulator: error saving slot:", e)
+      this._showError(`Save failed to reach the server (${e?.message || "network error"}). Your in-emulator progress is fine; click Save File again to retry.`)
     }
+  }
+
+  _showError(message) {
+    if (!this.hasErrorBannerTarget) return
+    this.errorBannerTarget.textContent = message
+    this.errorBannerTarget.hidden = false
+  }
+
+  _hideError() {
+    if (!this.hasErrorBannerTarget) return
+    this.errorBannerTarget.hidden = true
+    this.errorBannerTarget.textContent = ""
   }
 }

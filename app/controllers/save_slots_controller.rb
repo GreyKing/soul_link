@@ -42,21 +42,55 @@ class SaveSlotsController < ApplicationController
   # POST /emulator/save_slots — write SRAM bytes to first empty slot.
   # 201 on success with slot info; 409 with current slots if all 5 are full
   # (the client then prompts overwrite via the slot column).
+  #
+  # The pick-empty-slot + insert pair is NOT atomic. If two concurrent POSTs
+  # race past the same `pluck`, both target the same `slot_number` and the
+  # DB unique index on (session_id, slot_number) rejects the second insert
+  # with `RecordNotUnique`. We retry up to MAX_SLOT times — each iteration
+  # re-plucks the freshly-committed used set, so a successful peer write
+  # shifts us to the next empty slot. The cap is the slot range itself: if
+  # MAX_SLOT concurrent inserts all win their first attempt, the table is
+  # genuinely full and the next iteration's `empty.nil?` check returns 409.
   def create
     return head :not_found if @session.nil?
     return head :content_too_large if oversized?
     bytes = read_body
     return head :content_too_large if bytes.bytesize > MAX_SAVE_DATA_BYTES
+    return invalid_save_response unless valid_sram?(bytes)
 
-    used = @session.save_slots.pluck(:slot_number).to_set
-    empty = (SoulLinkEmulatorSaveSlot::MIN_SLOT..SoulLinkEmulatorSaveSlot::MAX_SLOT).find { |n| !used.include?(n) }
+    slot = nil
+    SoulLinkEmulatorSaveSlot::MAX_SLOT.times do
+      used = @session.save_slots.pluck(:slot_number).to_set
+      empty = (SoulLinkEmulatorSaveSlot::MIN_SLOT..SoulLinkEmulatorSaveSlot::MAX_SLOT).find { |n| !used.include?(n) }
 
-    if empty.nil?
+      if empty.nil?
+        slots = @session.save_slots.order(:slot_number).map { |s| slot_payload(s) }
+        return render json: { error: "all_slots_full", slots: slots }, status: :conflict
+      end
+
+      begin
+        slot = @session.save_slots.create!(slot_number: empty, save_data: bytes)
+        break
+      rescue ActiveRecord::RecordNotUnique
+        # DB unique-index rejected our insert: another POST committed the
+        # same slot_number between our pluck and our insert. Retry.
+        next
+      rescue ActiveRecord::RecordInvalid => e
+        # Rails' model-level uniqueness validation runs a SELECT EXISTS
+        # pre-check; if a peer committed our chosen slot_number between our
+        # pluck and that pre-check, this raises with "Slot number has
+        # already been taken". Treat the same as RecordNotUnique. Any
+        # non-uniqueness validation failure is a real bug — re-raise.
+        raise unless e.record&.errors&.of_kind?(:slot_number, :taken)
+        next
+      end
+    end
+
+    if slot.nil?
       slots = @session.save_slots.order(:slot_number).map { |s| slot_payload(s) }
       return render json: { error: "all_slots_full", slots: slots }, status: :conflict
     end
 
-    slot = @session.save_slots.create!(slot_number: empty, save_data: bytes)
     @session.update_column(:active_save_slot, slot.slot_number)
     render json: slot_payload(slot), status: :created
   end
@@ -71,6 +105,7 @@ class SaveSlotsController < ApplicationController
     return head :content_too_large if oversized?
     bytes = read_body
     return head :content_too_large if bytes.bytesize > MAX_SAVE_DATA_BYTES
+    return invalid_save_response unless valid_sram?(bytes)
 
     @slot.update!(save_data: bytes)
     @session.update_column(:active_save_slot, @slot.slot_number)
@@ -149,5 +184,20 @@ class SaveSlotsController < ApplicationController
 
   def read_body
     request.body.read
+  end
+
+  # Reject any payload that the parser can't read. Catches:
+  #   - wrong total size (real Platinum SRAM is exactly 0x80000 bytes)
+  #   - both general-block CRCs failing (every byte got corrupted, or
+  #     bytes that aren't a Platinum save at all)
+  # Run synchronously here so the player gets immediate 422 feedback rather
+  # than a silent "save succeeded but parse_job logged a CRC fail" mystery.
+  # The parser is a pure function — sub-millisecond on a 512KB buffer.
+  def valid_sram?(bytes)
+    SoulLink::SaveParser.parse(bytes) ? true : false
+  end
+
+  def invalid_save_response
+    render json: { error: "invalid_save_data" }, status: :unprocessable_content
   end
 end
