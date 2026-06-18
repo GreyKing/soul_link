@@ -38,7 +38,7 @@ class GymPollDiscordSyncJobTest < ActiveJob::TestCase
     assert_requested stub
   end
 
-  test "embed body contains slot fields and tally text" do
+  test "embed body shows voters grouped by response with their names" do
     body_captured = nil
     stub_request(:patch, /discord.com/).with { |req| body_captured = req.body }.to_return(status: 200, body: "{}")
     with_credentials_and_players do
@@ -46,7 +46,8 @@ class GymPollDiscordSyncJobTest < ActiveJob::TestCase
       GymPollDiscordSyncJob.perform_now(@poll.id)
     end
     assert_includes body_captured, "Gym Poll"
-    assert_includes body_captured, "yes"
+    assert_includes body_captured, "✅ A"
+    assert_includes body_captured, "⏳ B, C, D"
   end
 
   test "logs error on 5xx but does not raise" do

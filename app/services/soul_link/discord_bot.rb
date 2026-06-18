@@ -1013,53 +1013,8 @@ module SoulLink
     # Gym Poll Helpers
     # ------------------------
     def post_initial_poll_message(channel, poll)
-      state = poll.broadcast_state
-      tz = ActiveSupport::TimeZone[state[:timezone]]
-      week_label = state[:slots].first ? Time.iso8601(state[:slots].first[:scheduled_at]).in_time_zone(tz).strftime("Week of %b %-d") : ""
-
-      slot_lines = state[:slots].map do |slot|
-        at = Time.iso8601(slot[:scheduled_at]).in_time_zone(tz)
-        label = at.strftime("%a %-l:%M %p")
-        "**#{label}** — 0✅ / 0❓ / 0❌ / 4⏳"
-      end
-
-      embed = Discordrb::Webhooks::Embed.new(
-        title: "🗓️ Gym Poll — #{week_label}",
-        description: slot_lines.join("\n"),
-        color: 0x5865F2,
-        timestamp: Time.now
-      )
-
-      channel.send_message('', false, embed, nil, nil, nil, build_poll_components(poll))
-    end
-
-    def build_poll_components(poll)
-      state = poll.broadcast_state
-      tz = ActiveSupport::TimeZone[state[:timezone]]
-      rows = []
-
-      state[:slots].each do |slot|
-        next if slot[:past]
-        at = Time.iso8601(slot[:scheduled_at]).in_time_zone(tz)
-        label_base = at.strftime("%a %-l%P").sub(":00", "")
-        rows << {
-          type: 1, # Action Row
-          components: [
-            { type: 2, style: 3, label: "#{label_base} ✅", custom_id: "soul_link:gym_poll_vote:#{poll.id}:#{slot[:index]}:yes" },
-            { type: 2, style: 2, label: "#{label_base} ❓", custom_id: "soul_link:gym_poll_vote:#{poll.id}:#{slot[:index]}:maybe" },
-            { type: 2, style: 4, label: "#{label_base} ❌", custom_id: "soul_link:gym_poll_vote:#{poll.id}:#{slot[:index]}:no" }
-          ]
-        }
-      end
-
-      rows << {
-        type: 1,
-        components: [
-          { type: 2, style: 4, label: "🔄 Reset", custom_id: "soul_link:gym_poll_reset:#{poll.id}" }
-        ]
-      }
-
-      rows
+      embed = Discordrb::Webhooks::Embed.new(**SoulLink::GymPollMessage.embed(poll), timestamp: Time.now)
+      channel.send_message('', false, embed, nil, nil, nil, SoulLink::GymPollMessage.components(poll))
     end
 
     # ------------------------
