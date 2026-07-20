@@ -25,22 +25,24 @@
               class="gb-btn gb-btn-sm" style="padding: 2px 4px; font-size: 9px;">
         EDIT
       </button>
-      <%# Step 20 — confirm-modal gate. Trigger opens the modal; the
-          modal's confirm button carries the group id so the JS handler
-          doesn't need to walk back up to data-group-id. %>
-      <button type="button"
-              data-action="click->confirm-modal#open"
-              data-confirm-modal-id-param="delete-group-<%= group.id %>-confirm"
-              class="gb-btn-danger gb-btn-sm" style="padding: 2px 4px; font-size: 9px;">
-        DEL
-      </button>
+      <%# Step 20 — confirm-modal gate. The trigger is passed as a block so it
+          renders inside the controller element; see ConfirmModalHelper for why
+          a sibling trigger never fires. The modal's confirm button carries the
+          group id so the JS handler doesn't need to walk back up to
+          data-group-id. %>
       <%= confirm_modal(
         id: "delete-group-#{group.id}-confirm",
         title: "DELETE GROUP?",
         body: "Removes <strong>#{ERB::Util.html_escape(group.nickname)}</strong> and every player's species assignment in this group.",
         confirm_label: "DELETE GROUP",
         confirm_data: { action: "click->species-assignment#deleteGroup", group_id: group.id }
-      ) %>
+      ) do %>
+        <button type="button"
+                data-action="click->confirm-modal#open"
+                class="gb-btn-danger gb-btn-sm" style="padding: 2px 4px; font-size: 9px;">
+          DEL
+        </button>
+      <% end %>
     </div>
   </div>
 

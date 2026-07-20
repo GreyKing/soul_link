@@ -6,8 +6,42 @@ require "test_helper"
 class ConfirmModalHelperTest < ActionView::TestCase
   include ConfirmModalHelper
 
+  # `confirm_modal` now REQUIRES a trigger block — the trigger and the dialog
+  # must render inside one controller element or Stimulus can never route the
+  # open action. Most tests below only care about the dialog's contents, so
+  # they go through this shim rather than repeating a throwaway trigger.
+  def render_confirm_modal(**kwargs, &trigger)
+    trigger ||= -> { tag.button("GO", data: { action: "click->confirm-modal#open" }) }
+    confirm_modal(**kwargs, &trigger)
+  end
+
+  # ── Trigger/dialog scoping — the invariant that was previously unenforced ──
+
+  test "raises without a trigger block so miswiring fails loudly at render time" do
+    error = assert_raises(ArgumentError) do
+      confirm_modal(id: "x", title: "Y?", body: "Z.", confirm_label: "GO", confirm_data: {})
+    end
+
+    assert_match(/trigger block/i, error.message)
+  end
+
+  test "renders the trigger and the dialog inside one confirm-modal controller element" do
+    html = render_confirm_modal(id: "scoped", title: "Y?", body: "Z.", confirm_label: "GO", confirm_data: {}) do
+      tag.button("TRIGGER ME", data: { action: "click->confirm-modal#open" })
+    end
+
+    scope = Nokogiri::HTML::DocumentFragment.parse(html).at_css('[data-controller~="confirm-modal"]')
+    refute_nil scope, "expected a confirm-modal controller element"
+
+    refute_nil scope.at_css('button[data-action*="confirm-modal#open"]'),
+               "the trigger must render INSIDE the controller element — Stimulus routes actions to " \
+               "the closest ancestor controller, so a sibling trigger silently never fires"
+    refute_nil scope.at_css("#scoped"),
+               "the dialog must render inside the same controller element as its trigger"
+  end
+
   test "renders all required locals" do
-    html = confirm_modal(
+    html = render_confirm_modal(
       id: "test-confirm",
       title: "DELETE WIDGET?",
       body: "This removes the widget.",
@@ -21,7 +55,7 @@ class ConfirmModalHelperTest < ActionView::TestCase
   end
 
   test "outer container has correct ARIA wiring" do
-    html = confirm_modal(
+    html = render_confirm_modal(
       id: "end-run-confirm",
       title: "END THIS RUN?",
       body: "Body copy.",
@@ -36,7 +70,7 @@ class ConfirmModalHelperTest < ActionView::TestCase
   end
 
   test "outer wrapper has the partial id" do
-    html = confirm_modal(
+    html = render_confirm_modal(
       id: "my-special-id",
       title: "X?",
       body: "Y.",
@@ -48,7 +82,7 @@ class ConfirmModalHelperTest < ActionView::TestCase
   end
 
   test "data-controller attaches confirm-modal" do
-    html = confirm_modal(
+    html = render_confirm_modal(
       id: "any",
       title: "X?",
       body: "Y.",
@@ -57,11 +91,16 @@ class ConfirmModalHelperTest < ActionView::TestCase
     )
 
     assert_match(/data-controller="confirm-modal"/, html)
-    assert_match(/data-confirm-modal-id-value="any"/, html)
+
+    # The dialog is reached through a target rather than an id value: one
+    # controller instance now owns exactly one trigger/dialog pair, so there
+    # is no id to disambiguate on.
+    assert_match(/data-confirm-modal-target="dialog"/, html)
+    assert_match(/id="any"/, html)
   end
 
   test "confirm_data hash spreads as data-* attributes on the confirm button" do
-    html = confirm_modal(
+    html = render_confirm_modal(
       id: "delete-slot-3-confirm",
       title: "DELETE THIS SLOT?",
       body: "Body.",
@@ -74,7 +113,7 @@ class ConfirmModalHelperTest < ActionView::TestCase
   end
 
   test "confirm_class defaults to gb-btn-danger gb-btn-sm" do
-    html = confirm_modal(
+    html = render_confirm_modal(
       id: "x",
       title: "Y?",
       body: "Z.",
@@ -87,7 +126,7 @@ class ConfirmModalHelperTest < ActionView::TestCase
   end
 
   test "confirm_class can be overridden" do
-    html = confirm_modal(
+    html = render_confirm_modal(
       id: "x",
       title: "Y?",
       body: "Z.",
@@ -100,7 +139,7 @@ class ConfirmModalHelperTest < ActionView::TestCase
   end
 
   test "body accepts safe HTML such as <strong>" do
-    html = confirm_modal(
+    html = render_confirm_modal(
       id: "x",
       title: "Y?",
       body: "This action <strong>cannot be undone</strong>.",
@@ -113,7 +152,7 @@ class ConfirmModalHelperTest < ActionView::TestCase
   end
 
   test "cancel_label defaults to CANCEL" do
-    html = confirm_modal(
+    html = render_confirm_modal(
       id: "x",
       title: "Y?",
       body: "Z.",
@@ -126,7 +165,7 @@ class ConfirmModalHelperTest < ActionView::TestCase
   end
 
   test "cancel_label can be overridden" do
-    html = confirm_modal(
+    html = render_confirm_modal(
       id: "x",
       title: "Y?",
       body: "Z.",
@@ -139,7 +178,7 @@ class ConfirmModalHelperTest < ActionView::TestCase
   end
 
   test "modal starts hidden" do
-    html = confirm_modal(
+    html = render_confirm_modal(
       id: "x",
       title: "Y?",
       body: "Z.",

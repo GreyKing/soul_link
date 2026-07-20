@@ -2,10 +2,11 @@ import { Controller } from "@hotwired/stimulus"
 
 // Step 20 — Shared confirm-modal controller for destructive actions.
 //
-// Renders alongside the `app/views/shared/_confirm_modal.html.erb` partial.
-// One controller instance per modal. Triggers (the destructive button on the
-// page) call `confirm-modal#open` with `data-confirm-modal-id-param="<id>"`;
-// we look up the matching modal in a process-wide registry and reveal it.
+// Rendered by the `app/views/shared/_confirm_modal.html.erb` partial, which
+// wraps the caller's trigger AND the dialog in one controller element. One
+// controller instance therefore owns exactly one trigger/dialog pair: the
+// trigger calls `confirm-modal#open` and we reveal `dialogTarget`. There is
+// no id matching and no registry — scoping alone decides which dialog opens.
 //
 // ESC handling is provided globally by `escape_close_controller`, which
 // clicks the `.gb-modal-close` button inside the topmost visible modal — that
@@ -14,40 +15,35 @@ import { Controller } from "@hotwired/stimulus"
 // confirm-modal partial bakes the same focus management directly into open()/
 // close() below so it doesn't need a sibling controller.
 export default class extends Controller {
-  static values = { id: String }
-  static targets = [ "cancel" ]
+  static targets = [ "cancel", "dialog" ]
 
   connect() {
-    if (!this.idValue) return
-    if (typeof window !== "undefined") {
-      window.__confirmModals = window.__confirmModals || {}
-      window.__confirmModals[this.idValue] = this.element
-    }
-
     this._priorFocus = null
     this._keydownHandler = this.#handleKeydown.bind(this)
   }
 
   disconnect() {
-    if (typeof window !== "undefined" && window.__confirmModals) {
-      delete window.__confirmModals[this.idValue]
-    }
     document.removeEventListener("keydown", this._keydownHandler)
   }
 
-  // Triggered by:
-  //   <button data-action="click->confirm-modal#open"
-  //           data-confirm-modal-id-param="end-run-confirm">END RUN</button>
-  // The trigger is on a different element from the modal, but Stimulus still
-  // routes the action to every connected `confirm-modal` controller; only the
-  // one whose idValue matches the param will reveal itself.
+  // Triggered by the trigger button, which `ConfirmModalHelper#confirm_modal`
+  // renders INSIDE this controller's element:
+  //   <div data-controller="confirm-modal" style="display: contents">
+  //     <button data-action="click->confirm-modal#open">END RUN</button>
+  //     <div data-confirm-modal-target="dialog" class="hidden">…</div>
+  //   </div>
+  //
+  // One controller instance per trigger/dialog pair, so there is no id to
+  // match on — the action can only reach the dialog it belongs to. An earlier
+  // version rendered the trigger as a sibling of the dialog and relied on
+  // Stimulus broadcasting the action to every connected `confirm-modal`
+  // controller. Stimulus does not do that: it routes to the closest ancestor
+  // controller only, so the click was silently dropped and the dialog could
+  // never open.
   open(event) {
-    const id = event.params?.id
-    if (!id || id !== this.idValue) return
-
     event.preventDefault()
     this._priorFocus = document.activeElement
-    this.element.classList.remove("hidden")
+    this.dialogTarget.classList.remove("hidden")
 
     // Focus the safe-default Cancel button. If the partial omitted it for
     // some reason (it shouldn't), fall back to the first focusable element
@@ -60,7 +56,7 @@ export default class extends Controller {
 
   close() {
     document.removeEventListener("keydown", this._keydownHandler)
-    this.element.classList.add("hidden")
+    this.dialogTarget.classList.add("hidden")
 
     if (this._priorFocus && typeof this._priorFocus.focus === "function") {
       this._priorFocus.focus()
@@ -101,9 +97,12 @@ export default class extends Controller {
     }
   }
 
+  // Scoped to the dialog, NOT to this.element — the controller element also
+  // contains the trigger button, and including it would let Tab walk out of
+  // the open dialog and back onto the control that opened it.
   #focusables() {
     return Array.from(
-      this.element.querySelectorAll(
+      this.dialogTarget.querySelectorAll(
         'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
       )
     ).filter((el) => !el.hasAttribute("hidden") && el.offsetParent !== null)
