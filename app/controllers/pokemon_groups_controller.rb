@@ -107,8 +107,16 @@ class PokemonGroupsController < ApplicationController
     end
 
     # Re-sync the live catch embed after any edit (rename, relocate, dead,
-    # revive). Fire-and-forget; a Discord failure never touches the response.
-    SoulLink::CatchMessage.post_or_update(group)
+    # revive). Only groups that already have an embed — the update hook keeps
+    # an existing message in sync; posting a first message is #create's job.
+    # Without this guard, editing a bot-created group (which never posts, so
+    # carries a nil id) would spawn a stray catch embed — and for an
+    # uncaught-death group, a 💀 embed in the catches channel for a Pokemon
+    # that was never caught. Fire-and-forget; a Discord failure never touches
+    # the response.
+    if group.discord_catch_message_id.present?
+      SoulLink::CatchMessage.post_or_update(group)
+    end
 
     render json: { status: "updated", group_id: group.id, nickname: group.nickname }
   rescue ActiveRecord::RecordInvalid => e

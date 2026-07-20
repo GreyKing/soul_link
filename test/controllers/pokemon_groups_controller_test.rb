@@ -69,7 +69,23 @@ class PokemonGroupsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, calls.length
   end
 
-  test "updating a group re-syncs the catch embed" do
+  test "updating a group with a live embed re-syncs it" do
+    login_as(GREY)
+    group = create(:soul_link_pokemon_group, :route206, soul_link_run: @run,
+                   discord_catch_message_id: 5150)
+    calls = []
+
+    SoulLink::CatchMessage.stub(:post_or_update, ->(g) { calls << g.id }) do
+      patch pokemon_group_path(group), params: { nickname: "RENAMED" }, as: :json
+    end
+
+    assert_response :success
+    assert_equal [ group.id ], calls
+  end
+
+  # A group that never posted (nil id — e.g. bot-created) must NOT get a
+  # brand-new catch embed spawned by a website edit. Posting is #create's job.
+  test "updating a group that never posted does not spawn an embed" do
     login_as(GREY)
     group = create(:soul_link_pokemon_group, :route206, soul_link_run: @run)
     calls = []
@@ -79,7 +95,7 @@ class PokemonGroupsControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :success
-    assert_equal [ group.id ], calls
+    assert_empty calls
   end
 
   test "destroying a group deletes the catch embed before the row is gone" do
