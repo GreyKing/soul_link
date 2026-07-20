@@ -365,6 +365,15 @@ export default class extends Controller {
     this.pokemonModalTarget.classList.add("hidden")
   }
 
+  // The dimming backdrop sits *behind* the centering wrapper (both z-index
+  // auto, wrapper paints later), so clicks in the empty area never reach it.
+  // The wrapper carries the close action instead; this guard ignores clicks
+  // that bubbled up from the modal card.
+  closePokemonModalOnBackdrop(event) {
+    if (event.target !== event.currentTarget) return
+    this.closePokemonModal()
+  }
+
   searchSpecies() {
     const input = this.modalSpeciesInputTarget.value.trim()
 

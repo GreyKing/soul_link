@@ -68,6 +68,15 @@ export default class extends Controller {
     this._priorFocus = null
   }
 
+  // The dimming backdrop sits *behind* the centering wrapper (both z-index
+  // auto, wrapper paints later), so clicks in the empty area never reach it.
+  // The wrapper carries the close action instead; this guard ignores clicks
+  // that bubbled up from the modal card.
+  closeOnBackdrop(event) {
+    if (event.target !== event.currentTarget) return
+    this.close()
+  }
+
   #handleKeydown(event) {
     if (event.key === "Tab") {
       this.#trapTab(event)

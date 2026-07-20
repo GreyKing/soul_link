@@ -2,10 +2,10 @@
 <div data-pixeldex-target="pokemonModal"
      class="hidden"
      style="position: fixed; inset: 0; z-index: 50;">
-  <div data-action="click->pixeldex#closePokemonModal"
-       style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.75);"></div>
+  <div style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.75);"></div>
 
-  <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
+  <div data-action="click->pixeldex#closePokemonModalOnBackdrop"
+       style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
     <div class="gb-modal" style="max-width: 520px;"
          role="dialog"
          aria-modal="true"

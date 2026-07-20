@@ -27,6 +27,15 @@ export default class extends Controller {
     this.catchModalTarget.classList.add("hidden")
   }
 
+  // The dimming backdrop sits *behind* the centering wrapper (both z-index
+  // auto, wrapper paints later), so clicks in the empty area never reach it.
+  // The wrapper carries the close action instead; this guard ignores clicks
+  // that bubbled up from the modal card.
+  closeCatchModalOnBackdrop(event) {
+    if (event.target !== event.currentTarget) return
+    this.closeCatchModal()
+  }
+
   async submitCatch(event) {
     event.preventDefault()
 
@@ -98,6 +107,11 @@ export default class extends Controller {
     this.markDeadGroupIdTarget.value = ""
   }
 
+  closeMarkDeadModalOnBackdrop(event) {
+    if (event.target !== event.currentTarget) return
+    this.closeMarkDeadModal()
+  }
+
   async confirmMarkDead() {
     const groupId = this.markDeadGroupIdTarget.value
     if (!groupId) return
@@ -146,6 +160,11 @@ export default class extends Controller {
     if (!this.hasResetDraftModalTarget) return
     this.resetDraftModalTarget.classList.add("hidden")
     this.resetDraftIdTarget.value = ""
+  }
+
+  closeResetDraftModalOnBackdrop(event) {
+    if (event.target !== event.currentTarget) return
+    this.closeResetDraftModal()
   }
 
   async confirmResetDraft() {
