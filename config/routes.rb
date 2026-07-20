@@ -38,7 +38,11 @@ Rails.application.routes.draw do
   end
   resources :gym_results, only: [ :update ]
   # Run management
-  resources :runs, only: %i[index edit update]
+  resources :runs, only: %i[index edit update] do
+    resources :rom_downloads, only: %i[create show], module: :runs do
+      get :download, on: :member
+    end
+  end
 
   # Singleton poll: one open/locked poll per run at a time
   resource :gym_poll, only: %i[show create destroy], controller: "gym_polls"

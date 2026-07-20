@@ -51,6 +51,29 @@ module SoulLink
       fail!("Generation timed out after #{GENERATION_TIMEOUT}s")
     end
 
+    class << self
+      # Session-free generation for callers with no session to mutate (the
+      # on-demand download). Returns [ok, error_message].
+      def generate_to(output_path) = new(nil).generate_to(output_path)
+    end
+
+    # Public instance entry point. The session-mutating `call` wraps the same
+    # subprocess machinery; this exposes it without the session bookkeeping.
+    def generate_to(output_path)
+      reason = precondition_error
+      return [ false, reason ] if reason
+
+      path = Pathname.new(output_path.to_s)
+      FileUtils.mkdir_p(path.dirname)
+
+      _stdout, stderr, status = run_subprocess(path)
+      return [ true, nil ] if status&.success?
+
+      [ false, stderr.to_s.strip.presence || "Randomizer exited non-zero" ]
+    rescue Timeout::Error
+      [ false, "Generation timed out after #{GENERATION_TIMEOUT}s" ]
+    end
+
     private
 
     attr_reader :session
