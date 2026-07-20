@@ -36,7 +36,7 @@ class WipeFlowTest < ActionDispatch::IntegrationTest
     death_recorder = ->(*) { death_calls << :hit }
 
     SoulLink::DiscordNotifier.stub(:notify_wipe, wipe_recorder) do
-      SoulLink::DiscordNotifier.stub(:notify_death, death_recorder) do
+      SoulLink::DiscordNotifier.stub(:notify_group_death, death_recorder) do
         patch pokemon_group_path(group), params: { status: "dead" }, as: :json
       end
     end
@@ -50,7 +50,7 @@ class WipeFlowTest < ActionDispatch::IntegrationTest
     assert_equal GREY, wipe_calls.first[:uid]
     assert_equal "Route 207", wipe_calls.first[:route]
 
-    assert_equal 1, death_calls.size, "one death notification per linked Pokemon"
+    assert_equal 1, death_calls.size, "one death notification per group"
 
     # Re-render the dashboard — the wipe banner should appear above
     # the gb-grid-4 stats in the runs panel, and at least one of the
@@ -83,7 +83,7 @@ class WipeFlowTest < ActionDispatch::IntegrationTest
     login_as(GREY)
     wipe_calls = []
     SoulLink::DiscordNotifier.stub(:notify_wipe, ->(*) { wipe_calls << :hit }) do
-      SoulLink::DiscordNotifier.stub(:notify_death, ->(*) { }) do
+      SoulLink::DiscordNotifier.stub(:notify_group_death, ->(*) { }) do
         patch pokemon_group_path(grey_first_group), params: { status: "dead" }, as: :json
       end
     end

@@ -36,15 +36,20 @@ module SoulLink
       end
 
       # Death-event surface (PokemonGroupsController#update — Mark Dead).
-      # One notification per linked Pokemon in the group.
-      def notify_death(run, player_uid, species, route)
-        return if run.nil?
+      # ONE message per group listing every fallen linked Pokemon — not one
+      # message per Pokemon, which spammed the channel four times per death.
+      def notify_group_death(run, group)
+        return if run.nil? || group.nil?
 
         channel_id = run.deaths_channel_id
         return if channel_id.blank?
 
-        player = SoulLink::GameState.player_name(player_uid)
-        content = "💀 RIP #{species} — #{player}'s #{route} catch"
+        lines = group.soul_link_pokemon.map do |pokemon|
+          "#{SoulLink::GameState.player_name(pokemon.discord_user_id)} — #{pokemon.species}"
+        end
+
+        route = SoulLink::GameState.location_name(group.location)
+        content = "💀 RIP \"#{group.nickname}\" — #{route}\n#{lines.join("\n")}"
 
         send_message(channel_id, content, run: run, method_name: __method__)
       end
