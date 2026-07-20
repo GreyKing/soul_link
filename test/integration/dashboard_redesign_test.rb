@@ -306,6 +306,23 @@ class DashboardRedesignTest < ActionDispatch::IntegrationTest
     assert_select "input[type=time][value=?]", "20:00"
   end
 
+  # ── Pokemon modal — inline ability options ───────────────────────────
+
+  test "the pokemon modal ships the ability options inline as a non-empty JSON array" do
+    get root_path
+    assert_response :success
+
+    raw = response.body[/data-searchable-select-options-value="([^"]*)"/, 1]
+    assert raw, "expected the pokemon modal to render data-searchable-select-options-value"
+
+    options = JSON.parse(CGI.unescapeHTML(raw))
+    assert_kind_of Array, options,
+      "ability options must render inline via SoulLink::GameState — an ivar-based " \
+      "approach is nil on this page, serialises to \"null\", and makes the " \
+      "searchable-select controller throw a TypeError on filter()"
+    assert options.any?, "ability options rendered as an empty list"
+  end
+
   # ── Helpers ──────────────────────────────────────────────────────────
 
   private

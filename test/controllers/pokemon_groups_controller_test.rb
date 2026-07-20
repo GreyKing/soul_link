@@ -54,4 +54,18 @@ class PokemonGroupsControllerTest < ActionDispatch::IntegrationTest
     end
     assert_response :success
   end
+
+  test "creating a group posts the catch embed once" do
+    login_as(GREY)
+    calls = []
+
+    SoulLink::CatchMessage.stub(:post_or_update, ->(group) { calls << group.id }) do
+      post pokemon_groups_path, params: {
+        nickname: "TOMMY", location: "route_205"
+      }, as: :json
+    end
+
+    assert_response :success
+    assert_equal 1, calls.length
+  end
 end

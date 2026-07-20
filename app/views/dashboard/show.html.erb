@@ -11,7 +11,7 @@
     subscriptions. The window-level numeric jump (1-8) is bound here so
     it works no matter where focus is. %>
 <div class="dash-r1"
-     data-controller="dashboard pixeldex run-management"
+     data-controller="dashboard pixeldex run-management party-drag"
      data-action="keydown@window->pixeldex#numericJump"
      data-dashboard-groups-url-value="<%= pokemon_groups_path %>"
      data-dashboard-csrf-value="<%= form_authenticity_token %>"
@@ -24,6 +24,8 @@
      data-pixeldex-group-update-url-value="<%= pokemon_groups_path %>"
      data-pixeldex-update-slots-url-value="<%= update_slots_team_path %>"
      data-pixeldex-csrf-value="<%= form_authenticity_token %>"
+     data-party-drag-update-url-value="<%= update_slots_team_path %>"
+     data-party-drag-csrf-value="<%= form_authenticity_token %>"
      data-run-management-guild-id-value="<%= @guild_id %>"
      data-run-management-user-id-value="<%= current_user_id %>">
 

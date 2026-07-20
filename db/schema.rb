@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_14_120002) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_20_182647) do
   create_table "gym_auto_mark_suppressions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "gym_number", null: false
@@ -205,6 +205,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_14_120002) do
     t.datetime "caught_at"
     t.datetime "created_at", null: false
     t.datetime "died_at"
+    t.bigint "discord_catch_message_id"
     t.text "eulogy"
     t.string "location", null: false
     t.string "nickname", null: false
@@ -215,6 +216,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_14_120002) do
     t.index ["soul_link_run_id", "nickname"], name: "idx_on_soul_link_run_id_nickname_4d742b8831"
     t.index ["soul_link_run_id", "status"], name: "index_soul_link_pokemon_groups_on_soul_link_run_id_and_status"
     t.index ["soul_link_run_id"], name: "index_soul_link_pokemon_groups_on_soul_link_run_id"
+  end
+
+  create_table "soul_link_rom_downloads", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "discord_user_id", null: false
+    t.string "error_message"
+    t.string "rom_path"
+    t.bigint "soul_link_run_id", null: false
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.index ["soul_link_run_id", "discord_user_id"], name: "idx_on_soul_link_run_id_discord_user_id_f551044606"
+    t.index ["soul_link_run_id"], name: "index_soul_link_rom_downloads_on_soul_link_run_id"
   end
 
   create_table "soul_link_runs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -278,6 +291,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_14_120002) do
   add_foreign_key "soul_link_pokemon", "soul_link_pokemon_groups"
   add_foreign_key "soul_link_pokemon", "soul_link_runs"
   add_foreign_key "soul_link_pokemon_groups", "soul_link_runs"
+  add_foreign_key "soul_link_rom_downloads", "soul_link_runs"
   add_foreign_key "soul_link_team_slots", "soul_link_pokemon_groups"
   add_foreign_key "soul_link_team_slots", "soul_link_teams"
   add_foreign_key "soul_link_teams", "soul_link_runs"

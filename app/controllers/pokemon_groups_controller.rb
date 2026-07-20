@@ -42,6 +42,11 @@ class PokemonGroupsController < ApplicationController
       end
     end
 
+    # Live catch embed. Last statement before render so a Discord failure
+    # can never roll back the group/pokemon writes. The service is
+    # fire-and-forget and swallows its own errors.
+    SoulLink::CatchMessage.post_or_update(group)
+
     if errors.any?
       render json: { status: "partial", group_id: group.id, nickname: group.nickname, errors: errors }, status: :multi_status
     else
@@ -73,12 +78,9 @@ class PokemonGroupsController < ApplicationController
         location: params[:location]&.strip || group.location
       )
 
-      # Step 19 — Discord death notifications, one per linked Pokemon.
-      # `reload` so we see the cascaded dead status; `notify_death` is
-      # fire-and-forget (rescues every failure internally).
-      group.soul_link_pokemon.reload.each do |p|
-        SoulLink::DiscordNotifier.notify_death(run, p.discord_user_id, p.species, p.location)
-      end
+      # One message for the whole group; the notifier rescues every
+      # failure internally.
+      SoulLink::DiscordNotifier.notify_group_death(run, group)
 
       # Step 19 — wipe-detection runs on every Mark Dead transition.
       # Idempotency lives inside the coordinator (skips if wiped_at set).

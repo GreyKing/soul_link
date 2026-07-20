@@ -17,6 +17,7 @@ class PokemonController < ApplicationController
     end
 
     pokemon.update!(pokemon_params)
+    SoulLink::CatchMessage.post_or_update(pokemon.soul_link_pokemon_group)
     render json: { status: "updated", pokemon_id: pokemon.id }
   rescue ActiveRecord::RecordInvalid => e
     render json: { error: e.message }, status: :unprocessable_entity
@@ -60,6 +61,7 @@ class PokemonController < ApplicationController
       )
     end
 
+    SoulLink::CatchMessage.post_or_update(group)
     render json: { status: "created", pokemon_id: pokemon.id }
   rescue ActiveRecord::RecordNotUnique
     render json: { error: "You already have a pokemon in this group" }, status: :unprocessable_entity

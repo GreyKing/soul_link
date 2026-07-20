@@ -250,6 +250,12 @@ export default class extends Controller {
   // ── PC Box Cell Selection ──
 
   selectPokemon(event) {
+    // A drag ends with a click on the dragged element; ignore it so dropping
+    // into the party does not also open the detail modal. Complements the
+    // existing sortable-chosen check below (the cloned box-cell does not
+    // carry that class, so both guards are needed).
+    if (document.body.classList.contains("sortable-dragging")) return
+
     // Don't open modal if this was a drag
     if (event.currentTarget.classList.contains("sortable-chosen")) return
 
@@ -363,6 +369,15 @@ export default class extends Controller {
 
   closePokemonModal() {
     this.pokemonModalTarget.classList.add("hidden")
+  }
+
+  // The dimming backdrop sits *behind* the centering wrapper (both z-index
+  // auto, wrapper paints later), so clicks in the empty area never reach it.
+  // The wrapper carries the close action instead; this guard ignores clicks
+  // that bubbled up from the modal card.
+  closePokemonModalOnBackdrop(event) {
+    if (event.target !== event.currentTarget) return
+    this.closePokemonModal()
   }
 
   searchSpecies() {
@@ -510,18 +525,16 @@ export default class extends Controller {
     }
   }
 
-  #populateAbilities(species, currentAbility) {
-    const abilities = this.abilitiesDataValue[species] || []
-    const select = this.modalAbilityTarget
-    select.innerHTML = '<option value="">Select...</option>'
+  // Any Pokemon may now have any ability, so this no longer filters by
+  // species — it just seeds the searchable select's current value. Kept
+  // under the original name/arity because both callers (#openModal and
+  // searchSpecies) still invoke it.
+  #populateAbilities(_species, currentAbility) {
+    this.modalAbilityTarget.value = currentAbility || ""
 
-    abilities.forEach(ab => {
-      const opt = document.createElement("option")
-      opt.value = ab
-      opt.textContent = ab
-      if (ab === currentAbility) opt.selected = true
-      select.appendChild(opt)
-    })
+    const wrapper = this.modalAbilityTarget.closest(".searchable-select")
+    const input = wrapper?.querySelector("[data-searchable-select-target='input']")
+    if (input) input.value = currentAbility || ""
   }
 
   // Builds a tree structure from evolutions data.

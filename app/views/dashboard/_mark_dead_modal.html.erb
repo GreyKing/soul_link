@@ -13,10 +13,10 @@
 <div data-dashboard-target="markDeadModal"
      class="hidden"
      style="position: fixed; inset: 0; z-index: 60;">
-  <div data-action="click->dashboard#closeMarkDeadModal"
-       style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.85);"></div>
+  <div style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.85);"></div>
 
-  <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
+  <div data-action="click->dashboard#closeMarkDeadModalOnBackdrop"
+       style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
     <div class="gb-modal" style="max-width: 440px;"
          role="dialog"
          aria-modal="true"

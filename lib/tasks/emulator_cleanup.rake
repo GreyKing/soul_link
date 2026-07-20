@@ -33,4 +33,19 @@ namespace :soul_link do
 
     puts "Cleaned #{deleted_files} ROM file(s) and #{cleared_saves} save(s) from #{inactive_runs.count} inactive run(s)."
   end
+
+  desc "Prune downloaded ROMs older than 7 days"
+  task prune_rom_downloads: :environment do
+    cutoff = 7.days.ago
+    pruned = 0
+
+    SoulLinkRomDownload.where("created_at < ?", cutoff).find_each do |download|
+      path = download.absolute_rom_path
+      File.delete(path) if path
+      download.destroy!
+      pruned += 1
+    end
+
+    puts "Pruned #{pruned} ROM download(s) older than #{cutoff.to_date}"
+  end
 end

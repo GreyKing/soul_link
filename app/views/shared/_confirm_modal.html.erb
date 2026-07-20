@@ -12,10 +12,10 @@
      data-controller="confirm-modal"
      data-confirm-modal-id-value="<%= id %>"
      style="position: fixed; inset: 0; z-index: 50;">
-  <div data-action="click->confirm-modal#close"
-       style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.85);"></div>
+  <div style="position: absolute; inset: 0; background: rgba(15, 56, 15, 0.85);"></div>
 
-  <div style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
+  <div data-action="click->confirm-modal#closeOnBackdrop"
+       style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px;">
     <div class="gb-modal" style="max-width: 440px;"
          role="dialog"
          aria-modal="true"

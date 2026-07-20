@@ -186,6 +186,13 @@ module SoulLink
         pokemon_abilities[species_name] || []
       end
 
+      # Every ability in the game, sorted and deduplicated (123 of them).
+      # Any Pokemon may now have any ability, so the detail-page selector
+      # offers the whole list rather than a species-restricted subset.
+      def all_abilities
+        @all_abilities ||= pokemon_abilities.values.flatten.uniq.sort
+      end
+
       # Evolutions: species name → hash with evolves_to, level/method
       def evolutions
         @evolutions ||= File.exist?(EVOLUTIONS_PATH) ? YAML.load_file(EVOLUTIONS_PATH) : {}
@@ -216,6 +223,7 @@ module SoulLink
         @progression = nil
         @pokemon_types = nil
         @pokemon_abilities = nil
+        @all_abilities = nil
         @evolutions = nil
         @cheats = nil
       end

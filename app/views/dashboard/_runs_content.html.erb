@@ -101,6 +101,22 @@
                   class="gb-btn-primary gb-btn-sm <%= 'hidden' if active_run&.discord_channels_configured? %>">
             SETUP DISCORD
           </button>
+          <span data-controller="rom-download"
+                data-rom-download-run-id-value="<%= active_run&.id %>"
+                style="display: inline-flex; align-items: center; gap: 6px;">
+            <button data-action="click->rom-download#generate"
+                    data-rom-download-target="button"
+                    class="gb-btn-primary gb-btn-sm">
+              Download Randomized ROM
+            </button>
+            <span data-rom-download-target="status"
+                  class="hidden"
+                  style="font-size: 11px; color: var(--l1);"></span>
+            <a data-rom-download-target="link"
+               class="gb-btn gb-btn-sm hidden"
+               style="text-decoration: none;"
+               download>SAVE .NDS</a>
+          </span>
           <%# Step 24 R1 — emulator-ROM affordances moved from the deleted
               `/runs` page. Same wiring (`run-management#generateEmulatorRoms`
               / `#regenerateEmulatorRoms`) and the same mutually-exclusive

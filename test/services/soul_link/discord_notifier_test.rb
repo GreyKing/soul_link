@@ -33,7 +33,7 @@ module SoulLink
     test "every notifier method is a silent no-op when run is nil" do
       with_stubbed_notifier do
         SoulLink::DiscordNotifier.notify_catch(nil, GREY, "Starly", "Route 201", 5)
-        SoulLink::DiscordNotifier.notify_death(nil, GREY, "Starly", "Route 201")
+        SoulLink::DiscordNotifier.notify_group_death(nil, nil)
         SoulLink::DiscordNotifier.notify_gym_player_progress(nil, 1, GREY)
         SoulLink::DiscordNotifier.notify_gym_team_beaten(nil, 1)
         SoulLink::DiscordNotifier.notify_wipe(nil, GREY, "Route 201")
@@ -52,10 +52,11 @@ module SoulLink
       assert_equal [], @captured
     end
 
-    test "notify_death is a no-op when run.deaths_channel_id is blank" do
+    test "notify_group_death is a no-op when run.deaths_channel_id is blank" do
       @run.update!(deaths_channel_id: nil)
+      group = create(:soul_link_pokemon_group, soul_link_run: @run)
       with_stubbed_notifier do
-        SoulLink::DiscordNotifier.notify_death(@run, GREY, "Starly", "Route 201")
+        SoulLink::DiscordNotifier.notify_group_death(@run, group)
       end
       assert_equal [], @captured
     end
@@ -100,14 +101,6 @@ module SoulLink
       end
       assert_equal 1, @captured.size
       assert_equal 1111, @captured.first[:channel_id]
-    end
-
-    test "notify_death routes to deaths_channel_id" do
-      with_stubbed_notifier do
-        SoulLink::DiscordNotifier.notify_death(@run, GREY, "Starly", "Route 201")
-      end
-      assert_equal 1, @captured.size
-      assert_equal 2222, @captured.first[:channel_id]
     end
 
     test "notify_gym_player_progress routes to general_channel_id" do
@@ -155,11 +148,43 @@ module SoulLink
       assert_equal "Grey just caught a Starly on Route 201 (Lv 5) [off-feed]", @captured.first[:content]
     end
 
-    test "notify_death formats with RIP marker + species + player + route" do
-      with_stubbed_notifier do
-        SoulLink::DiscordNotifier.notify_death(@run, GREY, "Starly", "Route 201")
+    test "notify_group_death sends exactly one message for a four-pokemon group" do
+      group = create(:soul_link_pokemon_group, soul_link_run: @run,
+                     nickname: "TOMMY", location: "route_205")
+      SoulLink::GameState.players.first(4).each_with_index do |player, i|
+        create(:soul_link_pokemon, soul_link_run: @run, soul_link_pokemon_group: group,
+               discord_user_id: player["discord_user_id"],
+               species: %w[Staravia Shinx Bidoof Kricketot][i])
       end
-      assert_equal "💀 RIP Starly — Grey's Route 201 catch", @captured.first[:content]
+
+      with_stubbed_notifier { SoulLink::DiscordNotifier.notify_group_death(@run, group) }
+
+      assert_equal 1, @captured.length
+      assert_equal 2222, @captured.first[:channel_id]
+    end
+
+    test "notify_group_death names every fallen pokemon" do
+      group = create(:soul_link_pokemon_group, soul_link_run: @run, nickname: "TOMMY")
+      uid = SoulLink::GameState.players.first["discord_user_id"]
+      create(:soul_link_pokemon, soul_link_run: @run, soul_link_pokemon_group: group,
+             discord_user_id: uid, species: "Staravia")
+
+      with_stubbed_notifier { SoulLink::DiscordNotifier.notify_group_death(@run, group) }
+
+      content = @captured.first[:content]
+      assert_includes content, "Staravia"
+      assert_includes content, "TOMMY"
+      assert_includes content, SoulLink::GameState.location_name(group.location)
+      assert_includes content, SoulLink::GameState.player_name(uid)
+    end
+
+    test "notify_group_death is a no-op with a nil run or nil group" do
+      group = create(:soul_link_pokemon_group, soul_link_run: @run)
+      with_stubbed_notifier do
+        SoulLink::DiscordNotifier.notify_group_death(nil, group)
+        SoulLink::DiscordNotifier.notify_group_death(@run, nil)
+      end
+      assert_empty @captured
     end
 
     test "notify_gym_player_progress formats with player + gym number + leader + town" do
