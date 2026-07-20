@@ -114,7 +114,7 @@ Follows the existing `soul_link:species_modal` pattern already in
 
 1. `bot.button(custom_id: /^soul_link:catch_add:/)` — opens a Discord modal with
    a single species text field.
-2. `bot.modal_submit(custom_id: /^soul_link:catch_species_modal:/)` — resolves
+2. `bot.modal_submit(custom_id: /^soul_link:catch_quick_add_modal:/)` — resolves
    the species, creates the `SoulLinkPokemon` for `event.user.id`, calls
    `CatchMessage.post_or_update(group)` to refresh the embed.
 
