@@ -50,6 +50,19 @@ module SoulLink
       { ok: false, error: e.record.errors.full_messages.join(", ") }
     end
 
+    # Pure core of the catch REFRESH button: re-render the embed from current
+    # DB state. Read-only, so no ownership/registration gate. Run-scoped for
+    # the same reason quick-add is — a stale post must not touch a live run.
+    #
+    # Returns { ok: true } or { ok: false, error: "<player-facing message>" }.
+    def self.apply_catch_refresh(run:, group_id:)
+      group = run&.soul_link_pokemon_groups&.find_by(id: group_id)
+      return { ok: false, error: "That catch group no longer exists." } if group.nil?
+
+      SoulLink::CatchMessage.post_or_update(group)
+      { ok: true }
+    end
+
     def self.species_error(input, resolution)
       if resolution.candidates.any?
         "Did you mean: #{resolution.candidates.join(', ')}?"
@@ -321,6 +334,12 @@ module SoulLink
       bot.button(custom_id: /^soul_link:catch_add:/) do |event|
         group_id = event.interaction.data['custom_id'].split(':').last
         open_catch_quick_add_modal(event, group_id)
+      end
+
+      # Button: refresh a catch post from current website/DB state
+      bot.button(custom_id: /^soul_link:catch_refresh:/) do |event|
+        group_id = event.interaction.data['custom_id'].split(':').last
+        handle_catch_refresh(event, group_id)
       end
 
       # Modal: quick-add species submission
@@ -913,6 +932,24 @@ module SoulLink
 
       update_catches_panel(run)
       respond_ephemeral(event, "✅ Added your **#{result[:species]}**.")
+    rescue => e
+      respond_ephemeral(event, "❌ Error: #{e.message}")
+    end
+
+    def handle_catch_refresh(event, group_id)
+      run = current_run(event)
+      unless run
+        respond_ephemeral(event, "❌ No active run found!")
+        return
+      end
+
+      result = self.class.apply_catch_refresh(run: run, group_id: group_id)
+      unless result[:ok]
+        respond_ephemeral(event, "❌ #{result[:error]}")
+        return
+      end
+
+      respond_ephemeral(event, "🔄 Refreshed.")
     rescue => e
       respond_ephemeral(event, "❌ Error: #{e.message}")
     end
