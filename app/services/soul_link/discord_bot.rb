@@ -63,6 +63,39 @@ module SoulLink
       { ok: true }
     end
 
+    # Pure, testable core of the bot's "new catch" modal. Creates the group
+    # and the submitter's Pokemon atomically, then posts the live catch embed
+    # — the same embed the website posts from PokemonGroupsController#create,
+    # so bot- and website-created catches stay symmetric (and the group gets a
+    # discord_catch_message_id, so later website edits re-sync it too).
+    #
+    # Returns { ok: true, group: <group> } or { ok: false, error: "<msg>" }.
+    def self.apply_catch_create(run:, nickname:, location:, species:, discord_user_id:)
+      return { ok: false, error: "No active run found." } if run.nil?
+
+      group = nil
+      ActiveRecord::Base.transaction do
+        group = run.soul_link_pokemon_groups.create!(
+          nickname: nickname,
+          location: location,
+          status: "caught"
+        )
+        group.soul_link_pokemon.create!(
+          soul_link_run: run,
+          species: species,
+          name: nickname,
+          location: location,
+          discord_user_id: discord_user_id,
+          status: "caught"
+        )
+      end
+
+      SoulLink::CatchMessage.post_or_update(group)
+      { ok: true, group: group }
+    rescue ActiveRecord::RecordInvalid => e
+      { ok: false, error: e.record.errors.full_messages.join(", ") }
+    end
+
     def self.species_error(input, resolution)
       if resolution.candidates.any?
         "Did you mean: #{resolution.candidates.join(', ')}?"
@@ -1044,23 +1077,21 @@ module SoulLink
 
       values = extract_modal_values(event)
 
-      group = run.soul_link_pokemon_groups.create!(
+      result = self.class.apply_catch_create(
+        run: run,
         nickname: values['nickname'],
         location: values['location'],
-        status: 'caught'
+        species: values['species'],
+        discord_user_id: event.user.id
       )
 
-      group.soul_link_pokemon.create!(
-        soul_link_run: run,
-        species: values['species'],
-        name: values['nickname'],
-        location: values['location'],
-        discord_user_id: event.user.id,
-        status: 'caught'
-      )
+      unless result[:ok]
+        respond_ephemeral(event, "❌ #{result[:error]}")
+        return
+      end
 
       update_catches_panel(run)
-      respond_ephemeral(event, "✅ Added group **#{group.nickname}** with your species **#{values['species']}**!\n" \
+      respond_ephemeral(event, "✅ Added group **#{result[:group].nickname}** with your species **#{values['species']}**!\n" \
         "Other players: use **Add My Species** to add yours.")
     rescue => e
       respond_ephemeral(event, "❌ Error: #{e.message}")
@@ -1095,6 +1126,10 @@ module SoulLink
         discord_user_id: event.user.id,
         status: 'caught'
       )
+
+      # Keep the live catch embed in sync, same as the website's pokemon
+      # create path. Posts the first embed if the group was bot-created.
+      SoulLink::CatchMessage.post_or_update(group)
 
       update_catches_panel(run)
       respond_ephemeral(event, "✅ Added **#{values['species']}** to group **#{group.nickname}**!")
