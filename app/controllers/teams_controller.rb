@@ -24,6 +24,14 @@ class TeamsController < ApplicationController
     team = run.soul_link_teams.find_or_create_by!(discord_user_id: current_user_id)
     group_ids = params[:group_ids] || []
 
+    # A swap is expressed client-side as a reordered id list. A duplicate id
+    # means the client built that list wrong — reject rather than silently
+    # dropping a slot inside replace_slots!.
+    if group_ids.length != group_ids.uniq.length
+      render json: { error: "Duplicate group ids in team" }, status: :unprocessable_entity
+      return
+    end
+
     # Validate: all group_ids must be caught groups in this run
     # Use a Set for fast lookup while preserving the JS-sent order
     allowed_ids = run.caught_groups.where(id: group_ids)

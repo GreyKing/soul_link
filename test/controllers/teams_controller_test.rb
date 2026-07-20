@@ -66,6 +66,36 @@ class TeamsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 0, team.soul_link_team_slots.count
   end
 
+  test "update_slots rejects duplicate group ids" do
+    login_as(GREY)
+    group = create(:soul_link_pokemon_group, soul_link_run: @run)
+    create(:soul_link_pokemon, soul_link_run: @run, soul_link_pokemon_group: group,
+           discord_user_id: GREY, species: "Staravia")
+
+    patch update_slots_team_path, params: { group_ids: [ group.id, group.id ] }, as: :json
+
+    assert_response :unprocessable_entity
+    assert_match(/duplicate/i, JSON.parse(response.body)["error"])
+  end
+
+  test "update_slots preserves the submitted order" do
+    login_as(GREY)
+    groups = 3.times.map do
+      g = create(:soul_link_pokemon_group, soul_link_run: @run)
+      create(:soul_link_pokemon, soul_link_run: @run, soul_link_pokemon_group: g,
+             discord_user_id: GREY, species: "Staravia")
+      g
+    end
+    ordered = [ groups[2].id, groups[0].id, groups[1].id ]
+
+    patch update_slots_team_path, params: { group_ids: ordered }, as: :json
+
+    assert_response :success
+    team = @run.soul_link_teams.find_by(discord_user_id: GREY)
+    assert_equal ordered,
+                 team.soul_link_team_slots.order(:position).pluck(:soul_link_pokemon_group_id)
+  end
+
   test "index shows all teams" do
     login_as(GREY)
     get teams_path
