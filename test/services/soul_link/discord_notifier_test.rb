@@ -52,6 +52,15 @@ module SoulLink
       assert_equal [], @captured
     end
 
+    test "notify_group_death is a no-op when run.deaths_channel_id is blank" do
+      @run.update!(deaths_channel_id: nil)
+      group = create(:soul_link_pokemon_group, soul_link_run: @run)
+      with_stubbed_notifier do
+        SoulLink::DiscordNotifier.notify_group_death(@run, group)
+      end
+      assert_equal [], @captured
+    end
+
     test "notify_gym_player_progress is a no-op when general_channel_id is blank" do
       @run.update!(general_channel_id: nil)
       with_stubbed_notifier do
@@ -162,8 +171,11 @@ module SoulLink
 
       with_stubbed_notifier { SoulLink::DiscordNotifier.notify_group_death(@run, group) }
 
-      assert_includes @captured.first[:content], "Staravia"
-      assert_includes @captured.first[:content], "TOMMY"
+      content = @captured.first[:content]
+      assert_includes content, "Staravia"
+      assert_includes content, "TOMMY"
+      assert_includes content, SoulLink::GameState.location_name(group.location)
+      assert_includes content, SoulLink::GameState.player_name(uid)
     end
 
     test "notify_group_death is a no-op with a nil run or nil group" do

@@ -78,9 +78,8 @@ class PokemonGroupsController < ApplicationController
         location: params[:location]&.strip || group.location
       )
 
-      # One message for the whole group. `reload` so the cascaded dead
-      # status is visible; the notifier rescues every failure internally.
-      group.soul_link_pokemon.reload
+      # One message for the whole group; the notifier rescues every
+      # failure internally.
       SoulLink::DiscordNotifier.notify_group_death(run, group)
 
       # Step 19 — wipe-detection runs on every Mark Dead transition.

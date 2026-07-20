@@ -15,15 +15,28 @@ class WipeFlowTest < ActionDispatch::IntegrationTest
   end
 
   test "PATCH pokemon_group with status=dead triggers wipe + notify_wipe + read-only banner" do
-    # One alive group. Grey has the only catch in the run, so when the
-    # group flips dead the wipe rule (player has catches AND zero alive)
-    # fires for Grey.
+    # One alive group linking TWO players' Pokemon (Grey + ARaty) — this
+    # is each of their only catch in the run, so when the group flips
+    # dead the wipe rule (player has catches AND zero alive) fires for
+    # both, but WipeCoordinator reports the first player in canonical
+    # `player_ids` order, which is Grey. The two linked Pokemon also let
+    # the death-notification assertion below actually constrain the
+    # controller call site: a single grouped message is still expected
+    # even though more than one Pokemon died.
     group = create(:soul_link_pokemon_group, soul_link_run: @run, status: "caught", nickname: "DOOMED", location: "Route 207")
     create(:soul_link_pokemon,
            soul_link_run: @run,
            soul_link_pokemon_group: group,
            discord_user_id: GREY,
            species: "Bidoof",
+           name: "DOOMED",
+           location: "Route 207",
+           status: "caught")
+    create(:soul_link_pokemon,
+           soul_link_run: @run,
+           soul_link_pokemon_group: group,
+           discord_user_id: ARATY,
+           species: "Shinx",
            name: "DOOMED",
            location: "Route 207",
            status: "caught")
@@ -50,7 +63,7 @@ class WipeFlowTest < ActionDispatch::IntegrationTest
     assert_equal GREY, wipe_calls.first[:uid]
     assert_equal "Route 207", wipe_calls.first[:route]
 
-    assert_equal 1, death_calls.size, "one death notification per group"
+    assert_equal 1, death_calls.size, "one death notification per group, not one per linked Pokemon"
 
     # Re-render the dashboard — the wipe banner should appear above
     # the gb-grid-4 stats in the runs panel, and at least one of the
