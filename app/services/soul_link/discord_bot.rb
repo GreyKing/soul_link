@@ -8,10 +8,17 @@ module SoulLink
     # from the `bot.modal_submit` block so it can be tested without booting
     # the bot's event loop.
     #
-    # Returns { ok: true } or { ok: false, error: "<player-facing message>" }.
-    def self.apply_catch_quick_add(group_id:, discord_user_id:, species_input:)
-      group = SoulLinkPokemonGroup.find_by(id: group_id)
+    # Scoped to `run` for the same reason every sibling handler is: catch
+    # posts from an inactive run keep live buttons in Discord forever, so an
+    # unscoped lookup would let a click on an old post write into that old
+    # run's group.
+    #
+    # Returns { ok: true, species: "<canonical>" } or
+    # { ok: false, error: "<player-facing message>" }.
+    def self.apply_catch_quick_add(run:, group_id:, discord_user_id:, species_input:)
+      group = run&.soul_link_pokemon_groups&.find_by(id: group_id)
       return { ok: false, error: "That catch no longer exists." } if group.nil?
+      return { ok: false, error: "That catch is already marked dead." } if group.dead?
 
       unless SoulLink::GameState.player_ids.include?(discord_user_id)
         return { ok: false, error: "You're not a registered player in this run." }
@@ -26,7 +33,7 @@ module SoulLink
         return { ok: false, error: species_error(species_input, resolution) }
       end
 
-      group.soul_link_run.soul_link_pokemon.create!(
+      run.soul_link_pokemon.create!(
         soul_link_pokemon_group: group,
         discord_user_id: discord_user_id,
         species: resolution.species,
@@ -36,7 +43,7 @@ module SoulLink
       )
 
       SoulLink::CatchMessage.post_or_update(group)
-      { ok: true }
+      { ok: true, species: resolution.species }
     rescue ActiveRecord::RecordNotUnique
       { ok: false, error: "You already have a Pokemon in this catch." }
     rescue ActiveRecord::RecordInvalid => e
@@ -50,6 +57,7 @@ module SoulLink
         "No species matches \"#{input}\"."
       end
     end
+    private_class_method :species_error
 
     def initialize
       creds = Rails.application.credentials.discord
@@ -882,20 +890,31 @@ module SoulLink
     end
 
     def handle_catch_quick_add(event)
+      run = current_run(event)
+      unless run
+        respond_ephemeral(event, "❌ No active run found!")
+        return
+      end
+
       group_id = event.interaction.data['custom_id'].split(':').last
       species  = extract_modal_values(event)['species']
 
       result = self.class.apply_catch_quick_add(
+        run: run,
         group_id: group_id,
         discord_user_id: event.user.id,
         species_input: species
       )
 
-      if result[:ok]
-        respond_ephemeral(event, "✅ Added your #{species}.")
-      else
-        respond_ephemeral(event, "⚠️ #{result[:error]}")
+      unless result[:ok]
+        respond_ephemeral(event, "❌ #{result[:error]}")
+        return
       end
+
+      update_catches_panel(run)
+      respond_ephemeral(event, "✅ Added your **#{result[:species]}**.")
+    rescue => e
+      respond_ephemeral(event, "❌ Error: #{e.message}")
     end
 
     def open_uncaught_death_modal(event, location)
