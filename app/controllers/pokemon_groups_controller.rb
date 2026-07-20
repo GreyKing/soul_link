@@ -42,6 +42,11 @@ class PokemonGroupsController < ApplicationController
       end
     end
 
+    # Live catch embed. Last statement before render so a Discord failure
+    # can never roll back the group/pokemon writes. The service is
+    # fire-and-forget and swallows its own errors.
+    SoulLink::CatchMessage.post_or_update(group)
+
     if errors.any?
       render json: { status: "partial", group_id: group.id, nickname: group.nickname, errors: errors }, status: :multi_status
     else
