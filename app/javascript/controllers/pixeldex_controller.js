@@ -519,18 +519,16 @@ export default class extends Controller {
     }
   }
 
-  #populateAbilities(species, currentAbility) {
-    const abilities = this.abilitiesDataValue[species] || []
-    const select = this.modalAbilityTarget
-    select.innerHTML = '<option value="">Select...</option>'
+  // Any Pokemon may now have any ability, so this no longer filters by
+  // species — it just seeds the searchable select's current value. Kept
+  // under the original name/arity because both callers (#openModal and
+  // searchSpecies) still invoke it.
+  #populateAbilities(_species, currentAbility) {
+    this.modalAbilityTarget.value = currentAbility || ""
 
-    abilities.forEach(ab => {
-      const opt = document.createElement("option")
-      opt.value = ab
-      opt.textContent = ab
-      if (ab === currentAbility) opt.selected = true
-      select.appendChild(opt)
-    })
+    const wrapper = this.modalAbilityTarget.closest(".searchable-select")
+    const input = wrapper?.querySelector("[data-searchable-select-target='input']")
+    if (input) input.value = currentAbility || ""
   }
 
   // Builds a tree structure from evolutions data.

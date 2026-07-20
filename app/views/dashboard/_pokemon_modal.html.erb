@@ -58,11 +58,34 @@
                  class="gb-input"
                  placeholder="1-100">
         </div>
-        <div>
-          <label class="gb-label">ABILITY</label>
-          <select data-pixeldex-target="modalAbility" class="gb-select">
-            <option value="">Select...</option>
-          </select>
+        <%# Options read from GameState directly, not an ivar — this partial
+            renders from BOTH dashboard#show and map#show, and an ivar set in
+            only one controller would be nil on the other. %>
+        <div class="searchable-select"
+             data-controller="searchable-select"
+             data-searchable-select-options-value="<%= SoulLink::GameState.all_abilities.to_json %>"
+             data-searchable-select-visible-count-value="5">
+          <label class="gb-label" for="modal-ability-input">ABILITY</label>
+          <input type="text"
+                 id="modal-ability-input"
+                 class="gb-input"
+                 role="combobox"
+                 aria-expanded="false"
+                 aria-autocomplete="list"
+                 autocomplete="off"
+                 placeholder="Search abilities..."
+                 data-searchable-select-target="input"
+                 data-action="input->searchable-select#filter
+                              focus->searchable-select#filter
+                              blur->searchable-select#closeSoon
+                              keydown->searchable-select#keydown">
+          <ul class="searchable-select-list hidden"
+              role="listbox"
+              data-searchable-select-target="list"
+              data-action="mousedown->searchable-select#cancelClose"></ul>
+          <input type="hidden"
+                 data-searchable-select-target="hidden"
+                 data-pixeldex-target="modalAbility">
         </div>
       </div>
 
