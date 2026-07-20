@@ -2,9 +2,27 @@ module Runs
   class RomDownloadsController < ApplicationController
     before_action :require_login
 
+    # Statuses that mean "a subprocess is already queued or running for this
+    # player". Deliberately excludes ready/failed so the guard self-releases.
+    IN_FLIGHT_STATUSES = %w[pending generating].freeze
+
     def create
       run = find_run
       head :not_found and return unless run
+
+      # Each generation spawns a 30s Java subprocess, so an unbounded POST is a
+      # resource-exhaustion vector — the client-side `disabled` attribute stops
+      # nobody scripted. Reattach to the caller's in-flight download instead of
+      # queueing a duplicate: idempotent while work is running, and a player
+      # who reloads mid-generation rejoins their job rather than abandoning it.
+      # The guard releases as soon as the download reaches ready/failed.
+      in_flight = run.soul_link_rom_downloads
+                     .where(discord_user_id: current_user_id, status: IN_FLIGHT_STATUSES)
+                     .order(:created_at).last
+      if in_flight
+        render json: { id: in_flight.id, status: in_flight.status }
+        return
+      end
 
       download = run.soul_link_rom_downloads.create!(
         discord_user_id: current_user_id,
