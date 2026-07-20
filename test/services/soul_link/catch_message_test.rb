@@ -8,6 +8,7 @@ module SoulLink
                       nickname: "TOMMY", location: "route_205")
       @posts = []
       @edits = []
+      @deletes = []
     end
 
     # Positional stubs, matching the real discordrb signatures. If the service
@@ -28,9 +29,16 @@ module SoulLink
         { "id" => message_id.to_s }.to_json
       end
 
+      delete_stub = lambda do |_token, channel_id, message_id, *_rest|
+        @deletes << { channel_id: channel_id, message_id: message_id }
+        { "id" => message_id.to_s }.to_json
+      end
+
       Discordrb::API::Channel.stub(:create_message, post_stub) do
         Discordrb::API::Channel.stub(:edit_message, edit_stub) do
-          SoulLink::CatchMessage.stub(:resolve_token, "Bot test", &block)
+          Discordrb::API::Channel.stub(:delete_message, delete_stub) do
+            SoulLink::CatchMessage.stub(:resolve_token, "Bot test", &block)
+          end
         end
       end
     end
@@ -169,6 +177,36 @@ module SoulLink
       assert_includes embed[:title], "💀"
       assert_equal SoulLink::CatchMessage::DEAD_EMBED_COLOR, embed[:color]
       assert_empty @edits.first[:components]
+    end
+
+    test "delete removes the discord message and clears the id" do
+      @group.update!(discord_catch_message_id: 7777)
+      with_stubbed_discord { SoulLink::CatchMessage.delete(@group) }
+
+      assert_equal 1, @deletes.length
+      assert_equal 7777, @deletes.first[:message_id]
+      assert_nil @group.reload.discord_catch_message_id
+    end
+
+    test "delete is a no-op when the group never posted" do
+      with_stubbed_discord { SoulLink::CatchMessage.delete(@group) }
+      assert_empty @deletes
+    end
+
+    test "delete is a no-op when the group is nil" do
+      with_stubbed_discord { SoulLink::CatchMessage.delete(nil) }
+      assert_empty @deletes
+    end
+
+    test "delete never raises when Discord is unreachable" do
+      @group.update!(discord_catch_message_id: 7777)
+      boom = ->(*_args) { raise SocketError, "no network" }
+
+      Discordrb::API::Channel.stub(:delete_message, boom) do
+        SoulLink::CatchMessage.stub(:resolve_token, "Bot test") do
+          assert_nothing_raised { SoulLink::CatchMessage.delete(@group) }
+        end
+      end
     end
   end
 end

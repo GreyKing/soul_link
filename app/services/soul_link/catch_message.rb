@@ -38,6 +38,29 @@ module SoulLink
         nil
       end
 
+      # Remove the catch message from Discord and forget its id. Callers must
+      # invoke this BEFORE destroying the group row — the id lives on the group.
+      # Fire-and-forget, matching post_or_update: every failure is swallowed.
+      def delete(group)
+        return if group.nil? || group.discord_catch_message_id.blank?
+
+        run = group.soul_link_run
+        return if run.nil? || run.catches_channel_id.blank?
+
+        token = resolve_token
+        return if token.blank?
+
+        Discordrb::API::Channel.delete_message(
+          token,
+          run.catches_channel_id,
+          group.discord_catch_message_id
+        )
+        group.update_columns(discord_catch_message_id: nil)
+      rescue StandardError => e
+        log_failure(e, group)
+        nil
+      end
+
       # ── embed construction ───────────────────────────────────────────
       # Public for the same reason GymPollMessage's are: the pieces are
       # consumed by other callers (the catch button handler) as well as by
