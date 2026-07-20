@@ -250,6 +250,12 @@ export default class extends Controller {
   // ── PC Box Cell Selection ──
 
   selectPokemon(event) {
+    // A drag ends with a click on the dragged element; ignore it so dropping
+    // into the party does not also open the detail modal. Complements the
+    // existing sortable-chosen check below (the cloned box-cell does not
+    // carry that class, so both guards are needed).
+    if (document.body.classList.contains("sortable-dragging")) return
+
     // Don't open modal if this was a drag
     if (event.currentTarget.classList.contains("sortable-chosen")) return
 

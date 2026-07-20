@@ -207,7 +207,7 @@
     </div>
 
     <div class="box-layout">
-      <div class="box-grid">
+      <div class="box-grid" data-party-drag-target="boxGrid">
         <% status_groups.each do |group, status| %>
           <%
             my_pokemon = group.soul_link_pokemon.find { |g| g.discord_user_id == current_user_id }
@@ -227,6 +227,7 @@
                data-search-haystack="<%= search_haystack %>"
                data-action="click->pixeldex#selectPokemon"
                data-group-id="<%= group.id %>"
+               data-alive="<%= group.caught? %>"
                data-group-nickname="<%= group.nickname %>"
                data-group-species="<%= my_pokemon&.species || '' %>"
                data-group-location="<%= group.location %>"
