@@ -1130,6 +1130,9 @@ module SoulLink
       death_location = location == 'original' ? nil : location
       group.mark_as_dead!(death_location: death_location, eulogy: eulogy)
 
+      # Recolor the catch embed to its dead state, same as the website path.
+      SoulLink::CatchMessage.post_or_update(group)
+
       update_catches_panel(run)
       update_deaths_panel(run)
 

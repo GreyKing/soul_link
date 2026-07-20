@@ -106,6 +106,10 @@ class PokemonGroupsController < ApplicationController
       )
     end
 
+    # Re-sync the live catch embed after any edit (rename, relocate, dead,
+    # revive). Fire-and-forget; a Discord failure never touches the response.
+    SoulLink::CatchMessage.post_or_update(group)
+
     render json: { status: "updated", group_id: group.id, nickname: group.nickname }
   rescue ActiveRecord::RecordInvalid => e
     render json: { error: e.message }, status: :unprocessable_entity
@@ -142,6 +146,9 @@ class PokemonGroupsController < ApplicationController
       return
     end
 
+    # Remove the catch embed BEFORE the row is gone — delete reads the
+    # message id off the group.
+    SoulLink::CatchMessage.delete(group)
     group.destroy!
     render json: { status: "deleted" }
   rescue => e

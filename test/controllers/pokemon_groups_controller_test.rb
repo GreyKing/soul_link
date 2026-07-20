@@ -68,4 +68,30 @@ class PokemonGroupsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal 1, calls.length
   end
+
+  test "updating a group re-syncs the catch embed" do
+    login_as(GREY)
+    group = create(:soul_link_pokemon_group, :route206, soul_link_run: @run)
+    calls = []
+
+    SoulLink::CatchMessage.stub(:post_or_update, ->(g) { calls << g.id }) do
+      patch pokemon_group_path(group), params: { nickname: "RENAMED" }, as: :json
+    end
+
+    assert_response :success
+    assert_equal [ group.id ], calls
+  end
+
+  test "destroying a group deletes the catch embed before the row is gone" do
+    login_as(GREY)
+    group = create(:soul_link_pokemon_group, :route206, soul_link_run: @run)
+    seen_ids = []
+
+    SoulLink::CatchMessage.stub(:delete, ->(g) { seen_ids << g.id }) do
+      delete pokemon_group_path(group), as: :json
+    end
+
+    assert_response :success
+    assert_equal [ group.id ], seen_ids
+  end
 end
