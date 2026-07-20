@@ -151,5 +151,24 @@ module SoulLink
       button = @posts.first[:components].first[:components].first
       assert_equal "soul_link:catch_add:#{@group.id}", button[:custom_id]
     end
+
+    test "caught embed carries both add and refresh buttons" do
+      with_stubbed_discord { SoulLink::CatchMessage.post_or_update(@group) }
+
+      buttons = @posts.first[:components].first[:components]
+      custom_ids = buttons.map { |b| b[:custom_id] }
+      assert_includes custom_ids, "soul_link:catch_add:#{@group.id}"
+      assert_includes custom_ids, "soul_link:catch_refresh:#{@group.id}"
+    end
+
+    test "dead group renders a red death embed with no buttons" do
+      @group.update!(discord_catch_message_id: 4242, status: "dead")
+      with_stubbed_discord { SoulLink::CatchMessage.post_or_update(@group) }
+
+      embed = @edits.first[:embeds].first
+      assert_includes embed[:title], "💀"
+      assert_equal SoulLink::CatchMessage::DEAD_EMBED_COLOR, embed[:color]
+      assert_empty @edits.first[:components]
+    end
   end
 end

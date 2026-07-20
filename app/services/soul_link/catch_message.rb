@@ -14,8 +14,9 @@ module SoulLink
   # Fire-and-forget, matching the `DiscordNotifier` contract: every failure
   # mode is swallowed and logged at warn level. Callers need no rescue.
   class CatchMessage
-    EMBED_COLOR = 0x57F287  # green — matches the "caught" status colour
-    NOT_CAUGHT  = "— not caught yet —".freeze
+    EMBED_COLOR      = 0x57F287  # green — matches the "caught" status colour
+    DEAD_EMBED_COLOR = 0xED4245  # red — matches the "dead" status colour
+    NOT_CAUGHT       = "— not caught yet —".freeze
 
     class << self
       def post_or_update(group)
@@ -43,22 +44,34 @@ module SoulLink
       # post/edit below.
 
       def embed(group)
+        dead = group.dead?
         {
-          title: "🎯 NEW CATCH — #{location_label(group)}",
+          title: dead ? "💀 #{location_label(group)}" : "🎯 NEW CATCH — #{location_label(group)}",
           description: player_lines(group).join("\n"),
-          color: EMBED_COLOR
+          color: dead ? DEAD_EMBED_COLOR : EMBED_COLOR
         }
       end
 
+      # A dead group freezes as history: recolored embed, no buttons.
       def components(group)
+        return [] if group.dead?
+
         [ {
           type: 1,
-          components: [ {
-            type: 2,
-            style: 1,
-            label: "ADD MY POKEMON",
-            custom_id: "soul_link:catch_add:#{group.id}"
-          } ]
+          components: [
+            {
+              type: 2,
+              style: 1,
+              label: "ADD MY POKEMON",
+              custom_id: "soul_link:catch_add:#{group.id}"
+            },
+            {
+              type: 2,
+              style: 2,
+              label: "🔄 REFRESH",
+              custom_id: "soul_link:catch_refresh:#{group.id}"
+            }
+          ]
         } ]
       end
 
