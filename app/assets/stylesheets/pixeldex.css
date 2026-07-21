@@ -2826,3 +2826,29 @@ body::after {
   font-size: 11px;
   color: var(--d2);
 }
+
+/* Ability hover popup — shared, fixed-position, never clipped. */
+.gb-tooltip {
+  position: fixed;
+  z-index: 80;                /* above modal (50/60) and dropdown (70) */
+  display: none;
+  max-width: 220px;
+  padding: 4px 6px;
+  font-size: 10px;
+  line-height: 14px;
+  background: var(--d1);
+  color: var(--l2);
+  border: var(--border-thin);
+  pointer-events: none;
+}
+
+/* Dimmed short blurb inside a searchable-select option. */
+.ss-option-meta {
+  color: var(--d2);
+  font-size: 9px;
+  margin-left: 6px;
+}
+.searchable-select-option.is-active .ss-option-meta,
+.searchable-select-option:hover .ss-option-meta {
+  color: var(--l2);
+}
