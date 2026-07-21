@@ -6,7 +6,7 @@ export default class extends Controller {
     "tabContent", "tabButton",
     "pokemonDetail",
     "pokemonModal", "modalSprite", "modalSpeciesName", "modalNickLoc", "modalTypes",
-    "modalSpeciesInput", "modalSpeciesHidden", "modalLevel", "modalAbility",
+    "modalSpeciesInput", "modalSpeciesHidden", "modalLevel", "modalAbility", "modalAbilityLabel",
     "modalEvoInfo", "modalEvoText", "modalLinked", "modalNickname",
     "modalDeadBtn", "modalStatus", "modalPokemonId", "modalGroupId",
     "modalNature", "modalNatureLabel",
@@ -514,6 +514,10 @@ export default class extends Controller {
     this.#updateNatureLabelFromValue(this.modalNatureTarget.value)
   }
 
+  updateAbilityLabel() {
+    this.#updateAbilityLabelFromValue(this.modalAbilityTarget.value)
+  }
+
   // ── Private Helpers ──
 
   #updateNatureLabelFromValue(nature) {
@@ -523,6 +527,23 @@ export default class extends Controller {
       this.modalNatureLabelTarget.textContent = nature ? "Neutral" : ""
     } else {
       this.modalNatureLabelTarget.textContent = `+${info.up}  -${info.down}`
+    }
+  }
+
+  #updateAbilityLabelFromValue(ability) {
+    if (!this.hasModalAbilityLabelTarget) return
+    const label = this.modalAbilityLabelTarget
+    const effect = this.abilityEffectsDataValue?.[ability]
+    if (!ability || !effect) {
+      label.textContent = ""
+      label.removeAttribute("data-ability-full")
+    } else {
+      label.textContent = effect.short || ""
+      if (effect.full) {
+        label.setAttribute("data-ability-full", effect.full)
+      } else {
+        label.removeAttribute("data-ability-full")
+      }
     }
   }
 
@@ -536,6 +557,8 @@ export default class extends Controller {
     const wrapper = this.modalAbilityTarget.closest(".searchable-select")
     const input = wrapper?.querySelector("[data-searchable-select-target='input']")
     if (input) input.value = currentAbility || ""
+
+    this.#updateAbilityLabelFromValue(currentAbility || "")
   }
 
   // Builds a tree structure from evolutions data.

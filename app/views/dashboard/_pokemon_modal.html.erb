@@ -64,6 +64,7 @@
         <div class="searchable-select"
              data-controller="searchable-select"
              data-searchable-select-options-value="<%= SoulLink::GameState.all_abilities.to_json %>"
+             data-searchable-select-meta-value="<%= SoulLink::GameState.ability_effects.to_json %>"
              data-searchable-select-visible-count-value="5">
           <label class="gb-label" for="modal-ability-input">ABILITY</label>
           <input type="text"
@@ -85,7 +86,10 @@
               data-action="mousedown->searchable-select#cancelClose"></ul>
           <input type="hidden"
                  data-searchable-select-target="hidden"
-                 data-pixeldex-target="modalAbility">
+                 data-pixeldex-target="modalAbility"
+                 data-action="change->pixeldex#updateAbilityLabel">
+          <div data-pixeldex-target="modalAbilityLabel"
+               style="font-size: 9px; color: var(--d2); margin-top: 3px; min-height: 12px; cursor: help;"></div>
         </div>
       </div>
 
