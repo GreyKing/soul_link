@@ -11,7 +11,7 @@
     subscriptions. The window-level numeric jump (1-8) is bound here so
     it works no matter where focus is. %>
 <div class="dash-r1"
-     data-controller="dashboard pixeldex run-management party-drag"
+     data-controller="dashboard pixeldex run-management party-drag ability-tooltip"
      data-action="keydown@window->pixeldex#numericJump"
      data-dashboard-groups-url-value="<%= pokemon_groups_path %>"
      data-dashboard-csrf-value="<%= form_authenticity_token %>"
@@ -20,6 +20,7 @@
      data-pixeldex-evolutions-data-value="<%= SoulLink::GameState.evolutions.to_json %>"
      data-pixeldex-sprite-map-value="<%= pixeldex_sprite_urls.to_json %>"
      data-pixeldex-natures-data-value="<%= PixeldexHelper::NATURES.to_json %>"
+     data-pixeldex-ability-effects-data-value="<%= SoulLink::GameState.ability_effects.to_json %>"
      data-pixeldex-pokemon-update-url-value="/pokemon"
      data-pixeldex-group-update-url-value="<%= pokemon_groups_path %>"
      data-pixeldex-update-slots-url-value="<%= update_slots_team_path %>"

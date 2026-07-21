@@ -12,7 +12,7 @@
   current_seg_label = current_segment_label(@progression, @gym_info, next_uncaught_key)
 %>
 <div class="map-r4"
-     data-controller="timeline dashboard pixeldex"
+     data-controller="timeline dashboard pixeldex ability-tooltip"
      data-timeline-gyms-defeated-value="<%= @gyms_defeated %>"
      data-timeline-csrf-value="<%= form_authenticity_token %>"
      data-timeline-gym-progress-url-value="<%= gym_progress_path %>"
@@ -26,6 +26,7 @@
      data-pixeldex-evolutions-data-value="<%= SoulLink::GameState.evolutions.to_json %>"
      data-pixeldex-sprite-map-value="<%= pixeldex_sprite_urls.to_json %>"
      data-pixeldex-natures-data-value="<%= PixeldexHelper::NATURES.to_json %>"
+     data-pixeldex-ability-effects-data-value="<%= SoulLink::GameState.ability_effects.to_json %>"
      data-pixeldex-pokemon-update-url-value="/pokemon"
      data-pixeldex-group-update-url-value="<%= pokemon_groups_path %>"
      data-pixeldex-update-slots-url-value="<%= update_slots_team_path %>"

@@ -18,6 +18,7 @@ export default class extends Controller {
     evolutionsData: Object,
     spriteMap: Object,
     naturesData: Object,
+    abilityEffectsData: Object,
     pokemonUpdateUrl: String,
     groupUpdateUrl: String,
     updateSlotsUrl: String,
