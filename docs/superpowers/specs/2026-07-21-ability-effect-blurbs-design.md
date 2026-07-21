@@ -20,7 +20,9 @@ on contact. There is **no ability description/effect data anywhere in the repo.*
 1. A **short inline blurb** next to each ability name (parallel to the nature
    `+X -Y` label), e.g. `Levitate` → `Immune to Ground`.
 2. A **Game-Boy-styled hover popup** showing the full Gen-IV description when the
-   user hovers (or keyboard-focuses) an annotated ability.
+   user hovers an annotated ability. (Hover-only, matching the nature label,
+   which has no keyboard/tooltip treatment; the annotated elements are
+   non-focusable, so focus-based popups would be dead code.)
 3. Applied on **every surface an ability renders**: the detail modal (including
    its searchable-select dropdown), the JS linked-Pokémon cards, and the gym
    team snapshot.
@@ -90,15 +92,15 @@ The dropdown list, linked-cards container, and gym snapshot card all live inside
 **clipped**. Instead:
 
 - **`app/javascript/controllers/ability_tooltip_controller.js`** — a small
-  Stimulus controller mounted once high in the tree (on the pixeldex root, and on
-  the gym content container). It delegates document-scoped-to-element
-  `mouseover`/`mouseout` plus `focusin`/`focusout`. When the event target (or its
-  closest ancestor) carries `data-ability-full`, it positions a single reusable
-  `position: fixed` popup element next to that element and fills it with the full
-  text; on out/blur it hides. One popup node is reused (created lazily), never one
-  per ability.
+  Stimulus controller mounted once on the pixeldex root. Because `_gyms_content`
+  renders inside that same root (`.dash-r1`), one mount covers all three surfaces
+  — no separate mount on the gym container. It delegates `mouseover`/`mouseout`
+  (both bubble). When the event target (or its closest ancestor) carries
+  `data-ability-full`, it positions a single reusable `position: fixed` popup
+  element next to that element and fills it with the full text; on out it hides.
+  One popup node is reused (created lazily), never one per ability.
   - Positioning: anchor above the element, flipping below when it would clip the
-    viewport top; clamp horizontally into the viewport. Keep it simple — no
+    viewport top; clamp into the viewport on both axes. Keep it simple — no
     external positioning lib.
 - **`.gb-tooltip` in `pixeldex.css`** — dark background (`var(--d1)`), pixel
   border (`var(--border-thin)`), light text (`var(--l2)`), ~10px font, high
@@ -125,7 +127,7 @@ The dropdown list, linked-cards container, and gym snapshot card all live inside
   ability `.searchable-select` passes
   `data-searchable-select-meta-value="<%= SoulLink::GameState.ability_effects.to_json %>"`.
 
-**b. Linked-Pokémon cards — `pixeldex_controller.js` `#renderLinkedPokemon`**
+**b. Linked-Pokémon cards — `pixeldex_controller.js` `#populateLinked`**
 
 - Where the stats row currently pushes the plain ability string, render the
   ability as a `<span>` reading `Ability (short blurb)` — mirroring the nature
@@ -141,16 +143,19 @@ The dropdown list, linked-cards container, and gym snapshot card all live inside
   ability portion as a `<span>` carrying `ability_effect_short` (as `(blurb)`)
   and `data-ability-full`, `safe_join`-ing the parts so the ability span keeps
   its tooltip while level/nature remain plain text.
-- Mount the `ability-tooltip` controller on the gyms content container so hover
-  works on this server-rendered surface.
+- No extra controller mount is needed here: `_gyms_content` renders inside
+  `.dash-r1`, which already hosts the `ability-tooltip` controller, so hover works
+  on this server-rendered surface via delegation.
 
 ### 5. Tests
 
 - **`pixeldex_helper_test.rb`** — `ability_effect_short` / `ability_effect_full`
   return the authored blurb/full for a known ability and `""` for an unknown one.
-- **`game_state_test.rb`** — `ability_effects` loads the YAML; `ability_effect`
-  returns the hash for a known name and `nil` for an unknown one.
-- **Data-integrity test** (in `game_state_test.rb`) — asserts **every** name in
+- **`game_state_ability_effects_test.rb`** (new, per-feature — GameState tests are
+  split per feature; there is no `game_state_test.rb`) — `ability_effects` loads
+  the YAML; `ability_effect` returns the hash for a known name and `nil` for an
+  unknown one.
+- **Data-integrity test** (same file) — asserts **every** name in
   `all_abilities` has an entry in `ability_effects.yml` with non-empty `short`
   and `full`. This is the guard that catches missing/mis-typed authoring for any
   of the 123.

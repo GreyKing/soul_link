@@ -28,8 +28,8 @@
 - `app/assets/stylesheets/pixeldex.css` — `.gb-tooltip` + `.ss-option-meta` styles.
 
 **Test:**
-- `test/services/soul_link/game_state_test.rb` — loader + data-integrity.
-- `test/helpers/pixeldex_helper_test.rb` — helper blurbs.
+- Create: `test/services/soul_link/game_state_ability_effects_test.rb` — loader + data-integrity (GameState tests are split per-feature; follow the `game_state_abilities_test.rb` convention).
+- Modify: `test/helpers/pixeldex_helper_test.rb` — helper blurbs (file already exists: `class PixeldexHelperTest < ActionView::TestCase` with `include PixeldexHelper`).
 
 ---
 
@@ -37,34 +37,42 @@
 
 **Files:**
 - Create: `config/soul_link/ability_effects.yml`
-- Modify: `app/services/soul_link/game_state.rb` (path constants ~`:14`, loaders after `abilities_for` ~`:187`, `reload!` ~`:214`)
-- Test: `test/services/soul_link/game_state_test.rb`
+- Modify: `app/services/soul_link/game_state.rb` (path constants ~`:14`, loaders after `all_abilities` ~`:194`, `reload!` ~`:226`)
+- Create: `test/services/soul_link/game_state_ability_effects_test.rb`
+
+> **Note on the test file:** GameState tests are split per feature (see `game_state_abilities_test.rb`, `game_state_maps_test.rb`, …), each wrapped in `module SoulLink; class GameState<Feature>Test < ActiveSupport::TestCase`. There is **no** `game_state_test.rb`. Create a new per-feature file as below.
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/services/soul_link/game_state_test.rb` (inside the existing test class):
+Create `test/services/soul_link/game_state_ability_effects_test.rb`:
 
 ```ruby
-test "ability_effect returns short and full for a known ability" do
-  effect = SoulLink::GameState.ability_effect("Levitate")
-  assert_equal "Immune to Ground", effect["short"]
-  assert_equal "Gives full immunity to all Ground-type moves.", effect["full"]
-end
+require "test_helper"
 
-test "ability_effect returns nil for an unknown ability" do
-  assert_nil SoulLink::GameState.ability_effect("Not An Ability")
-end
+module SoulLink
+  class GameStateAbilityEffectsTest < ActiveSupport::TestCase
+    test "ability_effect returns short and full for a known ability" do
+      effect = SoulLink::GameState.ability_effect("Levitate")
+      assert_equal "Immune to Ground", effect["short"]
+      assert_equal "Gives full immunity to all Ground-type moves.", effect["full"]
+    end
 
-test "ability_effects is a non-empty hash keyed by ability name" do
-  assert SoulLink::GameState.ability_effects.is_a?(Hash)
-  assert SoulLink::GameState.ability_effects.key?("Static")
+    test "ability_effect returns nil for an unknown ability" do
+      assert_nil SoulLink::GameState.ability_effect("Not An Ability")
+    end
+
+    test "ability_effects is a non-empty hash keyed by ability name" do
+      assert SoulLink::GameState.ability_effects.is_a?(Hash)
+      assert SoulLink::GameState.ability_effects.key?("Static")
+    end
+  end
 end
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `bin/rails test test/services/soul_link/game_state_test.rb`
-Expected: FAIL — `NoMethodError: undefined method 'ability_effect'`.
+Run: `bin/rails test test/services/soul_link/game_state_ability_effects_test.rb`
+Expected: FAIL — `NoMethodError: undefined method 'ability_effect' for SoulLink::GameState`. (The file loads fine; the methods just don't exist yet.)
 
 - [ ] **Step 3: Create the data file**
 
@@ -229,13 +237,13 @@ Add the reset line to `reload!` next to `@all_abilities = nil` (~`:226`):
 
 - [ ] **Step 5: Run the test to verify it passes**
 
-Run: `bin/rails test test/services/soul_link/game_state_test.rb`
+Run: `bin/rails test test/services/soul_link/game_state_ability_effects_test.rb`
 Expected: PASS (all three new tests green).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add config/soul_link/ability_effects.yml app/services/soul_link/game_state.rb test/services/soul_link/game_state_test.rb
+git add config/soul_link/ability_effects.yml app/services/soul_link/game_state.rb test/services/soul_link/game_state_ability_effects_test.rb
 git commit -m "feat(abilities): add ability_effects data + GameState loader"
 ```
 
@@ -244,34 +252,34 @@ git commit -m "feat(abilities): add ability_effects data + GameState loader"
 ## Task 2: Data-integrity test (every ability is covered)
 
 **Files:**
-- Test: `test/services/soul_link/game_state_test.rb`
+- Modify: `test/services/soul_link/game_state_ability_effects_test.rb` (created in Task 1)
 
 - [ ] **Step 1: Write the test**
 
-Add to `test/services/soul_link/game_state_test.rb`:
+Add this `test` block inside `SoulLink::GameStateAbilityEffectsTest` in `test/services/soul_link/game_state_ability_effects_test.rb`:
 
 ```ruby
-test "every ability has a non-empty short and full effect entry" do
-  missing = []
-  SoulLink::GameState.all_abilities.each do |name|
-    effect = SoulLink::GameState.ability_effect(name)
-    if effect.nil? || effect["short"].to_s.strip.empty? || effect["full"].to_s.strip.empty?
-      missing << name
+    test "every ability has a non-empty short and full effect entry" do
+      missing = []
+      SoulLink::GameState.all_abilities.each do |name|
+        effect = SoulLink::GameState.ability_effect(name)
+        if effect.nil? || effect["short"].to_s.strip.empty? || effect["full"].to_s.strip.empty?
+          missing << name
+        end
+      end
+      assert_empty missing, "abilities missing short/full effect: #{missing.join(', ')}"
     end
-  end
-  assert_empty missing, "abilities missing short/full effect: #{missing.join(', ')}"
-end
 ```
 
 - [ ] **Step 2: Run the test**
 
-Run: `bin/rails test test/services/soul_link/game_state_test.rb`
+Run: `bin/rails test test/services/soul_link/game_state_ability_effects_test.rb`
 Expected: PASS. If it FAILS, the failure message lists exactly which ability names are missing or blank in `ability_effects.yml` — add/fix those entries (spelling must match `abilities.yml`) until green.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add test/services/soul_link/game_state_test.rb
+git add test/services/soul_link/game_state_ability_effects_test.rb
 git commit -m "test(abilities): assert every ability has an effect entry"
 ```
 
@@ -285,12 +293,9 @@ git commit -m "test(abilities): assert every ability has an effect entry"
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/helpers/pixeldex_helper_test.rb` (create the file if it does not exist — see structure below):
+`test/helpers/pixeldex_helper_test.rb` already exists as `class PixeldexHelperTest < ActionView::TestCase` with `include PixeldexHelper`. Add these four `test` blocks inside that existing class:
 
 ```ruby
-require "test_helper"
-
-class PixeldexHelperTest < ActionView::TestCase
   test "ability_effect_short returns the blurb for a known ability" do
     assert_equal "Immune to Ground", ability_effect_short("Levitate")
   end
@@ -306,10 +311,7 @@ class PixeldexHelperTest < ActionView::TestCase
   test "ability_effect_full returns empty string for an unknown ability" do
     assert_equal "", ability_effect_full("Not An Ability")
   end
-end
 ```
-
-> If `test/helpers/pixeldex_helper_test.rb` already exists, add just the four `test` blocks inside the existing class instead of recreating the file.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -362,10 +364,12 @@ Create `app/javascript/controllers/ability_tooltip_controller.js`:
 import { Controller } from "@hotwired/stimulus"
 
 // One reusable, position:fixed popup for any descendant carrying
-// `data-ability-full`. Mounted once high in the tree; uses event
-// delegation (mouseover/mouseout bubble; focusin/focusout for keyboard)
-// so it also covers elements created later by JS (dropdown options,
-// linked-pokemon cards).
+// `data-ability-full`. Mounted once high in the tree; uses mouseover/
+// mouseout delegation (both bubble) so it also covers elements created
+// later by JS (dropdown options, linked-pokemon cards). Hover-only —
+// matching the nature label, which has no keyboard/tooltip treatment
+// either; the annotated elements are non-focusable, so focus events
+// would be dead code.
 export default class extends Controller {
   connect() {
     this._popup = null
@@ -373,15 +377,11 @@ export default class extends Controller {
     this._onOut = (e) => this.#maybeHide(e.target, e.relatedTarget)
     this.element.addEventListener("mouseover", this._onOver)
     this.element.addEventListener("mouseout", this._onOut)
-    this.element.addEventListener("focusin", this._onOver)
-    this.element.addEventListener("focusout", this._onOut)
   }
 
   disconnect() {
     this.element.removeEventListener("mouseover", this._onOver)
     this.element.removeEventListener("mouseout", this._onOut)
-    this.element.removeEventListener("focusin", this._onOver)
-    this.element.removeEventListener("focusout", this._onOut)
     this.#destroyPopup()
   }
 
@@ -409,9 +409,12 @@ export default class extends Controller {
 
     const rect = host.getBoundingClientRect()
     const pr = popup.getBoundingClientRect()
-    // Prefer above; flip below if it would clip the viewport top.
+    // Prefer above; flip below if it would clip the viewport top,
+    // then clamp into the viewport on both axes.
     let top = rect.top - pr.height - 6
     if (top < 4) top = rect.bottom + 6
+    const maxTop = window.innerHeight - pr.height - 4
+    if (top > maxTop) top = Math.max(4, maxTop)
     let left = rect.left
     const maxLeft = window.innerWidth - pr.width - 4
     if (left > maxLeft) left = Math.max(4, maxLeft)
@@ -724,11 +727,11 @@ git commit -m "feat(abilities): show effect blurbs in the ability dropdown"
 ## Task 8: Ability blurb on the linked-Pokémon cards
 
 **Files:**
-- Modify: `app/javascript/controllers/pixeldex_controller.js` (`#renderLinkedPokemon` stats row ~`:747-762`)
+- Modify: `app/javascript/controllers/pixeldex_controller.js` (`#populateLinked` stats row ~`:747-762`; the method is defined at ~`:696`)
 
 - [ ] **Step 1: Render the ability as a tooltip span with its blurb**
 
-In `#renderLinkedPokemon`, the stats row is currently assembled as plain text joined by `" / "`. Replace the block that builds and appends the stats row (~`:747-762`) with node-based assembly so the ability token can carry a blurb + `data-ability-full` while level/nature stay text:
+In `#populateLinked` (the method that renders the LINKED POKEMON cards), the stats row is currently assembled as plain text joined by `" / "`. Replace the block that builds and appends the stats row (~`:747-762`) with node-based assembly so the ability token can carry a blurb + `data-ability-full` while level/nature stay text:
 
 ```js
         // Stats row: level, ability (with effect blurb), nature
@@ -761,7 +764,7 @@ In `#renderLinkedPokemon`, the stats row is currently assembled as plain text jo
         }
 ```
 
-> This preserves the existing `Lv.X / Ability / Nature` layout and the nature `(+X -Y)` treatment; only the ability token becomes a hoverable span. `naturesData` is the local const already defined at the top of `#renderLinkedPokemon` (~`:705`).
+> This preserves the existing `Lv.X / Ability / Nature` layout and the nature `(+X -Y)` treatment; only the ability token becomes a hoverable span. `naturesData` is the local const already defined at the top of `#populateLinked` (~`:705`).
 
 - [ ] **Step 2: Manual verification**
 
