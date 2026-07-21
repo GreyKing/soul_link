@@ -64,4 +64,20 @@ class PixeldexHelperTest < ActionView::TestCase
     assert_equal "Team is solid. Watch out for ICE and FGT types.",
                  pixeldex_team_dialog(type_analysis, 4)
   end
+
+  test "ability_effect_short returns the blurb for a known ability" do
+    assert_equal "Immune to Ground", ability_effect_short("Levitate")
+  end
+
+  test "ability_effect_short returns empty string for an unknown ability" do
+    assert_equal "", ability_effect_short("Not An Ability")
+  end
+
+  test "ability_effect_full returns the full text for a known ability" do
+    assert_equal "Contact with this Pokémon may leave the attacker paralyzed.", ability_effect_full("Static")
+  end
+
+  test "ability_effect_full returns empty string for an unknown ability" do
+    assert_equal "", ability_effect_full("Not An Ability")
+  end
 end
