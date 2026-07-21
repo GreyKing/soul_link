@@ -14,11 +14,14 @@ export default class extends Controller {
     this._onOut = (e) => this.#maybeHide(e.target, e.relatedTarget)
     this.element.addEventListener("mouseover", this._onOver)
     this.element.addEventListener("mouseout", this._onOut)
+    this._onDown = () => this.#hide()
+    this.element.addEventListener("mousedown", this._onDown)
   }
 
   disconnect() {
     this.element.removeEventListener("mouseover", this._onOver)
     this.element.removeEventListener("mouseout", this._onOut)
+    this.element.removeEventListener("mousedown", this._onDown)
     this.#destroyPopup()
   }
 
@@ -55,6 +58,7 @@ export default class extends Controller {
     let left = rect.left
     const maxLeft = window.innerWidth - pr.width - 4
     if (left > maxLeft) left = Math.max(4, maxLeft)
+    if (left < 4) left = 4
 
     popup.style.top = `${Math.round(top)}px`
     popup.style.left = `${Math.round(left)}px`
