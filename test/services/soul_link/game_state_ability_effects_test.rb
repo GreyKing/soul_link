@@ -16,5 +16,16 @@ module SoulLink
       assert SoulLink::GameState.ability_effects.is_a?(Hash)
       assert SoulLink::GameState.ability_effects.key?("Static")
     end
+
+    test "every ability has a non-empty short and full effect entry" do
+      missing = []
+      SoulLink::GameState.all_abilities.each do |name|
+        effect = SoulLink::GameState.ability_effect(name)
+        if effect.nil? || effect["short"].to_s.strip.empty? || effect["full"].to_s.strip.empty?
+          missing << name
+        end
+      end
+      assert_empty missing, "abilities missing short/full effect: #{missing.join(', ')}"
+    end
   end
 end
