@@ -12,6 +12,7 @@ module SoulLink
     PROGRESSION_PATH = Rails.root.join('config', 'soul_link', 'progression.yml')
     TYPES_PATH = Rails.root.join('config', 'soul_link', 'types.yml')
     ABILITIES_PATH = Rails.root.join('config', 'soul_link', 'abilities.yml')
+    ABILITY_EFFECTS_PATH = Rails.root.join('config', 'soul_link', 'ability_effects.yml')
     EVOLUTIONS_PATH = Rails.root.join('config', 'soul_link', 'evolutions.yml')
     CHEATS_PATH = Rails.root.join('config', 'soul_link', 'cheats.yml')
 
@@ -193,6 +194,16 @@ module SoulLink
         @all_abilities ||= pokemon_abilities.values.flatten.uniq.sort
       end
 
+      # Ability effects: ability name → { "short" =>, "full" => }
+      def ability_effects
+        @ability_effects ||= File.exist?(ABILITY_EFFECTS_PATH) ? YAML.load_file(ABILITY_EFFECTS_PATH) : {}
+      end
+
+      # Returns the { "short" =>, "full" => } hash for an ability, or nil
+      def ability_effect(name)
+        ability_effects[name]
+      end
+
       # Evolutions: species name → hash with evolves_to, level/method
       def evolutions
         @evolutions ||= File.exist?(EVOLUTIONS_PATH) ? YAML.load_file(EVOLUTIONS_PATH) : {}
@@ -224,6 +235,7 @@ module SoulLink
         @pokemon_types = nil
         @pokemon_abilities = nil
         @all_abilities = nil
+        @ability_effects = nil
         @evolutions = nil
         @cheats = nil
       end
