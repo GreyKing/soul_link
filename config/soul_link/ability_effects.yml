@@ -1,0 +1,126 @@
+# config/soul_link/ability_effects.yml
+# Gen IV Platinum ability effects. Keys match abilities.yml exactly.
+# `short` = terse blurb for inline display; `full` = one-sentence hover text.
+Adaptability:  { short: "Boosts same-type moves",  full: "Powers up moves of the same type as the Pokémon." }
+Aftermath:     { short: "Hurts foe on fainting",    full: "Damages the attacker if it lands the finishing hit with a contact move." }
+Air Lock:      { short: "Negates weather",          full: "Eliminates the effects of all weather while the Pokémon is in battle." }
+Anger Point:   { short: "Max Attack when crit",     full: "Maxes the Attack stat after taking a critical hit." }
+Anticipation:  { short: "Senses danger",            full: "Senses when an opposing Pokémon has a dangerous move." }
+Arena Trap:    { short: "Foes can't escape",        full: "Prevents opposing Pokémon from fleeing or switching out." }
+Bad Dreams:    { short: "Saps sleeping foes",       full: "Reduces the HP of any sleeping opposing Pokémon each turn." }
+Battle Armor:  { short: "Blocks critical hits",     full: "Protects the Pokémon from critical hits." }
+Blaze:         { short: "Boosts Fire at low HP",    full: "Powers up Fire-type moves when the Pokémon's HP is low." }
+Chlorophyll:   { short: "Fast in sunshine",         full: "Doubles the Pokémon's Speed in harsh sunlight." }
+Clear Body:    { short: "Blocks stat drops",        full: "Prevents other Pokémon from lowering its stats." }
+Cloud Nine:    { short: "Negates weather",          full: "Eliminates the effects of all weather while the Pokémon is in battle." }
+Color Change:  { short: "Takes attacker's type",    full: "Changes the Pokémon's type to that of the move that last hit it." }
+Compound Eyes: { short: "Boosts accuracy",          full: "Increases the accuracy of the Pokémon's moves." }
+Cute Charm:    { short: "May infatuate on contact", full: "Contact with this Pokémon may cause infatuation." }
+Damp:          { short: "Blocks explosions",        full: "Prevents the use of Selfdestruct and Explosion by any Pokémon." }
+Download:      { short: "Boosts on entry",          full: "Raises Attack or Sp. Atk based on the opposing Pokémon's weaker defense." }
+Drizzle:       { short: "Summons rain",             full: "Makes it rain when the Pokémon enters battle." }
+Drought:       { short: "Summons sunlight",         full: "Turns the sunlight harsh when the Pokémon enters battle." }
+Dry Skin:      { short: "Reacts to water & sun",    full: "Restores HP in rain and from Water moves, but takes more from Fire and loses HP in sun." }
+Early Bird:    { short: "Wakes up fast",            full: "Awakens from sleep in half the usual time." }
+Effect Spore:  { short: "May afflict on contact",   full: "Contact may leave the attacker poisoned, paralyzed, or asleep." }
+Filter:        { short: "Softens super-effective",  full: "Reduces damage taken from super-effective moves." }
+Flame Body:    { short: "May burn on contact",      full: "Contact with this Pokémon may leave the attacker with a burn." }
+Flash Fire:    { short: "Powered by Fire",          full: "Absorbs Fire moves, taking no damage and boosting its own Fire moves." }
+Flower Gift:   { short: "Boosts stats in sun",      full: "Raises the Attack and Sp. Def of ally Pokémon in harsh sunlight." }
+Forecast:      { short: "Changes with weather",     full: "Changes the Pokémon's type with the weather." }
+Forewarn:      { short: "Reveals a strong move",    full: "Reveals one of the opposing Pokémon's moves when battle begins." }
+Frisk:         { short: "Checks foe's item",        full: "Reveals the held item of an opposing Pokémon when battle begins." }
+Gluttony:      { short: "Eats Berry early",         full: "Uses a held Berry sooner than usual, when HP drops to half." }
+Guts:          { short: "Attack up when statused",  full: "Boosts Attack if the Pokémon has a status condition." }
+Heatproof:     { short: "Halves Fire damage",       full: "Weakens the damage from Fire-type moves and from burns." }
+Honey Gather:  { short: "Gathers Honey",            full: "May gather Honey after a battle." }
+Huge Power:    { short: "Doubles Attack",           full: "Doubles the Pokémon's Attack stat." }
+Hustle:        { short: "Power over accuracy",      full: "Boosts Attack but lowers the accuracy of physical moves." }
+Hydration:     { short: "Cures status in rain",     full: "Heals status conditions if it is raining." }
+Hyper Cutter:  { short: "Attack can't be cut",      full: "Prevents other Pokémon from lowering its Attack stat." }
+Ice Body:      { short: "Heals in hail",            full: "Restores HP each turn during hail and takes no hail damage." }
+Illuminate:    { short: "Lures wild Pokémon",       full: "Increases the likelihood of encountering wild Pokémon." }
+Immunity:      { short: "Can't be poisoned",        full: "Prevents the Pokémon from becoming poisoned." }
+Inner Focus:   { short: "Never flinches",           full: "Protects the Pokémon from flinching." }
+Insomnia:      { short: "Can't sleep",              full: "Prevents the Pokémon from falling asleep." }
+Intimidate:    { short: "Lowers foe's Attack",      full: "Lowers the opposing Pokémon's Attack stat on entering battle." }
+Iron Fist:     { short: "Boosts punch moves",       full: "Powers up punching moves." }
+Keen Eye:      { short: "Accuracy can't drop",      full: "Prevents other Pokémon from lowering its accuracy." }
+Klutz:         { short: "Can't use items",          full: "Prevents the Pokémon from using its held item." }
+Leaf Guard:    { short: "No status in sun",         full: "Prevents status conditions in harsh sunlight." }
+Levitate:      { short: "Immune to Ground",         full: "Gives full immunity to all Ground-type moves." }
+Lightning Rod: { short: "Draws Electric moves",     full: "In double battles, draws in all Electric-type moves to itself." }
+Limber:        { short: "Can't be paralyzed",       full: "Prevents the Pokémon from becoming paralyzed." }
+Liquid Ooze:   { short: "Poisons HP drainers",      full: "Damages foes that drain its HP instead of healing them." }
+Magic Guard:   { short: "Only direct damage",       full: "Takes damage only from attacks; indirect damage is prevented." }
+Magma Armor:   { short: "Can't be frozen",          full: "Prevents the Pokémon from becoming frozen." }
+Magnet Pull:   { short: "Traps Steel types",        full: "Prevents Steel-type Pokémon from fleeing or switching out." }
+Marvel Scale:  { short: "Defense up when statused", full: "Boosts Defense if the Pokémon has a status condition." }
+Minus:         { short: "Teams with Plus",          full: "Raises Sp. Atk when an ally has the Plus ability." }
+Mold Breaker:  { short: "Ignores foe abilities",    full: "Moves can be used regardless of the target's ability." }
+Motor Drive:   { short: "Electric boosts Speed",    full: "Raises Speed and takes no damage when hit by an Electric move." }
+Multitype:     { short: "Type matches Plate",       full: "Changes the Pokémon's type to match its held Plate." }
+Natural Cure:  { short: "Cures on switch-out",      full: "Heals status conditions when the Pokémon switches out." }
+No Guard:      { short: "Every move lands",         full: "Ensures moves used by or against the Pokémon always hit." }
+Normalize:     { short: "Moves turn Normal",        full: "Makes all of the Pokémon's moves Normal-type." }
+Oblivious:     { short: "Ignores attraction",       full: "Prevents the Pokémon from becoming infatuated." }
+Overgrow:      { short: "Boosts Grass at low HP",   full: "Powers up Grass-type moves when the Pokémon's HP is low." }
+Own Tempo:     { short: "Can't be confused",        full: "Prevents the Pokémon from becoming confused." }
+Pickup:        { short: "Picks up items",           full: "May pick up an item after a battle." }
+Plus:          { short: "Teams with Minus",         full: "Raises Sp. Atk when an ally has the Minus ability." }
+Poison Heal:   { short: "Poison heals it",          full: "Restores HP instead of losing it when poisoned." }
+Poison Point:  { short: "May poison on contact",    full: "Contact with this Pokémon may leave the attacker poisoned." }
+Pressure:      { short: "Drains foe's PP",          full: "Causes the opposing Pokémon to use more PP for its moves." }
+Pure Power:    { short: "Doubles Attack",           full: "Doubles the Pokémon's Attack stat using its own power." }
+Quick Feet:    { short: "Speed up when statused",   full: "Boosts Speed if the Pokémon has a status condition." }
+Rain Dish:     { short: "Heals in rain",            full: "Gradually restores HP in rain." }
+Reckless:      { short: "Boosts recoil moves",      full: "Powers up moves that cause recoil damage." }
+Rivalry:       { short: "Fights by gender",         full: "Deals more damage to same-gender foes and less to opposite-gender." }
+Rock Head:     { short: "No recoil damage",         full: "Protects the Pokémon from recoil damage." }
+Rough Skin:    { short: "Hurts on contact",         full: "Damages the attacker on contact." }
+Run Away:      { short: "Always escapes",           full: "Ensures escape from any wild Pokémon." }
+Sand Stream:   { short: "Summons sandstorm",        full: "Summons a sandstorm when the Pokémon enters battle." }
+Sand Veil:     { short: "Evasion up in sand",       full: "Boosts evasion during a sandstorm and blocks sandstorm damage." }
+Scrappy:       { short: "Hits Ghost types",         full: "Enables Normal- and Fighting-type moves to hit Ghost-type Pokémon." }
+Serene Grace:  { short: "Boosts move effects",      full: "Raises the chance of a move's added effect occurring." }
+Shadow Tag:    { short: "Foes can't escape",        full: "Prevents opposing Pokémon from fleeing or switching out." }
+Shed Skin:     { short: "May cure status",          full: "May heal its own status conditions each turn." }
+Shell Armor:   { short: "Blocks critical hits",     full: "Protects the Pokémon from critical hits." }
+Shield Dust:   { short: "Blocks added effects",     full: "Blocks the added effects of attacks taken." }
+Simple:        { short: "Doubles stat changes",     full: "Doubles the effect of the Pokémon's stat changes." }
+Skill Link:    { short: "Max multi-hits",           full: "Multi-strike moves always hit the maximum number of times." }
+Slow Start:    { short: "Slow to warm up",          full: "Halves Attack and Speed for five turns after entering battle." }
+Sniper:        { short: "Stronger crits",           full: "Powers up critical hits beyond the usual boost." }
+Snow Cloak:    { short: "Evasion up in hail",       full: "Boosts evasion during hail and blocks hail damage." }
+Snow Warning:  { short: "Summons hail",             full: "Summons a hailstorm when the Pokémon enters battle." }
+Solar Power:   { short: "Sp.Atk up in sun",         full: "Boosts Sp. Atk in harsh sunlight but loses HP each turn." }
+Solid Rock:    { short: "Softens super-effective",  full: "Reduces damage taken from super-effective moves." }
+Soundproof:    { short: "Blocks sound moves",       full: "Gives immunity to sound-based moves." }
+Speed Boost:   { short: "Speed rises each turn",    full: "Raises the Pokémon's Speed every turn." }
+Stall:         { short: "Acts last",                full: "Causes the Pokémon to move after all others." }
+Static:        { short: "May paralyze on contact",  full: "Contact with this Pokémon may leave the attacker paralyzed." }
+Steadfast:     { short: "Speed up on flinch",       full: "Raises Speed each time the Pokémon flinches." }
+Stench:        { short: "Repels wild Pokémon",      full: "Helps keep wild Pokémon away with its stench." }
+Sticky Hold:   { short: "Holds its item",           full: "Prevents the Pokémon's held item from being taken." }
+Storm Drain:   { short: "Draws Water moves",        full: "In double battles, draws in all Water-type moves to itself." }
+Sturdy:        { short: "Blocks OHKO moves",        full: "Protects the Pokémon against one-hit KO moves." }
+Suction Cups:  { short: "Can't be moved",           full: "Prevents the Pokémon from being switched out by moves or items." }
+Super Luck:    { short: "Crits more often",         full: "Raises the likelihood of landing critical hits." }
+Swarm:         { short: "Boosts Bug at low HP",     full: "Powers up Bug-type moves when the Pokémon's HP is low." }
+Swift Swim:    { short: "Fast in rain",             full: "Doubles the Pokémon's Speed in rain." }
+Synchronize:   { short: "Shares its status",        full: "Passes a burn, poison, or paralysis to the Pokémon that caused it." }
+Tangled Feet:  { short: "Evasion up when confused", full: "Raises evasion while the Pokémon is confused." }
+Technician:    { short: "Boosts weak moves",        full: "Powers up the Pokémon's weaker moves." }
+Thick Fat:     { short: "Resists Fire & Ice",       full: "Halves damage taken from Fire- and Ice-type moves." }
+Tinted Lens:   { short: "Boosts weak hits",         full: "Doubles the power of not-very-effective moves." }
+Torrent:       { short: "Boosts Water at low HP",   full: "Powers up Water-type moves when the Pokémon's HP is low." }
+Trace:         { short: "Copies foe's ability",     full: "Copies an opposing Pokémon's ability on entering battle." }
+Truant:        { short: "Acts every other turn",    full: "Causes the Pokémon to loaf around every other turn." }
+Unaware:       { short: "Ignores stat changes",     full: "Ignores the opposing Pokémon's stat changes when dealing or taking damage." }
+Unburden:      { short: "Speed up when item used",  full: "Doubles Speed if the Pokémon's held item is used or lost." }
+Vital Spirit:  { short: "Can't sleep",              full: "Prevents the Pokémon from falling asleep." }
+Volt Absorb:   { short: "Electric heals it",        full: "Restores HP when hit by an Electric move, taking no damage." }
+Water Absorb:  { short: "Water heals it",           full: "Restores HP when hit by a Water move, taking no damage." }
+Water Veil:    { short: "Can't be burned",          full: "Prevents the Pokémon from getting a burn." }
+White Smoke:   { short: "Blocks stat drops",        full: "Prevents other Pokémon from lowering its stats." }
+Wonder Guard:  { short: "Only super-effective hurt", full: "Only super-effective moves can damage the Pokémon." }

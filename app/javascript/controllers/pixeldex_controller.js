@@ -6,7 +6,7 @@ export default class extends Controller {
     "tabContent", "tabButton",
     "pokemonDetail",
     "pokemonModal", "modalSprite", "modalSpeciesName", "modalNickLoc", "modalTypes",
-    "modalSpeciesInput", "modalSpeciesHidden", "modalLevel", "modalAbility",
+    "modalSpeciesInput", "modalSpeciesHidden", "modalLevel", "modalAbility", "modalAbilityLabel",
     "modalEvoInfo", "modalEvoText", "modalLinked", "modalNickname",
     "modalDeadBtn", "modalStatus", "modalPokemonId", "modalGroupId",
     "modalNature", "modalNatureLabel",
@@ -18,6 +18,7 @@ export default class extends Controller {
     evolutionsData: Object,
     spriteMap: Object,
     naturesData: Object,
+    abilityEffectsData: Object,
     pokemonUpdateUrl: String,
     groupUpdateUrl: String,
     updateSlotsUrl: String,
@@ -513,6 +514,10 @@ export default class extends Controller {
     this.#updateNatureLabelFromValue(this.modalNatureTarget.value)
   }
 
+  updateAbilityLabel() {
+    this.#updateAbilityLabelFromValue(this.modalAbilityTarget.value)
+  }
+
   // ── Private Helpers ──
 
   #updateNatureLabelFromValue(nature) {
@@ -522,6 +527,23 @@ export default class extends Controller {
       this.modalNatureLabelTarget.textContent = nature ? "Neutral" : ""
     } else {
       this.modalNatureLabelTarget.textContent = `+${info.up}  -${info.down}`
+    }
+  }
+
+  #updateAbilityLabelFromValue(ability) {
+    if (!this.hasModalAbilityLabelTarget) return
+    const label = this.modalAbilityLabelTarget
+    const effect = this.abilityEffectsDataValue?.[ability]
+    if (!ability || !effect) {
+      label.textContent = ""
+      label.removeAttribute("data-ability-full")
+    } else {
+      label.textContent = effect.short || ""
+      if (effect.full) {
+        label.setAttribute("data-ability-full", effect.full)
+      } else {
+        label.removeAttribute("data-ability-full")
+      }
     }
   }
 
@@ -535,6 +557,8 @@ export default class extends Controller {
     const wrapper = this.modalAbilityTarget.closest(".searchable-select")
     const input = wrapper?.querySelector("[data-searchable-select-target='input']")
     if (input) input.value = currentAbility || ""
+
+    this.#updateAbilityLabelFromValue(currentAbility || "")
   }
 
   // Builds a tree structure from evolutions data.
@@ -744,20 +768,32 @@ export default class extends Controller {
         speciesRow.appendChild(specName)
         card.appendChild(speciesRow)
 
-        // Stats row: level, ability, nature
-        const stats = []
-        if (p.level) stats.push(`Lv.${p.level}`)
-        if (p.ability) stats.push(p.ability)
+        // Stats row: level, ability (with effect blurb), nature
+        const statsRow = document.createElement("div")
+        statsRow.style.cssText = "font-size: 9px; color: var(--d2);"
+        const parts = []
+        if (p.level) parts.push(document.createTextNode(`Lv.${p.level}`))
+        if (p.ability) {
+          const effect = this.abilityEffectsDataValue?.[p.ability]
+          const abilitySpan = document.createElement("span")
+          abilitySpan.textContent = effect?.short ? `${p.ability} (${effect.short})` : p.ability
+          if (effect?.full) {
+            abilitySpan.setAttribute("data-ability-full", effect.full)
+            abilitySpan.style.cursor = "help"
+          }
+          parts.push(abilitySpan)
+        }
         if (p.nature) {
           const info = naturesData[p.nature]
           const effect = (info && info.up) ? ` (+${info.up} -${info.down})` : ""
-          stats.push(`${p.nature}${effect}`)
+          parts.push(document.createTextNode(`${p.nature}${effect}`))
         }
 
-        if (stats.length) {
-          const statsRow = document.createElement("div")
-          statsRow.style.cssText = "font-size: 9px; color: var(--d2);"
-          statsRow.textContent = stats.join(" / ")
+        if (parts.length) {
+          parts.forEach((node, i) => {
+            if (i > 0) statsRow.appendChild(document.createTextNode(" / "))
+            statsRow.appendChild(node)
+          })
           card.appendChild(statsRow)
         }
       } else {

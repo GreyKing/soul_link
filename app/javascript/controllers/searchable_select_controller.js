@@ -9,6 +9,7 @@ export default class extends Controller {
   static targets = ["input", "list", "hidden"]
   static values = {
     options: Array,
+    meta: Object,
     visibleCount: { type: Number, default: 5 }
   }
 
@@ -129,7 +130,6 @@ export default class extends Controller {
 
     this._filtered.forEach((option, index) => {
       const li = document.createElement("li")
-      li.textContent = option
       li.dataset.value = option
       li.id = `${this._uid}-opt-${index}`
       li.setAttribute("role", "option")
@@ -137,6 +137,23 @@ export default class extends Controller {
       li.className =
         "searchable-select-option" + (index === this._activeIndex ? " is-active" : "")
       li.setAttribute("data-action", "mousedown->searchable-select#selectOption")
+
+      const meta = this.hasMetaValue ? this.metaValue[option] : null
+      if (meta) {
+        const name = document.createElement("span")
+        name.textContent = option
+        li.appendChild(name)
+        if (meta.short) {
+          const blurb = document.createElement("span")
+          blurb.className = "ss-option-meta"
+          blurb.textContent = meta.short
+          li.appendChild(blurb)
+        }
+        if (meta.full) li.setAttribute("data-ability-full", meta.full)
+      } else {
+        li.textContent = option
+      }
+
       this.listTarget.appendChild(li)
     })
 

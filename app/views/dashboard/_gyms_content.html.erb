@@ -90,8 +90,16 @@
                   <% group_data["pokemon"]&.each do |p| %>
                     <div style="margin-left: 8px; color: var(--d2);">
                       <%= p["player_name"] %>: <%= p["species"] %>
-                      <% stats = [p["level"] ? "Lv.#{p["level"]}" : nil, p["ability"], p["nature"]].compact %>
-                      <% if stats.any? %><span style="color: var(--d2);"> &mdash; <%= stats.join(" / ") %></span><% end %>
+                      <% parts = [] %>
+                      <% parts << ERB::Util.html_escape("Lv.#{p["level"]}") if p["level"] %>
+                      <% if p["ability"].present? %>
+                        <% blurb = ability_effect_short(p["ability"]) %>
+                        <% full = ability_effect_full(p["ability"]) %>
+                        <% label = blurb.present? ? "#{p["ability"]} (#{blurb})" : p["ability"] %>
+                        <% parts << content_tag(:span, label, "data-ability-full": full.presence, style: ("cursor: help;" if full.present?)) %>
+                      <% end %>
+                      <% parts << ERB::Util.html_escape(p["nature"]) if p["nature"].present? %>
+                      <% if parts.any? %><span style="color: var(--d2);"> &mdash; <%= safe_join(parts, " / ") %></span><% end %>
                     </div>
                   <% end %>
                 </div>

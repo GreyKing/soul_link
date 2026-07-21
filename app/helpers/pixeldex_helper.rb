@@ -58,6 +58,16 @@ module PixeldexHelper
     "+#{info[:up]} -#{info[:down]}"
   end
 
+  # Short inline blurb for an ability, or "" when unknown
+  def ability_effect_short(ability_name)
+    SoulLink::GameState.ability_effect(ability_name)&.fetch("short", "") || ""
+  end
+
+  # Full hover description for an ability, or "" when unknown
+  def ability_effect_full(ability_name)
+    SoulLink::GameState.ability_effect(ability_name)&.fetch("full", "") || ""
+  end
+
   # Renders a 3-letter type badge in pixeldex style
   def pixeldex_type_badge(type_name)
     abbr = TYPE_ABBREVIATIONS[type_name] || type_name[0..2].upcase
