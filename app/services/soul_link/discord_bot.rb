@@ -524,9 +524,9 @@ module SoulLink
       message = channel.send_message(
         '',
         false,
-        build_deaths_embed(run),
+        SoulLink::DeathsPanel.embed(run),
         nil, nil, nil,
-        build_deaths_buttons
+        SoulLink::DeathsPanel.components
       )
 
       run.update!(deaths_panel_message_id: message.id)
@@ -543,15 +543,10 @@ module SoulLink
       Rails.logger.error "Failed to update catches panel: #{e.message}"
     end
 
+    # Web-safe: DeathsPanel edits over the stateless REST layer, so this now
+    # works from the request path as well as the bot process.
     def update_deaths_panel(run)
-      return unless run.deaths_panel_message_id
-
-      channel = bot.channel(run.deaths_channel_id)
-      message = channel.load_message(run.deaths_panel_message_id)
-
-      message.edit('', build_deaths_embed(run), build_deaths_buttons)
-    rescue => e
-      Rails.logger.error "Failed to update deaths panel: #{e.message}"
+      SoulLink::DeathsPanel.refresh(run)
     end
 
     # ------------------------
@@ -582,36 +577,6 @@ module SoulLink
         title: "🎯 Caught Pokemon",
         description: description,
         color: 0x00ff00,
-        footer: { text: "Run ##{run.run_number} | Groups: #{groups.count}" },
-        timestamp: Time.now
-      )
-    end
-
-    def build_deaths_embed(run)
-      groups = run.dead_groups.includes(:soul_link_pokemon)
-
-      description = if groups.empty?
-                      "*No deaths yet. Stay safe out there!*"
-      else
-                      groups.map.with_index(1) do |group, idx|
-                        lines = [ "**#{idx}.** #{group.nickname} *(#{GameState.location_name(group.location)})*" ]
-
-                        group.soul_link_pokemon.each do |pokemon|
-                          lines << "   #{GameState.player_name(pokemon.discord_user_id)}: #{pokemon.species}"
-                        end
-
-                        if group.eulogy.present?
-                          lines << "   📝 *#{group.eulogy}*"
-                        end
-
-                        lines.join("\n")
-                      end.join("\n\n")
-      end
-
-      Discordrb::Webhooks::Embed.new(
-        title: "💀 Fallen Pokemon",
-        description: description,
-        color: 0xff0000,
         footer: { text: "Run ##{run.run_number} | Groups: #{groups.count}" },
         timestamp: Time.now
       )
@@ -648,28 +613,6 @@ module SoulLink
               style: 1, # Primary (blue)
               label: '🔗 Add My Species',
               custom_id: 'soul_link:add_species'
-            }
-          ]
-        }
-      ]
-    end
-
-    def build_deaths_buttons
-      [
-        {
-          type: 1, # Action Row
-          components: [
-            {
-              type: 2, # Button
-              style: 4, # Danger (red)
-              label: '💀 Move Caught to Deaths',
-              custom_id: 'soul_link:move_to_deaths'
-            },
-            {
-              type: 2, # Button
-              style: 2, # Secondary (gray)
-              label: '➕ Add Uncaught Death',
-              custom_id: 'soul_link:add_uncaught_death'
             }
           ]
         }
