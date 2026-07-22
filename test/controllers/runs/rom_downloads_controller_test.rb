@@ -20,11 +20,18 @@ module Runs
     # Generation spawns a 30s Java subprocess, so `create` is idempotent while
     # work is in flight: a repeat POST reattaches to the existing download
     # rather than queueing a second subprocess.
+    #
+    # The job assertions below are scoped with `only:` on purpose. Unrelated
+    # models broadcast Turbo `refresh` jobs via `broadcasts_refreshes_to`, and
+    # turbo-rails enqueues those on a 0.5s background timer (Turbo::Debouncer).
+    # Under parallel tests they land in the process-global enqueued-jobs array
+    # at unpredictable times, so an unscoped `assert_no_enqueued_jobs` here is
+    # flaky. We only care that no *second* ROM job is queued, so we filter to it.
     test "create reuses a pending download and enqueues no second job" do
       existing = create(:soul_link_rom_download, soul_link_run: @run,
                         discord_user_id: @user_id, status: "pending")
 
-      assert_no_enqueued_jobs do
+      assert_no_enqueued_jobs only: SoulLink::GenerateRomDownloadJob do
         post run_rom_downloads_path(@run), as: :json
       end
 
@@ -39,7 +46,7 @@ module Runs
       existing = create(:soul_link_rom_download, soul_link_run: @run,
                         discord_user_id: @user_id, status: "generating")
 
-      assert_no_enqueued_jobs do
+      assert_no_enqueued_jobs only: SoulLink::GenerateRomDownloadJob do
         post run_rom_downloads_path(@run), as: :json
       end
 

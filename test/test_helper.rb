@@ -4,16 +4,6 @@ require "rails/test_help"
 require "minitest/mock"
 require "webmock/minitest"
 
-# Auto-retry failed tests in CI only (GitHub Actions sets CI=true). This guards
-# the deploy gate against rare parallel test-isolation flakes: a genuine flake
-# passes on a fresh rerun, while a real failure fails every attempt and still
-# blocks the deploy. Local runs deliberately skip retry so flakes stay visible
-# during development.
-if ENV["CI"].present?
-  require "minitest/retry"
-  Minitest::Retry.use!(retry_count: 3)
-end
-
 # OmniAuth test mode — prevents real OAuth calls
 OmniAuth.config.test_mode = true
 
