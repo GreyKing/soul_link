@@ -67,6 +67,11 @@ group :test do
   gem "factory_bot_rails"
   # HTTP request stubbing for job tests that call external APIs.
   gem "webmock"
+  # Auto-reruns failed tests in CI. Guards the deploy gate against parallel
+  # test-isolation flakes (a genuine flake passes on retry; a real failure
+  # still fails every attempt and still blocks deploy). Enabled in CI only —
+  # local runs stay honest so flakes remain visible. See test/test_helper.rb.
+  gem "minitest-retry"
 end
 
 gem 'discordrb', github: 'shardlab/discordrb', branch: 'main'
