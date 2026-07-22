@@ -63,6 +63,26 @@ module SoulLink
       { ok: true }
     end
 
+    # Pure core of the per-group death REFRESH button — re-render the RIP embed
+    # from current DB state. Read-only, run-scoped, same contract as
+    # apply_catch_refresh.
+    def self.apply_death_refresh(run:, group_id:)
+      group = run&.soul_link_pokemon_groups&.find_by(id: group_id)
+      return { ok: false, error: "That death no longer exists." } if group.nil?
+
+      SoulLink::DeathMessage.post_or_update(group)
+      { ok: true }
+    end
+
+    # Pure core of the Fallen Pokemon panel REFRESH button — re-render the
+    # roster from current DB state.
+    def self.apply_deaths_panel_refresh(run:)
+      return { ok: false, error: "No active run found." } if run.nil?
+
+      SoulLink::DeathsPanel.refresh(run)
+      { ok: true }
+    end
+
     # Pure, testable core of the bot's "new catch" modal. Creates the group
     # and the submitter's Pokemon atomically, then posts the live catch embed
     # — the same embed the website posts from PokemonGroupsController#create,
@@ -375,6 +395,17 @@ module SoulLink
         handle_catch_refresh(event, group_id)
       end
 
+      # Button: refresh a single RIP death embed from current website/DB state
+      bot.button(custom_id: /^soul_link:death_refresh:/) do |event|
+        group_id = event.interaction.data['custom_id'].split(':').last
+        handle_death_refresh(event, group_id)
+      end
+
+      # Button: refresh the Fallen Pokemon roster panel (anchored — no group id)
+      bot.button(custom_id: /^soul_link:deaths_refresh$/) do |event|
+        handle_deaths_panel_refresh(event)
+      end
+
       # Modal: quick-add species submission
       bot.modal_submit(custom_id: /^soul_link:catch_quick_add_modal:/) do |event|
         handle_catch_quick_add(event)
@@ -524,9 +555,9 @@ module SoulLink
       message = channel.send_message(
         '',
         false,
-        build_deaths_embed(run),
+        SoulLink::DeathsPanel.embed(run),
         nil, nil, nil,
-        build_deaths_buttons
+        SoulLink::DeathsPanel.components
       )
 
       run.update!(deaths_panel_message_id: message.id)
@@ -543,15 +574,10 @@ module SoulLink
       Rails.logger.error "Failed to update catches panel: #{e.message}"
     end
 
+    # Web-safe: DeathsPanel edits over the stateless REST layer, so this now
+    # works from the request path as well as the bot process.
     def update_deaths_panel(run)
-      return unless run.deaths_panel_message_id
-
-      channel = bot.channel(run.deaths_channel_id)
-      message = channel.load_message(run.deaths_panel_message_id)
-
-      message.edit('', build_deaths_embed(run), build_deaths_buttons)
-    rescue => e
-      Rails.logger.error "Failed to update deaths panel: #{e.message}"
+      SoulLink::DeathsPanel.refresh(run)
     end
 
     # ------------------------
@@ -582,36 +608,6 @@ module SoulLink
         title: "🎯 Caught Pokemon",
         description: description,
         color: 0x00ff00,
-        footer: { text: "Run ##{run.run_number} | Groups: #{groups.count}" },
-        timestamp: Time.now
-      )
-    end
-
-    def build_deaths_embed(run)
-      groups = run.dead_groups.includes(:soul_link_pokemon)
-
-      description = if groups.empty?
-                      "*No deaths yet. Stay safe out there!*"
-      else
-                      groups.map.with_index(1) do |group, idx|
-                        lines = [ "**#{idx}.** #{group.nickname} *(#{GameState.location_name(group.location)})*" ]
-
-                        group.soul_link_pokemon.each do |pokemon|
-                          lines << "   #{GameState.player_name(pokemon.discord_user_id)}: #{pokemon.species}"
-                        end
-
-                        if group.eulogy.present?
-                          lines << "   📝 *#{group.eulogy}*"
-                        end
-
-                        lines.join("\n")
-                      end.join("\n\n")
-      end
-
-      Discordrb::Webhooks::Embed.new(
-        title: "💀 Fallen Pokemon",
-        description: description,
-        color: 0xff0000,
         footer: { text: "Run ##{run.run_number} | Groups: #{groups.count}" },
         timestamp: Time.now
       )
@@ -648,28 +644,6 @@ module SoulLink
               style: 1, # Primary (blue)
               label: '🔗 Add My Species',
               custom_id: 'soul_link:add_species'
-            }
-          ]
-        }
-      ]
-    end
-
-    def build_deaths_buttons
-      [
-        {
-          type: 1, # Action Row
-          components: [
-            {
-              type: 2, # Button
-              style: 4, # Danger (red)
-              label: '💀 Move Caught to Deaths',
-              custom_id: 'soul_link:move_to_deaths'
-            },
-            {
-              type: 2, # Button
-              style: 2, # Secondary (gray)
-              label: '➕ Add Uncaught Death',
-              custom_id: 'soul_link:add_uncaught_death'
             }
           ]
         }
@@ -987,6 +961,37 @@ module SoulLink
       respond_ephemeral(event, "❌ Error: #{e.message}")
     end
 
+    def handle_death_refresh(event, group_id)
+      run = current_run(event)
+      unless run
+        respond_ephemeral(event, "❌ No active run found!")
+        return
+      end
+
+      result = self.class.apply_death_refresh(run: run, group_id: group_id)
+      unless result[:ok]
+        respond_ephemeral(event, "❌ #{result[:error]}")
+        return
+      end
+
+      respond_ephemeral(event, "🔄 Refreshed.")
+    rescue => e
+      respond_ephemeral(event, "❌ Error: #{e.message}")
+    end
+
+    def handle_deaths_panel_refresh(event)
+      run = current_run(event)
+      unless run
+        respond_ephemeral(event, "❌ No active run found!")
+        return
+      end
+
+      self.class.apply_deaths_panel_refresh(run: run)
+      respond_ephemeral(event, "🔄 Refreshed.")
+    rescue => e
+      respond_ephemeral(event, "❌ Error: #{e.message}")
+    end
+
     def open_uncaught_death_modal(event, location)
       components = [
         {
@@ -1167,6 +1172,8 @@ module SoulLink
 
       # Recolor the catch embed to its dead state, same as the website path.
       SoulLink::CatchMessage.post_or_update(group)
+      # Post/refresh the live RIP embed, same as the website Mark-Dead path.
+      SoulLink::DeathMessage.post_or_update(group)
 
       update_catches_panel(run)
       update_deaths_panel(run)
@@ -1196,6 +1203,8 @@ module SoulLink
         eulogy: values['eulogy'].presence
       )
 
+      # Post the live RIP embed for the uncaught death too, then the panel.
+      SoulLink::DeathMessage.post_or_update(group)
       update_deaths_panel(run)
       response = "💀 Added **#{group.nickname}** to deaths!"
       response += "\n📝 *#{values['eulogy']}*" if values['eulogy'].present?

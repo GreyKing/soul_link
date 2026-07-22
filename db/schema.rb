@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_20_182647) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_22_164407) do
   create_table "gym_auto_mark_suppressions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "gym_number", null: false
@@ -206,6 +206,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_182647) do
     t.datetime "created_at", null: false
     t.datetime "died_at"
     t.bigint "discord_catch_message_id"
+    t.bigint "discord_death_message_id"
     t.text "eulogy"
     t.string "location", null: false
     t.string "nickname", null: false

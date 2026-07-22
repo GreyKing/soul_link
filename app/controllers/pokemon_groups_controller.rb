@@ -78,9 +78,11 @@ class PokemonGroupsController < ApplicationController
         location: params[:location]&.strip || group.location
       )
 
-      # One message for the whole group; the notifier rescues every
-      # failure internally.
-      SoulLink::DiscordNotifier.notify_group_death(run, group)
+      # Live RIP embed + roster panel, both fire-and-forget. Replaces the old
+      # one-shot plain-text notifier; the embed carries a 🔄 REFRESH button and
+      # re-syncs in place, and the panel now updates from the web path too.
+      SoulLink::DeathMessage.post_or_update(group)
+      SoulLink::DeathsPanel.refresh(run)
 
       # Step 19 — wipe-detection runs on every Mark Dead transition.
       # Idempotency lives inside the coordinator (skips if wiped_at set).
@@ -97,6 +99,10 @@ class PokemonGroupsController < ApplicationController
         )
         group.soul_link_pokemon.each { |p| p.update!(status: "caught", died_at: nil) }
       end
+
+      # No longer dead: drop the RIP embed and re-render the roster panel.
+      SoulLink::DeathMessage.delete(group)
+      SoulLink::DeathsPanel.refresh(run)
     else
       # Simple metadata update (no status change)
       group.update!(
@@ -104,6 +110,14 @@ class PokemonGroupsController < ApplicationController
         location: params[:location]&.strip || group.location,
         eulogy: group.dead? ? (params[:eulogy] || group.eulogy) : group.eulogy
       )
+
+      # Re-sync a dead group's RIP embed + roster panel after a metadata edit
+      # (nickname, location, eulogy). Guarded like the catch embed — only groups
+      # that already posted. The mark-dead / revive branches handle their own.
+      if group.dead?
+        SoulLink::DeathMessage.post_or_update(group) if group.discord_death_message_id.present?
+        SoulLink::DeathsPanel.refresh(run)
+      end
     end
 
     # Re-sync the live catch embed after any edit (rename, relocate, dead,
@@ -154,10 +168,13 @@ class PokemonGroupsController < ApplicationController
       return
     end
 
-    # Remove the catch embed BEFORE the row is gone — delete reads the
+    # Remove the catch + death embeds BEFORE the row is gone — delete reads the
     # message id off the group.
+    was_dead = group.dead?
     SoulLink::CatchMessage.delete(group)
+    SoulLink::DeathMessage.delete(group)
     group.destroy!
+    SoulLink::DeathsPanel.refresh(run) if was_dead
     render json: { status: "deleted" }
   rescue => e
     render json: { error: e.message }, status: :unprocessable_entity
