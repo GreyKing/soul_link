@@ -49,7 +49,7 @@ class WipeFlowTest < ActionDispatch::IntegrationTest
     death_recorder = ->(*) { death_calls << :hit }
 
     SoulLink::DiscordNotifier.stub(:notify_wipe, wipe_recorder) do
-      SoulLink::DiscordNotifier.stub(:notify_group_death, death_recorder) do
+      SoulLink::DeathMessage.stub(:post_or_update, death_recorder) do
         patch pokemon_group_path(group), params: { status: "dead" }, as: :json
       end
     end
@@ -96,7 +96,7 @@ class WipeFlowTest < ActionDispatch::IntegrationTest
     login_as(GREY)
     wipe_calls = []
     SoulLink::DiscordNotifier.stub(:notify_wipe, ->(*) { wipe_calls << :hit }) do
-      SoulLink::DiscordNotifier.stub(:notify_group_death, ->(*) { }) do
+      SoulLink::DeathMessage.stub(:post_or_update, ->(*) { }) do
         patch pokemon_group_path(grey_first_group), params: { status: "dead" }, as: :json
       end
     end

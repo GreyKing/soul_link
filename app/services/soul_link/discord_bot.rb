@@ -1172,6 +1172,8 @@ module SoulLink
 
       # Recolor the catch embed to its dead state, same as the website path.
       SoulLink::CatchMessage.post_or_update(group)
+      # Post/refresh the live RIP embed, same as the website Mark-Dead path.
+      SoulLink::DeathMessage.post_or_update(group)
 
       update_catches_panel(run)
       update_deaths_panel(run)
@@ -1201,6 +1203,8 @@ module SoulLink
         eulogy: values['eulogy'].presence
       )
 
+      # Post the live RIP embed for the uncaught death too, then the panel.
+      SoulLink::DeathMessage.post_or_update(group)
       update_deaths_panel(run)
       response = "💀 Added **#{group.nickname}** to deaths!"
       response += "\n📝 *#{values['eulogy']}*" if values['eulogy'].present?

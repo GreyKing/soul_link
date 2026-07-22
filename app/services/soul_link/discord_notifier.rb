@@ -35,25 +35,6 @@ module SoulLink
         send_message(channel_id, content, run: run, method_name: __method__)
       end
 
-      # Death-event surface (PokemonGroupsController#update — Mark Dead).
-      # ONE message per group listing every fallen linked Pokemon — not one
-      # message per Pokemon, which spammed the channel four times per death.
-      def notify_group_death(run, group)
-        return if run.nil? || group.nil?
-
-        channel_id = run.deaths_channel_id
-        return if channel_id.blank?
-
-        lines = group.soul_link_pokemon.map do |pokemon|
-          "#{SoulLink::GameState.player_name(pokemon.discord_user_id)} — #{pokemon.species}"
-        end
-
-        route = SoulLink::GameState.location_name(group.location)
-        content = "💀 RIP \"#{group.nickname}\" — #{route}\n#{lines.join("\n")}"
-
-        send_message(channel_id, content, run: run, method_name: __method__)
-      end
-
       # Per-player gym-progress event (GymBeatenCoordinator). Fires once
       # per BadgeGained event, before the all-4 gate is evaluated.
       def notify_gym_player_progress(run, gym_number, player_uid)

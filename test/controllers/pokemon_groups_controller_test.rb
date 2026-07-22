@@ -110,4 +110,65 @@ class PokemonGroupsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal [ group.id ], seen_ids
   end
+
+  test "marking a group dead posts the death embed and refreshes the panel" do
+    login_as(GREY)
+    group = create(:soul_link_pokemon_group, :route206, soul_link_run: @run)
+    death_calls = []
+    panel_calls = []
+
+    SoulLink::DeathMessage.stub(:post_or_update, ->(g) { death_calls << g.id }) do
+      SoulLink::DeathsPanel.stub(:refresh, ->(run) { panel_calls << run.id }) do
+        patch pokemon_group_path(group), params: { status: "dead" }, as: :json
+      end
+    end
+
+    assert_response :success
+    assert_equal [ group.id ], death_calls
+    assert_equal [ @run.id ], panel_calls
+  end
+
+  test "reviving a dead group deletes the death embed and refreshes the panel" do
+    login_as(GREY)
+    group = create(:soul_link_pokemon_group, :route206, soul_link_run: @run, status: "dead")
+    deleted = []
+    panel_calls = []
+
+    SoulLink::DeathMessage.stub(:delete, ->(g) { deleted << g.id }) do
+      SoulLink::DeathsPanel.stub(:refresh, ->(run) { panel_calls << run.id }) do
+        patch pokemon_group_path(group), params: { status: "caught" }, as: :json
+      end
+    end
+
+    assert_response :success
+    assert_equal [ group.id ], deleted
+    assert_equal [ @run.id ], panel_calls
+  end
+
+  test "editing a dead group with a live death embed re-syncs it" do
+    login_as(GREY)
+    group = create(:soul_link_pokemon_group, :route206, soul_link_run: @run,
+                   status: "dead", discord_death_message_id: 4242)
+    calls = []
+
+    SoulLink::DeathMessage.stub(:post_or_update, ->(g) { calls << g.id }) do
+      patch pokemon_group_path(group), params: { eulogy: "Rest well" }, as: :json
+    end
+
+    assert_response :success
+    assert_equal [ group.id ], calls
+  end
+
+  test "destroying a group deletes the death embed before the row is gone" do
+    login_as(GREY)
+    group = create(:soul_link_pokemon_group, :route206, soul_link_run: @run, status: "dead")
+    seen_ids = []
+
+    SoulLink::DeathMessage.stub(:delete, ->(g) { seen_ids << g.id }) do
+      delete pokemon_group_path(group), as: :json
+    end
+
+    assert_response :success
+    assert_equal [ group.id ], seen_ids
+  end
 end
