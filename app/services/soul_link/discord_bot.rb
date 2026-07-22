@@ -63,6 +63,26 @@ module SoulLink
       { ok: true }
     end
 
+    # Pure core of the per-group death REFRESH button — re-render the RIP embed
+    # from current DB state. Read-only, run-scoped, same contract as
+    # apply_catch_refresh.
+    def self.apply_death_refresh(run:, group_id:)
+      group = run&.soul_link_pokemon_groups&.find_by(id: group_id)
+      return { ok: false, error: "That death no longer exists." } if group.nil?
+
+      SoulLink::DeathMessage.post_or_update(group)
+      { ok: true }
+    end
+
+    # Pure core of the Fallen Pokemon panel REFRESH button — re-render the
+    # roster from current DB state.
+    def self.apply_deaths_panel_refresh(run:)
+      return { ok: false, error: "No active run found." } if run.nil?
+
+      SoulLink::DeathsPanel.refresh(run)
+      { ok: true }
+    end
+
     # Pure, testable core of the bot's "new catch" modal. Creates the group
     # and the submitter's Pokemon atomically, then posts the live catch embed
     # — the same embed the website posts from PokemonGroupsController#create,
@@ -373,6 +393,17 @@ module SoulLink
       bot.button(custom_id: /^soul_link:catch_refresh:/) do |event|
         group_id = event.interaction.data['custom_id'].split(':').last
         handle_catch_refresh(event, group_id)
+      end
+
+      # Button: refresh a single RIP death embed from current website/DB state
+      bot.button(custom_id: /^soul_link:death_refresh:/) do |event|
+        group_id = event.interaction.data['custom_id'].split(':').last
+        handle_death_refresh(event, group_id)
+      end
+
+      # Button: refresh the Fallen Pokemon roster panel (anchored — no group id)
+      bot.button(custom_id: /^soul_link:deaths_refresh$/) do |event|
+        handle_deaths_panel_refresh(event)
       end
 
       # Modal: quick-add species submission
@@ -925,6 +956,37 @@ module SoulLink
         return
       end
 
+      respond_ephemeral(event, "🔄 Refreshed.")
+    rescue => e
+      respond_ephemeral(event, "❌ Error: #{e.message}")
+    end
+
+    def handle_death_refresh(event, group_id)
+      run = current_run(event)
+      unless run
+        respond_ephemeral(event, "❌ No active run found!")
+        return
+      end
+
+      result = self.class.apply_death_refresh(run: run, group_id: group_id)
+      unless result[:ok]
+        respond_ephemeral(event, "❌ #{result[:error]}")
+        return
+      end
+
+      respond_ephemeral(event, "🔄 Refreshed.")
+    rescue => e
+      respond_ephemeral(event, "❌ Error: #{e.message}")
+    end
+
+    def handle_deaths_panel_refresh(event)
+      run = current_run(event)
+      unless run
+        respond_ephemeral(event, "❌ No active run found!")
+        return
+      end
+
+      self.class.apply_deaths_panel_refresh(run: run)
       respond_ephemeral(event, "🔄 Refreshed.")
     rescue => e
       respond_ephemeral(event, "❌ Error: #{e.message}")
