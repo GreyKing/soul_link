@@ -24,11 +24,7 @@ class GymResult < ApplicationRecord
   # not yet attached to a result — and snapshots its team. Callers
   # own their own guards (uniqueness, suppression, all-4 gate).
   def self.record_beaten!(run, gym_number, draft: nil)
-    draft ||= run.gym_drafts
-                 .where(status: "complete")
-                 .where.missing(:gym_results)
-                 .order(updated_at: :desc, id: :desc)
-                 .first
+    draft ||= run.gym_drafts.pending_for_next_gym
 
     run.transaction do
       result = run.gym_results.create!(
