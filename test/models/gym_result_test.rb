@@ -45,4 +45,58 @@ class GymResultTest < ActiveSupport::TestCase
     assert first_group["pokemon"].first.key?("species")
     assert first_group["pokemon"].first.key?("player_name")
   end
+
+  # --- record_beaten! -------------------------------------------------------
+
+  def complete_draft(groups, **attrs)
+    create(:gym_draft, soul_link_run: @run, status: "complete",
+      state_data: { "ready_players" => [], "first_pick_votes" => {},
+                    "picks" => groups.each_with_index.map { |g, i| { "round" => i + 1, "group_id" => g.id, "picked_by" => 1 } } },
+      **attrs)
+  end
+
+  test "record_beaten! links the newest unattached complete draft and snapshots its team" do
+    create(:soul_link_pokemon, :route201_grey, soul_link_run: @run, soul_link_pokemon_group: @groups[0])
+    complete_draft(@groups[3..4], updated_at: 2.hours.ago)
+    newest = complete_draft(@groups[0..1], updated_at: 1.hour.ago)
+
+    result = GymResult.record_beaten!(@run, 1)
+
+    assert_equal newest, result.gym_draft
+    assert_equal @groups[0..1].map(&:id), result.team_snapshot["groups"].map { |g| g["group_id"] }
+    assert_equal 1, @run.reload.gyms_defeated
+  end
+
+  test "record_beaten! does not reuse a draft already attached to a result" do
+    used = complete_draft(@groups[0..1])
+    @run.gym_results.create!(gym_number: 1, beaten_at: Time.current, gym_draft: used)
+
+    result = GymResult.record_beaten!(@run, 2)
+
+    assert_nil result.gym_draft
+    assert_nil result.team_snapshot
+  end
+
+  test "record_beaten! ignores non-complete drafts" do
+    create(:gym_draft, soul_link_run: @run, status: "drafting")
+
+    result = GymResult.record_beaten!(@run, 1)
+
+    assert_nil result.gym_draft
+  end
+
+  test "record_beaten! prefers an explicitly passed draft" do
+    complete_draft(@groups[0..1])
+    explicit = complete_draft(@groups[2..3], updated_at: 1.day.ago)
+
+    result = GymResult.record_beaten!(@run, 1, draft: explicit)
+
+    assert_equal explicit, result.gym_draft
+  end
+
+  test "record_beaten! never lowers gyms_defeated" do
+    @run.update!(gyms_defeated: 5)
+    GymResult.record_beaten!(@run, 2)
+    assert_equal 5, @run.reload.gyms_defeated
+  end
 end

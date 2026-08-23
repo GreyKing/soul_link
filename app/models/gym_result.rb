@@ -17,6 +17,31 @@ class GymResult < ApplicationRecord
   # `gym_results.create!`.
   broadcasts_refreshes_to ->(record) { [ record.soul_link_run, :dashboard ] }
 
+  # Single entry point for "mark gym N beaten" used by every path
+  # (draft-page MARK BEATEN, dashboard MARK BEATEN, save-parse
+  # auto-mark). Links the completed draft for this gym — explicit
+  # `draft:` if given, else the run's most recently completed draft
+  # not yet attached to a result — and snapshots its team. Callers
+  # own their own guards (uniqueness, suppression, all-4 gate).
+  def self.record_beaten!(run, gym_number, draft: nil)
+    draft ||= run.gym_drafts
+                 .where(status: "complete")
+                 .where.missing(:gym_results)
+                 .order(updated_at: :desc, id: :desc)
+                 .first
+
+    run.transaction do
+      result = run.gym_results.create!(
+        gym_number: gym_number,
+        beaten_at: Time.current,
+        gym_draft: draft,
+        team_snapshot: draft && snapshot_from_draft(draft)
+      )
+      run.update!(gyms_defeated: [ run.gyms_defeated, gym_number ].max)
+      result
+    end
+  end
+
   def self.snapshot_from_groups(groups)
     players = SoulLink::GameState.players
     {

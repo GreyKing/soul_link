@@ -24,11 +24,9 @@ class GymProgressController < ApplicationController
       run.gym_auto_mark_suppressions.find_or_create_by!(gym_number: gym_number)
       notice = "Gym #{gym_number} unmarked."
     else
-      run.gym_results.create!(
-        gym_number: gym_number,
-        beaten_at: Time.current
-      )
-      run.update!(gyms_defeated: [ run.gyms_defeated, gym_number ].max)
+      # Links the latest completed draft (if any) as the team that beat
+      # this gym — see `GymResult.record_beaten!`.
+      GymResult.record_beaten!(run, gym_number)
       # Manual MARK BEATEN clears any suppression for this gym so
       # auto-detection can resume after a re-engagement.
       run.gym_auto_mark_suppressions.where(gym_number: gym_number).destroy_all

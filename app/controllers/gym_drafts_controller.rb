@@ -92,14 +92,7 @@ class GymDraftsController < ApplicationController
       return
     end
 
-    snapshot = GymResult.snapshot_from_draft(draft)
-    run.gym_results.create!(
-      gym_number: gym_number,
-      beaten_at: Time.current,
-      gym_draft: draft,
-      team_snapshot: snapshot
-    )
-    run.update!(gyms_defeated: gym_number)
+    GymResult.record_beaten!(run, gym_number, draft: draft)
     # Completing a draft for this gym is an explicit re-engagement
     # signal — clear any auto-mark suppression so future save parses
     # can flow through `GymBeatenCoordinator` again.

@@ -70,10 +70,7 @@ module SoulLink
       return if run.gym_auto_mark_suppressions.exists?(gym_number: gym_number)
       return unless all_players_have_badge?(run, gym_number)
 
-      run.transaction do
-        run.gym_results.create!(gym_number: gym_number, beaten_at: Time.current)
-        run.update!(gyms_defeated: [ run.gyms_defeated, gym_number ].max)
-      end
+      GymResult.record_beaten!(run, gym_number)
     end
 
     # All-4 check. Counts every session in the run (even if a player
