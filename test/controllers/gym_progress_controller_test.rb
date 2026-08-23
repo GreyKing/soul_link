@@ -22,6 +22,20 @@ class GymProgressControllerTest < ActionDispatch::IntegrationTest
     assert @run.gym_results.exists?(gym_number: 1)
   end
 
+  test "mark gym beaten links the latest completed draft to the result" do
+    login_as(GREY)
+    group = create(:soul_link_pokemon_group, :route201, soul_link_run: @run)
+    draft = create(:gym_draft, soul_link_run: @run, status: "complete",
+      state_data: { "ready_players" => [], "first_pick_votes" => {},
+                    "picks" => [ { "round" => 1, "group_id" => group.id, "picked_by" => GREY } ] })
+
+    patch gym_progress_path(gym_number: 1)
+
+    result = @run.gym_results.find_by!(gym_number: 1)
+    assert_equal draft, result.gym_draft
+    assert_equal [ group.id ], result.team_snapshot["groups"].map { |g| g["group_id"] }
+  end
+
   test "unmark beaten destroys result and decrements gyms_defeated" do
     login_as(GREY)
     @run.gym_results.create!(gym_number: 1, beaten_at: Time.current)

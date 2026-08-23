@@ -32,6 +32,20 @@ module SoulLink
       assert_equal 4, @run.reload.gyms_defeated
     end
 
+    test "BadgeGained auto-mark links the latest completed draft to the result" do
+      group = create(:soul_link_pokemon_group, :route201, soul_link_run: @run)
+      draft = create(:gym_draft, soul_link_run: @run, status: "complete",
+        state_data: { "ready_players" => [], "first_pick_votes" => {},
+                      "picks" => [ { "round" => 1, "group_id" => group.id, "picked_by" => 100 } ] })
+      @slots.each { |slot| slot.update_columns(parsed_badges: 1) }
+
+      SoulLink::GymBeatenCoordinator.process(@slots.first, [ event(SoulLink::SaveDiff::BadgeGained, 1) ])
+
+      result = @run.gym_results.find_by!(gym_number: 1)
+      assert_equal draft, result.gym_draft
+      assert_equal [ group.id ], result.team_snapshot["groups"].map { |g| g["group_id"] }
+    end
+
     test "BadgeGained with 3/4 players → no gym_results created" do
       # First three slots have the badge; fourth doesn't.
       @slots[0..2].each { |slot| slot.update_columns(parsed_badges: 4) }
