@@ -28,8 +28,13 @@
 <% end %>
 
 <%# ── YOUR TEAM ── %>
-<div style="margin-bottom: 16px;">
-  <div class="gb-section-header">YOUR TEAM</div>
+<div style="margin-bottom: 16px;" id="gym-ready-team" data-team-source="<%= @pending_draft ? 'draft' : 'personal' %>">
+  <div class="gb-section-header"><%= @pending_draft ? "DRAFTED TEAM" : "YOUR TEAM" %></div>
+  <% if @pending_draft %>
+    <div style="font-size: 9px; color: var(--d2); margin-bottom: 8px;">
+      From the <a href="<%= gym_draft_path(@pending_draft) %>" class="gb-link">gym draft</a> for Gym <%= @gyms_defeated + 1 %>. Showing your pokemon from each drafted pair.
+    </div>
+  <% end %>
   <% if @team_groups.any? %>
     <div class="gb-grid-3">
       <% @team_groups.each_with_index do |group, idx| %>
