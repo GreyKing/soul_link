@@ -495,11 +495,24 @@ export default class extends Controller {
           nameDiv.className = "text-xs font-medium text-white"
           nameDiv.textContent = group.nickname
 
+          // One line per linked pokemon (one per player), same shape as
+          // the nominating-phase candidate cards, so the slot shows the
+          // actual species names and not just the shared group nickname.
+          const speciesDiv = document.createElement("div")
+          speciesDiv.className = "gb-candidate-card__species"
+          const pokemon = group.pokemon || []
+          pokemon.forEach(p => {
+            const owner = this.findPlayer(p.discord_user_id)
+            const line = document.createElement("div")
+            line.textContent = `${owner?.display_name || "?"}: ${p.species || "?"}`
+            speciesDiv.appendChild(line)
+          })
+
           const pickerDiv = document.createElement("div")
           pickerDiv.className = "text-[10px] text-gray-500"
-          pickerDiv.textContent = picker?.display_name || ""
+          pickerDiv.textContent = picker?.display_name ? `picked by ${picker.display_name}` : ""
 
-          slot.append(nameDiv, pickerDiv)
+          slot.append(nameDiv, speciesDiv, pickerDiv)
           slot.classList.remove("border-dashed", "border-gray-600")
           slot.classList.add("border-solid", "border-indigo-600", "bg-indigo-950/30")
         }
