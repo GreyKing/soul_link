@@ -68,6 +68,11 @@ production:
 
 - There is no `connects_to`, so `SolidCable::Record` uses the primary
   connection.
+- `reconnect_attempts: [ 1, 2, 3, 5, 10, 15, 30, 60, 60, 60 ]` (about 4 minutes
+  of backoff). By default, Puma's listener retries once after a DB connection
+  error and then its thread ends silently, so live updates would stop until
+  the next Puma restart, for example after a MySQL restart. A successful poll
+  resets the counter.
 - `polling_interval: 0.1.seconds` keeps gym-draft and dashboard updates
   feeling instant. Only processes with subscribers poll, which in practice
   means Puma: one indexed query every 100ms.
@@ -94,9 +99,10 @@ production:
 - `config/queue.yml` is unchanged. The dispatcher polls every 1s with a batch
   of 500. The worker handles all queues with 3 threads and polls every 0.1s.
   `processes` is ignored in async mode.
-- `config/recurring.yml` is unchanged. Its production-only
-  `clear_solid_queue_finished_jobs` task runs every hour and deletes finished
-  jobs, which Solid Queue keeps for 1 day by default.
+- `config/recurring.yml` keeps its `clear_solid_queue_finished_jobs` task. It
+  runs every hour and deletes finished jobs, which Solid Queue keeps for 1 day
+  by default. A `development:` entry now reuses it (see Error visibility).
+  Failed jobs are never cleared; volume is tiny, so that is noted for phase 3.
 
 ### Worker process
 
@@ -115,7 +121,8 @@ User=root
 WorkingDirectory=/opt/soul_link
 # Async mode runs the worker (3 job threads plus a poller), the dispatcher,
 # the scheduler and their heartbeats in one process on one connection pool.
-# Set in ExecStart, because EnvironmentFile= would override Environment=.
+# Set in ExecStart, so a RAILS_MAX_THREADS entry in the env file can never
+# override it (EnvironmentFile= wins over Environment=).
 ExecStart=/usr/bin/env RAILS_MAX_THREADS=10 /root/.rbenv/shims/bundle exec bin/jobs --mode async
 Restart=always
 RestartSec=5
@@ -189,11 +196,18 @@ systemctl restart soul-link-jobs
 
 - The deploy creates and starts the new service, so no manual SSH is needed.
 - The env file doesn't change: the jobs unit sets its own `RAILS_MAX_THREADS`.
-- `appleboy/ssh-action` doesn't use `set -e`. With `Type=simple`, a
-  `restart` returns 0 even when the worker then crash-loops. After the web
-  restart, the script sleeps 15s and runs `systemctl is-active soul-link-jobs`,
-  printing the unit's journal and failing the workflow if it isn't active. It
-  runs last, so bot and web are always restarted first.
+- `appleboy/ssh-action` doesn't use `set -e`, so a failed `bundle install` or
+  `db:migrate` would still restart every service onto code whose gems or
+  tables are missing. Both lines now end in `|| exit 1`.
+- With `Type=simple`, `systemctl restart` returns 0 and the unit reports
+  `active` even while the worker crash-loops.
+  - The script records `JOBS_T0` before the restarts. After the web restart it
+    waits up to 60s for `Started Worker` to appear in
+    `journalctl -u soul-link-jobs --since "$JOBS_T0"`, and requires the unit's
+    `NRestarts` to be 0.
+  - If either check fails, it prints only warning-level and higher journal
+    lines, because Actions logs are public, and fails the workflow.
+  - The check runs last, so bot and web are always restarted first.
 
 ### Data flow after the change
 
@@ -287,6 +301,25 @@ Following the project memory, any job assertions stay scoped with `only:`.
 - Discord gym-poll votes still don't push to an open web poll page, because
   `GymPoll` has no refresh broadcast. This is existing behaviour and out of
   scope.
+
+## Rollback runbook
+
+If phase 2 has to be reverted:
+
+1. Revert with `git revert` commits on `main` and push. Never reset or
+   force-push. The server runs `git pull origin main`, so a reset `main` would
+   pull nothing while the deploy still showed green.
+2. The reverted deploy puts web and bot back on async. `db:migrate` is a no-op,
+   and the Solid tables stay. That is harmless: leave them. If they are ever
+   dropped, also delete `schema_migrations` row `20260927120000`, or a later
+   re-ship won't recreate them.
+3. The old `deploy.yml` doesn't manage `soul-link-jobs`. On its next restart
+   or a reboot, the service would crash-loop, because old code has no
+   `solid_queue/cli`. Over SSH, with the user's approval:
+   - First, if you want to see what will be abandoned, run
+     `SolidQueue::Job.where(finished_at: nil).group(:class_name).count`.
+   - Then run
+     `systemctl disable --now soul-link-jobs && rm /etc/systemd/system/soul-link-jobs.service && systemctl daemon-reload && systemctl reset-failed`.
 
 ## Out of scope
 

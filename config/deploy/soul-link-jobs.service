@@ -16,8 +16,8 @@ User=root
 WorkingDirectory=/opt/soul_link
 # RAILS_MAX_THREADS=10 sizes the DB pool (database.yml): in async mode the
 # worker's 3 job threads, its poller, the dispatcher, the scheduler and their
-# heartbeats share one pool. Set here, not via Environment=, because
-# EnvironmentFile= would override Environment=. Web and bot keep 5.
+# heartbeats share one pool. Set here, not via Environment=, so an env-file
+# entry can never override it (EnvironmentFile= wins). Web and bot keep 5.
 ExecStart=/usr/bin/env RAILS_MAX_THREADS=10 /root/.rbenv/shims/bundle exec bin/jobs --mode async
 Restart=always
 RestartSec=5

@@ -645,6 +645,9 @@ OnFailure=systemd-failure-notify@%n.service
 Type=simple
 User=root
 WorkingDirectory=/opt/soul_link
+# (Superseded in review by 7cb0721: RAILS_MAX_THREADS=10 moved into ExecStart,
+# `/usr/bin/env RAILS_MAX_THREADS=10 /root/.rbenv/shims/bundle exec ...`, so
+# the env file can never override it. See the committed unit file.)
 ExecStart=/root/.rbenv/shims/bundle exec bin/jobs --mode async
 Restart=always
 RestartSec=5
