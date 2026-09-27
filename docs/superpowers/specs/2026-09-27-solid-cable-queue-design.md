@@ -196,6 +196,20 @@ systemctl restart soul-link-jobs
 - **Restart or deploy.** Jobs that are ready or scheduled stay in the
   database, and claimed jobs are released on graceful shutdown.
 
+### Error visibility (added after the Task 2 review)
+
+The Solid Cable writer thread and Solid Queue's threads report failures
+through `Rails.error.report`. The app has no `Rails.error` subscriber, so
+those reports would vanish. The bot's `rescue` around
+`RunChannel.broadcast_run_state` no longer sees cable write errors either,
+because the write happens on another thread. A small initializer,
+`config/initializers/error_logging.rb`, subscribes a logger to `Rails.error`,
+so these failures show up in each process's log (journald in production).
+
+`config/recurring.yml` also gets a `development:` entry that reuses the hourly
+finished-job cleanup. Otherwise the dev database's `solid_queue_jobs` table
+grows without limit, since every dashboard edit enqueues a Turbo refresh job.
+
 ### Other cleanup
 
 - `lib/tasks/soul_link/debug_save.rake`: the comment explaining `perform_now`

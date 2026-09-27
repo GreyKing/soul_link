@@ -64,7 +64,11 @@ systemd, GitHub Actions.
 | `config/deploy/soul-link-jobs.service` | Create | 3 |
 | `Procfile.dev` | Add a `jobs` process | 3 |
 | `.github/workflows/deploy.yml` | Install, enable and restart `soul-link-jobs` | 3 |
+| `test/infrastructure/error_logging_test.rb` | Create | 3A |
+| `config/initializers/error_logging.rb` | Create: log `Rails.error` reports | 3A |
+| `config/recurring.yml` | Clear finished jobs in development too | 3A |
 | `lib/tasks/soul_link/debug_save.rake` | Reword the stale comment | 4 |
+| `config/cable.yml` | Header comment precision | 4 |
 | `.claude/documents/deployment.md`, `CLAUDE.md` | Docs | 4 |
 
 ---
@@ -768,6 +772,132 @@ git commit -m "feat: run Solid Queue as the soul-link-jobs service in async mode
 
 ---
 
+### Task 3A: Log background-thread errors; clear finished jobs in development
+
+This task came out of the Task 2 review. solid_cable 4.1 writes broadcasts on
+a background thread. On failure, `SolidCable::BatchedBroadcaster#flush`
+rescues and calls `Rails.error.report`, and Solid Queue's `on_thread_error`
+does the same. The app registers no `Rails.error` subscriber, and with no
+subscribers `report` does nothing, so those failures would leave no trace.
+The bot's own `rescue` in `DiscordBot#broadcast_run_state` no longer sees
+cable write errors, because the write now happens on another thread.
+
+Separately, `config/recurring.yml` only clears finished jobs in production.
+Every dashboard edit now enqueues a Turbo refresh job, so `solid_queue_jobs`
+in the dev database would grow without limit.
+
+**Files:**
+- Create: `test/infrastructure/error_logging_test.rb`
+- Create: `config/initializers/error_logging.rb`
+- Modify: `config/recurring.yml`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `test/infrastructure/error_logging_test.rb`:
+
+```ruby
+require "test_helper"
+
+# Background threads (the Solid Cable writer, Solid Queue's supervisor
+# threads) report failures through Rails.error instead of raising. Without a
+# subscriber those reports would vanish.
+class ErrorLoggingTest < ActiveSupport::TestCase
+  test "errors reported to Rails.error are written to the log" do
+    original = Rails.logger
+    log = StringIO.new
+    Rails.logger = ActiveSupport::Logger.new(log)
+
+    Rails.error.report(RuntimeError.new("writer boom"), handled: true, source: "solid_cable")
+
+    assert_match(/\[solid_cable\] RuntimeError: writer boom/, log.string)
+  ensure
+    Rails.logger = original
+  end
+end
+```
+
+- [ ] **Step 2: Run it and confirm it fails**
+
+```bash
+rtk proxy bin/rails test test/infrastructure/error_logging_test.rb > tmp/t.txt 2>&1
+grep -E "runs, .*assertions" tmp/t.txt
+grep -A8 -E "^Failure|^Error" tmp/t.txt
+```
+
+Expected: 1 failure, with `Expected /\[solid_cable\] RuntimeError: writer boom/ to match ""`.
+
+- [ ] **Step 3: Add the subscriber**
+
+Create `config/initializers/error_logging.rb`:
+
+```ruby
+# Rails.error has no subscribers by default, so errors reported from
+# background threads would vanish. Examples are a failed Solid Cable write on
+# its writer thread, or a Solid Queue supervisor or worker thread error.
+# Log them.
+class ErrorLogSubscriber
+  def report(error, handled:, severity:, context:, source: nil)
+    level = severity == :warning ? :warn : severity
+    backtrace = Array(error.backtrace).first(10).join("\n")
+    Rails.logger.public_send(level, "[#{source}] #{error.class}: #{error.message}\n#{backtrace}".strip)
+  end
+end
+
+Rails.error.subscribe(ErrorLogSubscriber.new)
+```
+
+- [ ] **Step 4: Run it and confirm it passes**
+
+```bash
+rtk proxy bin/rails test test/infrastructure/error_logging_test.rb > tmp/t.txt 2>&1
+grep -E "runs, .*assertions" tmp/t.txt
+```
+
+Expected: `1 runs, 1 assertions, 0 failures, 0 errors`.
+
+- [ ] **Step 5: Clear finished jobs in development too**
+
+Replace the `production:` block at the bottom of `config/recurring.yml` with:
+
+```yaml
+production: &clear_finished_jobs
+  clear_solid_queue_finished_jobs:
+    command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
+    schedule: every hour at minute 12
+
+development:
+  <<: *clear_finished_jobs
+```
+
+Keep the commented examples above it unchanged. Verify:
+
+```bash
+rtk proxy bin/jobs check --mode async > tmp/jobs_check.txt 2>&1; cat tmp/jobs_check.txt
+```
+
+Expected: `Solid Queue configuration is valid.`
+
+- [ ] **Step 6: Run the whole suite**
+
+```bash
+rtk proxy bin/rails test > tmp/t.txt 2>&1
+grep -E "runs, .*assertions" tmp/t.txt
+grep -A8 -E "^Failure|^Error" tmp/t.txt
+```
+
+Expected: 1025 runs, 0 failures, 0 errors. Anything reported to `Rails.error`
+now also appears in `log/test.log`. That's harmless, but if a test asserts on
+exact log output, report it.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add test/infrastructure/error_logging_test.rb config/initializers/error_logging.rb config/recurring.yml
+git commit -m "feat: log errors reported by background threads and clear finished jobs in dev"
+```
+
+---
+
 ### Task 4: Comments and docs
 
 **Files:**
@@ -826,7 +956,7 @@ Make these edits:
    ```markdown
    ## Background Jobs
 
-   Development and production use **Solid Queue**, with tables in the primary database (`solid_queue_*`). Jobs survive restarts. Config: `config/queue.yml` (1 worker, 3 threads, all queues) and `config/recurring.yml` (hourly cleanup of finished jobs in production). Production runs the worker as `soul-link-jobs.service`; development runs it through `bin/dev`. Tests use the Active Job test adapter.
+   Development and production use **Solid Queue**, with tables in the primary database (`solid_queue_*`). Jobs survive restarts. Config: `config/queue.yml` (1 worker, 3 threads, all queues) and `config/recurring.yml` (hourly cleanup of finished jobs, in development and production). Production runs the worker as `soul-link-jobs.service`; development runs it through `bin/dev`. Tests use the Active Job test adapter. Failures that background threads report through `Rails.error` (the Solid Cable writer, Solid Queue's threads) are logged by `config/initializers/error_logging.rb`.
    ```
 
 6. **Development**: change "Runs two processes" to "Runs three processes" and
@@ -860,10 +990,25 @@ with:
 - **Cable and jobs:** Solid Cable and Solid Queue, both in the primary MySQL database. Broadcasts from any process (bot, jobs worker, console) reach browsers. Jobs need the worker (`bin/dev` starts it; prod runs `soul-link-jobs.service`).
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Make the `config/cable.yml` comment precise**
+
+A one-shot process can drop its last broadcasts (see the spec's Known
+limitations), so "any process" overstates it. Replace the header comment with:
+
+```yaml
+# Solid Cable stores broadcasts in the primary database (solid_cable_messages),
+# so a broadcast from any long-lived process (Puma, the Discord bot, the jobs
+# worker, a console session) reaches every subscribed browser. Writes happen on
+# a background thread: a one-shot rake/runner process may drop broadcasts made
+# just before it exits. Old messages are trimmed after message_retention.
+```
+
+Run `rtk proxy bin/rails test test/infrastructure/cable_config_test.rb > tmp/t.txt 2>&1` and grep the "runs, assertions" line. Expect 3 runs and 0 failures.
+
+- [ ] **Step 5: Commit**
 
 ```bash
-git add lib/tasks/soul_link/debug_save.rake .claude/documents/deployment.md CLAUDE.md
+git add config/cable.yml lib/tasks/soul_link/debug_save.rake .claude/documents/deployment.md CLAUDE.md
 git commit -m "docs: describe Solid Cable, Solid Queue and the jobs service"
 ```
 
@@ -879,7 +1024,7 @@ grep -E "runs, .*assertions" tmp/t.txt
 grep -A8 -E "^Failure|^Error" tmp/t.txt
 ```
 
-Expected: `1024 runs` (1017 plus 7 new), 0 failures, 0 errors.
+Expected: `1025 runs` (1017 plus 8 new), 0 failures, 0 errors.
 
 - [ ] **Step 2: Full suite as CI runs it (eager loading)**
 
