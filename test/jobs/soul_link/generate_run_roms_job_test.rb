@@ -37,6 +37,18 @@ module SoulLink
 
     # ---- happy path --------------------------------------------------------
 
+    test "checks the session count and creates sessions under the run's row lock" do
+      lock_calls = 0
+      with_randomizer_stub(succeed_quietly) do
+        @run.stub(:with_lock, ->(&block) { lock_calls += 1; block.call }) do
+          SoulLink::GenerateRunRomsJob.perform_now(@run)
+        end
+      end
+
+      assert_equal 1, lock_calls
+      assert_equal 4, SoulLinkEmulatorSession.where(soul_link_run_id: @run.id).count
+    end
+
     test "creates 4 unclaimed pending sessions when run has none" do
       with_randomizer_stub(succeed_quietly) do |counter|
         SoulLink::GenerateRunRomsJob.perform_now(@run)

@@ -3,18 +3,23 @@ module SoulLink
   # a randomized ROM for each. One session per player slot — claiming is the
   # users' problem (see SoulLinkEmulatorSession#claim!).
   #
-  # Idempotent on count: re-enqueueing for a run that already has 4 sessions
-  # is a safe no-op. Individual ROM failures do NOT halt the rest — each
-  # session reflects its own outcome via status / error_message.
+  # Idempotent on count, checked under the run's row lock: re-enqueueing
+  # for a run that already has 4 sessions is a safe no-op. Individual ROM
+  # failures do NOT halt the rest — each session reflects its own outcome
+  # via status / error_message.
   class GenerateRunRomsJob < ApplicationJob
     queue_as :default
 
     SESSIONS_PER_RUN = 4
 
     def perform(soul_link_run)
-      return if SoulLinkEmulatorSession.where(soul_link_run_id: soul_link_run.id).count >= SESSIONS_PER_RUN
+      # Check and create under the run's row lock, so a double enqueue can't
+      # create eight sessions.
+      sessions = soul_link_run.with_lock do
+        next [] if SoulLinkEmulatorSession.where(soul_link_run_id: soul_link_run.id).count >= SESSIONS_PER_RUN
 
-      sessions = create_sessions(soul_link_run)
+        create_sessions(soul_link_run)
+      end
 
       # Subprocesses run OUTSIDE the transaction. Holding a row-level lock
       # while shelling out to Java would needlessly serialize the four jobs
