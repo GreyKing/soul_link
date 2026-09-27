@@ -45,3 +45,18 @@ end
 class ActionDispatch::IntegrationTest
   include LoginHelper
 end
+
+# ActionCable's ConnectionStub only knows `identified_by` attributes. Channels
+# that authorize against the logged-in guild read `connection.session`, so the
+# stub has to fake one.
+module CableSessionHelper
+  def stub_connection_with_session(current_user_id:, guild_id: LoginHelper::GUILD_ID)
+    stub_connection(current_user_id: current_user_id)
+    fake_session = { guild_id: guild_id }
+    connection.define_singleton_method(:session) { fake_session }
+  end
+end
+
+class ActionCable::Channel::TestCase
+  include CableSessionHelper
+end

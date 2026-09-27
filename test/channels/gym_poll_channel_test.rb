@@ -13,7 +13,7 @@ class GymPollChannelTest < ActionCable::Channel::TestCase
 
   setup do
     @poll = create(:gym_poll)
-    stub_connection current_user_id: 111
+    stub_connection_with_session(current_user_id: 111)
   end
 
   def with_player_data(&block)
@@ -28,6 +28,14 @@ class GymPollChannelTest < ActionCable::Channel::TestCase
       assert subscription.confirmed?
       assert_has_stream_for @poll
     end
+  end
+
+  test "rejects a subscription to another guild's poll" do
+    other = create(:gym_poll, soul_link_run: create(:soul_link_run, guild_id: 1))
+
+    with_player_data { subscribe(id: other.id) }
+
+    assert subscription.rejected?
   end
 
   test "vote action records and broadcasts state" do
@@ -60,7 +68,7 @@ class GymPollChannelTest < ActionCable::Channel::TestCase
 
   test "vote action rejects unregistered users" do
     with_player_data do
-      stub_connection current_user_id: 99999  # not in PLAYER_IDS
+      stub_connection_with_session(current_user_id: 99999)  # not in PLAYER_IDS
       subscribe(id: @poll.id)
       perform :vote, { "slot_index" => 0, "response" => "yes" }
     end

@@ -11,17 +11,6 @@ class RunChannelTest < ActionCable::Channel::TestCase
     stub_connection_with_session(current_user_id: GREY, guild_id: GUILD_ID)
   end
 
-  # `ConnectionStub` from ActionCable's TestCase doesn't expose a session —
-  # it only knows about `identified_by` attrs. The new guild authz check in
-  # `RunChannel#subscribed` reads `connection.session[:guild_id]`, so the stub
-  # has to fake one. Define the method on the stub's singleton class after
-  # `stub_connection` builds it.
-  def stub_connection_with_session(current_user_id:, guild_id:)
-    stub_connection(current_user_id: current_user_id)
-    fake_session = { guild_id: guild_id }
-    connection.define_singleton_method(:session) { fake_session }
-  end
-
   # ── subscription ────────────────────────────────────────────────────────
 
   test "subscribes and streams for guild" do

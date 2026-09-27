@@ -19,6 +19,8 @@ class GymPoll < ApplicationRecord
 
   after_initialize :set_defaults, if: :new_record?
 
+  scope :for_guild, ->(guild_id) { joins(:soul_link_run).where(soul_link_runs: { guild_id: guild_id }) }
+
   # ── Class methods ──
   def self.materialize_slots(run, now: Time.current)
     template_slots = run.schedule_template&.dig("slots")

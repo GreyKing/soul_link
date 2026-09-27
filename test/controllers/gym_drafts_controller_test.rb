@@ -37,6 +37,15 @@ class GymDraftsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to gym_draft_path(@draft)
   end
 
+  test "show returns 404 for another guild's draft" do
+    other = create(:gym_draft, soul_link_run: create(:soul_link_run, guild_id: 1))
+    login_as(GREY)
+
+    get gym_draft_path(other)
+
+    assert_response :not_found
+  end
+
   test "show loads draft successfully" do
     login_as(GREY)
 

@@ -125,6 +125,16 @@ class GymPollVoteTest < ActiveSupport::TestCase
     })
   end
 
+  test "for_guild only returns polls from that guild's runs" do
+    poll = open_poll
+    other = create(:gym_poll, soul_link_run: create(:soul_link_run, guild_id: 1))
+
+    polls = GymPoll.for_guild(poll.soul_link_run.guild_id)
+
+    assert_includes polls, poll
+    assert_not_includes polls, other
+  end
+
   test "vote! records the response in state_data" do
     poll = open_poll
     with_player_ids { poll.vote!(111, 0, "yes") }

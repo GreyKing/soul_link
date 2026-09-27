@@ -1280,7 +1280,7 @@ module SoulLink
 
     def handle_gym_poll_vote(event)
       _, _, poll_id, slot_index, response = event.interaction.data["custom_id"].split(":")
-      poll = GymPoll.find_by(id: poll_id)
+      poll = GymPoll.for_guild(event_guild_id(event)).find_by(id: poll_id)
       return respond_ephemeral(event, "❌ Poll not found.") unless poll
 
       discord_user_id = event.user.id
@@ -1301,7 +1301,7 @@ module SoulLink
 
     def handle_gym_poll_reset(event)
       _, _, poll_id = event.interaction.data["custom_id"].split(":")
-      poll = GymPoll.find_by(id: poll_id)
+      poll = GymPoll.for_guild(event_guild_id(event)).find_by(id: poll_id)
       return respond_ephemeral(event, "❌ Poll not found.") unless poll
 
       poll.destroy
@@ -1327,15 +1327,17 @@ module SoulLink
     end
 
     def current_run(event)
-      guild_id = if event.respond_to?(:server_id)
-                   event.server_id
-      elsif event.respond_to?(:server) && event.server
-                   event.server.id
-      elsif event.respond_to?(:interaction) && event.interaction
-                   event.interaction.server_id
-      end
+      SoulLinkRun.current(event_guild_id(event))
+    end
 
-      SoulLinkRun.current(guild_id)
+    def event_guild_id(event)
+      if event.respond_to?(:server_id)
+        event.server_id
+      elsif event.respond_to?(:server) && event.server
+        event.server.id
+      elsif event.respond_to?(:interaction) && event.interaction
+        event.interaction.server_id
+      end
     end
   end
 end

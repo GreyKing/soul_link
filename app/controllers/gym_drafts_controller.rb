@@ -17,7 +17,7 @@ class GymDraftsController < ApplicationController
   end
 
   def show
-    @draft = GymDraft.find(params[:id])
+    @draft = GymDraft.for_guild(session[:guild_id]).find(params[:id])
     run = @draft.soul_link_run
 
     @players = SoulLink::GameState.players

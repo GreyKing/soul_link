@@ -1,6 +1,8 @@
 class GymPollChannel < ApplicationCable::Channel
   def subscribed
-    @poll = GymPoll.find(params[:id])
+    @poll = GymPoll.for_guild(session_guild_id).find_by(id: params[:id])
+    return reject unless @poll
+
     stream_for @poll
     broadcast_state
   end

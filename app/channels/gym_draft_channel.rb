@@ -1,6 +1,8 @@
 class GymDraftChannel < ApplicationCable::Channel
   def subscribed
-    @draft = GymDraft.find(params[:draft_id])
+    @draft = GymDraft.for_guild(session_guild_id).find_by(id: params[:draft_id])
+    return reject unless @draft
+
     stream_for @draft
     broadcast_state
   end

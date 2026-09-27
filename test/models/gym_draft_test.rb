@@ -17,6 +17,15 @@ class GymDraftTest < ActiveSupport::TestCase
     @draft = create(:gym_draft, :lobby, soul_link_run: @run)
   end
 
+  test "for_guild only returns drafts from that guild's runs" do
+    other = create(:gym_draft, soul_link_run: create(:soul_link_run, guild_id: 1))
+
+    drafts = GymDraft.for_guild(@run.guild_id)
+
+    assert_includes drafts, @draft
+    assert_not_includes drafts, other
+  end
+
   # ── Lobby Phase ──
 
   test "new draft starts in lobby with empty state" do

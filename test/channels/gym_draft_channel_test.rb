@@ -15,13 +15,21 @@ class GymDraftChannelTest < ActionCable::Channel::TestCase
       create(:soul_link_pokemon_group, trait, soul_link_run: @run)
     end
     @draft = create(:gym_draft, :lobby, soul_link_run: @run)
-    stub_connection(current_user_id: GREY)
+    stub_connection_with_session(current_user_id: GREY)
   end
 
   test "subscribes and streams for draft" do
     subscribe(draft_id: @draft.id)
     assert subscription.confirmed?
     assert_has_stream_for @draft
+  end
+
+  test "rejects a subscription to another guild's draft" do
+    other = create(:gym_draft, soul_link_run: create(:soul_link_run, guild_id: 1))
+
+    subscribe(draft_id: other.id)
+
+    assert subscription.rejected?
   end
 
   test "subscribes and broadcasts initial state" do
@@ -81,7 +89,7 @@ class GymDraftChannelTest < ActionCable::Channel::TestCase
     # Whoever is up next endorses through the channel — restub the
     # connection to that player's user id.
     next_nominator = @draft.current_nominator_id
-    stub_connection(current_user_id: next_nominator)
+    stub_connection_with_session(current_user_id: next_nominator)
     subscribe(draft_id: @draft.id)
     perform :nominate, { "group_id" => @groups[4].id }
     @draft.reload

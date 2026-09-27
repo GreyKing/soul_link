@@ -18,6 +18,8 @@ class GymDraft < ApplicationRecord
 
   after_initialize :set_defaults, if: :new_record?
 
+  scope :for_guild, ->(guild_id) { joins(:soul_link_run).where(soul_link_runs: { guild_id: guild_id }) }
+
   # The completed draft whose team hasn't beaten a gym yet — i.e. the
   # team lined up for the next gym. Consumed when a GymResult attaches
   # to it (see `GymResult.record_beaten!`).
