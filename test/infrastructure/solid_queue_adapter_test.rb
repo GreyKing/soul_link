@@ -13,6 +13,8 @@ class SolidQueueAdapterTest < ActiveSupport::TestCase
     end
   end
 
+  teardown { ProbeJob.performed_with = nil }
+
   test "Solid Queue uses the primary database" do
     assert_equal ActiveRecord::Base.connection_db_config, SolidQueue::Record.connection_db_config
   end

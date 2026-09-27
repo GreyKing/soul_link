@@ -14,10 +14,16 @@ class SolidCableAdapterTest < ActiveSupport::TestCase
     adapter = ActionCable::SubscriptionAdapter::SolidCable.new(ActionCable.server)
     messages = -> { SolidCable::Message.where(channel_hash: SolidCable::Message.channel_hash_for(CHANNEL)) }
 
-    assert_difference -> { messages.call.count }, 1 do
-      adapter.broadcast(CHANNEL, { hello: "world" }.to_json)
-      # solid_cable 4.1 writes from a background thread. shutdown closes the
-      # queue and joins the writer, so the insert has happened afterwards.
+    begin
+      assert_difference -> { messages.call.count }, 1 do
+        adapter.broadcast(CHANNEL, { hello: "world" }.to_json)
+        # solid_cable 4.1 writes from a background thread. shutdown closes the
+        # queue and joins the writer, so the insert has happened afterwards.
+        # The writer thread uses the test's pinned transactional connection
+        # (lock_threads), so the insert is rolled back with the test.
+        adapter.shutdown
+      end
+    ensure
       adapter.shutdown
     end
 
