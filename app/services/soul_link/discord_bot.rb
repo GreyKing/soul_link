@@ -116,6 +116,25 @@ module SoulLink
       { ok: false, error: e.record.errors.full_messages.join(", ") }
     end
 
+    # Pure core of the bot's Mark Dead flow. Marks the group dead, syncs its
+    # catch and RIP embeds, and runs wipe detection, same as
+    # PokemonGroupsController#update. `location` is "original" to keep the
+    # catch location.
+    #
+    # Returns { ok: true, group: <group> } or { ok: false, error: "<msg>" }.
+    def self.apply_mark_dead(run:, group_id:, location:, eulogy: nil)
+      group = run&.caught_groups&.find_by(id: group_id)
+      return { ok: false, error: "Could not find that group!" } if group.nil?
+
+      death_location = location == "original" ? nil : location
+      group.mark_as_dead!(death_location: death_location, eulogy: eulogy)
+
+      SoulLink::CatchMessage.post_or_update(group)
+      SoulLink::DeathMessage.post_or_update(group)
+      SoulLink::WipeCoordinator.process(run)
+      { ok: true, group: group }
+    end
+
     # Gym info for the `!next_gym` text command. nil once every gym is beaten.
     def self.next_gym_for(run)
       GameState.next_gym_info(run.gyms_defeated)
@@ -1171,19 +1190,12 @@ module SoulLink
         return
       end
 
-      group = run.caught_groups.find_by(id: group_id)
-      unless group
-        respond_ephemeral(event, "❌ Could not find that group!")
+      result = self.class.apply_mark_dead(run: run, group_id: group_id, location: location, eulogy: eulogy)
+      unless result[:ok]
+        respond_ephemeral(event, "❌ #{result[:error]}")
         return
       end
-
-      death_location = location == 'original' ? nil : location
-      group.mark_as_dead!(death_location: death_location, eulogy: eulogy)
-
-      # Recolor the catch embed to its dead state, same as the website path.
-      SoulLink::CatchMessage.post_or_update(group)
-      # Post/refresh the live RIP embed, same as the website Mark-Dead path.
-      SoulLink::DeathMessage.post_or_update(group)
+      group = result[:group]
 
       update_catches_panel(run)
       update_deaths_panel(run)
