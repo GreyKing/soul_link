@@ -20,6 +20,18 @@ module SoulLink
       SoulLink::SaveDiff::PokemonCaughtEvent.new(**defaults.merge(overrides))
     end
 
+    test "stores the species name from pokemon_base_stats" do
+      Pokemon::BaseStat.create!(species: "Turtwig", national_dex_number: 387, type1: "grass",
+                                hp: 55, atk: 68, def_stat: 64, spa: 45, spd: 55, spe: 31)
+      SoulLink::CatchCoordinator.reset_species_cache!
+
+      SoulLink::CatchCoordinator.process(@slot, [ caught_event ])
+
+      row = SoulLinkPokemon.find_by!(pid: 0xDEADBEEF)
+      assert_equal "Turtwig", row.species
+      assert_equal "Turtwig", row.name
+    end
+
     test "no-op on empty events array" do
       assert_no_difference "SoulLinkPokemon.count" do
         SoulLink::CatchCoordinator.process(@slot, [])

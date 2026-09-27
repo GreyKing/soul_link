@@ -175,15 +175,7 @@ module SoulLink
     # table as a runtime cache. (Pokedex.yml has no IDs at all; it's
     # purely a sprite-filename map.)
     def self.species_name_by_id
-      @species_name_by_id ||= begin
-        if defined?(PokemonBaseStat) && PokemonBaseStat.table_exists?
-          PokemonBaseStat.pluck(:national_dex_number, :species).to_h
-        else
-          {}
-        end
-      rescue StandardError
-        {}
-      end
+      @species_name_by_id ||= Pokemon::BaseStat.pluck(:national_dex_number, :species).to_h
     end
 
     # Reset the memoized species lookup. Used in tests where the
