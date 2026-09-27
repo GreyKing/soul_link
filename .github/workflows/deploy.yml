@@ -68,8 +68,8 @@ jobs:
 
             cd /opt/soul_link
             git pull origin main
-            ~/.rbenv/shims/bundle install --without development test
-            ~/.rbenv/shims/ruby bin/rails db:migrate
+            ~/.rbenv/shims/bundle install --without development test || exit 1
+            ~/.rbenv/shims/ruby bin/rails db:migrate || exit 1
             ~/.rbenv/shims/ruby bin/rails assets:precompile
 
             # Ensure p7zip is available — required by emulatorjs:install to
@@ -102,10 +102,20 @@ jobs:
             # Reload nginx if running, restart if failed (safe — certbot manages the main config)
             nginx -t && systemctl reload-or-restart nginx
 
+            JOBS_T0=$(date '+%Y-%m-%d %H:%M:%S')
             systemctl restart soul-link-jobs
             systemctl restart soul-link-bot
             systemctl restart soul-link-web
 
-            # Fail the deploy (after web and bot are already restarted) if the jobs worker isn't up
-            sleep 15
-            systemctl is-active --quiet soul-link-jobs || { journalctl -u soul-link-jobs -n 50 --no-pager; exit 1; }
+            # Fail the deploy (after web and bot are already restarted) unless the jobs
+            # worker logged "Started Worker" since its restart without being auto-restarted.
+            # Only warnings and errors are printed: Actions logs are public.
+            for i in $(seq 1 12); do
+              journalctl -u soul-link-jobs --since "$JOBS_T0" -o cat --no-pager | grep -q "Started Worker" && break
+              sleep 5
+            done
+            if ! journalctl -u soul-link-jobs --since "$JOBS_T0" -o cat --no-pager | grep -q "Started Worker" \
+               || [ "$(systemctl show -p NRestarts --value soul-link-jobs)" != "0" ]; then
+              journalctl -u soul-link-jobs --since "$JOBS_T0" -p warning -n 20 -o cat --no-pager
+              exit 1
+            fi
