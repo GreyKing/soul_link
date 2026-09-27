@@ -939,9 +939,10 @@ Make these edits:
    ```markdown
    ### soul-link-jobs.service
    - Runs Solid Queue: `bundle exec bin/jobs --mode async` (worker, dispatcher and scheduler as threads in one process, to save memory)
-   - `Environment=RAILS_MAX_THREADS=10`: every component shares this process's DB pool
+   - `RAILS_MAX_THREADS=10` is set in `ExecStart`, because every component shares this process's DB pool. It isn't set with `Environment=`, because `EnvironmentFile=` would override it.
    - Restart: always (5s delay); same env file and failure notification
-   - Enabled and restarted by the deploy workflow
+   - Enabled and restarted by the deploy workflow, which fails if the unit isn't active 15s after the restarts
+   - On restart, Solid Queue waits 5s (`shutdown_timeout`). A job still running after that, in practice ROM generation, is recorded as failed about 5 min later and must be regenerated from the UI. The unclean exit can also trigger a failure email.
    ```
 
 3. **Puma Configuration**: change the Plugins line to `- Plugins: \`tmp_restart\``.

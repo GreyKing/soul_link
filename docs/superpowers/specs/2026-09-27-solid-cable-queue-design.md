@@ -113,14 +113,14 @@ OnFailure=systemd-failure-notify@%n.service
 Type=simple
 User=root
 WorkingDirectory=/opt/soul_link
-ExecStart=/root/.rbenv/shims/bundle exec bin/jobs --mode async
+# Async mode runs the worker (3 job threads plus a poller), the dispatcher,
+# the scheduler and their heartbeats in one process on one connection pool.
+# Set in ExecStart, because EnvironmentFile= would override Environment=.
+ExecStart=/usr/bin/env RAILS_MAX_THREADS=10 /root/.rbenv/shims/bundle exec bin/jobs --mode async
 Restart=always
 RestartSec=5
 
 EnvironmentFile=/etc/soul_link/env
-# Async mode runs the worker (3 job threads plus a poller), the dispatcher,
-# the scheduler and their heartbeats in one process on one connection pool.
-Environment=RAILS_MAX_THREADS=10
 
 [Install]
 WantedBy=multi-user.target
@@ -139,10 +139,20 @@ WantedBy=multi-user.target
   `pool:` in `database.yml`. Web and bot keep their current pool of 5.
   Connections open lazily, so the most the app can use is about 20, well under
   MySQL's default limit of 151.
-- **Shutdown.** On shutdown, systemd sends SIGTERM. Solid Queue waits
-  `shutdown_timeout` (5s by default) and then releases any unfinished claimed
-  jobs back to the queue, so they run again when the worker starts. systemd's
-  90s stop timeout is well above that.
+- **Shutdown (decided 2026-09-27: keep the 5s default).** On a restart,
+  systemd sends SIGTERM. The async supervisor stops its threads and waits
+  `shutdown_timeout` (5s) for them. Jobs that finish in that window complete
+  normally, and jobs not yet claimed stay in the queue.
+  - If a job is still running after 5s, the supervisor calls `exit!` and
+    skips deregistration. About 5 minutes later (`process_alive_threshold`)
+    the new supervisor prunes the dead process. Its claimed job is then
+    recorded as **failed** (`ProcessPrunedError`) and is not rerun.
+  - In practice only ROM generation takes that long. The fix is to regenerate
+    it from the UI.
+  - The unclean exit can also mark the unit failed during that restart and
+    fire the failure email.
+  - We chose fast deploys over waiting out a ROM batch, which can take up to
+    about 2 minutes.
 
 **Development:** `Procfile.dev` gains
 `jobs: env RAILS_MAX_THREADS=10 bin/jobs --mode async`, so `bin/dev` starts
@@ -179,6 +189,11 @@ systemctl restart soul-link-jobs
 
 - The deploy creates and starts the new service, so no manual SSH is needed.
 - The env file doesn't change: the jobs unit sets its own `RAILS_MAX_THREADS`.
+- `appleboy/ssh-action` doesn't use `set -e`. With `Type=simple`, a
+  `restart` returns 0 even when the worker then crash-loops. After the web
+  restart, the script sleeps 15s and runs `systemctl is-active soul-link-jobs`,
+  printing the unit's journal and failing the workflow if it isn't active. It
+  runs last, so bot and web are always restarted first.
 
 ### Data flow after the change
 
@@ -194,7 +209,8 @@ systemctl restart soul-link-jobs
   row is committed in the same database. If it is enqueued inside a
   transaction, it commits or rolls back with that transaction.
 - **Restart or deploy.** Jobs that are ready or scheduled stay in the
-  database, and claimed jobs are released on graceful shutdown.
+  database and run after the restart. A job still running 5s after SIGTERM is
+  recorded as failed (see Shutdown).
 
 ### Error visibility (added after the Task 2 review)
 
@@ -262,10 +278,12 @@ Following the project memory, any job assertions stay scoped with `only:`.
   async, those broadcasts never reached a browser at all. The bot, Puma and
   the jobs worker are long-lived and unaffected.
 
-- If a deploy interrupts `GenerateRunRomsJob` after it created the four
-  sessions, the released job reruns, sees four sessions and does nothing. The
-  sessions stay `pending`. Today the job is lost outright, which ends the same
-  way. This belongs to phase 3.
+- If a deploy interrupts `GenerateRunRomsJob` or `GenerateRomDownloadJob`
+  mid-run, the job is recorded as failed about 5 minutes later, and the
+  sessions or download stay `pending` or `generating`. Retrying
+  `GenerateRunRomsJob` would do nothing anyway, because it is idempotent on
+  session count. Today the job is lost outright, which ends the same way.
+  Recovering stuck ROM sessions belongs to phase 3.
 - Discord gym-poll votes still don't push to an open web poll page, because
   `GymPoll` has no refresh broadcast. This is existing behaviour and out of
   scope.
