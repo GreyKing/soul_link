@@ -87,29 +87,34 @@ class GymPoll < ApplicationRecord
     }
   end
 
+  # Runs inside `with_lock` (reloads the row under SELECT ... FOR UPDATE) so
+  # votes from different players, via the web and the bot, can't overwrite
+  # each other.
   def vote!(user_id, slot_index, response)
-    raise LockedError, "Poll is locked — reset to vote again" if locked?
-    raise InvalidResponseError, "Response must be yes, maybe, or no" unless VALID_RESPONSES.include?(response)
+    with_lock do
+      raise LockedError, "Poll is locked — reset to vote again" if locked?
+      raise InvalidResponseError, "Response must be yes, maybe, or no" unless VALID_RESPONSES.include?(response)
 
-    slot = slots.find { |s| s["index"].to_i == slot_index.to_i }
-    raise InvalidSlotError, "Slot #{slot_index} does not exist on this poll" unless slot
-    raise PastSlotError, "Slot has already passed" if Time.iso8601(slot["scheduled_at"]) < Time.current
+      slot = slots.find { |s| s["index"].to_i == slot_index.to_i }
+      raise InvalidSlotError, "Slot #{slot_index} does not exist on this poll" unless slot
+      raise PastSlotError, "Slot has already passed" if Time.iso8601(slot["scheduled_at"]) < Time.current
 
-    user_key  = user_id.to_s
-    slot_key  = slot_index.to_s
-    next_data = data.deep_dup
-    next_data["votes"][user_key] ||= {}
-    next_data["votes"][user_key][slot_key] = response
+      user_key  = user_id.to_s
+      slot_key  = slot_index.to_s
+      next_data = data.deep_dup
+      next_data["votes"][user_key] ||= {}
+      next_data["votes"][user_key][slot_key] = response
 
-    if all_yes_on_slot?(next_data, slot_index)
-      update!(
-        state_data:        next_data.as_json,
-        status:            "locked",
-        locked_slot_index: slot_index.to_i,
-        locked_at:         Time.current
-      )
-    else
-      update!(state_data: next_data.as_json)
+      if all_yes_on_slot?(next_data, slot_index)
+        update!(
+          state_data:        next_data.as_json,
+          status:            "locked",
+          locked_slot_index: slot_index.to_i,
+          locked_at:         Time.current
+        )
+      else
+        update!(state_data: next_data.as_json)
+      end
     end
     true
   end

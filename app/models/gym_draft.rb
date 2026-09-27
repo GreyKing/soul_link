@@ -123,58 +123,68 @@ class GymDraft < ApplicationRecord
   end
 
   # ── Actions ──
+  #
+  # Every action runs inside `with_lock`: it reloads the row under
+  # SELECT ... FOR UPDATE, so two players acting at once can't overwrite each
+  # other's changes to the JSON state.
 
   def mark_ready!(uid)
-    raise "Not in lobby" unless lobby?
-    rp = ready_players
-    rp << uid.to_i unless rp.include?(uid.to_i)
-    update_data!("ready_players" => rp)
+    with_lock do
+      raise "Not in lobby" unless lobby?
+      rp = ready_players
+      rp << uid.to_i unless rp.include?(uid.to_i)
+      update_data!("ready_players" => rp)
 
-    if all_players_ready?
-      update!(status: "voting")
+      if all_players_ready?
+        update!(status: "voting")
+      end
     end
   end
 
   def cast_vote!(voter_uid, voted_for_uid)
-    raise "Not in voting phase" unless voting?
-    votes = first_pick_votes
-    votes[voter_uid.to_s] = voted_for_uid.to_i
-    update_data!("first_pick_votes" => votes)
+    with_lock do
+      raise "Not in voting phase" unless voting?
+      votes = first_pick_votes
+      votes[voter_uid.to_s] = voted_for_uid.to_i
+      update_data!("first_pick_votes" => votes)
 
-    if all_voted?
-      resolve_votes!
+      if all_voted?
+        resolve_votes!
+      end
     end
   end
 
   def make_pick!(picker_uid, group_id)
-    raise "Not in drafting phase" unless drafting?
-    raise "Not your turn" unless current_drafter_id == picker_uid.to_i
-    raise "That pokemon has already been picked" if picks.any? { |p| p["group_id"] == group_id.to_i }
+    with_lock do
+      raise "Not in drafting phase" unless drafting?
+      raise "Not your turn" unless current_drafter_id == picker_uid.to_i
+      raise "That pokemon has already been picked" if picks.any? { |p| p["group_id"] == group_id.to_i }
 
-    new_picks = picks + [ { "round" => picks.size + 1, "group_id" => group_id.to_i, "picked_by" => picker_uid.to_i } ]
-    next_index = current_player_index + 1
+      new_picks = picks + [ { "round" => picks.size + 1, "group_id" => group_id.to_i, "picked_by" => picker_uid.to_i } ]
+      next_index = current_player_index + 1
 
-    if new_picks.size >= INDIVIDUAL_ROUNDS
-      # All individual picks done — move to nomination. Seed the new
-      # nominating-phase state shape: empty candidates list and the
-      # turn-start timestamp that drives the 60s grace window.
-      update!(
-        current_round: new_picks.size,
-        current_player_index: 0,
-        status: "nominating",
-        state_data: data.merge(
-          "picks" => new_picks,
-          "candidates" => [],
-          "current_turn_started_at" => Time.current.iso8601,
-          "tiebreak" => nil
-        ).as_json
-      )
-    else
-      update!(
-        current_round: new_picks.size,
-        current_player_index: next_index,
-        state_data: data.merge("picks" => new_picks).as_json
-      )
+      if new_picks.size >= INDIVIDUAL_ROUNDS
+        # All individual picks done — move to nomination. Seed the new
+        # nominating-phase state shape: empty candidates list and the
+        # turn-start timestamp that drives the 60s grace window.
+        update!(
+          current_round: new_picks.size,
+          current_player_index: 0,
+          status: "nominating",
+          state_data: data.merge(
+            "picks" => new_picks,
+            "candidates" => [],
+            "current_turn_started_at" => Time.current.iso8601,
+            "tiebreak" => nil
+          ).as_json
+        )
+      else
+        update!(
+          current_round: new_picks.size,
+          current_player_index: next_index,
+          state_data: data.merge("picks" => new_picks).as_json
+        )
+      end
     end
   end
 
@@ -184,41 +194,43 @@ class GymDraft < ApplicationRecord
   # nominator. After all 4 players have made their nominating-phase
   # pick, automatically resolves into the final 2 team slots.
   def nominate!(picker_uid, group_id)
-    raise "Not in nominating phase" unless nominating?
-    raise "Not your turn to nominate" unless current_nominator_id == picker_uid.to_i
-    raise "That pokemon has already been picked" if picks.any? { |p| p["group_id"] == group_id.to_i }
+    with_lock do
+      raise "Not in nominating phase" unless nominating?
+      raise "Not your turn to nominate" unless current_nominator_id == picker_uid.to_i
+      raise "That pokemon has already been picked" if picks.any? { |p| p["group_id"] == group_id.to_i }
 
-    cands = candidates.map(&:deep_dup)
-    existing = cands.find { |c| c["group_id"] == group_id.to_i }
-    if existing
-      raise "You already endorsed this nomination" if existing["voters"].include?(picker_uid.to_i)
-      existing["voters"] << picker_uid.to_i
-    else
-      cands << { "group_id" => group_id.to_i, "voters" => [ picker_uid.to_i ] }
-    end
+      cands = candidates.map(&:deep_dup)
+      existing = cands.find { |c| c["group_id"] == group_id.to_i }
+      if existing
+        raise "You already endorsed this nomination" if existing["voters"].include?(picker_uid.to_i)
+        existing["voters"] << picker_uid.to_i
+      else
+        cands << { "group_id" => group_id.to_i, "voters" => [ picker_uid.to_i ] }
+      end
 
-    next_index = (current_player_index + 1) % pick_order.size
-    total_picks_after = cands.flat_map { |c| c["voters"] }.size
+      next_index = (current_player_index + 1) % pick_order.size
+      total_picks_after = cands.flat_map { |c| c["voters"] }.size
 
-    if total_picks_after >= pick_order.size
-      # All 4 players have made their nominating-phase pick — persist
-      # the final candidates list, clear the turn timer, and resolve.
-      update!(
-        state_data: data.merge(
-          "candidates" => cands,
-          "current_turn_started_at" => nil
-        ).as_json
-      )
-      reload
-      resolve_nominations!
-    else
-      update!(
-        current_player_index: next_index,
-        state_data: data.merge(
-          "candidates" => cands,
-          "current_turn_started_at" => Time.current.iso8601
-        ).as_json
-      )
+      if total_picks_after >= pick_order.size
+        # All 4 players have made their nominating-phase pick — persist
+        # the final candidates list, clear the turn timer, and resolve.
+        update!(
+          state_data: data.merge(
+            "candidates" => cands,
+            "current_turn_started_at" => nil
+          ).as_json
+        )
+        reload
+        resolve_nominations!
+      else
+        update!(
+          current_player_index: next_index,
+          state_data: data.merge(
+            "candidates" => cands,
+            "current_turn_started_at" => Time.current.iso8601
+          ).as_json
+        )
+      end
     end
   end
 
@@ -228,37 +240,39 @@ class GymDraft < ApplicationRecord
   #   player may skip after `NOMINATION_GRACE_SECONDS` have elapsed
   #   since the current nominator's turn began.
   def skip_turn!(requester_uid)
-    raise "Can only skip during drafting or nominating" unless drafting? || nominating?
+    with_lock do
+      raise "Can only skip during drafting or nominating" unless drafting? || nominating?
 
-    if drafting?
-      raise "Not your turn" unless current_drafter_id == requester_uid.to_i
-      next_index = current_player_index + 1
-      if next_index >= pick_order.size
-        # All players had a turn this round (some skipped) — move to
-        # nominating and seed the turn timer like make_pick! does.
-        update!(
-          current_player_index: 0,
-          status: "nominating",
-          state_data: data.merge(
-            "candidates" => candidates,
-            "current_turn_started_at" => Time.current.iso8601,
-            "tiebreak" => nil
-          ).as_json
-        )
+      if drafting?
+        raise "Not your turn" unless current_drafter_id == requester_uid.to_i
+        next_index = current_player_index + 1
+        if next_index >= pick_order.size
+          # All players had a turn this round (some skipped) — move to
+          # nominating and seed the turn timer like make_pick! does.
+          update!(
+            current_player_index: 0,
+            status: "nominating",
+            state_data: data.merge(
+              "candidates" => candidates,
+              "current_turn_started_at" => Time.current.iso8601,
+              "tiebreak" => nil
+            ).as_json
+          )
+        else
+          update!(current_player_index: next_index)
+        end
       else
-        update!(current_player_index: next_index)
-      end
-    else
-      # Nominating phase — auth: current nominator any time, OR any
-      # player after the 60s grace expires.
-      is_current = current_nominator_id == requester_uid.to_i
-      raise "Not your turn (skip available to others after 60s)" unless is_current || grace_elapsed?
+        # Nominating phase — auth: current nominator any time, OR any
+        # player after the 60s grace expires.
+        is_current = current_nominator_id == requester_uid.to_i
+        raise "Not your turn (skip available to others after 60s)" unless is_current || grace_elapsed?
 
-      next_index = (current_player_index + 1) % pick_order.size
-      update!(
-        current_player_index: next_index,
-        state_data: data.merge("current_turn_started_at" => Time.current.iso8601).as_json
-      )
+        next_index = (current_player_index + 1) % pick_order.size
+        update!(
+          current_player_index: next_index,
+          state_data: data.merge("current_turn_started_at" => Time.current.iso8601).as_json
+        )
+      end
     end
   end
 

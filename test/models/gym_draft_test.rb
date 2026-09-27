@@ -55,6 +55,15 @@ class GymDraftTest < ActiveSupport::TestCase
     assert_raises(RuntimeError, "Not in lobby") { @draft.mark_ready!(GREY) }
   end
 
+  test "mark_ready! from a stale instance keeps the other player's ready mark" do
+    stale = GymDraft.find(@draft.id)
+
+    @draft.mark_ready!(GREY)
+    stale.mark_ready!(ARATY)
+
+    assert_equal [ GREY, ARATY ], @draft.reload.ready_players
+  end
+
   test "all players ready transitions to voting" do
     ALL_PLAYERS.each { |uid| @draft.mark_ready!(uid) }
     @draft.reload

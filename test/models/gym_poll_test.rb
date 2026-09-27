@@ -142,6 +142,20 @@ class GymPollVoteTest < ActiveSupport::TestCase
     assert_equal "yes", poll.votes["111"]["0"]
   end
 
+  test "vote! from a stale instance keeps the other player's vote" do
+    poll = open_poll
+    stale = GymPoll.find(poll.id)
+
+    with_player_ids do
+      poll.vote!(111, 0, "yes")
+      stale.vote!(222, 0, "maybe")
+    end
+
+    votes = poll.reload.votes
+    assert_equal "yes", votes["111"]["0"]
+    assert_equal "maybe", votes["222"]["0"]
+  end
+
   test "vote! is idempotent — re-voting same value is fine" do
     poll = open_poll
     with_player_ids do
