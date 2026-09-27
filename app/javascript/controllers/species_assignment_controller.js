@@ -1,6 +1,10 @@
 import { Controller } from "@hotwired/stimulus"
 import Sortable from "sortablejs"
 
+const LOCK_ICON = `<svg class="w-3 h-3 opacity-50" fill="currentColor" viewBox="0 0 20 20">
+  <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+</svg>`
+
 export default class extends Controller {
   static targets = [
     "poolList", "dropZone", "saveStatus", "poolCount", "poolEmpty",
@@ -369,19 +373,19 @@ export default class extends Controller {
 
   lockSpecies(card, zone) {
     const speciesName = card.querySelector("span")?.textContent?.trim() || "?"
+    // Find the group card first: once the zone is replaced it is detached,
+    // and `closest` on a detached node finds nothing.
+    const groupCard = zone?.closest("[data-group-id]")
 
-    // Replace the drop zone with a locked badge
-    zone.outerHTML = `
-      <span class="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-indigo-900/60 text-indigo-200 border border-indigo-700">
-        ${speciesName}
-        <svg class="w-3 h-3 opacity-50" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
-        </svg>
-      </span>
-    `
+    // Replace the drop zone with a locked badge. The name goes in as text,
+    // never as HTML.
+    const badge = document.createElement("span")
+    badge.className = "inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-indigo-900/60 text-indigo-200 border border-indigo-700"
+    badge.textContent = speciesName
+    badge.insertAdjacentHTML("beforeend", LOCK_ICON)
+    zone.replaceWith(badge)
 
     // Update the group card's status
-    const groupCard = zone?.closest("[data-group-id]")
     if (groupCard) {
       const remaining = groupCard.querySelectorAll(".drop-zone").length
       const statusEl = groupCard.querySelector("span.text-yellow-400, span.text-green-400")
