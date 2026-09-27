@@ -11,7 +11,7 @@ Soul Link is a Rails 8.1 web app + Discord bot for managing Pokemon Platinum Sou
 ## Commands
 
 ```bash
-bin/dev                              # Start web server + Tailwind watcher (Procfile.dev)
+bin/dev                              # Start web server + Tailwind watcher + Solid Queue worker (Procfile.dev)
 rake soul_link:bot                   # Start Discord bot (separate process, must run alongside web)
 bin/rails test                       # Run all tests
 bin/rails test test/models/foo_test.rb       # Single test file
@@ -45,7 +45,7 @@ For detailed documentation, see `.claude/documents/`:
 - **Domain model:** `SoulLinkRun` → `PokemonGroup` → `Pokemon` (one per player per group). Teams have max 6 slots referencing groups.
 - **Auth:** Discord OAuth, session-based, no User model. Guild ID scopes all data.
 - **Real-time:** ActionCable channels for GymDraft and GymPoll. Pattern: `stream_for @record`, broadcast full state, client re-renders.
-- **Dev gotcha:** Async cable adapter only works within same process — `rails console` broadcasts won't reach browser.
+- **Cable and jobs:** Solid Cable and Solid Queue, both in the primary MySQL database. Broadcasts from any process (bot, jobs worker, console) reach browsers. Jobs need the worker (`bin/dev` starts it; prod runs `soul-link-jobs.service`).
 - **Config:** YAML files in `config/soul_link/`, loaded via `SoulLink::GameState`.
 - **Bot:** Separate process (`rake soul_link:bot`), shares Rails models. Custom ID format: `soul_link:action:context:value`.
 - **Frontend:** Stimulus + Importmap + SortableJS + Tailwind (dark theme). No Node/npm.

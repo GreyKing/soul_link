@@ -7,11 +7,9 @@ namespace :soul_link do
       next
     end
 
-    # perform_now (not perform_later): the Async queue adapter runs jobs on a
-    # thread pool that gets torn down when this rake process exits. With
-    # perform_later, fast-finishing jobs win the race and slow ones get
-    # killed mid-flight. Synchronous execution in the main thread is the
-    # reliable path for a one-shot batch reparse.
+    # perform_now (not perform_later): parse each slot synchronously so the
+    # output below is in order and a failure shows up inline, without waiting
+    # on the jobs worker.
     slots.each do |slot|
       SoulLink::ParseSaveDataJob.perform_now(slot)
       puts "Reparsed slot id=#{slot.id} session=#{slot.soul_link_emulator_session_id} slot_number=#{slot.slot_number}"

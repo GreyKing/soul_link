@@ -1,7 +1,8 @@
 # Solid Cable stores broadcasts in the primary database (solid_cable_messages),
-# so a broadcast from any process (Puma, the Discord bot, the jobs worker, a
-# console) reaches every subscribed browser. Old messages are trimmed
-# automatically after message_retention.
+# so a broadcast from any long-lived process (Puma, the Discord bot, the jobs
+# worker, a console session) reaches every subscribed browser. Writes happen on
+# a background thread: a one-shot rake/runner process may drop broadcasts made
+# just before it exits. Old messages are trimmed after message_retention.
 development: &solid_cable
   adapter: solid_cable
   polling_interval: 0.1.seconds
