@@ -159,15 +159,37 @@ class SaveSlotsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  test "create succeeds without CSRF token (null_session bypass)" do
-    payload = "BYTES_NO_CSRF".b
+  test "writes without a CSRF token are rejected when forgery protection is on" do
     login_as(GREY)
 
     with_forgery_protection do
-      post emulator_save_slots_path,
-           params: payload,
+      post emulator_save_slots_path, params: "BYTES".b,
            headers: { "Content-Type" => "application/octet-stream" }
+      assert_response :unprocessable_entity, "create"
+
+      patch emulator_save_slot_path(slot_number: 1), params: "BYTES".b,
+            headers: { "Content-Type" => "application/octet-stream" }
+      assert_response :unprocessable_entity, "update"
+
+      delete emulator_save_slot_path(slot_number: 1)
+      assert_response :unprocessable_entity, "destroy"
+
+      post restore_emulator_save_slot_path(slot_number: 1)
+      assert_response :unprocessable_entity, "restore"
     end
+  end
+
+  test "create with the page's CSRF token succeeds when forgery protection is on" do
+    login_as(GREY)
+
+    with_forgery_protection do
+      get emulator_path
+      token = css_select("meta[name=csrf-token]").first["content"]
+
+      post emulator_save_slots_path, params: "BYTES_WITH_CSRF".b,
+           headers: { "Content-Type" => "application/octet-stream", "X-CSRF-Token" => token }
+    end
+
     assert_response :created
   end
 

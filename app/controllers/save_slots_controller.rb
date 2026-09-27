@@ -17,15 +17,6 @@ class SaveSlotsController < ApplicationController
   before_action :set_session
   before_action :set_slot, only: [ :update, :destroy, :restore, :download ]
 
-  # The binary upload endpoints (POST create, PATCH update) carry an
-  # octet-stream body that can't ride the standard form-CSRF token. The
-  # Stimulus controllers send `X-CSRF-Token` for belt-and-suspenders, but we
-  # accept the request even without one. DELETE / restore go through the
-  # standard CSRF path.
-  protect_from_forgery with: :null_session,
-                       only: [ :create, :update ],
-                       if: -> { request.post? || request.patch? }
-
   # GET /emulator/save_slots — JSON list of all slots for the current
   # player's session. Used by the slot column on connect and after any
   # mutation to refresh card state.
