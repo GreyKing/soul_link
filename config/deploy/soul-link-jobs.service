@@ -14,15 +14,15 @@ OnFailure=systemd-failure-notify@%n.service
 Type=simple
 User=root
 WorkingDirectory=/opt/soul_link
-ExecStart=/root/.rbenv/shims/bundle exec bin/jobs --mode async
+# RAILS_MAX_THREADS=10 sizes the DB pool (database.yml): in async mode the
+# worker's 3 job threads, its poller, the dispatcher, the scheduler and their
+# heartbeats share one pool. Set here, not via Environment=, because
+# EnvironmentFile= would override Environment=. Web and bot keep 5.
+ExecStart=/usr/bin/env RAILS_MAX_THREADS=10 /root/.rbenv/shims/bundle exec bin/jobs --mode async
 Restart=always
 RestartSec=5
 
 EnvironmentFile=/etc/soul_link/env
-# The worker's 3 job threads, its poller, the dispatcher, the scheduler and
-# their heartbeats all share this process's connection pool (database.yml
-# reads RAILS_MAX_THREADS). Web and bot keep the default of 5.
-Environment=RAILS_MAX_THREADS=10
 
 [Install]
 WantedBy=multi-user.target

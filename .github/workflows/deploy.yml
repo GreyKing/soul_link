@@ -105,3 +105,7 @@ jobs:
             systemctl restart soul-link-jobs
             systemctl restart soul-link-bot
             systemctl restart soul-link-web
+
+            # Fail the deploy (after web and bot are already restarted) if the jobs worker isn't up
+            sleep 15
+            systemctl is-active --quiet soul-link-jobs || { journalctl -u soul-link-jobs -n 50 --no-pager; exit 1; }
