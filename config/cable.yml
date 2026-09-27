@@ -7,6 +7,9 @@ development: &solid_cable
   adapter: solid_cable
   polling_interval: 0.1.seconds
   message_retention: 1.day
+  # Back off for ~4 minutes before giving up polling after a DB connection
+  # error (default: 1 immediate retry, then the listener thread dies silently).
+  reconnect_attempts: [ 1, 2, 3, 5, 10, 15, 30, 60, 60, 60 ]
 
 test:
   adapter: test

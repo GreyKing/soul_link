@@ -15,6 +15,7 @@ class CableConfigTest < ActiveSupport::TestCase
       assert_not config.key?("connects_to"), "Solid Cable must share the primary database"
       assert_equal "0.1.seconds", config["polling_interval"]
       assert_equal "1.day", config["message_retention"]
+      assert_equal [ 1, 2, 3, 5, 10, 15, 30, 60, 60, 60 ], config["reconnect_attempts"], "listener must survive a MySQL restart"
     end
   end
 
