@@ -45,7 +45,8 @@ Today:
 ### Gems
 
 Add `solid_cable` and `solid_queue` to the Gemfile, at the latest versions
-compatible with Rails 8.1.1. Replace the "we don't need these" comment with a
+compatible with Rails 8.1.1. At time of writing Bundler resolves solid_cable
+4.1.0 and solid_queue 1.7.0 (plus fugit, et-orbi and raabro). Replace the "we don't need these" comment with a
 one-line note: both use the primary database, and Solid Cache is not used.
 
 ### Action Cable: `config/cable.yml`
@@ -71,8 +72,14 @@ production:
   feeling instant. Only processes with subscribers poll, which in practice
   means Puma: one indexed query every 100ms.
 - Cleanup relies on `autotrim`, which is on by default. On a random fraction
-  of broadcasts it deletes up to 100 messages older than `message_retention`
-  (1 day). It runs inline (`TrimJob.perform_now`) and enqueues nothing.
+  of writes it deletes up to 100 messages older than `message_retention`
+  (1 day). It runs `TrimJob.perform_now` on the adapter's background thread
+  and never goes through Solid Queue.
+- Since solid_cable 4.1, `broadcast` doesn't write straight to the database.
+  It pushes onto an in-memory queue, and a `solid_cable_writer` thread inserts
+  the messages in batches (up to 4 per batch, 1ms delay by default). That
+  suits long-lived processes (Puma, the bot and the jobs worker). The limits
+  are listed under Known limitations.
 - The old comment about the async adapter and the web console goes, because
   a console broadcast now reaches the browser.
 
@@ -207,9 +214,10 @@ Write these tests first; each one should fail on the current code:
    production use `solid_cable` with no `connects_to` and have the
    polling/retention settings. Test uses `test`.
 2. **Solid Cable on the primary database.** Broadcasting through
-   `ActionCable::SubscriptionAdapter::SolidCable` inserts a
-   `SolidCable::Message` for that channel, and `SolidCable::Record` uses the
-   primary connection.
+   `ActionCable::SubscriptionAdapter::SolidCable` and then calling
+   `adapter.shutdown` inserts a `SolidCable::Message` for that channel.
+   `shutdown` closes the writer queue and joins the thread, which makes the
+   write deterministic. `SolidCable::Record` uses the primary connection.
 3. **Solid Queue on the primary database.** Enqueuing a real app job (for
    example `GymPollDiscordSyncJob`) through
    `ActiveJob::QueueAdapters::SolidQueueAdapter` persists a `SolidQueue::Job`
@@ -233,6 +241,12 @@ The test environment keeps `adapter: test` for cable and the test job adapter.
 Following the project memory, any job assertions stay scoped with `only:`.
 
 ## Known limitations (not regressions)
+
+- A one-shot process such as `rake soul_link:reparse_all_saves` or
+  `bin/rails runner` can drop a broadcast made in its last millisecond or so,
+  because the solid_cable writer thread dies when the process exits. Under
+  async, those broadcasts never reached a browser at all. The bot, Puma and
+  the jobs worker are long-lived and unaffected.
 
 - If a deploy interrupts `GenerateRunRomsJob` after it created the four
   sessions, the released job reruns, sees four sessions and does nothing. The
