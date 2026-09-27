@@ -1,5 +1,6 @@
 class GymProgressController < ApplicationController
   before_action :require_login
+  before_action :require_writable_run!
 
   def update
     run = current_run

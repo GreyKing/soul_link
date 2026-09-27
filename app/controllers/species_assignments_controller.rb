@@ -1,5 +1,6 @@
 class SpeciesAssignmentsController < ApplicationController
   before_action :require_login
+  before_action :require_writable_run!, except: :show
 
   def show
     run = current_run

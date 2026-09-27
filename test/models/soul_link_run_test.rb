@@ -7,6 +7,17 @@ class SoulLinkRunTest < ActiveSupport::TestCase
     @run = create(:soul_link_run)
   end
 
+  test "ensure_writable! refuses a wiped run unless it also completed" do
+    assert_nothing_raised { @run.ensure_writable! }
+
+    @run.update!(wiped_at: Time.current)
+    error = assert_raises(SoulLinkRun::ReadOnlyError) { @run.ensure_writable! }
+    assert_equal SoulLinkRun::READ_ONLY_MESSAGE, error.message
+
+    @run.update!(completed_at: Time.current)
+    assert_nothing_raised { @run.ensure_writable! }
+  end
+
   # ── #emulator_status ────────────────────────────────────────────────────
 
   test "#emulator_status returns :none when no sessions exist" do

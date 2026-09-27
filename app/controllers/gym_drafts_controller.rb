@@ -1,5 +1,6 @@
 class GymDraftsController < ApplicationController
   before_action :require_login
+  before_action :require_writable_run!, only: %i[create destroy mark_beaten]
 
   def create
     run = current_run

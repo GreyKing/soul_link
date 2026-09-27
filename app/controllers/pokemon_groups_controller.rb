@@ -1,5 +1,6 @@
 class PokemonGroupsController < ApplicationController
   before_action :require_login
+  before_action :require_writable_run!
 
   def create
     run = current_run

@@ -306,4 +306,13 @@ class RunChannelTest < ActionCable::Channel::TestCase
     assert_equal 1, enqueued_jobs.count { |j| j[:job] == SoulLink::GenerateRunRomsJob },
       "second call should no-op now that emulator_status != :none"
   end
+
+  test "end_run still works on a wiped run" do
+    @run.update!(wiped_at: Time.current)
+    subscribe(guild_id: GUILD_ID)
+
+    perform :end_run
+
+    assert_not @run.reload.active?
+  end
 end

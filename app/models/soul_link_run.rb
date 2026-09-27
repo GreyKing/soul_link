@@ -17,6 +17,16 @@ class SoulLinkRun < ApplicationRecord
 
   TIME_OF_DAY_FORMAT = /\A([01]\d|2[0-3]):[0-5]\d\z/.freeze
 
+  READ_ONLY_MESSAGE = "This run has wiped and is read-only.".freeze
+
+  # Raised by `ensure_writable!`. Callers that report errors to players use
+  # its message as-is.
+  class ReadOnlyError < StandardError
+    def initialize(message = READ_ONLY_MESSAGE)
+      super
+    end
+  end
+
   # Step 16 — broadcast a Turbo refresh on every run change so that when
   # `HallOfFameCoordinator` updates `completed_at`, the dashboard
   # refreshes and the "🏆 COMPLETE" banner appears in real time.
@@ -75,14 +85,19 @@ class SoulLinkRun < ApplicationRecord
     wiped_at.present?
   end
 
-  # Step 19 — read-only mode for the dashboard. True when the run is
-  # wiped AND not yet completed (HoF wins — a run that wipes after HoF
-  # is "complete" first, "wiped" second). Gates dashboard affordances
-  # via `dashboard_read_only?(active_run)` view helper. Server-side
-  # authz remains unchanged in v1 (UI hide-only); KG covers server
-  # enforcement of read-only mode.
+  # Read-only mode: true when the run is wiped AND not yet completed (HoF
+  # wins — a run that wipes after HoF is "complete" first). Enforced on the
+  # server by `ensure_writable!`; the dashboard also hides write controls via
+  # `dashboard_read_only?`.
   def read_only?
     wiped_at.present? && !completed?
+  end
+
+  # Called before any write to run data from the website, the bot, live
+  # channels or save parsing. Ending or starting a run, emulator saves and
+  # ROM downloads are not run data and stay allowed.
+  def ensure_writable!
+    raise ReadOnlyError if read_only?
   end
 
   # Step 16 — TID/SID mix-up detection (read-side).
