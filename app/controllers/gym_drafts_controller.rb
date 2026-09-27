@@ -3,7 +3,7 @@ class GymDraftsController < ApplicationController
 
   def create
     run = current_run
-    redirect_to login_path, alert: "No active run found." and return unless run
+    redirect_to root_path, alert: "No active run found." and return unless run
 
     # Check for an existing active draft
     existing = run.gym_drafts.where(status: %w[lobby voting drafting nominating]).first
@@ -68,7 +68,7 @@ class GymDraftsController < ApplicationController
 
   def mark_beaten
     run = current_run
-    redirect_to login_path, alert: "No active run found." and return unless run
+    redirect_to root_path, alert: "No active run found." and return unless run
 
     draft = run.gym_drafts.find_by(id: params[:id])
     unless draft&.complete?

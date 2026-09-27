@@ -11,16 +11,13 @@ class DashboardController < ApplicationController
 
     @all_runs = SoulLinkRun.for_guild(guild_id).order(run_number: :desc)
 
-    run = if params[:run_id].present?
-            @all_runs.find_by(id: params[:run_id])
-    else
-            @all_runs.active.first
-    end
-
-    unless run
-      redirect_to login_path, alert: "No active Soul Link run found."
-      return
-    end
+    # With no active run (after END RUN) show the latest run; its RUNS tab
+    # carries the START NEW RUN panel. Redirecting to login here looped,
+    # because login sends a signed-in user straight back.
+    run = (params[:run_id].present? && @all_runs.find_by(id: params[:run_id])) ||
+          @all_runs.active.first ||
+          @all_runs.first
+    return render :no_runs unless run
 
     @run = run
     @guild_id = guild_id

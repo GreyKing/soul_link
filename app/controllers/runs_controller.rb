@@ -30,6 +30,6 @@ class RunsController < ApplicationController
     guild_id = session[:guild_id]
     @run = SoulLinkRun.current(guild_id) if guild_id
     return if @run && @run.id == params[:id].to_i
-    redirect_to login_path, alert: "Run not found in this guild."
+    redirect_to root_path, alert: "Run not found in this guild."
   end
 end

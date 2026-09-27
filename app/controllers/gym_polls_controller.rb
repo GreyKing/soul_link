@@ -36,6 +36,6 @@ class GymPollsController < ApplicationController
   def load_run
     guild_id = session[:guild_id]
     @run = SoulLinkRun.current(guild_id) if guild_id
-    redirect_to login_path, alert: "No active run found." unless @run
+    redirect_to root_path, alert: "No active run found." unless @run
   end
 end

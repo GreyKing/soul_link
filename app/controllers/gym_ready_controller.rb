@@ -4,7 +4,7 @@ class GymReadyController < ApplicationController
   def show
     run = current_run
     unless run
-      redirect_to login_path, alert: "No active Soul Link run found."
+      redirect_to root_path, alert: "No active Soul Link run found."
       return
     end
 
