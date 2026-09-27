@@ -6,24 +6,37 @@
 
 A full audit of the codebase (baseline `e822ed9`, 964 tests passing) found
 duplication and performance issues, plus a set of real bugs. The cleanup is
-split into four phases, each with its own spec:
+split into five phases, each with its own spec:
 
 1. **Bug fixes** (this document)
-2. Rails core cleanup: controllers, models, dead code, quick speed wins
-3. Discord layer: shared REST base, services shared by bot and web, bot split
-4. Frontend: shared JS helpers, calculator merge, page weight
+2. Infrastructure: Solid Cable and Solid Queue on the existing MySQL database
+3. Rails core cleanup: controllers, models, dead code, quick speed wins
+4. Discord layer: shared REST base, services shared by bot and web, bot split
+5. Frontend: shared JS helpers, calculator merge, page weight
 
-Fixing bugs first keeps phases 2-4 purely structural, so any behaviour change
+Fixing bugs first keeps phases 3-5 purely structural, so any behaviour change
 in a later phase is a regression by definition.
+
+## Decisions (2026-09-27)
+
+| Question | Decision |
+|---|---|
+| Deploys for this phase | One. Batches are held on the branch. |
+| Live updates and background jobs | Solid Cable + Solid Queue, as phase 2 |
+| Server-side read-only for wiped runs | Enforce (2.3) |
+| Undoing a mistaken wipe | Revive stays allowed and clears the wipe (2.3) |
+| Who may edit run data on the website | Any server member (unchanged) |
+| Legacy "Add My Species" bot flow | Remove, in phase 4 |
 
 ## Rules
 
 - Every fix starts with a test that fails on the current code.
 - Fixes are minimal. No restructuring here, even where phase 2 or 3 will
   rewrite the surrounding code.
-- Work ships in three batches. Each batch is committed on the worktree branch,
-  fast-forward merged to `main` and pushed once the full suite passes. A push
-  to `main` deploys to production.
+- Work is done in three batches, each committed on the worktree branch once
+  the full suite passes. The batches are held on the branch and shipped
+  together: one fast-forward merge to `main` and one push, which is one
+  production deploy for the whole phase.
 
 ## Batch 1: user-facing
 
@@ -123,6 +136,45 @@ rejected when forgery protection is on.
 Risk: a browser tab opened before the deploy keeps a valid token, so no
 in-progress save is lost.
 
+### 2.3 Read-only mode is enforced in the UI only
+
+`SoulLinkRun#read_only?` (wiped and not completed) hides buttons, but every
+endpoint still accepts writes. The definition is unchanged: completed runs
+stay editable.
+
+Fix:
+
+- A `RunWriteGuard` controller concern with `require_writable_run!`. For a
+  read-only run it responds 403 with `{ error: "This run has wiped and is
+  read-only." }` for JSON, or redirects to `root_path` with an alert for HTML.
+- Applied to the mutating actions of `pokemon_groups`, `pokemon`,
+  `species_assignments`, `teams`, `gym_progress`, `gym_drafts`, `gym_results`
+  and `gym_polls`.
+- `GymDraftChannel` and `GymPollChannel` actions transmit the same error.
+- Bot handlers that write run data (catch, species, death, poll vote/reset)
+  reply with the same message.
+- `CatchCoordinator`, `GymBeatenCoordinator` and `HallOfFameCoordinator`
+  return early for a read-only run, so an uploaded save cannot change it.
+
+Not blocked: ending the run, starting a new run, emulator saves and save
+slots, ROM downloads, the schedule template.
+
+Undoing a wipe:
+
+- Revive (`PATCH /pokemon_groups/:id` with `status=caught` on a dead group) is
+  exempt from the guard.
+- After a revive, `WipeCoordinator.reconsider(run)` clears `wiped_at` under
+  `with_lock` when `wiping_player_and_route` no longer finds a wiped player.
+  If another player is still wiped, the run stays read-only.
+- The pokemon modal keeps the revive button visible for dead groups in a
+  read-only run; every other affordance stays hidden.
+- No Discord message is sent when a wipe is cleared.
+
+Tests: each guarded endpoint returns 403 on a wiped run and still works on a
+live and on a completed run; revive on a wiped run succeeds and clears
+`wiped_at`; revive that leaves another player wiped keeps `wiped_at`; a parsed
+save on a wiped run creates no catches; end run and start run still work.
+
 ## Batch 3: concurrency and jobs
 
 ### 3.1 Lost updates on draft and poll state
@@ -175,13 +227,13 @@ Fix: build the node with `textContent`.
 
 | Item | Why | Where it goes |
 |---|---|---|
-| Bot changes do not reach open browsers (`async` cable adapter across two processes) | Infrastructure change (Solid Cable or Redis) | Separate decision |
-| `async` job adapter loses jobs on restart | Same | Separate decision |
-| Read-only mode is enforced in the UI only | Policy decision | Phase 2 |
-| No registered-player check on web mutations | Policy decision | Phase 2 |
-| Unique index on `(run, user, pid)` | Needs a duplicate check on production data first | Phase 2 |
-| Bot interactions not deferred before REST calls | Touches every handler | Phase 3 |
-| Legacy "Add My Species" flow skips species validation | Removed by the shared service | Phase 3 |
+| Bot changes do not reach open browsers (`async` cable adapter across two processes) | Infrastructure change | Phase 2 |
+| `async` job adapter loses jobs on restart | Infrastructure change | Phase 2 |
+| Registered-player check on web mutations | Decided: any server member may edit | Not planned |
+| Unique index on `(run, user, pid)` | Needs a duplicate check on production data first | Phase 3 |
+| Bot interactions not deferred before REST calls | Touches every handler | Phase 4 |
+| Legacy "Add My Species" bot flow | Decided: remove | Phase 4 |
+| Client-side HTML building in draft and timeline pages | Not behaviour-preserving | Not planned |
 
 ## Verification
 
