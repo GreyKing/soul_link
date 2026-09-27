@@ -138,6 +138,15 @@ module SoulLink
       { ok: true, group: group }
     end
 
+    # The previous run's general channel, which a new run moves into its own
+    # category so the server keeps one general channel across runs. nil when
+    # there isn't one to reuse.
+    def self.reusable_general_channel(server, previous_run)
+      return nil unless previous_run&.general_channel_id
+
+      server.channels.find { |c| c.id == previous_run.general_channel_id }
+    end
+
     # Gym info for the `!next_gym` text command. nil once every gym is beaten.
     def self.next_gym_for(run)
       GameState.next_gym_info(run.gyms_defeated)
@@ -515,8 +524,10 @@ module SoulLink
       guild_id = event.server.id
       server = event.server
 
-      # Deactivate current run if exists
-      SoulLinkRun.current(guild_id)&.deactivate!
+      # Capture the current run before deactivating it: its general channel
+      # is reused below.
+      previous_run = SoulLinkRun.current(guild_id)
+      previous_run&.deactivate!
 
       # Determine next run number
       last_run = SoulLinkRun.for_guild(guild_id).order(run_number: :desc).first
@@ -528,14 +539,7 @@ module SoulLink
         4 # 4 = category type
       )
 
-      # Look for an existing "general" channel inside the current run's category,
-      # or create a new one under the new category
-      existing_run = SoulLinkRun.current(guild_id)
-      general_channel = if existing_run
-                          server.channels.find { |c| c.id == existing_run.general_channel_id }
-      else
-                          server.channels.find { |c| c.name == 'general' && c.parent_id == category.id }
-      end
+      general_channel = self.class.reusable_general_channel(server, previous_run)
 
       if general_channel
         general_channel.parent = category
