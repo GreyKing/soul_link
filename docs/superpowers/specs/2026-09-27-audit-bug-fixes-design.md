@@ -52,16 +52,19 @@ Fix:
   there is no active one (`@all_runs.active.first || @all_runs.first`). This is
   the same page as `/?run_id=<latest>`, which already works, and its Runs tab
   already shows the NO ACTIVE RUN panel with START NEW RUN.
-- If the guild has no runs at all, render a minimal page in the `pixeldex`
-  layout with the same START NEW RUN panel.
+- An unknown `?run_id=` falls back the same way instead of redirecting.
+- If the guild has no runs at all (only possible if runs were deleted, since
+  login requires one), render a minimal `pixeldex` page pointing to
+  `/start_new_run` in Discord, with a sign-out button.
 - Every "no active run" redirect for a logged-in user goes to `root_path`
   instead of `login_path` (teams, map, gym_ready, species_assignments,
-  gym_polls, gym_drafts).
-- `SessionsController#new` and `#create` redirect to `root_path`.
+  gym_polls, gym_drafts, runs).
+- The post-login landing page stays `/team`; `/login` → `/team` → `/` no
+  longer loops, so it does not need to change.
 
 Tests: logged-in user with only an inactive run gets 200 on `/` and sees the
-no-run panel; `/team` redirects to `/`; `/login` while logged in redirects to
-`/`; no request chain returns to `/login`.
+no-run panel; `/team` and the other pages redirect to `/`; the chain from
+`/login` ends on a 200.
 
 ### 1.2 Auto-detected catches saved as "Species #N"
 
@@ -166,8 +169,12 @@ Undoing a wipe:
 - After a revive, `WipeCoordinator.reconsider(run)` clears `wiped_at` under
   `with_lock` when `wiping_player_and_route` no longer finds a wiped player.
   If another player is still wiped, the run stays read-only.
-- The pokemon modal keeps the revive button visible for dead groups in a
-  read-only run; every other affordance stays hidden.
+- The web UI has no revive control today (the drag-to-revive grid was
+  removed; its JS is dead code). Add a REVIVE button to the Pokemon modal,
+  shown for dead groups in any run, wired to the existing `PATCH` revive
+  path. Every other affordance stays hidden on a read-only run.
+- Guard the modal's MARK DEAD target in JS: on a read-only run the button is
+  not rendered and opening the modal currently throws.
 - No Discord message is sent when a wipe is cleared.
 
 Tests: each guarded endpoint returns 403 on a wiped run and still works on a
@@ -221,7 +228,13 @@ Fix: capture the previous run before deactivating it.
 
 `species_assignment_controller.js` interpolates text into `outerHTML`.
 
-Fix: build the node with `textContent`.
+Fix: build the node with `textContent`. Look the group card up before
+replacing the drop zone; today the lookup runs on the detached node, so the
+card's "N missing" / "Complete" label never updates.
+
+Note: section 3.1 (locking) is implemented before 2.3 (read-only), because
+the read-only check sits inside the lock. Batches are internal groupings and
+ship together, so the order has no user-visible effect.
 
 ## Out of scope
 
