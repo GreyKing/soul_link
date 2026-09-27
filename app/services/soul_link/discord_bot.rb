@@ -116,6 +116,11 @@ module SoulLink
       { ok: false, error: e.record.errors.full_messages.join(", ") }
     end
 
+    # Gym info for the `!next_gym` text command. nil once every gym is beaten.
+    def self.next_gym_for(run)
+      GameState.next_gym_info(run.gyms_defeated)
+    end
+
     def self.species_error(input, resolution)
       if resolution.candidates.any?
         "Did you mean: #{resolution.candidates.join(', ')}?"
@@ -344,11 +349,16 @@ module SoulLink
       end
 
       # Text command for !next_gym
-      bot.message(content: '!next_gym') do |event|
-        next unless event.channel.id == current_run(event)&.general_channel_id
+      bot.message(content: "!next_gym") do |event|
+        run = current_run(event)
+        next unless run && event.channel.id == run.general_channel_id
 
-        gym = GameState.next_gym_info
-        event.respond embed: build_gym_embed(gym)
+        gym = self.class.next_gym_for(run)
+        if gym
+          event.respond embed: build_gym_embed(gym)
+        else
+          event.respond "🏆 All gyms beaten!"
+        end
       end
     end
 
