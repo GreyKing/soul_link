@@ -748,6 +748,8 @@ rtk proxy bin/rails runner '
   before = SolidCable::Message.where(channel_hash: hash).count
   Turbo::StreamsChannel.broadcast_refresh_later_to(stream)  # debounced 0.5s, then enqueued
   sleep 3
+  # The worker writes from another process; bypass runner's query cache.
+  ActiveRecord::Base.connection.clear_query_cache
   puts "jobs finished: #{SolidQueue::Job.where(class_name: "Turbo::Streams::BroadcastStreamJob").where.not(finished_at: nil).where("created_at > ?", 1.minute.ago).count}"
   puts "cable messages: #{SolidCable::Message.where(channel_hash: hash).count - before}"
 ' > tmp/e2e.txt 2>&1; cat tmp/e2e.txt
@@ -760,8 +762,9 @@ Expected: `jobs finished: 1` (or more) and `cable messages: 1`.
 - `cable messages: 0` with a finished job means the worker's broadcast didn't
   reach the table. Check `tmp/jobs_dev.log` for a solid_cable error.
 
-Stop the background worker afterwards (TaskStop, or
-`pkill -f "bin/jobs --mode async"`).
+Stop the background worker afterwards: use TaskStop, or `pkill -f solid-queue`.
+The async supervisor renames its process title, so `pkill -f "bin/jobs"` can
+miss it. Confirm with `pgrep -fl solid-queue`.
 
 - [ ] **Step 7: Commit**
 
