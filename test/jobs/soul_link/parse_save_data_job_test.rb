@@ -78,6 +78,13 @@ module SoulLink
       assert @slot.parsed_at > old_parsed_at, "parsed_at should be refreshed even on failure"
     end
 
+    test "a job for a slot deleted before it runs is discarded" do
+      SoulLink::ParseSaveDataJob.perform_later(@slot)
+      @slot.destroy!
+
+      assert_nothing_raised { perform_enqueued_jobs }
+    end
+
     test "re-broadcasts the slot's roster card after writing parsed fields" do
       @slot.update!(save_data: "\x00".b * 0x80000)
       calls = 0

@@ -6,7 +6,10 @@ class GymPollLockJob < ApplicationJob
     return unless poll&.locked?
     return unless poll.discord_message_id && poll.discord_channel_id
 
-    token = Rails.application.credentials.discord[:token]
+    return Rails.logger.error("GymPollLockJob: poll #{poll.id} locked on unknown slot #{poll.locked_slot_index}") unless locked_slot(poll)
+
+    token = Rails.application.credentials.discord&.dig(:token)
+    return Rails.logger.error("GymPollLockJob: no Discord bot token configured") if token.blank?
 
     embed_response = patch_embed(poll, token)
     Rails.logger.error "GymPollLockJob: PATCH failed #{embed_response.code}" unless embed_response.is_a?(Net::HTTPSuccess)
@@ -49,7 +52,7 @@ class GymPollLockJob < ApplicationJob
 
   def ping_text(poll)
     tz   = ActiveSupport::TimeZone[poll.soul_link_run.timezone]
-    slot = poll.slots.find { |s| s["index"].to_i == poll.locked_slot_index }
+    slot = locked_slot(poll)
     at   = Time.iso8601(slot["scheduled_at"]).in_time_zone(tz)
     when_str = at.strftime("%A, %B %-d at %-l:%M %p")
     mentions = SoulLink::GameState.players.map { |p| "<@#{p["discord_user_id"]}>" }.join(" ")
@@ -73,5 +76,9 @@ class GymPollLockJob < ApplicationJob
         ]
       }
     ]
+  end
+
+  def locked_slot(poll)
+    poll.slots.find { |s| s["index"].to_i == poll.locked_slot_index }
   end
 end

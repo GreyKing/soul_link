@@ -40,6 +40,20 @@ class GymPollLockJobTest < ActiveJob::TestCase
     assert_includes content, "<@444>"
   end
 
+  test "does nothing when the locked slot index matches no slot" do
+    @poll.update_columns(locked_slot_index: 9)
+
+    with_creds_and_players do
+      assert_nothing_raised { GymPollLockJob.perform_now(@poll.id) }
+    end
+  end
+
+  test "does nothing when no bot token is configured" do
+    Rails.application.credentials.stub(:discord, nil) do
+      assert_nothing_raised { GymPollLockJob.perform_now(@poll.id) }
+    end
+  end
+
   test "PATCHes the poll embed to a locked state" do
     patch_stub = stub_request(:patch, /messages\/12345/).to_return(status: 200, body: "{}")
     stub_request(:post, /channels\/999\/messages/).to_return(status: 200, body: "{}")

@@ -6,7 +6,9 @@ class GymPollDiscordSyncJob < ApplicationJob
     return unless poll
     return unless poll.discord_message_id && poll.discord_channel_id
 
-    token = Rails.application.credentials.discord[:token]
+    token = Rails.application.credentials.discord&.dig(:token)
+    return Rails.logger.error("GymPollDiscordSyncJob: no Discord bot token configured") if token.blank?
+
     embed = SoulLink::GymPollMessage.embed(poll).merge(timestamp: Time.now.iso8601)
     components = SoulLink::GymPollMessage.components(poll)
 

@@ -30,6 +30,12 @@ class GymPollDiscordSyncJobTest < ActiveJob::TestCase
     end
   end
 
+  test "does nothing when no bot token is configured" do
+    Rails.application.credentials.stub(:discord, nil) do
+      assert_nothing_raised { GymPollDiscordSyncJob.perform_now(@poll.id) }
+    end
+  end
+
   test "PATCHes the message embed" do
     stub = stub_request(:patch, "https://discord.com/api/v10/channels/999/messages/12345")
       .with(headers: { "Authorization" => "Bot test-token" })
