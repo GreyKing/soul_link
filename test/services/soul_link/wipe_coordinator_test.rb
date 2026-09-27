@@ -149,5 +149,32 @@ module SoulLink
 
       assert_equal "Route 203", @notify_calls.first[:route]
     end
+
+    test "reconsider clears the wipe once no player is wiped" do
+      pokemon(PLAYERS[0], status: "caught")
+      @run.update!(wiped_at: Time.current)
+
+      SoulLink::WipeCoordinator.reconsider(@run)
+
+      assert_nil @run.reload.wiped_at
+    end
+
+    test "reconsider keeps the wipe while another player is still wiped" do
+      pokemon(PLAYERS[0], status: "caught")
+      pokemon(PLAYERS[1], status: "dead", died_at: 1.day.ago)
+      @run.update!(wiped_at: Time.current)
+
+      SoulLink::WipeCoordinator.reconsider(@run)
+
+      assert @run.reload.wiped_at.present?
+    end
+
+    test "reconsider leaves a run that is not wiped alone" do
+      pokemon(PLAYERS[0], status: "dead", died_at: 1.day.ago)
+
+      SoulLink::WipeCoordinator.reconsider(@run)
+
+      assert_nil @run.reload.wiped_at
+    end
   end
 end

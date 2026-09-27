@@ -39,6 +39,21 @@ module SoulLink
       nil
     end
 
+    # Clears a wipe once no player meets the wipe rule any more. Called after
+    # a revive so a mistaken Mark Dead can be undone. Sends no Discord
+    # message; the original wipe announcement stays in the channel.
+    def self.reconsider(run)
+      return if run.nil? || run.wiped_at.nil?
+
+      run.with_lock do
+        return if run.wiped_at.nil?
+
+        uid, _route = wiping_player_and_route(run)
+        run.update!(wiped_at: nil) if uid.nil?
+      end
+      nil
+    end
+
     # Walk registered players in canonical order; return the first
     # `[uid, last_route]` pair where the player has caught at least one
     # Pokemon in this run AND has zero alive. Returns `[nil, nil]` when

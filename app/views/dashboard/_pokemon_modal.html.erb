@@ -135,9 +135,16 @@
       <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 10px; border-top: var(--border-thin);">
         <span data-pixeldex-target="modalStatus" style="font-size: 10px; color: var(--d2);"></span>
         <div style="display: flex; gap: 6px;">
+          <%# Shown by pixeldex#openModal for dead groups, including on a
+              wiped run, where reviving can lift the wipe. %>
+          <button type="button"
+                  data-pixeldex-target="modalReviveBtn"
+                  data-action="click->pixeldex#revivePokemon"
+                  class="gb-btn gb-btn-sm hidden">
+            REVIVE
+          </button>
           <%# Step 19 — hide the Mark Dead trigger when the run is in
-              read-only mode (already wiped). UI-hide only; server-side
-              authz unchanged in v1. %>
+              read-only mode (already wiped). The server refuses it too. %>
           <% unless dashboard_read_only?(@run) %>
             <button type="button"
                     data-pixeldex-target="modalDeadBtn"

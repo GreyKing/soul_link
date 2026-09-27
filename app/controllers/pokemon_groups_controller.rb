@@ -1,6 +1,6 @@
 class PokemonGroupsController < ApplicationController
   before_action :require_login
-  before_action :require_writable_run!
+  before_action :require_writable_run!, unless: :revive_request?
 
   def create
     run = current_run
@@ -104,6 +104,9 @@ class PokemonGroupsController < ApplicationController
       # No longer dead: drop the RIP embed and re-render the roster panel.
       SoulLink::DeathMessage.delete(group)
       SoulLink::DeathsPanel.refresh(run)
+
+      # A revive may be undoing the Mark Dead that wiped the run.
+      SoulLink::WipeCoordinator.reconsider(run)
     else
       # Simple metadata update (no status change)
       group.update!(
@@ -182,6 +185,13 @@ class PokemonGroupsController < ApplicationController
   end
 
   private
+
+  # Reviving a dead group stays allowed on a wiped run, so a mistaken Mark
+  # Dead can be undone (see WipeCoordinator.reconsider).
+  def revive_request?
+    action_name == "update" && params[:status] == "caught" &&
+      current_run&.soul_link_pokemon_groups&.dead&.exists?(id: params[:id])
+  end
 
   def current_run
     guild_id = session[:guild_id]

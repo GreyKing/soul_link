@@ -8,7 +8,7 @@ export default class extends Controller {
     "pokemonModal", "modalSprite", "modalSpeciesName", "modalNickLoc", "modalTypes",
     "modalSpeciesInput", "modalSpeciesHidden", "modalLevel", "modalAbility", "modalAbilityLabel",
     "modalEvoInfo", "modalEvoText", "modalLinked", "modalNickname",
-    "modalDeadBtn", "modalStatus", "modalPokemonId", "modalGroupId",
+    "modalDeadBtn", "modalReviveBtn", "modalStatus", "modalPokemonId", "modalGroupId",
     "modalNature", "modalNatureLabel",
     "onTeamGrid", "storageGrid", "fallenGrid"
   ]
@@ -356,12 +356,14 @@ export default class extends Controller {
     this.modalPokemonIdTarget.value = myPokemon.id || ""
     this.modalGroupIdTarget.value = groupId
 
-    if (status === "dead") {
-      this.modalDeadBtnTarget.classList.add("hidden")
-    } else {
-      this.modalDeadBtnTarget.classList.remove("hidden")
+    // MARK DEAD isn't rendered on a read-only run, so guard the target.
+    if (this.hasModalDeadBtnTarget) {
+      this.modalDeadBtnTarget.classList.toggle("hidden", status === "dead")
       this.modalDeadBtnTarget.dataset.groupId = groupId
       this.modalDeadBtnTarget.dataset.groupNickname = nickname
+    }
+    if (this.hasModalReviveBtnTarget) {
+      this.modalReviveBtnTarget.classList.toggle("hidden", status !== "dead")
     }
 
     this.modalStatusTarget.textContent = ""
@@ -469,6 +471,23 @@ export default class extends Controller {
     } catch (error) {
       this.modalStatusTarget.textContent = "NETWORK ERROR"
       if (saveBtn) saveBtn.disabled = false
+    }
+  }
+
+  async revivePokemon(event) {
+    const groupId = this.modalGroupIdTarget.value
+    if (!groupId) return
+
+    const reviveBtn = event.currentTarget
+    reviveBtn.disabled = true
+    this.modalStatusTarget.textContent = "REVIVING..."
+
+    try {
+      await this.#updateGroupStatus(groupId, "caught")
+      window.location.reload()
+    } catch (error) {
+      this.modalStatusTarget.textContent = error.message || "REVIVE FAILED"
+      reviveBtn.disabled = false
     }
   }
 

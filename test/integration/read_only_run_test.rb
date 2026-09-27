@@ -71,4 +71,33 @@ class ReadOnlyRunTest < ActionDispatch::IntegrationTest
 
     assert_response :success
   end
+
+  test "reviving a dead group on a wiped run is allowed and lifts the wipe" do
+    @group.mark_as_dead!
+
+    SoulLink::DeathMessage.stub(:delete, nil) do
+      SoulLink::DeathsPanel.stub(:refresh, nil) do
+        patch pokemon_group_path(@group), params: { status: "caught" }, as: :json
+      end
+    end
+
+    assert_response :success
+    assert @group.reload.caught?
+    assert_nil @run.reload.wiped_at
+  end
+
+  test "editing a dead group on a wiped run is still refused" do
+    @group.mark_as_dead!
+
+    patch pokemon_group_path(@group), params: { nickname: "Z" }, as: :json
+
+    assert_response :forbidden
+  end
+
+  test "the pokemon modal offers REVIVE but not MARK DEAD on a wiped run" do
+    get root_path
+
+    assert_select "[data-pixeldex-target=modalReviveBtn]", 1
+    assert_select "[data-pixeldex-target=modalDeadBtn]", 0
+  end
 end
