@@ -1,0 +1,252 @@
+# Solid Cable + Solid Queue (Cleanup Phase 2 of 5)
+
+**Date:** 2026-09-27
+**Baseline:** `main` at `80c2299` (phase 1 shipped), 1017 runs, 0 failures
+
+## Context
+
+Phase 1 (`2026-09-27-audit-bug-fixes-design.md`) fixed bugs. This phase
+changes infrastructure only. Behaviour stays the same, except that live
+updates now reach browsers from every process and jobs survive restarts.
+
+Today:
+
+- `config/cable.yml` uses `adapter: async` in development and production.
+  Async only delivers broadcasts inside the process that sent them. The
+  Discord bot is a separate process (`rake soul_link:bot`), so its
+  `RunChannel.broadcast_run_state` calls never reach a browser. Neither do the
+  Turbo `broadcasts_refreshes_to` refreshes triggered by bot DB writes: those
+  enqueue a `Turbo::Streams::BroadcastStreamJob`, which runs on the bot's own
+  async pool and broadcasts into the bot's own process. It also means Puma can
+  never run more than one worker.
+- `config.active_job.queue_adapter = :async` keeps jobs in process memory.
+  They are lost on restart or deploy. There are five job classes:
+  `SoulLink::ParseSaveDataJob`, `SoulLink::GenerateRunRomsJob` (shells out to
+  Java, ~30s), `SoulLink::GenerateRomDownloadJob`, `GymPollLockJob` and
+  `GymPollDiscordSyncJob`. There are also Turbo's broadcast jobs.
+- Dead leftovers from when the Solid gems were removed: the Gemfile comment,
+  `plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"]` in `config/puma.rb`,
+  `config/cache.yml`, `db/cache_schema.rb`, `db/cable_schema.rb`,
+  `db/queue_schema.rb`, and the production comment "inline ... no background
+  jobs needed".
+
+## Decisions (2026-09-27)
+
+| Question | Decision |
+|---|---|
+| Database | The existing single MySQL database. No `cable` or `queue` databases, and no `connects_to`. |
+| Where the worker runs | Its own systemd service, `soul-link-jobs`, running `bin/jobs --mode async` (one process, threads only) to save memory. |
+| Development | Full parity: dev uses solid_cable and solid_queue. `bin/dev` starts a worker. |
+| Solid Cache | Not adopted. The cache stays on `memory_store`. |
+| Deploys | One. Work is held on the branch, then `main` is fast-forwarded and pushed. |
+
+## Design
+
+### Gems
+
+Add `solid_cable` and `solid_queue` to the Gemfile, at the latest versions
+compatible with Rails 8.1.1. Replace the "we don't need these" comment with a
+one-line note: both use the primary database, and Solid Cache is not used.
+
+### Action Cable: `config/cable.yml`
+
+```yaml
+development:
+  adapter: solid_cable
+  polling_interval: 0.1.seconds
+  message_retention: 1.day
+
+test:
+  adapter: test
+
+production:
+  adapter: solid_cable
+  polling_interval: 0.1.seconds
+  message_retention: 1.day
+```
+
+- There is no `connects_to`, so `SolidCable::Record` uses the primary
+  connection.
+- `polling_interval: 0.1.seconds` keeps gym-draft and dashboard updates
+  feeling instant. Only processes with subscribers poll, which in practice
+  means Puma: one indexed query every 100ms.
+- Cleanup relies on `autotrim`, which is on by default. On a random fraction
+  of broadcasts it deletes up to 100 messages older than `message_retention`
+  (1 day). It runs inline (`TrimJob.perform_now`) and enqueues nothing.
+- The old comment about the async adapter and the web console goes, because
+  a console broadcast now reaches the browser.
+
+### Active Job: environments
+
+- In `development.rb` and `production.rb`, set
+  `config.active_job.queue_adapter = :solid_queue`. There is no
+  `config.solid_queue.connects_to`, so the primary database is used.
+- Fix the misleading production comment.
+- `test.rb` is unchanged: `ActiveJob::TestHelper` still installs the test
+  adapter.
+- `config/queue.yml` is unchanged. The dispatcher polls every 1s with a batch
+  of 500. The worker handles all queues with 3 threads and polls every 0.1s.
+  `processes` is ignored in async mode.
+- `config/recurring.yml` is unchanged. Its production-only
+  `clear_solid_queue_finished_jobs` task runs every hour and deletes finished
+  jobs, which Solid Queue keeps for 1 day by default.
+
+### Worker process
+
+**Production:** a new `config/deploy/soul-link-jobs.service`, modelled on
+`soul-link-bot.service`:
+
+```ini
+[Unit]
+Description=Soul Link Jobs (Solid Queue)
+After=network.target mysql.service
+OnFailure=systemd-failure-notify@%n.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/soul_link
+ExecStart=/root/.rbenv/shims/bundle exec bin/jobs --mode async
+Restart=always
+RestartSec=5
+
+EnvironmentFile=/etc/soul_link/env
+# Async mode runs the worker (3 job threads plus a poller), the dispatcher,
+# the scheduler and their heartbeats in one process on one connection pool.
+Environment=RAILS_MAX_THREADS=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+- **Why async mode.** Fork mode would run a supervisor, a worker, a
+  dispatcher and a scheduler as four Rails processes. Async mode runs them as
+  threads in one process. That costs one extra Rails boot on the VPS instead
+  of about four.
+- **What we give up.** A worker thread that hard-crashes the Ruby VM takes the
+  dispatcher and scheduler down with it. That is acceptable here: the job
+  volume is small, and `Restart=always` plus the failure email cover it.
+- **Pool size.** Solid Queue's own advisory check assumes one process per
+  component (threads + 2 = 5). In async mode every component shares one pool,
+  so the jobs process gets `RAILS_MAX_THREADS=10`, which only feeds the
+  `pool:` in `database.yml`. Web and bot keep their current pool of 5.
+  Connections open lazily, so the most the app can use is about 20, well under
+  MySQL's default limit of 151.
+- **Shutdown.** On shutdown, systemd sends SIGTERM. Solid Queue waits
+  `shutdown_timeout` (5s by default) and then releases any unfinished claimed
+  jobs back to the queue, so they run again when the worker starts. systemd's
+  90s stop timeout is well above that.
+
+**Development:** `Procfile.dev` gains
+`jobs: env RAILS_MAX_THREADS=10 bin/jobs --mode async`, so `bin/dev` starts
+web, css and jobs. The bot is still started separately.
+
+**Puma:** remove the `plugin :solid_queue` line and its comment.
+
+### Schema
+
+- One migration creates every `solid_queue_*` table and
+  `solid_cable_messages`. The table definitions are copied from the install
+  templates of the gem versions that end up in `Gemfile.lock`, so they match
+  what the gems expect.
+- The migration puts the tables into `db/schema.rb` for the primary database.
+  That covers CI (`bin/rails db:schema:load`), the parallel test databases and
+  fresh dev setups.
+- Delete the stale `db/cable_schema.rb`, `db/queue_schema.rb`,
+  `db/cache_schema.rb` and `config/cache.yml`.
+- **Production:** the deploy already runs `bin/rails db:migrate` before any
+  service restarts. Until the restart, the old processes stay on async and
+  never touch the new tables, so the ordering is safe.
+
+### Deploy: `.github/workflows/deploy.yml`
+
+Add these steps next to the existing unit installs and restarts:
+
+```sh
+cp config/deploy/soul-link-jobs.service /etc/systemd/system/
+# (after daemon-reload)
+systemctl enable soul-link-jobs      # idempotent; starts at boot
+# (with the other restarts)
+systemctl restart soul-link-jobs
+```
+
+- The deploy creates and starts the new service, so no manual SSH is needed.
+- The env file doesn't change: the jobs unit sets its own `RAILS_MAX_THREADS`.
+
+### Data flow after the change
+
+- **Bot writes a record.** `broadcasts_refreshes_to` enqueues a Turbo job and
+  a row lands in `solid_queue_jobs`. The worker runs the job, which inserts a
+  row into `solid_cable_messages`. Puma's listener picks it up and pushes it
+  to subscribed browsers.
+- **Bot calls `RunChannel.broadcast_run_state`.** The call becomes an insert
+  into `solid_cable_messages`, which Puma delivers. The bot loads `cable.yml`
+  for `RAILS_ENV=production` (from `/etc/soul_link/env`) through
+  `rake soul_link:bot` → `:environment`, so it needs no code change.
+- **Web enqueues a job** (ROM generation, save parsing, poll sync). The job
+  row is committed in the same database. If it is enqueued inside a
+  transaction, it commits or rolls back with that transaction.
+- **Restart or deploy.** Jobs that are ready or scheduled stay in the
+  database, and claimed jobs are released on graceful shutdown.
+
+### Other cleanup
+
+- `lib/tasks/soul_link/debug_save.rake`: the comment explaining `perform_now`
+  cites the async adapter's thread pool. Reword it: a one-shot batch runs
+  synchronously so the output is ordered and failures show up inline. The code
+  keeps `perform_now`.
+- Docs: update the ActionCable, Puma, systemd and Procfile sections of
+  `.claude/documents/deployment.md`, the "Dev gotcha" line in `CLAUDE.md`, and
+  any other `.claude/documents/` text that describes the async adapter.
+
+## Testing
+
+Write these tests first; each one should fail on the current code:
+
+1. **Cable config.** Parse `config/cable.yml` with ERB. Development and
+   production use `solid_cable` with no `connects_to` and have the
+   polling/retention settings. Test uses `test`.
+2. **Solid Cable on the primary database.** Broadcasting through
+   `ActionCable::SubscriptionAdapter::SolidCable` inserts a
+   `SolidCable::Message` for that channel, and `SolidCable::Record` uses the
+   primary connection.
+3. **Solid Queue on the primary database.** Enqueuing a real app job (for
+   example `GymPollDiscordSyncJob`) through
+   `ActiveJob::QueueAdapters::SolidQueueAdapter` persists a `SolidQueue::Job`
+   with a ready execution. Deserializing and running the stored job invokes
+   `perform` with the original arguments. This is what "jobs survive a
+   restart" means.
+
+Manual checks, recorded in the plan:
+
+- `RAILS_ENV=production bin/rails runner` reports the queue adapter as
+  `solid_queue` and the Action Cable pubsub as `SolidCable`. Use a dummy
+  secret or credentials as needed.
+- `bin/jobs --mode async` boots in dev, and the configuration check prints no
+  pool warning.
+- With `bin/dev` and the bot running locally, a bot-side change shows up live
+  in an open dashboard.
+- The full suite passes, including with `CI=true`. Rubocop shows only the 39
+  pre-existing offenses, and Brakeman only its 2 pre-existing weak warnings.
+
+The test environment keeps `adapter: test` for cable and the test job adapter.
+Following the project memory, any job assertions stay scoped with `only:`.
+
+## Known limitations (not regressions)
+
+- If a deploy interrupts `GenerateRunRomsJob` after it created the four
+  sessions, the released job reruns, sees four sessions and does nothing. The
+  sessions stay `pending`. Today the job is lost outright, which ends the same
+  way. This belongs to phase 3.
+- Discord gym-poll votes still don't push to an open web poll page, because
+  `GymPoll` has no refresh broadcast. This is existing behaviour and out of
+  scope.
+
+## Out of scope
+
+- Kamal and Docker files (`config/deploy.yml`, `Dockerfile`,
+  `bin/docker-entrypoint`). They are unused. `config/deploy.yml` still sets
+  `SOLID_QUEUE_IN_PUMA`; that can go in phase 3's dead-code pass.
+- Running more than one Puma worker. This change makes it possible but does
+  not turn it on.
+- Mission Control or any jobs dashboard.
