@@ -7,6 +7,8 @@ class ErrorLogSubscriber
     level = severity == :warning ? :warn : severity
     backtrace = Array(error.backtrace).first(10).join("\n")
     Rails.logger.public_send(level, "[#{source}] #{error.class}: #{error.message}\n#{backtrace}".strip)
+  rescue StandardError => e
+    warn "ErrorLogSubscriber failed: #{e.class}: #{e.message}"
   end
 end
 

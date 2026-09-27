@@ -9,9 +9,9 @@ class ErrorLoggingTest < ActiveSupport::TestCase
     log = StringIO.new
     Rails.logger = ActiveSupport::Logger.new(log)
 
-    Rails.error.report(RuntimeError.new("writer boom"), handled: true, source: "solid_cable")
+    Rails.error.report(RuntimeError.new("writer boom"), handled: true)
 
-    assert_match(/\[solid_cable\] RuntimeError: writer boom/, log.string)
+    assert_match(/\[application\] RuntimeError: writer boom/, log.string)
   ensure
     Rails.logger = original
   end
