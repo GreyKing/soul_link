@@ -31,6 +31,22 @@ class SoulLinkEmulatorSaveSlot < ApplicationRecord
   after_create_commit :broadcast_roster_card_on_create
   after_update_commit :broadcast_roster_card_on_update, if: :saved_change_to_parsed?
 
+  # Re-renders the owning session's roster card on the emulator page.
+  # Public because ParseSaveDataJob calls it: the job writes parsed_* with
+  # `update_columns`, which skips the update-commit callback above.
+  def broadcast_roster_card
+    session = soul_link_emulator_session
+    return unless session
+    run = session.soul_link_run
+    return unless run
+    Turbo::StreamsChannel.broadcast_replace_to(
+      run, :emulator,
+      target: "emulator_roster_session_#{session.id}",
+      partial: "emulator/run_sidebar_card",
+      locals: { s: session }
+    )
+  end
+
   private
 
   def enqueue_parse_if_save_changed
@@ -58,18 +74,5 @@ class SoulLinkEmulatorSaveSlot < ApplicationRecord
 
   def broadcast_roster_card_on_update
     broadcast_roster_card
-  end
-
-  def broadcast_roster_card
-    session = soul_link_emulator_session
-    return unless session
-    run = session.soul_link_run
-    return unless run
-    Turbo::StreamsChannel.broadcast_replace_to(
-      run, :emulator,
-      target: "emulator_roster_session_#{session.id}",
-      partial: "emulator/run_sidebar_card",
-      locals: { s: session }
-    )
   end
 end

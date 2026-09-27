@@ -18,8 +18,8 @@ module SoulLink
   #
   # **Critical**: writes via `update_columns` so the after_update_commit
   # callback that enqueued *this* job does not refire and create an
-  # infinite loop. The parsed_* columns are derived data; no validations or
-  # callbacks need to observe their writes.
+  # infinite loop. Because that also skips the model's broadcast, the job
+  # re-renders the roster card itself at the end.
   class ParseSaveDataJob < ApplicationJob
     queue_as :default
 
@@ -75,6 +75,8 @@ module SoulLink
         # parsed_box_data also stays at its prior value (Step 18).
         slot.update_columns(parsed_at: Time.current)
       end
+
+      slot.broadcast_roster_card
     end
 
     private

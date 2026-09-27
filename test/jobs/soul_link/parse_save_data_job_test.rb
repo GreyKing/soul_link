@@ -78,6 +78,19 @@ module SoulLink
       assert @slot.parsed_at > old_parsed_at, "parsed_at should be refreshed even on failure"
     end
 
+    test "re-broadcasts the slot's roster card after writing parsed fields" do
+      @slot.update!(save_data: "\x00".b * 0x80000)
+      calls = 0
+
+      @slot.stub(:broadcast_roster_card, -> { calls += 1 }) do
+        SoulLink::SaveParser.stub(:parse, nil) do
+          SoulLink::ParseSaveDataJob.perform_now(@slot)
+        end
+      end
+
+      assert_equal 1, calls
+    end
+
     test "KG-13: parse failure does not dispatch the diff (no spurious BadgeLost)" do
       @slot.update_columns(parsed_badges: 5, parsed_at: 1.minute.ago)
       @slot.update!(save_data: "\xFF".b * 0x80000)
