@@ -89,15 +89,19 @@ jobs:
             # Install/update systemd units from repo
             cp config/deploy/soul-link-web.service /etc/systemd/system/
             cp config/deploy/soul-link-bot.service /etc/systemd/system/
+            cp config/deploy/soul-link-jobs.service /etc/systemd/system/
             cp config/deploy/systemd-failure-notify@.service /etc/systemd/system/
             mkdir -p /etc/systemd/system/nginx.service.d
             cp config/deploy/nginx-override.conf /etc/systemd/system/nginx.service.d/override.conf
             cp config/deploy/notify-failure.sh /usr/local/bin/notify-failure
             chmod +x /usr/local/bin/notify-failure
             systemctl daemon-reload
+            # Idempotent: makes the jobs worker start at boot (first deploy creates it)
+            systemctl enable soul-link-jobs
 
             # Reload nginx if running, restart if failed (safe — certbot manages the main config)
             nginx -t && systemctl reload-or-restart nginx
 
+            systemctl restart soul-link-jobs
             systemctl restart soul-link-bot
             systemctl restart soul-link-web
