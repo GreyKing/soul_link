@@ -12,6 +12,17 @@ module SoulLink
     # the test env has no discord credentials, so `resolve_token` returns nil
     # and the service early-returns before any HTTP. Stubbed explicitly in the
     # one test that asserts on it.
+    test "refuses to add a species on a wiped run" do
+      @run.update!(wiped_at: Time.current)
+
+      result = SoulLink::DiscordBot.apply_catch_quick_add(
+        run: @run, group_id: @group.id, discord_user_id: @uid, species_input: "Bidoof"
+      )
+
+      assert_not result[:ok]
+      assert_equal SoulLinkRun::READ_ONLY_MESSAGE, result[:error]
+    end
+
     test "creates the pokemon for the clicking user" do
       result = SoulLink::DiscordBot.apply_catch_quick_add(
         run: @run, group_id: @group.id, discord_user_id: @uid, species_input: "staravia"

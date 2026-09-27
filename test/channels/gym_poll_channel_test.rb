@@ -30,6 +30,20 @@ class GymPollChannelTest < ActionCable::Channel::TestCase
     end
   end
 
+  test "vote and reset on a wiped run transmit the read-only error" do
+    @poll.soul_link_run.update!(wiped_at: Time.current)
+
+    with_player_data do
+      subscribe(id: @poll.id)
+      perform :vote, { "slot_index" => 0, "response" => "yes" }
+      perform :reset, {}
+    end
+
+    errors = transmissions.select { |t| t["type"] == "error" }.map { |t| t["message"] }
+    assert_equal [ SoulLinkRun::READ_ONLY_MESSAGE ] * 2, errors
+    assert GymPoll.exists?(@poll.id)
+  end
+
   test "rejects a subscription to another guild's poll" do
     other = create(:gym_poll, soul_link_run: create(:soul_link_run, guild_id: 1))
 

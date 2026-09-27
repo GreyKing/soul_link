@@ -142,6 +142,16 @@ class GymPollVoteTest < ActiveSupport::TestCase
     assert_equal "yes", poll.votes["111"]["0"]
   end
 
+  test "vote! on a wiped run raises ReadOnlyError" do
+    poll = open_poll
+    poll.soul_link_run.update!(wiped_at: Time.current)
+
+    with_player_ids do
+      assert_raises(SoulLinkRun::ReadOnlyError) { poll.vote!(111, 0, "yes") }
+    end
+    assert_empty poll.reload.votes
+  end
+
   test "vote! from a stale instance keeps the other player's vote" do
     poll = open_poll
     stale = GymPoll.find(poll.id)

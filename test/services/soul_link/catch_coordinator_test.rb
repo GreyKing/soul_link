@@ -32,6 +32,14 @@ module SoulLink
       assert_equal "Turtwig", row.name
     end
 
+    test "no-op on a wiped run" do
+      @run.update!(wiped_at: Time.current)
+
+      assert_no_difference "SoulLinkPokemon.count" do
+        SoulLink::CatchCoordinator.process(@slot, [ caught_event ])
+      end
+    end
+
     test "no-op on empty events array" do
       assert_no_difference "SoulLinkPokemon.count" do
         SoulLink::CatchCoordinator.process(@slot, [])

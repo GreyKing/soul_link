@@ -22,6 +22,7 @@ class GymPollChannel < ApplicationCable::Channel
 
   def reset(_data = {})
     @poll.reload
+    @poll.soul_link_run.ensure_writable!
     GymPollChannel.broadcast_to(@poll, type: "poll_reset")
     @poll.destroy
   rescue => e

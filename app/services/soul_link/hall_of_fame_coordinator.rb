@@ -18,7 +18,7 @@ module SoulLink
     def self.process(slot, events)
       return if events.empty?
       run = slot.soul_link_emulator_session&.soul_link_run
-      return if run.nil? || !run.active? || run.completed_at.present?
+      return if run.nil? || !run.active? || run.completed_at.present? || run.read_only?
       return unless all_players_in_hall_of_fame?(run)
 
       run.update!(completed_at: Time.current)

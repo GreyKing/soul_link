@@ -92,6 +92,7 @@ class GymPoll < ApplicationRecord
   # each other.
   def vote!(user_id, slot_index, response)
     with_lock do
+      soul_link_run.ensure_writable!
       raise LockedError, "Poll is locked — reset to vote again" if locked?
       raise InvalidResponseError, "Response must be yes, maybe, or no" unless VALID_RESPONSES.include?(response)
 

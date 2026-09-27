@@ -16,6 +16,7 @@ module SoulLink
     # Returns { ok: true, species: "<canonical>" } or
     # { ok: false, error: "<player-facing message>" }.
     def self.apply_catch_quick_add(run:, group_id:, discord_user_id:, species_input:)
+      return { ok: false, error: SoulLinkRun::READ_ONLY_MESSAGE } if run&.read_only?
       group = run&.soul_link_pokemon_groups&.find_by(id: group_id)
       return { ok: false, error: "That catch no longer exists." } if group.nil?
       return { ok: false, error: "That catch is already marked dead." } if group.dead?
@@ -91,6 +92,7 @@ module SoulLink
     #
     # Returns { ok: true, group: <group> } or { ok: false, error: "<msg>" }.
     def self.apply_catch_create(run:, nickname:, location:, species:, discord_user_id:)
+      return { ok: false, error: SoulLinkRun::READ_ONLY_MESSAGE } if run&.read_only?
       return { ok: false, error: "No active run found." } if run.nil?
 
       group = nil
@@ -123,6 +125,7 @@ module SoulLink
     #
     # Returns { ok: true, group: <group> } or { ok: false, error: "<msg>" }.
     def self.apply_mark_dead(run:, group_id:, location:, eulogy: nil)
+      return { ok: false, error: SoulLinkRun::READ_ONLY_MESSAGE } if run&.read_only?
       group = run&.caught_groups&.find_by(id: group_id)
       return { ok: false, error: "Could not find that group!" } if group.nil?
 
@@ -301,6 +304,11 @@ module SoulLink
           next
         end
 
+        if run.read_only?
+          event.edit_response(content: "❌ #{SoulLinkRun::READ_ONLY_MESSAGE}")
+          next
+        end
+
         if run.schedule_template.blank?
           event.edit_response(content: "❌ No schedule template set. Configure it on the dashboard Schedule tab first.")
           next
@@ -354,6 +362,11 @@ module SoulLink
         run = current_run(event)
         unless run
           event.edit_response(content: "❌ No active run found!")
+          next
+        end
+
+        if run.read_only?
+          event.edit_response(content: "❌ #{SoulLinkRun::READ_ONLY_MESSAGE}")
           next
         end
 
@@ -1138,6 +1151,11 @@ module SoulLink
         return
       end
 
+      if run.read_only?
+        respond_ephemeral(event, "❌ #{SoulLinkRun::READ_ONLY_MESSAGE}")
+        return
+      end
+
       group_id = event.interaction.data['custom_id'].split(':').last
       group = run.soul_link_pokemon_groups.find_by(id: group_id)
       unless group
@@ -1212,6 +1230,11 @@ module SoulLink
       run = current_run(event)
       unless run
         respond_ephemeral(event, "❌ No active run found!")
+        return
+      end
+
+      if run.read_only?
+        respond_ephemeral(event, "❌ #{SoulLinkRun::READ_ONLY_MESSAGE}")
         return
       end
 
@@ -1294,7 +1317,8 @@ module SoulLink
         at = Time.iso8601(poll.slots[slot_index.to_i]["scheduled_at"]).in_time_zone(poll.soul_link_run.timezone)
         confirmation = "Got it — #{at.strftime('%a %-l%P').sub(':00', '')} #{response_emoji(response)}"
         respond_ephemeral(event, confirmation)
-      rescue GymPoll::LockedError, GymPoll::InvalidSlotError, GymPoll::PastSlotError, GymPoll::InvalidResponseError => e
+      rescue GymPoll::LockedError, GymPoll::InvalidSlotError, GymPoll::PastSlotError,
+             GymPoll::InvalidResponseError, SoulLinkRun::ReadOnlyError => e
         respond_ephemeral(event, "❌ #{e.message}")
       end
     end
@@ -1303,6 +1327,7 @@ module SoulLink
       _, _, poll_id = event.interaction.data["custom_id"].split(":")
       poll = GymPoll.for_guild(event_guild_id(event)).find_by(id: poll_id)
       return respond_ephemeral(event, "❌ Poll not found.") unless poll
+      return respond_ephemeral(event, "❌ #{SoulLinkRun::READ_ONLY_MESSAGE}") if poll.soul_link_run.read_only?
 
       poll.destroy
       respond_ephemeral(event, "✅ Poll reset.")

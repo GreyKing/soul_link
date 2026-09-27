@@ -46,6 +46,15 @@ module SoulLink
       assert_equal [ group.id ], result.team_snapshot["groups"].map { |g| g["group_id"] }
     end
 
+    test "BadgeGained on a wiped run → no gym_results created" do
+      @slots.each { |slot| slot.update_columns(parsed_badges: 4) }
+      @run.update!(wiped_at: Time.current)
+
+      assert_no_difference "@run.gym_results.count" do
+        SoulLink::GymBeatenCoordinator.process(@slots.first, [ event(SoulLink::SaveDiff::BadgeGained, 4) ])
+      end
+    end
+
     test "BadgeGained with 3/4 players → no gym_results created" do
       # First three slots have the badge; fourth doesn't.
       @slots[0..2].each { |slot| slot.update_columns(parsed_badges: 4) }

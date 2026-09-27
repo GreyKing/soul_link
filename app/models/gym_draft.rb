@@ -126,10 +126,12 @@ class GymDraft < ApplicationRecord
   #
   # Every action runs inside `with_lock`: it reloads the row under
   # SELECT ... FOR UPDATE, so two players acting at once can't overwrite each
-  # other's changes to the JSON state.
+  # other's changes to the JSON state. Actions are refused once the run is
+  # read-only (wiped).
 
   def mark_ready!(uid)
     with_lock do
+      soul_link_run.ensure_writable!
       raise "Not in lobby" unless lobby?
       rp = ready_players
       rp << uid.to_i unless rp.include?(uid.to_i)
@@ -143,6 +145,7 @@ class GymDraft < ApplicationRecord
 
   def cast_vote!(voter_uid, voted_for_uid)
     with_lock do
+      soul_link_run.ensure_writable!
       raise "Not in voting phase" unless voting?
       votes = first_pick_votes
       votes[voter_uid.to_s] = voted_for_uid.to_i
@@ -156,6 +159,7 @@ class GymDraft < ApplicationRecord
 
   def make_pick!(picker_uid, group_id)
     with_lock do
+      soul_link_run.ensure_writable!
       raise "Not in drafting phase" unless drafting?
       raise "Not your turn" unless current_drafter_id == picker_uid.to_i
       raise "That pokemon has already been picked" if picks.any? { |p| p["group_id"] == group_id.to_i }
@@ -195,6 +199,7 @@ class GymDraft < ApplicationRecord
   # pick, automatically resolves into the final 2 team slots.
   def nominate!(picker_uid, group_id)
     with_lock do
+      soul_link_run.ensure_writable!
       raise "Not in nominating phase" unless nominating?
       raise "Not your turn to nominate" unless current_nominator_id == picker_uid.to_i
       raise "That pokemon has already been picked" if picks.any? { |p| p["group_id"] == group_id.to_i }
@@ -241,6 +246,7 @@ class GymDraft < ApplicationRecord
   #   since the current nominator's turn began.
   def skip_turn!(requester_uid)
     with_lock do
+      soul_link_run.ensure_writable!
       raise "Can only skip during drafting or nominating" unless drafting? || nominating?
 
       if drafting?

@@ -33,6 +33,15 @@ module SoulLink
       end
     end
 
+    test "wiped run → no-op even when 4/4 satisfy" do
+      @slots.each { |slot| slot.update_columns(parsed_hof_count: 1) }
+      @run.update!(wiped_at: Time.current)
+
+      SoulLink::HallOfFameCoordinator.process(@slots.first, [ event ])
+
+      assert_nil @run.reload.completed_at
+    end
+
     # ── 3/4 → no-op ───────────────────────────────────────────────────────
 
     test "3/4 sessions with parsed_hof_count >= 1 → completed_at stays nil" do

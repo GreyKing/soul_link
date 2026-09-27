@@ -55,7 +55,7 @@ module SoulLink
       return if events.nil? || events.empty?
       session = slot&.soul_link_emulator_session
       run = session&.soul_link_run
-      return if run.nil?
+      return if run.nil? || run.read_only?
 
       slot.transaction do
         events.each do |event|

@@ -35,6 +35,16 @@ module SoulLink
       assert @run.reload.wiped_at.present?, "the player's only pokemon died, so the run should wipe"
     end
 
+    test "refuses on a wiped run" do
+      @run.update!(wiped_at: Time.current)
+
+      result = apply
+
+      assert_not result[:ok]
+      assert_equal SoulLinkRun::READ_ONLY_MESSAGE, result[:error]
+      assert @group.reload.caught?
+    end
+
     test "reports an unknown group" do
       result = apply(group_id: 0)
 

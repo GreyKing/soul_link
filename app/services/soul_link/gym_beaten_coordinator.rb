@@ -27,7 +27,7 @@ module SoulLink
     def self.process(slot, events)
       session = slot.soul_link_emulator_session
       run = session&.soul_link_run
-      return if run.nil? || !run.active?
+      return if run.nil? || !run.active? || run.read_only?
 
       events.each do |event|
         case event

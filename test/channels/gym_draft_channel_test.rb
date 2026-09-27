@@ -24,6 +24,16 @@ class GymDraftChannelTest < ActionCable::Channel::TestCase
     assert_has_stream_for @draft
   end
 
+  test "actions on a wiped run transmit the read-only error" do
+    subscribe(draft_id: @draft.id)
+    @run.update!(wiped_at: Time.current)
+
+    perform :ready
+
+    assert_equal SoulLinkRun::READ_ONLY_MESSAGE, transmissions.last["error"]
+    assert_empty @draft.reload.ready_players
+  end
+
   test "rejects a subscription to another guild's draft" do
     other = create(:gym_draft, soul_link_run: create(:soul_link_run, guild_id: 1))
 

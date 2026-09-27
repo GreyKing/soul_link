@@ -55,6 +55,13 @@ class GymDraftTest < ActiveSupport::TestCase
     assert_raises(RuntimeError, "Not in lobby") { @draft.mark_ready!(GREY) }
   end
 
+  test "actions on a wiped run raise ReadOnlyError and change nothing" do
+    @run.update!(wiped_at: Time.current)
+
+    assert_raises(SoulLinkRun::ReadOnlyError) { @draft.mark_ready!(GREY) }
+    assert_empty @draft.reload.ready_players
+  end
+
   test "mark_ready! from a stale instance keeps the other player's ready mark" do
     stale = GymDraft.find(@draft.id)
 

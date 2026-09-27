@@ -10,6 +10,19 @@ module SoulLink
       @uid = SoulLink::GameState.players.first["discord_user_id"]
     end
 
+    test "refuses to create a catch on a wiped run" do
+      @run.update!(wiped_at: Time.current)
+
+      result = SoulLink::DiscordBot.apply_catch_create(
+        run: @run, nickname: "TOMMY", location: "route_205",
+        species: "Staravia", discord_user_id: @uid
+      )
+
+      assert_not result[:ok]
+      assert_equal SoulLinkRun::READ_ONLY_MESSAGE, result[:error]
+      assert_equal 0, @run.soul_link_pokemon_groups.count
+    end
+
     test "creates the group and the submitter's pokemon" do
       result = SoulLink::DiscordBot.apply_catch_create(
         run: @run, nickname: "TOMMY", location: "route_205",
