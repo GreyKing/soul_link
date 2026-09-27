@@ -46,11 +46,12 @@ Rails.application.configure do
   # Don't log any deprecations.
   config.active_support.report_deprecations = false
 
-  # Use in-memory cache (no separate cache database needed for this app).
+  # Use in-memory cache. Solid Cache is not used.
   config.cache_store = :memory_store
 
-  # Use inline queue adapter (no background jobs needed for this app).
-  config.active_job.queue_adapter = :async
+  # Durable jobs in the primary database, run by the soul-link-jobs systemd
+  # service (bin/jobs --mode async).
+  config.active_job.queue_adapter = :solid_queue
 
   # Ignore bad email addresses and do not raise email delivery errors.
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.
