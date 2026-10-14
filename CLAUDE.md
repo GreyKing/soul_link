@@ -40,6 +40,8 @@ For detailed documentation, see `.claude/documents/`:
 | [controllers-routes.md](.claude/documents/controllers-routes.md) | Full route map, controller actions, common patterns |
 | [deployment.md](.claude/documents/deployment.md) | CI/CD pipeline, systemd services, nginx, Puma, database config |
 
+Production deployment as it runs today (VM, Caddy, pull-based deploy) is in `docs/deployment.md`.
+
 ### Quick Reference
 
 - **Domain model:** `SoulLinkRun` → `PokemonGroup` → `Pokemon` (one per player per group). Teams have max 6 slots referencing groups.

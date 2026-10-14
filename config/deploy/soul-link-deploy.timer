@@ -1,0 +1,12 @@
+# /etc/systemd/system/soul-link-deploy.timer
+# Checks GitHub for a new, green commit on main every 3 minutes.
+
+[Unit]
+Description=Check for a new Soul Link deploy
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=3min
+
+[Install]
+WantedBy=timers.target
