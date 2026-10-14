@@ -14,7 +14,7 @@ A Discord bot for managing Pokemon Platinum Soul Link Nuzlocke runs, plus a web-
 - **Live Panels**: Catches and deaths panels auto-update with each new entry
 - **Mid-Run Import**: Import existing run data from YAML and post panels to existing channels
 - **Gym Info**: Quick command to check next gym details
-- **Auto-Deploy**: GitHub Actions workflow deploys to VPS on push to main
+- **Auto-Deploy**: pushes to main deploy themselves once tests pass (the server pulls; see `docs/deployment.md`)
 
 ### Team Builder Web UI
 - **Discord OAuth**: Sign in with Discord — only server members with an active run can access
@@ -275,6 +275,8 @@ GUILD_ID=404132250385383433 rake soul_link:test_data
 ```
 
 ## Production Deployment (Vultr VPS)
+
+> **Current setup:** production now runs in a VM on a dedicated server, with Caddy in place of nginx and a pull-based deploy in place of the GitHub SSH deploy. See [`docs/deployment.md`](docs/deployment.md). The steps below describe the original VPS and are kept for reference.
 
 The bot and web app run on a small VPS (1 CPU, 1GB RAM). Auto-deploys via GitHub Actions on push to main.
 

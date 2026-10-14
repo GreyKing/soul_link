@@ -1,4 +1,7 @@
-name: Test & Deploy
+# Deploying is not done from here. The server polls GitHub and deploys any
+# commit on main whose `test` job below passed (config/deploy/pull-deploy.sh).
+# Renaming that job means updating CHECK in that script.
+name: Test
 
 on:
   push:
@@ -47,75 +50,3 @@ jobs:
           RAILS_ENV: test
           DATABASE_HOST: 127.0.0.1
         run: bin/rails test
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: [ test ]
-
-    steps:
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: root
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            export RAILS_ENV=production
-            export RAILS_MASTER_KEY=${{ secrets.RAILS_MASTER_KEY }}
-            export DATABASE_USERNAME=${{ secrets.DATABASE_USERNAME }}
-            export DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
-            export SOUL_LINK_HOST=4luckyclovers.com
-
-            cd /opt/soul_link
-            git pull origin main
-            ~/.rbenv/shims/bundle install --without development test || exit 1
-            ~/.rbenv/shims/ruby bin/rails db:migrate || exit 1
-            ~/.rbenv/shims/ruby bin/rails assets:precompile
-
-            # Ensure p7zip is available — required by emulatorjs:install to
-            # extract the upstream .7z release asset. Idempotent (apt is a
-            # no-op if already installed). Suppress prompts.
-            command -v 7z >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y p7zip-full
-
-            # Install EmulatorJS if missing (idempotent — skips if already there).
-            # Downloads ~300MB on first install; no-op afterwards.
-            ~/.rbenv/shims/ruby bin/rails emulatorjs:ensure_installed
-
-            # Write environment file from secrets (not stored in repo)
-            mkdir -p /etc/soul_link
-            printf '%s\n' "RAILS_ENV=production" "RAILS_MASTER_KEY=${RAILS_MASTER_KEY}" "DATABASE_USERNAME=${DATABASE_USERNAME}" "DATABASE_PASSWORD=${DATABASE_PASSWORD}" "SOUL_LINK_HOST=${SOUL_LINK_HOST}" > /etc/soul_link/env
-            chmod 600 /etc/soul_link/env
-
-            # Install/update systemd units from repo
-            cp config/deploy/soul-link-web.service /etc/systemd/system/
-            cp config/deploy/soul-link-bot.service /etc/systemd/system/
-            cp config/deploy/soul-link-jobs.service /etc/systemd/system/
-            cp config/deploy/systemd-failure-notify@.service /etc/systemd/system/
-            mkdir -p /etc/systemd/system/nginx.service.d
-            cp config/deploy/nginx-override.conf /etc/systemd/system/nginx.service.d/override.conf
-            cp config/deploy/notify-failure.sh /usr/local/bin/notify-failure
-            chmod +x /usr/local/bin/notify-failure
-            systemctl daemon-reload
-            # Idempotent: makes the jobs worker start at boot (first deploy creates it)
-            systemctl enable soul-link-jobs
-
-            # Reload nginx if running, restart if failed (safe — certbot manages the main config)
-            nginx -t && systemctl reload-or-restart nginx
-
-            JOBS_T0=$(date '+%Y-%m-%d %H:%M:%S')
-            systemctl restart soul-link-jobs
-            systemctl restart soul-link-bot
-            systemctl restart soul-link-web
-
-            # Fail the deploy (after web and bot are already restarted) unless the jobs
-            # worker logged "Started Worker" since its restart without being auto-restarted.
-            # Only warnings and errors are printed: Actions logs are public.
-            for i in $(seq 1 12); do
-              journalctl -u soul-link-jobs --since "$JOBS_T0" -o cat --no-pager | grep -q "Started Worker" && break
-              sleep 5
-            done
-            if ! journalctl -u soul-link-jobs --since "$JOBS_T0" -o cat --no-pager | grep -q "Started Worker" \
-               || [ "$(systemctl show -p NRestarts --value soul-link-jobs)" != "0" ]; then
-              journalctl -u soul-link-jobs --since "$JOBS_T0" -p warning -n 20 -o cat --no-pager
-              exit 1
-            fi

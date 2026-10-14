@@ -1,0 +1,14 @@
+# /etc/systemd/system/soul-link-deploy.service
+# One deploy check. Installed and kept current by pull-deploy.sh itself.
+# A failed deploy emails through the same notifier as a failed service.
+
+[Unit]
+Description=Soul Link pull-based deploy
+After=network-online.target mysql.service
+Wants=network-online.target
+OnFailure=systemd-failure-notify@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/soul-link-deploy
+TimeoutStartSec=30min
