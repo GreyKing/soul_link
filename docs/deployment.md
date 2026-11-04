@@ -32,7 +32,7 @@ service (`notify-failure.sh`).
 | Database | MySQL 8 on localhost, database `soul_link_production` |
 | HTTPS and routing | Caddy, shared by every site in the VM (`/opt/caddy/Caddyfile`), which proxies `4luckyclovers.com` to `127.0.0.1:3000` and manages certificates itself. This replaced nginx and certbot. |
 | Settings and secrets | `/etc/soul_link/env` in the VM (`RAILS_MASTER_KEY`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `SOUL_LINK_HOST`). Edit there; nothing rewrites it. |
-| Files outside git | `storage/` (ROMs, randomizer jar) and `config/soul_link/randomizer_settings.rnqs` |
+| Files outside git | `storage/` (ROMs), `lib/randomizer/randomizer.jar` (ROM generation), `config/soul_link/randomizer_settings.rnqs`, and `/etc/soul_link/firmware.zip` (real DS firmware for the emulator; without it saves hit a "communication error"). Copy all of them when moving servers. |
 
 System packages the app needs: Ruby 3.4.5 (rbenv, under root), MySQL server and
 client headers, a Java 21 runtime (randomizer), p7zip (EmulatorJS install),
