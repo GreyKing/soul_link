@@ -14,6 +14,10 @@ at https://4luckyclovers.com. It moved there from a Vultr VPS in October 2026.
    units and itself from `config/deploy/`, restart jobs, bot and web, then
    confirm the jobs worker started and Puma answers `/up`.
 
+A separate `Audit` workflow (`.github/workflows/audit.yml`) checks the gems
+for published security advisories on every push and every Monday. It does not
+block deploys; a red Audit check means run `bundle update --conservative <gem>`.
+
 GitHub never connects to the server; the server takes no inbound SSH. No server
 secrets live in GitHub. A failed deploy sends the same email as a failed
 service (`notify-failure.sh`).
