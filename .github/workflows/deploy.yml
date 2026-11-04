@@ -9,7 +9,9 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Pinned to the production VM's Ubuntu. ubuntu-latest moved to 26.04, which
+    # setup-ruby had no Ruby 3.4.5 build for (2026-11-04).
+    runs-on: ubuntu-24.04
 
     services:
       mysql:
