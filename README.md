@@ -274,169 +274,13 @@ GUILD_ID=404132250385383433 rake soul_link:test_run
 GUILD_ID=404132250385383433 rake soul_link:test_data
 ```
 
-## Production Deployment (Vultr VPS)
+## Production Deployment
 
-> **Current setup:** production now runs in a VM on a dedicated server, with Caddy in place of nginx and a pull-based deploy in place of the GitHub SSH deploy. See [`docs/deployment.md`](docs/deployment.md). The steps below describe the original VPS and are kept for reference.
-
-The bot and web app run on a small VPS (1 CPU, 1GB RAM). Auto-deploys via GitHub Actions on push to main.
-
-### Server Setup
-
-1. **Install dependencies:**
-   ```bash
-   apt update && apt upgrade -y
-   apt install -y build-essential git curl libssl-dev libreadline-dev zlib1g-dev libffi-dev libyaml-dev mysql-server libmysqlclient-dev nginx certbot python3-certbot-nginx
-   ```
-
-2. **Add swap space** (recommended for 1GB servers):
-   ```bash
-   fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
-   echo '/swapfile none swap sw 0 0' >> /etc/fstab
-   ```
-
-3. **Install Ruby via rbenv:**
-   ```bash
-   git clone https://github.com/rbenv/rbenv.git ~/.rbenv
-   git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build
-   echo 'eval "$(~/.rbenv/bin/rbenv init - bash)"' >> ~/.bashrc
-   source ~/.bashrc
-   rbenv install 3.4.5
-   rbenv global 3.4.5
-   ```
-
-4. **Set up MySQL:**
-   ```bash
-   DB_PASS=$(openssl rand -base64 24) && echo "Your DB password: $DB_PASS"
-   mysql -u root -e "CREATE DATABASE soul_link_production; CREATE USER 'soul_link'@'localhost' IDENTIFIED BY '$DB_PASS'; GRANT ALL PRIVILEGES ON soul_link_production.* TO 'soul_link'@'localhost'; FLUSH PRIVILEGES;"
-   ```
-   Save the generated password!
-
-5. **Clone and install:**
-   ```bash
-   git clone https://github.com/GreyKing/soul_link.git /opt/soul_link
-   cd /opt/soul_link
-   gem install bundler && bundle install
-   ```
-
-6. **Run migrations and precompile assets:**
-   ```bash
-   RAILS_ENV=production RAILS_MASTER_KEY=your_key DATABASE_USERNAME=soul_link DATABASE_PASSWORD=your_pass bin/rails db:migrate
-   RAILS_ENV=production RAILS_MASTER_KEY=your_key DATABASE_USERNAME=soul_link DATABASE_PASSWORD=your_pass bin/rails assets:precompile
-   ```
-
-### Systemd Services
-
-**Discord Bot** — `/etc/systemd/system/soul-link-bot.service`:
-
-```ini
-[Unit]
-Description=Soul Link Discord Bot
-After=mysql.service
-
-[Service]
-WorkingDirectory=/opt/soul_link
-ExecStart=/root/.rbenv/shims/ruby bin/rails soul_link:bot
-Restart=always
-RestartSec=5
-Environment=RAILS_ENV=production
-Environment=RAILS_MASTER_KEY=your_master_key_here
-Environment=DATABASE_USERNAME=soul_link
-Environment=DATABASE_PASSWORD=your_db_password_here
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**Web Server (Puma)** — `/etc/systemd/system/soul-link-web.service`:
-
-```ini
-[Unit]
-Description=Soul Link Web (Puma)
-After=network.target mysql.service
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/soul_link
-ExecStart=/root/.rbenv/shims/bundle exec puma -C config/puma.rb
-Restart=always
-RestartSec=3
-Environment=RAILS_ENV=production
-Environment=RAILS_MASTER_KEY=your_master_key_here
-Environment=DATABASE_USERNAME=soul_link
-Environment=DATABASE_PASSWORD=your_db_password_here
-Environment=SOUL_LINK_HOST=4luckyclovers.com
-
-[Install]
-WantedBy=multi-user.target
-```
-
-A template is also available at `config/deploy/soul-link-web.service`.
-
-Enable and start both:
-
-```bash
-systemctl daemon-reload
-systemctl enable soul-link-bot soul-link-web
-systemctl start soul-link-bot soul-link-web
-```
-
-### Nginx + SSL
-
-Set up nginx as a reverse proxy for Puma:
-
-```bash
-# Copy nginx config (template at config/deploy/nginx-soul-link.conf)
-cp /opt/soul_link/config/deploy/nginx-soul-link.conf /etc/nginx/sites-available/soul-link
-ln -sf /etc/nginx/sites-available/soul-link /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/default
-nginx -t && systemctl reload nginx
-
-# Get SSL certificate
-certbot --nginx -d 4luckyclovers.com
-```
-
-### DNS
-
-Point your domain to the VPS. In your registrar's DNS settings, add an A record:
-
-| Type | Name | Value |
-|---|---|---|
-| A | `@` | Your Vultr VPS IP |
-
-### Server Management
-
-| Command | Description |
-|---|---|
-| `systemctl status soul-link-bot` | Check if the bot is running |
-| `systemctl status soul-link-web` | Check if the web server is running |
-| `journalctl -u soul-link-bot -f` | Tail bot logs |
-| `journalctl -u soul-link-web -f` | Tail web server logs |
-| `systemctl restart soul-link-bot` | Restart the bot |
-| `systemctl restart soul-link-web` | Restart the web server |
-
-### Auto-Deploy (GitHub Actions)
-
-Pushes to `main` automatically deploy via `.github/workflows/deploy.yml`. The workflow SSHs into the VPS, pulls the latest code, installs dependencies, runs migrations, precompiles assets, and restarts both services.
-
-Required GitHub Secrets:
-
-| Secret | Description |
-|---|---|
-| `VPS_HOST` | Vultr server IP address |
-| `VPS_SSH_KEY` | SSH private key for root access |
-| `RAILS_MASTER_KEY` | Rails master key for encrypted credentials |
-| `DATABASE_USERNAME` | MySQL username (e.g., `soul_link`) |
-| `DATABASE_PASSWORD` | MySQL password |
-
-### Manual Deploy
-
-```bash
-cd /opt/soul_link && git pull && bundle install && \
-RAILS_ENV=production RAILS_MASTER_KEY=your_key DATABASE_USERNAME=soul_link DATABASE_PASSWORD=your_pass bin/rails db:migrate && \
-RAILS_ENV=production RAILS_MASTER_KEY=your_key DATABASE_USERNAME=soul_link DATABASE_PASSWORD=your_pass bin/rails assets:precompile && \
-systemctl restart soul-link-bot soul-link-web
-```
+Production runs in a VM on the owner's dedicated server, at
+https://4luckyclovers.com. Caddy (shared by every site in the VM) handles HTTPS,
+and the server deploys itself: every few minutes it checks GitHub for a new
+commit on `main` whose tests passed, and deploys it. Push to `main`; nothing
+else is needed. Runbook, layout and commands: [`docs/deployment.md`](docs/deployment.md).
 
 ## Available Rake Tasks
 
@@ -485,8 +329,8 @@ app/
 
 config/
 ├── deploy/
-│   ├── nginx-soul-link.conf           # Nginx reverse proxy template
-│   └── soul-link-web.service          # Puma systemd service template
+│   ├── pull-deploy.sh                 # Server-side deploy, run by soul-link-deploy.timer
+│   └── *.service, *.timer             # systemd units the deploy installs
 ├── initializers/
 │   └── omniauth.rb                    # Discord OAuth configuration
 ├── soul_link/
@@ -509,7 +353,7 @@ db/
 
 .github/
 └── workflows/
-    └── deploy.yml                     # Auto-deploy bot + web to Vultr on push to main
+    └── deploy.yml                     # Tests; the server deploys commits that pass
 ```
 
 ## Database Schema
@@ -617,8 +461,8 @@ rake soul_link:reload_config
 **Web app not loading:**
 - Check Puma is running: `systemctl status soul-link-web`
 - Check logs: `journalctl -u soul-link-web -f`
-- Verify nginx config: `nginx -t`
-- Check DNS: `dig 4luckyclovers.com` should return your VPS IP
+- Check the app answers inside the VM: `curl -s localhost:3000/up`
+- Check DNS: `dig 4luckyclovers.com` should return `167.114.172.176`
 - Verify SSL: `curl -I https://4luckyclovers.com`
 
 **Discord OAuth fails:**
