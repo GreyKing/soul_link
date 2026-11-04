@@ -294,10 +294,13 @@ namespace :soul_link do
 
     bot = SoulLink::DiscordBot.new
 
-    # Graceful shutdown
-    trap('INT') do
-      puts "\nShutting down bot..."
-      exit
+    # Graceful shutdown. systemd stops the bot with TERM (every deploy); left
+    # unhandled, Ruby exits 1 and the unit's OnFailure= sends a failure email.
+    %w[INT TERM].each do |signal|
+      trap(signal) do
+        puts "\nShutting down bot..."
+        exit
+      end
     end
 
     bot.run
