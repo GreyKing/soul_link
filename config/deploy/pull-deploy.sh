@@ -82,6 +82,19 @@ main() {
     echo "jobs worker did not start cleanly" >&2
     exit 1
   fi
+
+  # Same check as the other sites in the VM: Puma must answer /up.
+  local code=000
+  for _ in $(seq 1 30); do
+    code=$(curl -s -o /dev/null --max-time 5 -w '%{http_code}' http://127.0.0.1:3000/up || true)
+    [ "$code" = 200 ] && break
+    sleep 3
+  done
+  if [ "$code" != 200 ]; then
+    journalctl -u soul-link-web --since "$t0" -n 30 -o cat --no-pager
+    echo "health check failed: /up returned $code" >&2
+    exit 1
+  fi
   echo "deployed ${new:0:7}"
 }
 

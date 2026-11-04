@@ -3,7 +3,7 @@
 # database. Async mode runs the worker, dispatcher and scheduler as threads in
 # one process instead of forking one process each, to save memory.
 #
-# Installed, enabled and restarted by .github/workflows/deploy.yml.
+# Installed, enabled and restarted by pull-deploy.sh (soul-link-deploy).
 
 [Unit]
 Description=Soul Link Jobs (Solid Queue)

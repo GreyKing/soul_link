@@ -12,7 +12,7 @@ at https://4luckyclovers.com. It moved there from a Vultr VPS in October 2026.
    `test` job succeeded, deploys it: fast-forward, `bundle install`,
    `db:migrate`, `assets:precompile`, EmulatorJS check, reinstall the systemd
    units and itself from `config/deploy/`, restart jobs, bot and web, then
-   confirm the jobs worker started.
+   confirm the jobs worker started and Puma answers `/up`.
 
 GitHub never connects to the server; the server takes no inbound SSH. No server
 secrets live in GitHub. A failed deploy sends the same email as a failed
@@ -38,6 +38,10 @@ System packages the app needs: Ruby 3.4.5 (rbenv, under root), MySQL server and
 client headers, a Java 21 runtime (randomizer), p7zip (EmulatorJS install),
 msmtp (failure emails).
 
-The README's "Production Deployment" section describes the original VPS setup
-and is kept for reference; where it differs from this file, this file is
-current.
+Shared pieces (Caddy, the VM itself, nightly backups of the MySQL database,
+ROMs and settings) are documented in the Faereleth Station repo and
+`MACHINES.md`, beside the other sites in the VM.
+
+The old Vultr VPS (`144.202.56.254`, hostname `soul-link-bot`) is retired:
+its copy of the app is in `/opt/soul_link.retired`, with a final database dump
+in `/root/soul_link_final_2026-10-14.sql.gz`. Nothing there serves the site.
